@@ -301,6 +301,24 @@ type Id =
       |> Assert.Exists.warningWith "CaseTest attribute on 'Slug' is ignored: it is only supported on TypeScriptTaggedUnion and Erase union cases"
       |> ignore
 
+    testCase "CaseTest in an erased union overrides untestable payload types" <| fun _ ->
+      for attributeNamespace in [ "Fable.Core"; "Fickl.Core" ] do
+        let source =
+          $"""
+open Fable.Core
+
+[<Erase>]
+type Value =
+    | [<{attributeNamespace}.CaseTest("$0 != null && 'a' in $0")>] First of obj
+    | [<{attributeNamespace}.CaseTest("$0 != null && 'b' in $0")>] Second of obj
+
+let isFirst (value: Value) = value.IsFirst
+let isSecond (value: Value) = match value with Second _ -> true | First _ -> false
+"""
+        compile source
+        |> Assert.Is.strictSuccess
+        |> ignore
+
     testCase "CaseTest in a TypeScriptTaggedUnion does not emit warning" <| fun _ ->
       let source =
         """

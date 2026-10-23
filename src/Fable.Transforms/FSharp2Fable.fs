@@ -647,9 +647,15 @@ let private transformUnionCaseTest
                 | TypeScript -> not (isReplacementCandidate (FsEnt.Ref tdef))
                 | _ -> false
 
-            match unionCase.Fields.Count with
-            | 0 -> return makeEqOp r unionExpr (transformStringEnum rule unionCase) BinaryEqual
-            | 1 ->
+            match FsUnionCase.CaseTest unionCase, unionCase.Fields.Count with
+            | Some macro, (0 | 1) when supportsCaseTest ->
+                // Preserve one value even when the predicate repeats a pure allocation.
+                let ident = getIdentUniqueName com ctx "unionValue" |> makeTypedIdent unionExpr.Type
+                let ident = { ident with IsMutable = true }
+                let test = emitExpr r Fable.Boolean [ Fable.IdentExpr ident ] macro
+                return Fable.Let(ident, unionExpr, test)
+            | _, 0 -> return makeEqOp r unionExpr (transformStringEnum rule unionCase) BinaryEqual
+            | _, 1 ->
                 let fableType = (payloadType unionCase).Value
 
                 let typeTest unionExpr =
