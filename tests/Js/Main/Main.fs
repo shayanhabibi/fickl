@@ -5,6 +5,7 @@ let allTests =
   [|
     UtilTests.tests
     Applicative.tests
+    CallableInterfaces.tests
     Arithmetic.tests
     RandomTests.tests
     Arrays.tests

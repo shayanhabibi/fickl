@@ -3,6 +3,19 @@ namespace Fickl.Core
 open System
 
 /// <summary>
+/// Represents a JavaScript callable with a single generic or non-generic Invoke method.
+/// </summary>
+/// <remarks>
+/// Object expressions implementing the interface compile to functions, and Invoke calls
+/// compile to direct function calls. Method type parameters remain method-owned.
+/// The interface must declare exactly one Invoke method with one argument group and no
+/// inherited interfaces. This interop representation targets JavaScript and TypeScript.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Interface)>]
+type CallableInterfaceAttribute() =
+    inherit Attribute()
+
+/// <summary>
 /// Defines a runtime predicate for an erased union case, or an additional test for a
 /// <c>TypeScriptTaggedUnion</c> case, checked after the tag matches.
 /// </summary>
