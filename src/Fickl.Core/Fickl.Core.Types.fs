@@ -3,8 +3,8 @@ namespace Fickl.Core
 open System
 
 /// <summary>
-/// Adds a test to a case of a <c>TypeScriptTaggedUnion</c>, checked after the tag matches.
-/// Use it when several cases share a tag value.
+/// Defines a runtime predicate for an erased union case, or an additional test for a
+/// <c>TypeScriptTaggedUnion</c> case, checked after the tag matches.
 /// </summary>
 /// <remarks>
 /// The test is a JS expression in <c>Emit</c> syntax, where <c>$0</c> is the tested value:
@@ -15,6 +15,10 @@ open System
 ///     | [&lt;CompiledName("done"); CaseTest("'error' in $0")>] DoneError of error: string
 ///     | Pending
 /// </code>
+/// On an <c>Erase</c> union, the predicate replaces the payload type test and can distinguish
+/// interface or same-type payloads. Construction and extraction still erase to the original
+/// payload; no tag is added and no copy is made. The predicate must recognize the values of
+/// its case. Cases without this attribute retain their ordinary runtime type tests.
 /// </remarks>
 type CaseTestAttribute(test: string) =
     inherit Attribute()

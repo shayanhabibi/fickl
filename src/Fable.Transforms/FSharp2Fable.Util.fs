@@ -138,7 +138,7 @@ type FsUnionCase(uci: FSharpUnionCase) =
             | _ -> None
         )
 
-    /// The macro of a CaseTestAttribute, an extra test for a TypeScriptTaggedUnion case
+    /// The CaseTest macro: an extra tagged-union test or an erased case's runtime predicate.
     static member CaseTest(uci: FSharpUnionCase) =
         [ Atts.caseTest; Atts.ficklCaseTest ]
         |> List.tryPick (fun fullName -> Helpers.tryFindAttrib fullName uci.Attributes)
