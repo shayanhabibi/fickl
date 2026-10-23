@@ -7,3 +7,12 @@ type Identity =
 [<Fickl.Core.CallableInterface>]
 type DerivedIdentity =
     inherit Identity
+
+[<Fickl.Core.CallableInterface>]
+type OtherIdentity =
+    inherit Identity
+
+[<Fickl.Core.CallableInterface>]
+type DiamondIdentity =
+    inherit DerivedIdentity
+    inherit OtherIdentity

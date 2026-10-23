@@ -84,3 +84,22 @@ for the repository; these are local validation results.
 This follow-up is based on merged 0.6.0 commit 37af5842c. The 0.6.0 publication attempt failed
 on the first package with NuGet HTTP 403; its validated package files contain the earlier commit,
 not this follow-up, and must not be represented as including inheritance support.
+
+## Shared-slot diamonds
+
+Xantham's unrelated generic callable bases cannot share one F# object-expression override:
+F# reports FS0361 because they declare two distinct abstract slots. A generated shared
+callable ancestor gives both named interfaces one real slot and retains both subtype
+relationships. This is a candidate generator representation, not yet implemented there.
+
+The compiler follow-up accepts multiple callable parents only when their validated ancestry
+contains one distinct instantiated declaring interface. It does not equate signatures from
+unrelated declarations or erase different generic applications. The source diamond regression
+first failed in the TypeScript pipeline with the inherited-interface diagnostic. After the
+validation change, 2,950 TypeScript tests pass, including generic substitutions and a DLL
+diamond. Added negative compiler cases cover unrelated identical signatures and distinct
+applications of one declaring interface; all 153 compiler tests pass. The JavaScript pipeline
+passes 2,998 .NET tests, 3,184 JavaScript tests, 3,209 standalone tests and the plugin test.
+Spec and standards reviews found no correctness or repository-rule defects; the public
+attribute documentation now describes the accepted shared-slot inheritance. GitHub Actions
+remains disabled on the repository, so this is local validation evidence.

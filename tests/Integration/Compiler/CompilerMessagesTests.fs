@@ -28,6 +28,38 @@ type Child =
       |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
       |> ignore
 
+    testCase "CallableInterface rejects unrelated identical callable slots" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type First = abstract Invoke<'T>: 'T -> 'T
+[<CallableInterface>]
+type Second = abstract Invoke<'T>: 'T -> 'T
+[<CallableInterface>]
+type Child =
+    inherit First
+    inherit Second
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> ignore
+
+    testCase "CallableInterface rejects distinct instantiations of one callable slot" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Parent<'T> = abstract Invoke: 'T -> 'T
+[<CallableInterface>]
+type First = inherit Parent<int>
+[<CallableInterface>]
+type Second = inherit Parent<string>
+[<CallableInterface>]
+type Child =
+    inherit First
+    inherit Second
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> ignore
+
     testCase "CallableInterface rejects multiple callable bases" <| fun _ ->
       compile """
 open Fickl.Core
