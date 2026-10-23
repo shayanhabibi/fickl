@@ -3168,14 +3168,22 @@ module Util =
         entity.Attributes
         |> Seq.exists (fun attribute -> attribute.AttributeType.TryFullName = Some Atts.callableInterface)
 
-    let validateCallableInterface (com: IFableCompiler) (entity: FSharpEntity) =
+    let rec validateCallableInterface (com: IFableCompiler) (entity: FSharpEntity) =
         let members =
             entity.MembersFunctionsAndValues |> Seq.filter _.IsInstanceMember |> Seq.toList
 
         if com.Options.Language <> JavaScript && com.Options.Language <> TypeScript then
             Some "CallableInterface is only supported for JavaScript and TypeScript"
-        elif not entity.IsInterface || entity.DeclaredInterfaces.Count <> 0 then
-            Some "CallableInterface requires an interface without inherited interfaces"
+        elif not entity.IsInterface then
+            Some "CallableInterface requires an interface"
+        elif entity.DeclaredInterfaces.Count <> 0 then
+            match members, Seq.toList entity.DeclaredInterfaces with
+            | [], [ parent ] ->
+                match tryDefinition parent with
+                | Some(parentEntity, _) when isCallableInterface parentEntity ->
+                    validateCallableInterface com parentEntity
+                | _ -> Some "CallableInterface inheritance requires a single callable base and no additional members"
+            | _ -> Some "CallableInterface inheritance requires a single callable base and no additional members"
         else
             match members with
             | [ memberInfo ] when

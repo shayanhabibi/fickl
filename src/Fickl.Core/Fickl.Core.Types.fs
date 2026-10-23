@@ -8,8 +8,8 @@ open System
 /// <remarks>
 /// Object expressions implementing the interface compile to functions, and Invoke calls
 /// compile to direct function calls. Method type parameters remain method-owned.
-/// The interface must declare exactly one Invoke method with one argument group and no
-/// inherited interfaces. This interop representation targets JavaScript and TypeScript.
+/// The interface declares one Invoke method with one argument group, or inherits a single
+/// callable interface without additional members. This representation targets JavaScript and TypeScript.
 /// </remarks>
 [<AttributeUsage(AttributeTargets.Interface)>]
 type CallableInterfaceAttribute() =

@@ -15,6 +15,34 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "CallableInterface rejects added members on a callable base" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Parent = abstract Invoke<'T>: 'T -> 'T
+[<CallableInterface>]
+type Child =
+    inherit Parent
+    abstract Name: string
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> ignore
+
+    testCase "CallableInterface rejects multiple callable bases" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type First = abstract Invoke: int -> int
+[<CallableInterface>]
+type Second = abstract Invoke: string -> string
+[<CallableInterface>]
+type Child =
+    inherit First
+    inherit Second
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> ignore
+
     testCase "CallableInterface rejects unsupported targets" <| fun _ ->
       Compiler.Cached.compileForLanguage Fable.Python Compiler.Settings.standard """
 open Fickl.Core
@@ -77,7 +105,7 @@ type Callback =
     inherit Parent
     abstract Invoke: int -> int
 """
-      |> Assert.Exists.errorWith "CallableInterface requires an interface without inherited interfaces"
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
       |> ignore
 
     testCase "CallableInterface rejects class implementations" <| fun _ ->
