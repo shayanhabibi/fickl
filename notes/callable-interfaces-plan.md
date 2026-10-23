@@ -65,3 +65,22 @@ wrapper stop. Logs are under Xantham/tests/.scratch/fickl-callable-*.log.
 
 Still required: PR CI and publication, then
 adoption through a consumer Xantham slice. No unreleased compiler is pinned in Xantham.
+
+## Inherited callable follow-up
+
+Xantham's live fixture includes `interface DerivedIdentity extends Identity {}`. Preserve
+that F# subtype relationship and JavaScript function identity. A CallableInterface may inherit
+a single attributed callable base while adding no instance members. Validate the base contract
+recursively; ordinary bases, extra members, multiple bases and class implementations remain
+diagnostic errors. Explicit attributes remain required on derived interfaces.
+
+Regression evidence: the derived object expression first failed at declaration and construction
+with the inherited-interface diagnostic. With recursive validation it passes the TypeScript
+suite, including a generic base instantiated through a second derived interface. The DLL-derived
+consumer regression also passes. Final evidence: 2,947 TypeScript tests, 151 compiler tests,
+2,995 .NET tests, 3,181 JavaScript tests, 3,206 standalone tests and the plugin gate pass.
+Independent spec and standards reviews found no remaining issues. GitHub Actions is disabled
+for the repository; these are local validation results.
+This follow-up is based on merged 0.6.0 commit 37af5842c. The 0.6.0 publication attempt failed
+on the first package with NuGet HTTP 403; its validated package files contain the earlier commit,
+not this follow-up, and must not be represented as including inheritance support.

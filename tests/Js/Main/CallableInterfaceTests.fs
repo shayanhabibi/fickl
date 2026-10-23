@@ -13,6 +13,10 @@ type Identity =
     abstract Invoke<'T>: value: 'T -> 'T
 
 [<CallableInterface>]
+type DerivedIdentity =
+    inherit Identity
+
+[<CallableInterface>]
 type Pair =
     abstract Invoke<'T>: left: 'T * right: 'T -> 'T
 
@@ -32,6 +36,14 @@ type WithOuter<'T> =
     abstract Invoke<'U>: left: 'T * right: 'U -> 'T * 'U
 
 [<CallableInterface>]
+type DerivedOuter<'T> =
+    inherit WithOuter<'T>
+
+[<CallableInterface>]
+type ClosedOuter =
+    inherit DerivedOuter<string>
+
+[<CallableInterface>]
 type Untrack =
     abstract Invoke<'T>: callback: (unit -> 'T) -> 'T
 
@@ -45,6 +57,31 @@ type BodyGeneric =
 
 let tests =
     testList "Callable interfaces" [
+        testCase "Inherited generic arguments substitute through callable bases" <| fun () ->
+            let callback =
+                { new ClosedOuter with
+                    member _.Invoke<'U>(left: string, right: 'U): string * 'U = left, right }
+            let parent: WithOuter<string> = callback
+            callback.Invoke("closed", 42) |> equal ("closed", 42)
+            parent.Invoke("base", true) |> equal ("base", true)
+#if FABLE_COMPILER
+            jsTypeof callback |> equal "function"
+            emitJsExpr (callback, parent) "$0 === $1" |> equal true
+#endif
+
+        testCase "Inherited callable contracts preserve base assignability" <| fun () ->
+            let callback =
+                { new DerivedIdentity with
+                    member _.Invoke<'T>(value: 'T): 'T = value }
+            let parent: Identity = callback
+            callback.Invoke 42 |> equal 42
+            parent.Invoke "base" |> equal "base"
+#if FABLE_COMPILER
+            jsTypeof callback |> equal "function"
+            emitJsExpr (callback, parent) "$0 === $1" |> equal true
+            emitJsExpr callback "$0(42)" |> equal 42
+#endif
+
         testCase "Rest parameters collect JavaScript arguments" <| fun () ->
             let callback = { new Rest with member _.Invoke values = Array.sum values }
             callback.Invoke(1, 2, 3) |> equal 6
@@ -124,6 +161,18 @@ let tests =
             callback.Invoke 3 |> equal 4
 #if FABLE_COMPILER
             jsTypeof callback |> equal "object"
+#endif
+
+        testCase "Referenced inherited contracts preserve construction and base identity" <| fun () ->
+            let callback =
+                { new Fable.Tests.DllRef.CallableContracts.DerivedIdentity with
+                    member _.Invoke<'T>(value: 'T): 'T = value }
+            let parent: Fable.Tests.DllRef.CallableContracts.Identity = callback
+            callback.Invoke 7 |> equal 7
+            parent.Invoke "dll-base" |> equal "dll-base"
+#if FABLE_COMPILER
+            jsTypeof callback |> equal "function"
+            emitJsExpr (callback, parent) "$0 === $1" |> equal true
 #endif
 
         testCase "Referenced assembly contracts preserve generic construction and calls" <| fun () ->
