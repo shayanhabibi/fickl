@@ -3183,6 +3183,32 @@ module Util =
                 | Some(parentEntity, _) when isCallableInterface parentEntity ->
                     validateCallableInterface com parentEntity
                 | _ -> Some "CallableInterface inheritance requires a single callable base and no additional members"
+            | [], parents when
+                parents
+                |> List.forall (fun parent ->
+                    match tryDefinition parent with
+                    | Some(parentEntity, _) when isCallableInterface parentEntity ->
+                        (validateCallableInterface com parentEntity).IsNone
+                    | _ -> false
+                )
+                ->
+                // A diamond is one implementation slot only when every path reaches the
+                // same instantiated declaring interface, not merely an equivalent signature.
+                let slots =
+                    entity.AllInterfaces
+                    |> Seq.filter (fun parent ->
+                        match tryDefinition parent with
+                        | Some(parentEntity, _) ->
+                            parentEntity.MembersFunctionsAndValues |> Seq.exists _.IsInstanceMember
+                        | _ -> false
+                    )
+                    |> Seq.distinct
+                    |> Seq.length
+
+                if slots = 1 then
+                    None
+                else
+                    Some "CallableInterface inheritance requires a single callable base and no additional members"
             | _ -> Some "CallableInterface inheritance requires a single callable base and no additional members"
         else
             match members with

@@ -17,6 +17,15 @@ type DerivedIdentity =
     inherit Identity
 
 [<CallableInterface>]
+type OtherIdentity =
+    inherit Identity
+
+[<CallableInterface>]
+type DiamondIdentity =
+    inherit DerivedIdentity
+    inherit OtherIdentity
+
+[<CallableInterface>]
 type Pair =
     abstract Invoke<'T>: left: 'T * right: 'T -> 'T
 
@@ -44,6 +53,15 @@ type ClosedOuter =
     inherit DerivedOuter<string>
 
 [<CallableInterface>]
+type OtherOuter<'T> =
+    inherit WithOuter<'T>
+
+[<CallableInterface>]
+type DiamondOuter =
+    inherit ClosedOuter
+    inherit OtherOuter<string>
+
+[<CallableInterface>]
 type Untrack =
     abstract Invoke<'T>: callback: (unit -> 'T) -> 'T
 
@@ -57,6 +75,46 @@ type BodyGeneric =
 
 let tests =
     testList "Callable interfaces" [
+        testCase "A generic callable diamond retains instantiated outer and method binders" <| fun () ->
+            let callback =
+                { new DiamondOuter with
+                    member _.Invoke<'U>(left: string, right: 'U): string * 'U = left, right }
+            let left: ClosedOuter = callback
+            let right: OtherOuter<string> = callback
+            callback.Invoke("direct", 42) |> equal ("direct", 42)
+            left.Invoke("left", true) |> equal ("left", true)
+            right.Invoke("right", "value") |> equal ("right", "value")
+#if FABLE_COMPILER
+            emitJsExpr (callback, left, right) "$0 === $1 && $1 === $2" |> equal true
+#endif
+
+        testCase "A referenced callable diamond retains both base contracts" <| fun () ->
+            let callback =
+                { new Fable.Tests.DllRef.CallableContracts.DiamondIdentity with
+                    member _.Invoke<'T>(value: 'T): 'T = value }
+            let left: Fable.Tests.DllRef.CallableContracts.DerivedIdentity = callback
+            let right: Fable.Tests.DllRef.CallableContracts.OtherIdentity = callback
+            left.Invoke 42 |> equal 42
+            right.Invoke "dll" |> equal "dll"
+#if FABLE_COMPILER
+            jsTypeof callback |> equal "function"
+            emitJsExpr (callback, left, right) "$0 === $1 && $1 === $2" |> equal true
+#endif
+
+        testCase "A callable diamond preserves the shared slot and both base identities" <| fun () ->
+            let callback =
+                { new DiamondIdentity with
+                    member _.Invoke<'T>(value: 'T): 'T = value }
+            let left: DerivedIdentity = callback
+            let right: OtherIdentity = callback
+            callback.Invoke 42 |> equal 42
+            left.Invoke "left" |> equal "left"
+            right.Invoke true |> equal true
+#if FABLE_COMPILER
+            jsTypeof callback |> equal "function"
+            emitJsExpr (callback, left, right) "$0 === $1 && $1 === $2" |> equal true
+#endif
+
         testCase "Inherited generic arguments substitute through callable bases" <| fun () ->
             let callback =
                 { new ClosedOuter with
