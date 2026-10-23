@@ -86,8 +86,8 @@ type TypeScriptTaggedUnionAttribute(tagName: string, caseRules: CaseRules) =
     new(tagName: string) = TypeScriptTaggedUnionAttribute(tagName, CaseRules.LowerFirst)
 
 /// <summary>
-/// Adds a test to a case of a <c>TypeScriptTaggedUnion</c>, checked after the tag matches.
-/// Use it when several cases share a tag value.
+/// Defines a runtime predicate for an erased union case, or an additional test for a
+/// <c>TypeScriptTaggedUnion</c> case, checked after the tag matches.
 /// </summary>
 /// <remarks>
 /// The test is a JS expression in <c>Emit</c> syntax, where <c>$0</c> is the tested value:

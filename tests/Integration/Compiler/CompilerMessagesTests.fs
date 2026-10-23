@@ -284,12 +284,11 @@ type MyClass() =
       |> Assert.Is.success
       |> ignore
 
-    testCase "CaseTest outside a TypeScriptTaggedUnion emits warning" <| fun _ ->
+    testCase "CaseTest on an ordinary union emits warning" <| fun _ ->
       let source =
         """
 open Fable.Core
 
-[<Erase>]
 type Id =
     | [<CaseTest("$0.startsWith('n:')")>] Name of string
     | [<CaseTest("$0.startsWith('s:')")>] Slug of string
@@ -297,8 +296,26 @@ type Id =
 let isName (id: Id) = match id with Name _ -> true | Slug _ -> false
 """
       compile source
-      |> Assert.Exists.warningWith "is ignored: it is only supported on TypeScriptTaggedUnion cases"
+      |> Assert.Exists.warningWith "is ignored: it is only supported on TypeScriptTaggedUnion or erased union cases"
       |> ignore
+
+    testCase "CaseTest in an erased union overrides untestable payload types" <| fun _ ->
+      for attributeNamespace in [ "Fable.Core"; "Fickl.Core" ] do
+        let source =
+          $"""
+open Fable.Core
+
+[<Erase>]
+type Value =
+    | [<{attributeNamespace}.CaseTest("$0 != null && 'a' in $0")>] First of obj
+    | [<{attributeNamespace}.CaseTest("$0 != null && 'b' in $0")>] Second of obj
+
+let isFirst (value: Value) = value.IsFirst
+let isSecond (value: Value) = match value with Second _ -> true | First _ -> false
+"""
+        compile source
+        |> Assert.Is.strictSuccess
+        |> ignore
 
     testCase "CaseTest in a TypeScriptTaggedUnion does not emit warning" <| fun _ ->
       let source =

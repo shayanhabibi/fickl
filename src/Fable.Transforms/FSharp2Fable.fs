@@ -608,18 +608,28 @@ let private transformUnionCaseTest
         do
             match unionPattern, FsUnionCase.CaseTest unionCase with
             | TypeScriptTaggedUnion _, _
+            | ErasedUnion _, _
             | _, None -> ()
             | _, Some _ ->
-                $"CaseTest attribute on '%s{unionCase.Name}' is ignored: it is only supported on TypeScriptTaggedUnion cases"
+                $"CaseTest attribute on '%s{unionCase.Name}' is ignored: it is only supported on TypeScriptTaggedUnion or erased union cases"
                 |> addWarning com ctx.InlinePath r
 
         match unionPattern with
         | ErasedUnionCase -> return "Cannot test erased union cases" |> addErrorAndReturnNull com ctx.InlinePath r
 
         | ErasedUnion(tdef, genArgs, rule) ->
-            match unionCase.Fields.Count with
-            | 0 -> return makeEqOp r unionExpr (transformStringEnum rule unionCase) BinaryEqual
-            | 1 ->
+            match FsUnionCase.CaseTest unionCase, unionCase.Fields.Count with
+            | Some macro, (0 | 1) ->
+                // An explicit predicate replaces the payload type test. The macro may
+                // repeat $0, so preserve even pure allocations through beta reduction.
+                let makeTest value =
+                    emitExpr r Fable.Boolean [ value ] macro
+
+                let ident = getIdentUniqueName com ctx "unionValue" |> makeTypedIdent unionExpr.Type
+                let ident = { ident with IsMutable = true }
+                return Fable.Let(ident, unionExpr, makeTest (Fable.IdentExpr ident))
+            | None, 0 -> return makeEqOp r unionExpr (transformStringEnum rule unionCase) BinaryEqual
+            | None, 1 ->
                 let fi = unionCase.Fields[0]
 
                 let typ =

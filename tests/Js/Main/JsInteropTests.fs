@@ -399,6 +399,47 @@ module TaggedUnion =
         | [<CompiledName("done"); CaseTest("$0.ok === false")>] DoneFailed of ok: bool
         | Pending
 
+    type CallableFirst =
+        abstract a: int
+        [<Emit("$0($1)")>]
+        abstract Invoke: int -> int
+
+    type CallableSecond =
+        abstract b: string
+        [<Emit("$0($1)")>]
+        abstract Invoke: int -> int
+
+    [<RequireQualifiedAccess; Erase>]
+    type ErasedCalls =
+        | [<Fable.Core.CaseTest("'a' in $0")>] First of CallableFirst
+        | [<Fickl.Core.CaseTest("'b' in $0")>] Second of CallableSecond
+        [<Emit("$0($1)")>]
+        member _.Invoke(value: int) : int = jsNative
+
+    [<RequireQualifiedAccess; Erase>]
+    type ErasedPrefixes =
+        | [<CaseTest("$0.startsWith('n:') && $0.length > 2")>] Name of string
+        | Slug of string
+
+    type Constructable =
+        [<EmitConstructor>]
+        abstract Create: int -> obj
+
+    [<RequireQualifiedAccess; Erase>]
+    type ErasedConstructor =
+        | [<CaseTest("typeof $0 === 'function'")>] Constructor of Constructable
+        | [<CaseTest("typeof $0 === 'string'")>] Text of string
+
+    [<RequireQualifiedAccess; Erase>]
+    type ErasedObject<'T> =
+        | [<CaseTest("$0 != null && 'a' in $0")>] First of 'T
+        | [<CaseTest("$0 != null && 'b' in $0")>] Second of 'T
+
+    [<RequireQualifiedAccess; Erase>]
+    type ErasedAllocation =
+        | [<CaseTest("$0 === $0")>] Values of obj[]
+        | Missing
+
     type Take =
         abstract fromIndex: int
         abstract toIndex: int
@@ -1144,6 +1185,58 @@ let tests =
             TaggedUnion.SharedTag.DoneError "oops"
         (next ()).IsDoneError |> equal true
         calls |> equal 1
+
+    testCase "Erased CaseTest preserves callable payloads and shared invocation" <| fun () ->
+        let first: TaggedUnion.CallableFirst = emitJsExpr () "Object.assign(x => x + 10, { a: 1 })"
+        let second: TaggedUnion.CallableSecond = emitJsExpr () "Object.assign(x => x * 2, { b: 'twice' })"
+        let wrapped = TaggedUnion.ErasedCalls.Second second
+        emitJsExpr (wrapped, second) "$0 === $1" |> equal true
+        wrapped.Invoke 5 |> equal 10
+        (TaggedUnion.ErasedCalls.First first).Invoke 5 |> equal 15
+        let describe = function
+            | TaggedUnion.ErasedCalls.First arm -> string (arm.Invoke 3)
+            | TaggedUnion.ErasedCalls.Second arm -> arm.b + string (arm.Invoke 3)
+        wrapped |> describe |> equal "twice6"
+        unbox<TaggedUnion.ErasedCalls> first |> describe |> equal "13"
+        wrapped.IsFirst |> equal false
+        wrapped.IsSecond |> equal true
+        emitJsExpr wrapped "Object.keys($0).join(',')" |> equal "b"
+
+    testCase "Erased CaseTest distinguishes equal runtime types and evaluates input once" <| fun () ->
+        let mutable calls = 0
+        let next () =
+            calls <- calls + 1
+            TaggedUnion.ErasedPrefixes.Name "n:alice"
+        (next ()).IsName |> equal true
+        calls |> equal 1
+        (TaggedUnion.ErasedPrefixes.Slug "s:alice").IsName |> equal false
+        let describe = function
+            | TaggedUnion.ErasedPrefixes.Name value -> "name:" + value
+            | TaggedUnion.ErasedPrefixes.Slug value -> "slug:" + value
+        TaggedUnion.ErasedPrefixes.Slug "s:alice" |> describe |> equal "slug:s:alice"
+
+    testCase "Erased CaseTest overrides obj and generic payload type tests" <| fun () ->
+        let first: obj = createObj [ "a", box 1 ]
+        let second: obj = createObj [ "b", box "two" ]
+        let describe (value: TaggedUnion.ErasedObject<obj>) =
+            match value with
+            | TaggedUnion.ErasedObject.First item -> string item?a
+            | TaggedUnion.ErasedObject.Second item -> string item?b
+        TaggedUnion.ErasedObject.First first |> describe |> equal "1"
+        TaggedUnion.ErasedObject.Second second |> describe |> equal "two"
+        (TaggedUnion.ErasedObject.Second second).IsFirst |> equal false
+
+    testCase "Erased CaseTest evaluates a fresh allocation once" <| fun () ->
+        (TaggedUnion.ErasedAllocation.Values [||]).IsValues |> equal true
+
+    testCase "Erased CaseTest preserves constructor payloads" <| fun () ->
+        let ctor: TaggedUnion.Constructable = emitJsExpr () "class { constructor(value) { this.value = value; } }"
+        let wrapped = TaggedUnion.ErasedConstructor.Constructor ctor
+        emitJsExpr (wrapped, ctor) "$0 === $1" |> equal true
+        match wrapped with
+        | TaggedUnion.ErasedConstructor.Constructor arm -> (arm.Create 7)?value |> equal 7
+        | TaggedUnion.ErasedConstructor.Text _ -> failwith "expected constructor"
+        (TaggedUnion.ErasedConstructor.Text "text").IsConstructor |> equal false
 
     testCase "InlineInterface on a TS tagged union case compiles the case as its interface" <| fun () ->
         let take = { new TaggedUnion.Take with
