@@ -563,7 +563,35 @@ let private transformObjExpr
             (objType, overrides) :: otherOverrides
             |> trampolineListMap (fun (_typ, overrides) -> overrides |> trampolineListMap mapOverride)
 
-        return Fable.ObjectExpr(members |> List.concat, makeType ctx.GenericArgs objType, baseCall)
+        let members = List.concat members
+        let typ = makeType ctx.GenericArgs objType
+
+        match tryDefinition objType with
+        | Some(entity, _) when isCallableInterface entity ->
+            let r = makeRangeFrom baseCallExpr
+
+            match validateCallableInterface com entity, members, baseCall, otherOverrides with
+            | None, [ _ ], None, [] ->
+                // Keep method metadata through the target transform: rest parameters and
+                // generic binders used only in the body cannot be recovered from a delegate.
+                return Fable.ObjectExpr(members, typ, baseCall)
+            | Some error, _, _, _ -> return error |> addErrorAndReturnNull com ctx.InlinePath r
+            | _ ->
+                return
+                    "CallableInterface object expressions must implement only their single Invoke method"
+                    |> addErrorAndReturnNull com ctx.InlinePath r
+        | _ when
+            otherOverrides
+            |> List.exists (fun (typ, _) ->
+                match tryDefinition typ with
+                | Some(entity, _) -> isCallableInterface entity
+                | _ -> false
+            )
+            ->
+            return
+                "CallableInterface must be the only interface implemented by an object expression"
+                |> addErrorAndReturnNull com ctx.InlinePath (makeRangeFrom baseCallExpr)
+        | _ -> return Fable.ObjectExpr(members, typ, baseCall)
     }
 
 let private transformDelegate com ctx (delegateType: FSharpType) expr =
@@ -2262,6 +2290,22 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
     |> List.collect (fun fsDecl ->
         match fsDecl with
         | FSharpImplementationFileDeclaration.Entity(fsEnt, sub) ->
+            let inheritsCallable =
+                fsEnt.AllInterfaces
+                |> Seq.exists (fun typ ->
+                    match tryDefinition typ with
+                    | Some(entity, _) -> isCallableInterface entity
+                    | _ -> false
+                )
+
+            if isCallableInterface fsEnt then
+                match validateCallableInterface com fsEnt with
+                | Some error -> addError com ctx.InlinePath (Some(makeRange fsEnt.DeclarationLocation)) error
+                | None -> ()
+            elif inheritsCallable then
+                "CallableInterface must be implemented with an object expression, not inherited or implemented by a class"
+                |> addError com ctx.InlinePath (Some(makeRange fsEnt.DeclarationLocation))
+
             match sub with
             | [] when isIgnoredLeafEntity fsEnt -> []
             | [] ->

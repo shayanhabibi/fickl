@@ -1853,7 +1853,14 @@ module Util =
             None
         | None, _ -> None
 
-    let transformObjectExpr (com: IBabelCompiler) ctx typ (members: Fable.ObjectExprMember list) baseCall : Expression =
+    let private transformOrdinaryObjectExpr
+        (com: IBabelCompiler)
+        ctx
+        typ
+        (members: Fable.ObjectExprMember list)
+        baseCall
+        : Expression
+        =
 
         let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
 
@@ -1987,6 +1994,42 @@ module Util =
                 Expression.classExpression (List.toArray classMembers, ?superClass = baseExpr)
 
             Expression.newExpression (classExpr, [||])
+
+    let transformObjectExpr (com: IBabelCompiler) ctx typ (members: Fable.ObjectExprMember list) baseCall : Expression =
+        match typ, members, baseCall with
+        | Fable.DeclaredType(entityRef, _), [ memberInfo ], None when
+            hasAttribute Atts.callableInterface (com.GetEntity(entityRef).Attributes)
+            ->
+            let entity = com.GetEntity(entityRef)
+            let info = com.GetMember(memberInfo.MemberRef)
+
+            let name, args, body =
+                match memberInfo.Args with
+                | self :: args when self.IsThisArgument ->
+                    let self = { self with IsThisArgument = false }
+
+                    let body =
+                        memberInfo.Body
+                        |> visitFromInsideOut (
+                            function
+                            | Fable.IdentExpr ident when ident.Name = self.Name -> Fable.IdentExpr self
+                            | expression -> expression
+                        )
+
+                    self.Name, args, body
+                | args -> "Invoke", args, memberInfo.Body
+
+            let args, body, returnType, typeParameters =
+                getMemberArgsAndBody com ctx (NonAttached name) (Some entity) info args body
+
+            Expression.functionExpression (
+                args,
+                body,
+                id = Identifier.identifier name,
+                ?returnType = returnType,
+                ?typeParameters = typeParameters
+            )
+        | _ -> transformOrdinaryObjectExpr com ctx typ members baseCall
 
     let transformCallArgsWithNamedArgs (com: IBabelCompiler) ctx (callInfo: Fable.CallInfo) =
         let memberInfo = callInfo.MemberRef |> Option.bind com.TryGetMember
@@ -4465,6 +4508,10 @@ but thanks to the optimisation done below we get
         name
 
     let transformAbstractMember com ctx (ent: Fable.Entity) (memb: Fable.MemberFunctionOrValue) =
+        let isCallable =
+            hasAttribute Atts.callableInterface ent.Attributes
+            && memb.CompiledName = "Invoke"
+
         // TODO: replicate the mangling logic from FSharp2Fable.Util.getAbstractMemberInfo
         // let info = FSharp2Fable.Util.getAbstractMemberInfo com ent memb
         let isMangled =
@@ -4487,6 +4534,10 @@ but thanks to the optimisation done below we get
         let args =
             memb.CurriedParameterGroups
             |> List.concat
+            |> fun args ->
+                match args with
+                | [ arg ] when isCallable && arg.Type = Fable.Unit -> []
+                | _ -> args
             // |> FSharp2Fable.Util.discardUnitArg
             |> List.toArray
 
@@ -4538,15 +4589,18 @@ but thanks to the optimisation done below we get
             else
                 ObjectMeth
 
-        AbstractMember.abstractMethod (
-            kind,
-            key,
-            args,
-            returnType = returnType,
-            typeParameters = typeParams,
-            isComputed = isComputed,
-            ?doc = memb.XmlDoc
-        )
+        if isCallable then
+            AbstractCallSignature(args, returnType, typeParams, memb.XmlDoc)
+        else
+            AbstractMember.abstractMethod (
+                kind,
+                key,
+                args,
+                returnType = returnType,
+                typeParameters = typeParams,
+                isComputed = isComputed,
+                ?doc = memb.XmlDoc
+            )
 
     let transformAbstractClassMembers com ctx (ent: Fable.Entity) =
         let memberImplNames =

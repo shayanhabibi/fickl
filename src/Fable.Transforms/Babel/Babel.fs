@@ -385,6 +385,11 @@ type VariableDeclaration =
 //    member _.Argument: Expression = argument
 
 type AbstractMember =
+    | AbstractCallSignature of
+        parameters: Parameter array *
+        returnType: TypeAnnotation *
+        typeParameters: TypeParameter array *
+        doc: string option
     | AbstractProperty of
         key: Expression *
         returnType: TypeAnnotation *

@@ -27,12 +27,12 @@ module Compiler =
   /// NOTE: NOT threadsafe
   ///       -> don't use `parallel`
   module Cached =
-    type private CachedProject(name: string) =
+    type private CachedProject(name: string, ?language) =
         let projDir = IO.Path.Join(__SOURCE_DIRECTORY__, "../" + name) |> Path.normalizeFullPath
         let projFile = IO.Path.Join(projDir, name + ".fsproj") |> Path.normalizeFullPath
 
         let cliArgs =
-            let compilerOptions = CompilerOptionsHelper.Make()
+            let compilerOptions = CompilerOptionsHelper.Make(?language=language)
             { CliArgs.ProjectFile = projFile
               FableLibraryPath = None
               RootDir = projDir
@@ -94,6 +94,12 @@ module Compiler =
         ]
 
     let compile settings source = compileWithLibrary settings emptyLibrary source
+
+    let compileForLanguage language settings source =
+        CachedProject("TestProject", language).Compile [
+          "Library.fs", emptyLibrary
+          "Program.fs", programFile settings source
+        ]
 
     let compileWithSignedLibrary settings (signature: string) (library: string) source =
         projectWithSignature.Compile [

@@ -3164,6 +3164,28 @@ module Util =
                || ent.IsValueType
                || (ent |> hasInterface Types.iStructuralComparable))
 
+    let isCallableInterface (entity: FSharpEntity) =
+        entity.Attributes
+        |> Seq.exists (fun attribute -> attribute.AttributeType.TryFullName = Some Atts.callableInterface)
+
+    let validateCallableInterface (com: IFableCompiler) (entity: FSharpEntity) =
+        let members =
+            entity.MembersFunctionsAndValues |> Seq.filter _.IsInstanceMember |> Seq.toList
+
+        if com.Options.Language <> JavaScript && com.Options.Language <> TypeScript then
+            Some "CallableInterface is only supported for JavaScript and TypeScript"
+        elif not entity.IsInterface || entity.DeclaredInterfaces.Count <> 0 then
+            Some "CallableInterface requires an interface without inherited interfaces"
+        else
+            match members with
+            | [ memberInfo ] when
+                memberInfo.CompiledName = "Invoke"
+                && not memberInfo.IsProperty
+                && memberInfo.CurriedParameterGroups.Count = 1
+                ->
+                None
+            | _ -> Some "CallableInterface requires exactly one instance Invoke method with one argument group"
+
     let makeCallWithArgInfo
         com
         (ctx: Context)
@@ -3207,6 +3229,21 @@ module Util =
                 makeCall r typ callInfo callee
             | _ ->
                 "Only Invoke is supported in delegates"
+                |> addErrorAndReturnNull com ctx.InlinePath r
+
+        | _, Some entity when memb.IsInstanceMember && isCallableInterface entity ->
+            match validateCallableInterface com entity, callInfo.ThisArg, memb.CompiledName with
+            | None, Some callee, "Invoke" ->
+                let callInfo =
+                    { callInfo with
+                        ThisArg = None
+                        GenericArgs = List.skip entity.GenericParameters.Count callInfo.GenericArgs
+                    }
+
+                makeCall r typ callInfo callee
+            | Some error, _, _ -> error |> addErrorAndReturnNull com ctx.InlinePath r
+            | _ ->
+                "Only Invoke is supported on callable interfaces"
                 |> addErrorAndReturnNull com ctx.InlinePath r
 
         // Check if this is an interface or abstract/overriden method
