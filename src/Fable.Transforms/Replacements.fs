@@ -289,6 +289,8 @@ let toDecimal com (ctx: Context) r targetType (args: Expr list) : Expr =
         match kind with
         | Decimal -> args.Head
         | BigIntegers _ -> Helper.LibCall(com, "BigInt", "toDecimal", targetType, args)
+        | Float32 -> Helper.LibCall(com, "Decimal", "fromFloat32", targetType, args, ?loc = r)
+        | Float64 -> Helper.LibCall(com, "Decimal", "fromFloat64", targetType, args, ?loc = r)
         | _ -> makeDecimalFromExpr com r targetType args.Head
     | _ ->
         addWarning com ctx.InlinePath r "Cannot make conversion because source type is unknown"
@@ -617,7 +619,7 @@ let structuralHash (com: ICompiler) r (arg: Expr) =
             | Char
             | String
             | Builtin BclGuid -> "stringHash"
-            | Number(Decimal, _) -> "fastStructuralHash"
+            | Number(Decimal, _) -> "safeHash"
             | Number(BigIntegers _, _) -> "bigintHash"
             | Number(Numbers _, _) -> "numberHash"
             | Builtin BclTimeSpan
@@ -851,6 +853,7 @@ let tryEntityIdent (com: Compiler) entFullName =
     // | Naming.EndsWith "Exception" _ -> makeImportLib com Any "Exception" "Util" |> Some
     | Types.attribute -> makeImportLib com Any "Attribute" "Types" |> Some
     | "System.Uri" -> makeImportLib com Any "Uri" "Uri" |> Some
+    | "System.Diagnostics.Stopwatch" -> makeImportLib com Any "Stopwatch" "Stopwatch" |> Some
     | "Microsoft.FSharp.Control.FSharpAsyncReplyChannel`1" ->
         makeImportLib com Any "AsyncReplyChannel" "AsyncBuilder" |> Some
     | "Microsoft.FSharp.Control.FSharpEvent`1" -> makeImportLib com Any "Event" "Event" |> Some
@@ -1366,6 +1369,10 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
     | "Fable.Core.JSX", meth ->
         match meth with
         | "create" -> Helper.LibCall(com, "JSX", "create", t, args, ?loc = r) |> withTag "jsx" |> Some
+        | "spread" ->
+            Helper.LibCall(com, "JSX", "spread", t, args, ?loc = r)
+            |> withTag "jsx-spread"
+            |> Some
         | "html"
         | "jsx" ->
             Helper.LibCall(com, "JSX", "html", t, args, ?loc = r)
@@ -1730,8 +1737,7 @@ let objects (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
     | "GetHashCode", Some arg, _ -> identityHash com r arg |> Some
     | "GetType", Some arg, _ ->
         if arg.Type = Any then
-            "Types can only be resolved at compile time. At runtime this will be same as `typeof<obj>`"
-            |> addWarning com ctx.InlinePath r
+            WarningCodes.getTypeOnObj |> addWarningWithCode com ctx.InlinePath r
 
         makeTypeInfo (changeRangeToCallSite ctx.InlinePath r) arg.Type |> Some
     | _ -> None
@@ -1857,7 +1863,7 @@ let strings (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
         Helper.LibCall(com, "String", "startsWith", t, args, i.SignatureArgTypes, thisArg = c, ?loc = r)
         |> Some
     | "StartsWith", Some c, [ value; ignoreCase; _culture ] ->
-        addWarning com ctx.InlinePath r "CultureInfo argument is ignored"
+        WarningCodes.cultureInfoIgnored |> addWarningWithCode com ctx.InlinePath r
         let args = [ value; ignoreCase ]
 
         Helper.LibCall(com, "String", "startsWith", t, args, i.SignatureArgTypes, thisArg = c, ?loc = r)
@@ -1867,7 +1873,7 @@ let strings (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
         Helper.LibCall(com, "String", "endsWith", t, args, i.SignatureArgTypes, thisArg = c, ?loc = r)
         |> Some
     | "EndsWith", Some c, [ value; ignoreCase; _culture ] ->
-        addWarning com ctx.InlinePath r "CultureInfo argument is ignored"
+        WarningCodes.cultureInfoIgnored |> addWarningWithCode com ctx.InlinePath r
         let args = [ value; ignoreCase ]
 
         Helper.LibCall(com, "String", "endsWith", t, args, i.SignatureArgTypes, thisArg = c, ?loc = r)
@@ -2696,7 +2702,9 @@ let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
                 []
 
         let args =
-            if isFloatOrDecimal then
+            if kind = Decimal then
+                [ str; makeIntConst style ] @ outValue
+            elif isFloatOrDecimal then
                 [ str ] @ outValue
             else
                 [ str; makeIntConst style; makeBoolConst unsigned; makeIntConst bitsize ]
@@ -2745,9 +2753,13 @@ let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
         let hexConst = int System.Globalization.NumberStyles.HexNumber
         let intConst = int System.Globalization.NumberStyles.Integer
 
-        if style <> hexConst && style <> intConst then
-            $"%s{i.DeclaringEntityFullName}.%s{meth}(): NumberStyle %d{style} is ignored"
-            |> addWarning com ctx.InlinePath r
+        if
+            style <> hexConst
+            && style <> intConst
+            && i.DeclaringEntityFullName <> Types.decimal
+        then
+            WarningCodes.numberStylesIgnored style
+            |> addWarningWithCode com ctx.InlinePath r
 
         let acceptedArgs =
             if meth = "Parse" then
@@ -2755,10 +2767,13 @@ let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
             else
                 3
 
-        if List.length args > acceptedArgs then
+        match List.tryItem acceptedArgs args with
+        // InvariantCulture asks for exactly what Fable does, so there is nothing to report.
+        | None
+        | Some InvariantCulture -> ()
+        | Some _ ->
             // e.g. Double.Parse(string, style, IFormatProvider) etc.
-            $"%s{i.DeclaringEntityFullName}.%s{meth}(): provider argument is ignored"
-            |> addWarning com ctx.InlinePath r
+            WarningCodes.formatProviderIgnored |> addWarningWithCode com ctx.InlinePath r
 
         parseCall meth str args style |> Some
     | ("Parse" | "TryParse") as meth, str :: _ ->
@@ -2768,12 +2783,20 @@ let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
             else
                 2
 
-        if List.length args > acceptedArgs then
+        match List.tryItem acceptedArgs args with
+        // InvariantCulture asks for exactly what Fable does, so there is nothing to report.
+        | None
+        | Some InvariantCulture -> ()
+        | Some _ ->
             // e.g. Double.Parse(string, IFormatProvider) etc.
-            $"%s{i.DeclaringEntityFullName}.%s{meth}(): provider argument is ignored"
-            |> addWarning com ctx.InlinePath r
+            WarningCodes.formatProviderIgnored |> addWarningWithCode com ctx.InlinePath r
 
-        let style = int System.Globalization.NumberStyles.Any
+        let style =
+            if i.DeclaringEntityFullName = Types.decimal then
+                int System.Globalization.NumberStyles.Number
+            else
+                int System.Globalization.NumberStyles.Any
+
         parseCall meth str args style |> Some
     | "Pow", _ ->
         Helper.GlobalCall("Math", t, args, i.SignatureArgTypes, memb = "pow", ?loc = r)
@@ -2826,6 +2849,13 @@ let decimals (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg:
 
         Helper.LibCall(com, "Decimal", meth, t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
+    | ("ToByte" | "ToSByte" | "ToInt16" | "ToUInt16" | "ToInt32" | "ToUInt32" | "ToInt64" | "ToUInt64" | "ToSingle" | "ToDouble"),
+      [ _ ] ->
+        match t with
+        | Number(BigIntegers _, _) -> toLong com ctx r t args |> Some
+        | Number(Integers _, _) -> toInt com ctx r t args |> Some
+        | Number(Floats _, _) -> toFloat com ctx r t args |> Some
+        | _ -> None
     | "ToString", [ ExprTypeAs(String, format) ]
     | "ToString", [ ExprTypeAs(String, format); _ (* Culture info *) ] ->
         numericStringFormat com ctx r t i thisArg format
@@ -3310,8 +3340,7 @@ let convert (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (
     | "ToBase64String"
     | "FromBase64String" ->
         if not (List.isSingle args) then
-            $"Convert.%s{Naming.upperFirst i.CompiledName} only accepts one single argument"
-            |> addWarning com ctx.InlinePath r
+            WarningCodes.base64ArgumentsIgnored |> addWarningWithCode com ctx.InlinePath r
 
         Helper.LibCall(com, "String", (Naming.lowerFirst i.CompiledName), t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
@@ -3322,7 +3351,7 @@ let console (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
     | "get_Out" -> Helper.GlobalIdent("console", "log", t) |> Some
     | "get_Error" -> Helper.GlobalIdent("console", "error", t) |> Some
     | "Write" ->
-        addWarning com ctx.InlinePath r "Write will behave as WriteLine"
+        WarningCodes.writeBehavesAsWriteLine |> addWarningWithCode com ctx.InlinePath r
         log com r t i thisArg args |> Some
     | "WriteLine" -> log com r t i thisArg args |> Some
     | _ -> None
@@ -3337,7 +3366,7 @@ let textWriter (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
 let debug (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName with
     | "Write" ->
-        addWarning com ctx.InlinePath r "Write will behave as WriteLine"
+        WarningCodes.writeBehavesAsWriteLine |> addWarningWithCode com ctx.InlinePath r
         log com r t i thisArg args |> Some
     | "WriteLine" -> log com r t i thisArg args |> Some
     | "Break" -> makeDebugger r |> Some
@@ -3354,12 +3383,37 @@ let debug (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr optio
             IfThenElse(cond, makeDebugger r, unit, r) |> Some
     | _ -> None
 
-let ignoreFormatProvider meth args =
+/// Drops the `IFormatProvider` (and `DateTimeStyles`, where present) a date/time `Parse` was
+/// given, warning once per discarded argument. `Parse arg` with no extra argument discards
+/// nothing, so it must not warn.
+let ignoreFormatProvider com (ctx: Context) r meth args =
+    // Passing InvariantCulture asks for exactly what Fable does, so there is nothing to report.
+    let warnProvider culture =
+        match culture with
+        | InvariantCulture -> ()
+        | _ -> WarningCodes.formatProviderIgnored |> addWarningWithCode com ctx.InlinePath r
+
+    let warnStyles styles =
+        match styles with
+        | NumberConst(NumberValue.Int32 0, _) -> () // DateTimeStyles.None: no special handling
+        | _ -> WarningCodes.dateTimeStylesIgnored |> addWarningWithCode com ctx.InlinePath r
+
     match meth, args with
-    // Ignore IFormatProvider
+    | "Parse", arg :: culture :: styles :: _ ->
+        warnProvider culture
+        warnStyles styles
+        [ arg ]
+    | "Parse", arg :: culture :: _ ->
+        warnProvider culture
+        [ arg ]
     | "Parse", arg :: _ -> [ arg ]
-    | "TryParse", input :: _culture :: _styles :: defVal :: _ -> [ input; defVal ]
-    | "TryParse", input :: _culture :: defVal :: _ -> [ input; defVal ]
+    | "TryParse", input :: culture :: styles :: defVal :: _ ->
+        warnProvider culture
+        warnStyles styles
+        [ input; defVal ]
+    | "TryParse", input :: culture :: defVal :: _ ->
+        warnProvider culture
+        [ input; defVal ]
     | _ -> args
 
 let dateTime (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
@@ -3434,7 +3488,7 @@ let dateTime (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
 
         getFieldWith r t thisArg.Value fieldName |> Some
     | meth ->
-        let args = ignoreFormatProvider meth args
+        let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst
 
         Helper.LibCall(com, moduleName, meth, t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
@@ -3545,7 +3599,7 @@ let dateTimeOffset (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: E
 
         getFieldWith r t thisArg.Value fieldName |> Some
     | meth ->
-        let args = ignoreFormatProvider meth args
+        let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst
 
         Helper.LibCall(com, moduleName, meth, t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
@@ -3608,7 +3662,7 @@ let dateOnly (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
 
         getFieldWith r t thisArg.Value fieldName |> Some
     | meth ->
-        let args = ignoreFormatProvider meth args
+        let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst
 
         Helper.LibCall(com, moduleName, meth, t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
@@ -3618,7 +3672,7 @@ let timeSpans (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg
     let moduleName = timeSpanModule com
 
     let timeSpanLibCall meth args =
-        let args = ignoreFormatProvider meth args
+        let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst
 
         Helper.LibCall(com, moduleName, meth, t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
@@ -3632,11 +3686,7 @@ let timeSpans (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg
     let limitArgsCountToMilliseconds (meth: string) (maxArgsCount: int) =
         if args.Length > maxArgsCount then
             if isNotDefaultInt64ZeroValue args.[maxArgsCount] then
-                addWarning
-                    com
-                    ctx.InlinePath
-                    r
-                    "TimeSpan precision is limited to milliseconds, microsecond arguments will be ignored"
+                WarningCodes.timeSpanPrecisionIgnored |> addWarningWithCode com ctx.InlinePath r
 
             args |> List.take maxArgsCount |> timeSpanLibCall meth
 
@@ -3768,7 +3818,7 @@ let timeOnly (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
             |> Some
         | _ -> None
     | meth ->
-        let args = ignoreFormatProvider meth args
+        let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix i.CompiledName |> Naming.lowerFirst
 
         Helper.LibCall(com, moduleName, meth, t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
@@ -3782,6 +3832,33 @@ let timers (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opti
     | Naming.StartsWith "get_" meth, Some x, _ -> getFieldWith r t x meth |> Some
     | Naming.StartsWith "set_" meth, Some x, [ value ] -> setExpr r x (makeStrConst meth) value |> Some
     | meth, Some x, args -> Helper.InstanceCall(x, meth, t, args, i.SignatureArgTypes, ?loc = r) |> Some
+    | _ -> None
+
+let stopwatch (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    let toTimeSpan (ms: Expr) =
+        Helper.LibCall(com, timeSpanModule com, "fromMilliseconds", t, [ ms ], ?loc = r)
+
+    let float64 = Number(Float64, NumberInfo.Empty)
+
+    match i.CompiledName, thisArg with
+    | ".ctor", _ -> Helper.LibCall(com, "Stopwatch", "create", t, [], ?loc = r) |> Some
+    | ("StartNew" | "GetTimestamp" as meth), None ->
+        Helper.LibCall(com, "Stopwatch", Naming.lowerFirst meth, t, [], ?loc = r)
+        |> Some
+    | ("Start" | "Stop" | "Reset" | "Restart" as meth), Some x ->
+        Helper.LibCall(com, "Stopwatch", Naming.lowerFirst meth, t, [ x ], ?loc = r)
+        |> Some
+    | ("get_IsRunning" | "get_ElapsedMilliseconds" | "get_ElapsedTicks" as meth), Some x ->
+        Helper.LibCall(com, "Stopwatch", Naming.removeGetSetPrefix meth |> Naming.lowerFirst, t, [ x ], ?loc = r)
+        |> Some
+    | "get_Elapsed", Some x ->
+        Helper.LibCall(com, "Stopwatch", "elapsedTotalMilliseconds", float64, [ x ], ?loc = r)
+        |> toTimeSpan
+        |> Some
+    | "GetElapsedTime", None ->
+        Helper.LibCall(com, "Stopwatch", "getElapsedTotalMilliseconds", float64, args, ?loc = r)
+        |> toTimeSpan
+        |> Some
     | _ -> None
 
 let systemEnv (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (args: Expr list) =
@@ -4196,7 +4273,8 @@ let asyncBuilder (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
 let asyncs com (ctx: Context) r t (i: CallInfo) (_: Expr option) (args: Expr list) =
     match i.CompiledName with
     | "Start" ->
-        "Async.Start will behave as StartImmediate" |> addWarning com ctx.InlinePath r
+        WarningCodes.asyncStartBehavesAsStartImmediate
+        |> addWarningWithCode com ctx.InlinePath r
 
         Helper.LibCall(com, "Async", "start", t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
         |> Some
@@ -4254,11 +4332,39 @@ let taskBuilder (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr
         )
         |> Some
 
-let tasks (com: ICompiler) (_ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+// .NET implements these overloads with Async.StartImmediateAsTask
+let taskBuilderAsync (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    let startAsPromise (computation: Expr) =
+        Helper.LibCall(com, "Async", "startAsPromise", Any, [ computation ], ?loc = r)
+
+    match i.CompiledName, args with
+    | "TaskBuilderBase.Bind", [ computation; f ] -> taskBuilder com ctx r t i thisArg [ startAsPromise computation; f ]
+    | "TaskBuilderBase.ReturnFrom", [ computation ] -> taskBuilder com ctx r t i thisArg [ startAsPromise computation ]
+    | _ -> None
+
+let tasks (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match thisArg, i.CompiledName with
-    | Some x, ("GetAwaiter" | "GetResult" | "get_Result" | "Result") ->
-        // Task<T> = Promise<T>; return the promise - callers use Async.AwaitTask to extract the value
+    | Some x, "GetAwaiter" -> Some x
+    | Some x, ("GetResult" | "get_Result" | "Result") ->
+        WarningCodes.taskResultReturnsTask |> addWarningWithCode com ctx.InlinePath r
+
         Some x
+    | None, "Delay" ->
+        // Without Temporal, a TimeSpan is already a number of milliseconds
+        let args =
+            match args with
+            | ExprType(Builtin BclTimeSpan) as delay :: rest when com.Options.JsTemporal ->
+                Helper.LibCall(
+                    com,
+                    timeSpanModule com,
+                    "totalMilliseconds",
+                    Number(Float64, NumberInfo.Empty),
+                    [ delay ]
+                )
+                :: rest
+            | args -> args
+
+        Helper.LibCall(com, "Task", "delay", t, args, ?loc = r) |> Some
     | None, "FromResult" ->
         Helper.LibCall(com, "Task", "fromResult", t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
@@ -4586,6 +4692,10 @@ let fsharpType com (ctx: Context) methName (r: SourceLocation option) t (i: Call
     // Prevent name clash with FSharpValue.GetRecordFields
     | "GetRecordFields" ->
         // Drop the trailing `allowAccessToPrivateRepresentation` flag (no meaning in JS/TS)
+        if List.length args > 1 then
+            WarningCodes.privateRepresentationFlagIgnored
+            |> addWarningWithCode com ctx.InlinePath r
+
         Helper.LibCall(com, "Reflection", "getRecordElements", t, List.truncate 1 args, i.SignatureArgTypes, ?loc = r)
         |> Some
     | "GetUnionCases"
@@ -4596,8 +4706,8 @@ let fsharpType com (ctx: Context) methName (r: SourceLocation option) t (i: Call
     | "IsTuple"
     | "IsFunction" ->
         if List.length args > 1 then
-            $"FSharpType.%s{methName}(): second argument is ignored"
-            |> addWarning com ctx.InlinePath r
+            WarningCodes.privateRepresentationFlagIgnored
+            |> addWarningWithCode com ctx.InlinePath r
 
         let args = [ List.head args ]
 
@@ -4679,6 +4789,9 @@ let tryField com returnTyp ownerTyp fieldName =
         match ent.FullName with
         | "System.BitConverter" ->
             Helper.LibCall(com, "BitConverter", Naming.lowerFirst fieldName, returnTyp, [])
+            |> Some
+        | "System.Diagnostics.Stopwatch" when fieldName = "Frequency" || fieldName = "IsHighResolution" ->
+            Helper.LibCall(com, "Stopwatch", Naming.lowerFirst fieldName, returnTyp, [])
             |> Some
         | _ -> None
     | _ -> None
@@ -4778,6 +4891,7 @@ let private replacedModules =
             "System.Convert", convert
             "System.Console", console
             "System.Diagnostics.Debug", debug
+            "System.Diagnostics.Stopwatch", stopwatch
             "System.Diagnostics.Debugger", debug
             Types.datetime, dateTime
             Types.datetimeOffset, dateTimeOffset
@@ -4823,6 +4937,7 @@ let private replacedModules =
             "Microsoft.FSharp.Control.TaskBuilderBase", taskBuilder
             "Microsoft.FSharp.Control.TaskBuilderModule", taskBuilder
             "Microsoft.FSharp.Control.TaskBuilderExtensions.HighPriority", taskBuilder
+            "Microsoft.FSharp.Control.TaskBuilderExtensions.MediumPriority", taskBuilderAsync
             "Microsoft.FSharp.Control.TaskBuilderExtensions.LowPriority", taskBuilder
             Types.guid, guids
             "System.Uri", uris

@@ -438,24 +438,54 @@ module Process =
         if not p.HasExited then
             p.Kill(entireProcessTree = true)
 
+    let mutable private runProcess: Process option = None
+
+    let private killRunProcess () =
+        runProcess
+        |> Option.iter (fun p ->
+            try
+                kill p
+            with _ ->
+                ()
+        )
+
+    // Terminating Fable doesn't terminate the processes it spawned, so kill them when Fable exits.
+    // SIGTERM is what IDEs and task runners send, and the runtime only intercepts it when registered.
+    let private killRunProcessOnExit =
+        lazy
+            (AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> killRunProcess ())
+
+             if isWindows () then
+                 Console.CancelKeyPress.AddHandler(ConsoleCancelEventHandler(fun _ _ -> killRunProcess ()))
+
+                 let assemblyLoadContext =
+                     getCurrentAssembly () |> Loader.AssemblyLoadContext.GetLoadContext
+
+                 assemblyLoadContext.add_Unloading (fun _ -> killRunProcess ())
+
+             Runtime.InteropServices.PosixSignalRegistration.Create(
+                 Runtime.InteropServices.PosixSignal.SIGTERM,
+                 (fun _ -> killRunProcess ())
+             ))
+
+    let private track (p: Process) =
+        killRunProcessOnExit.Force() |> ignore
+        runProcess <- Some p
+
+    let private untrack (p: Process) =
+        if runProcess = Some p then
+            runProcess <- None
+
     let startWithEnv envVars =
-        let mutable runningProcess = None
-
-        // In Windows, terminating the main process doesn't kill the spawned ones so we need
-        // to listen for the Console.CancelKeyPress and AssemblyLoadContext.Unloading events
-        if isWindows () then
-            Console.CancelKeyPress.AddHandler(ConsoleCancelEventHandler(fun _ _ -> runningProcess |> Option.iter kill))
-
-            let assemblyLoadContext =
-                getCurrentAssembly () |> Loader.AssemblyLoadContext.GetLoadContext
-
-            assemblyLoadContext.add_Unloading (fun _ -> runningProcess |> Option.iter kill)
-
         fun (workingDir: string) (exePath: string) (args: string list) ->
             try
-                runningProcess |> Option.iter kill
-                let p = startProcess false envVars workingDir exePath args
-                runningProcess <- Some p
+                runProcess
+                |> Option.iter (fun p ->
+                    kill p
+                    untrack p
+                )
+
+                startProcess false envVars workingDir exePath args |> track
             with ex ->
                 Log.always ("Cannot run: " + ex.Message)
 
@@ -464,7 +494,9 @@ module Process =
     let runSyncWithEnv envVars (workingDir: string) (exePath: string) (args: string list) =
         try
             let p = startProcess false envVars workingDir exePath args
+            track p
             p.WaitForExit()
+            untrack p
             p.ExitCode
         with ex ->
             Log.always ("Cannot run: " + ex.Message)
@@ -484,18 +516,15 @@ module Process =
         else
             []
 
-    /// fickl: runSyncWithOutput with environment variables
     let runSyncWithOutputEnv envVars workingDir exePath args =
         let p = startProcess true envVars workingDir exePath args
-        p.WaitForExit 7000 |> ignore
-        p.StandardOutput.ReadToEnd()
-
-    let runSyncWithOutput workingDir exePath args =
-        let p = startProcess true [] workingDir exePath args
         // Don't wait indefinitely to run process
         // This call is used to build local plugins, if the binary is used by another process this process will never end.
         p.WaitForExit 7000 |> ignore
         p.StandardOutput.ReadToEnd()
+
+    let runSyncWithOutput workingDir exePath args =
+        runSyncWithOutputEnv [] workingDir exePath args
 
 [<RequireQualifiedAccess>]
 module Async =

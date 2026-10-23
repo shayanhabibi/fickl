@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
     <OutputType>Exe</OutputType>
@@ -25,6 +25,10 @@
     <Compile Include="CompilerMessagesTests.fs" />
     <Compile Include="CodeServicesTests.fs" />
     <Compile Include="IwsamWarningTests.fs" />
+
+    <Compile Include="WarningSuppressionTests.fs" />
+    <Compile Include="IgnoredArgumentTests.fs" />
+    <Compile Include="BehaviorWarningTests.fs" />
     <Compile Include="AnonRecordInInterfaceTests.fs" />
     <Compile Include="CompilerHelpersTests.fs" />
     <Compile Include="InflateTests.fs" />

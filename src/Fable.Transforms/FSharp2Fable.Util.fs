@@ -144,10 +144,6 @@ type FsUnionCase(uci: FSharpUnionCase) =
         |> List.tryPick (fun fullName -> Helpers.tryFindAttrib fullName uci.Attributes)
         |> Option.map (fun (att: FSharpAttribute) -> att.ConstructorArguments[0] |> snd |> string<obj>)
 
-    // static member HasNamedFields(uci: FSharpUnionCase) =
-    //     not (uci.Fields.Count = 1 && uci.Fields[0].Name = "Item")
-    //     true
-
     interface Fable.UnionCase with
         member _.Name = uci.Name
         member _.FullName = FsUnionCase.FullName uci
@@ -3309,3 +3305,414 @@ module Util =
         | Imported com ctx r typ None imported -> imported
         | Try (tryGetIdentFromScope ctx r (Some typ)) expr, _ -> expr
         | _ -> getValueMemberRef v |> memberIdent com ctx r typ v
+
+    /// Runtime checks that tell apart union cases the tag or type test alone cannot
+    [<RequireQualifiedAccess>]
+    type DerivedCaseTest =
+        | HasField of name: string
+        | LacksField of name: string
+        | FieldOfType of name: string * typ: Fable.Type
+        | NotOfType of typ: Fable.Type
+        | NotCaseTest of macro: string
+
+    let private tryTaggedUnionTagKey (rule: CaseRules) (unionCase: FSharpUnionCase) =
+        match transformStringEnum rule unionCase with
+        | Fable.Value(Fable.StringConstant s, _) -> Some("s:" + s)
+        | Fable.Value(Fable.BoolConstant b, _) -> Some("b:" + string b)
+        | Fable.Value(Fable.NumberConstant(v, _), _) -> Some("n:" + string v)
+        | _ -> None
+
+    let taggedUnionTagDisplay (rule: CaseRules) (unionCase: FSharpUnionCase) =
+        match FsUnionCase.CompiledValue unionCase with
+        | Some(CompiledValue.Integer i) -> string i
+        | Some(CompiledValue.Float f) -> string f
+        | Some(CompiledValue.Boolean b) -> (string b).ToLowerInvariant()
+        | None ->
+            match transformStringEnum rule unionCase with
+            | Fable.Value(Fable.StringConstant s, _) -> $"\"%s{s}\""
+            | _ -> "the same tag"
+
+    type private TaggedUnionField =
+        {
+            Name: string
+            Type: Fable.Type
+            Display: string
+        }
+
+    /// Keep in sync with Fable2Babel.Reflection.transformTypeTest: equal keys are the same runtime test, None is untestable
+    let rec private tryRuntimeTypeTestKey (com: Compiler) (typ: Fable.Type) : string option =
+        match typ with
+        | Fable.String
+        | Fable.Char -> Some "string"
+        | Fable.Boolean -> Some "boolean"
+        | Fable.Number(Decimal, _) -> Some "decimal"
+        | Fable.Number((Int64 | UInt64 | Int128 | UInt128 | BigInt | NativeInt | UNativeInt), _) -> Some "bigint"
+        | Fable.Number _ -> Some "number"
+        | Fable.Regex -> Some "regexp"
+        | Fable.LambdaType _
+        | Fable.DelegateType _ -> Some "function"
+        | Fable.Array _
+        | Fable.Tuple _ -> Some "array"
+        | Fable.List _ -> Some "list"
+        | Fable.Nullable(genArg, _) -> tryRuntimeTypeTestKey com genArg
+        | Fable.DeclaredType(entRef, _) ->
+            match com.TryGetEntity entRef with
+            | None -> None
+            | Some _ when isReplacementCandidate entRef -> None
+            | Some ent when hasAttribute Atts.stringEnum ent -> Some "string"
+            | Some ent when hasAttribute Atts.erase ent && ent.IsFSharpUnion ->
+                match ent.UnionCases with
+                | [ uci ] when List.isSingle uci.UnionCaseFields ->
+                    tryRuntimeTypeTestKey com uci.UnionCaseFields[0].FieldType
+                | cases when cases |> List.forall (fun c -> List.isEmpty c.UnionCaseFields) -> Some "string"
+                | _ -> None
+            | Some ent when
+                ent.IsMeasure
+                || isErasedOrStringEnumEntity ent
+                || isPojoDefinedByConsArgsEntity ent
+                ->
+                None
+            | Some ent when ent.IsInterface && not (isGlobalOrImportedEntity ent) -> None
+            | Some ent -> Some("instanceof:" + ent.FullName)
+        | _ -> None
+
+    let rec private isSubtypeOf (com: Compiler) (baseFullName: string) (entRef: Fable.EntityRef) =
+        entRef.FullName = baseFullName
+        || match com.TryGetEntity entRef with
+           | None -> false
+           | Some ent ->
+               ent.AllInterfaces |> Seq.exists (fun ifc -> ifc.Entity.FullName = baseFullName)
+               || (
+                   match ent.BaseType with
+                   | Some baseType -> isSubtypeOf com baseFullName baseType.Entity
+                   | None -> false
+               )
+
+    /// Whether every value of `sub` also passes the runtime test of `super`
+    let private passesTestOf (com: Compiler) (super: Fable.Type) (sub: Fable.Type) =
+        match super, sub with
+        | Fable.DeclaredType(superRef, _), Fable.DeclaredType(subRef, _) -> isSubtypeOf com superRef.FullName subRef
+        | _ -> false
+
+    /// A required field that only one side has
+    let private tryDistinguishByPresence (mine: TaggedUnionField list) (other: TaggedUnionField list) =
+        let isRequired (f: TaggedUnionField) =
+            match f.Type with
+            | Fable.Option _ -> false
+            | _ -> true
+
+        let hasName name (fields: TaggedUnionField list) =
+            fields |> List.exists (fun f -> f.Name = name)
+
+        let byPresence =
+            mine
+            |> List.tryFind (fun f -> isRequired f && not (hasName f.Name other))
+            |> Option.map (fun f -> DerivedCaseTest.HasField f.Name)
+
+        let byAbsence () =
+            other
+            |> List.tryFind (fun f -> isRequired f && not (hasName f.Name mine))
+            |> Option.map (fun f -> DerivedCaseTest.LacksField f.Name)
+
+        byPresence |> Option.orElseWith byAbsence
+
+    let private tryDistinguishTaggedUnionCase
+        (com: Compiler)
+        (mine: TaggedUnionField list)
+        (other: TaggedUnionField list)
+        =
+        let byType () =
+            mine
+            |> List.tryPick (fun f ->
+                match List.tryFind (fun (o: TaggedUnionField) -> o.Name = f.Name) other with
+                | None -> None
+                | Some o ->
+                    match tryRuntimeTypeTestKey com f.Type, tryRuntimeTypeTestKey com o.Type with
+                    | Some myKey, Some otherKey when
+                        myKey <> otherKey
+                        && not (passesTestOf com f.Type o.Type)
+                        && not (passesTestOf com o.Type f.Type)
+                        ->
+                        Some(DerivedCaseTest.FieldOfType(f.Name, f.Type))
+                    | _ -> None
+            )
+
+        tryDistinguishByPresence mine other |> Option.orElseWith byType
+
+    /// Why a type is known to have no runtime test, None when it has one or when this is unknown
+    let private tryUntestableKind (com: Compiler) (typ: Fable.Type) =
+        match typ with
+        | Fable.Any -> Some "which can hold any value"
+        | Fable.GenericParam _ -> Some "a generic parameter unknown at runtime"
+        | Fable.DeclaredType(entRef, _) when (tryRuntimeTypeTestKey com typ).IsNone ->
+            match com.TryGetEntity entRef with
+            | Some ent when isPojoDefinedByConsArgsEntity ent -> Some "a Pojo that is a plain object at runtime"
+            | Some ent when ent.IsInterface -> Some "an interface that does not exist at runtime"
+            | Some ent when isErasedOrStringEnumEntity ent -> Some "an erased type"
+            | _ -> None
+        | _ -> None
+
+    let isUntestableType (com: Compiler) (typ: Fable.Type) = (tryUntestableKind com typ).IsSome
+
+    let private describeUntestableType (com: Compiler) (f: TaggedUnionField) =
+        let kind =
+            tryUntestableKind com f.Type
+            |> Option.defaultValue "a type that cannot be tested at runtime"
+
+        $"field '%s{f.Name}' has type '%s{f.Display}', %s{kind}"
+
+    /// Why no field of `mine` tells it apart from `other` at runtime
+    let private explainIndistinguishable (com: Compiler) (mine: TaggedUnionField list) (other: TaggedUnionField list) =
+        let shared =
+            mine
+            |> List.choose (fun f -> other |> List.tryFind (fun o -> o.Name = f.Name) |> Option.map (fun o -> f, o))
+
+        match shared |> List.tryFind (fun (f, o) -> f.Type <> o.Type) with
+        | None when List.length shared = List.length mine && List.length shared = List.length other ->
+            "have the same fields"
+        | None -> "differ only by optional fields"
+        | Some(f, o) ->
+            let reason =
+                match tryRuntimeTypeTestKey com f.Type, tryRuntimeTypeTestKey com o.Type with
+                | None, _ -> describeUntestableType com f
+                | _, None -> describeUntestableType com o
+                | Some myKey, Some otherKey when myKey = otherKey ->
+                    $"field '%s{f.Name}' has types '%s{f.Display}' and '%s{o.Display}', which look the same at runtime"
+                | _ ->
+                    let sub, super =
+                        if passesTestOf com f.Type o.Type then
+                            o, f
+                        else
+                            f, o
+
+                    $"field '%s{f.Name}' has types '%s{f.Display}' and '%s{o.Display}', and '%s{sub.Display}' is a subtype of '%s{super.Display}'"
+
+            "cannot be told apart at runtime: " + reason
+
+    /// Required members of an interface and the interfaces it inherits, with the names they have at runtime
+    let private tryInterfaceMembers (com: Compiler) (typ: Fable.Type) : TaggedUnionField list option =
+        let hasRuntimeName (m: Fable.MemberFunctionOrValue) =
+            m.Attributes
+            |> Seq.forall (fun att ->
+                match att.Entity.FullName with
+                | Naming.StartsWith Atts.emit _
+                | Naming.StartsWith Atts.import _
+                | Atts.global_ -> false
+                | _ -> true
+            )
+
+        let isPlainInterface (ent: Fable.Entity) =
+            ent.IsInterface
+            && not (hasAttribute Atts.mangle ent)
+            && not (ent.FullName.StartsWith("System.", StringComparison.Ordinal))
+
+        let membersOf (ent: Fable.Entity) =
+            ent.MembersFunctionsAndValues
+            |> Seq.filter (fun m ->
+                m.IsInstance
+                && not m.IsConstructor
+                && not m.IsGetter
+                && not m.IsSetter
+                && hasRuntimeName m
+            )
+            |> Seq.map (fun m ->
+                {
+                    Name =
+                        if m.IsProperty then
+                            m.DisplayName
+                        else
+                            m.CompiledName
+                    Type =
+                        if m.IsProperty then
+                            m.ReturnParameter.Type
+                        else
+                            Fable.Any
+                    Display = m.DisplayName
+                }
+            )
+
+        match typ with
+        | Fable.DeclaredType(entRef, _) ->
+            match com.TryGetEntity entRef with
+            | Some ent when isPlainInterface ent ->
+                ent.AllInterfaces
+                |> Seq.choose (fun i -> com.TryGetEntity i.Entity)
+                |> Seq.filter isPlainInterface
+                |> Seq.collect membersOf
+                |> Seq.append (membersOf ent)
+                |> Seq.distinctBy (fun f -> f.Name)
+                |> List.ofSeq
+                |> Some
+            | _ -> None
+        | _ -> None
+
+    /// <summary>Returns the interface type automatically erased for a union using implicit interface inlining.</summary>
+    let tryInlinedTaggedUnionCase (com: Compiler) (unionCase: FSharpUnionCase) =
+        let ent = FsEnt unionCase.ReturnType.TypeDefinition
+
+        if hasExplicitInlineInterface ent then
+            None
+        else
+            tryInlinedTaggedUnionCaseType com (FsUnionCase unionCase)
+
+    /// Whether the interface of an inlined TypeScriptTaggedUnion case declares the tag member, None when the case is not inlined or the members are unknown
+    let inlinedTaggedUnionCaseHasTag (com: Compiler) (tagName: string) (unionCase: FSharpUnionCase) =
+        tryInlinedTaggedUnionCase com unionCase
+        |> Option.bind (tryInterfaceMembers com)
+        |> Option.map (List.exists (fun m -> m.Name = tagName))
+
+    /// One check per other case with the same tag value, or the case the fields cannot exclude
+    let deriveDerivedCaseTests
+        (com: Compiler)
+        (tdef: FSharpEntity)
+        (rule: CaseRules)
+        (unionCase: FSharpUnionCase)
+        : Result<DerivedCaseTest list, FSharpUnionCase * string>
+        =
+        let fieldsOf (uc: FSharpUnionCase) =
+            let explicitType =
+                tryInlinedInterface com (FsEnt tdef) (FsUnionCase uc)
+                |> Result.defaultValue None
+
+            match explicitType |> Option.orElseWith (fun () -> tryInlinedTaggedUnionCase com uc) with
+            | Some typ -> tryInterfaceMembers com typ |> Option.defaultValue []
+            | None ->
+                uc.Fields
+                |> Seq.map (fun fi ->
+                    {
+                        Name = FsField.FSharpFieldName fi
+                        Type = makeType Map.empty fi.FieldType
+                        Display = fi.FieldType.Format(FSharpDisplayContext.Empty.WithShortTypeNames(true))
+                    }
+                )
+                |> List.ofSeq
+
+        match tryTaggedUnionTagKey rule unionCase with
+        | None -> Ok []
+        | Some myTag ->
+            let myFields = fieldsOf unionCase
+
+            tdef.UnionCases
+            |> Seq.filter (fun uc -> uc.Name <> unionCase.Name && tryTaggedUnionTagKey rule uc = Some myTag)
+            |> Seq.fold
+                (fun acc other ->
+                    match acc with
+                    | Error _ -> acc
+                    | Ok tests ->
+                        let otherFields = fieldsOf other
+
+                        let byCaseTest () =
+                            FsUnionCase.CaseTest other |> Option.map DerivedCaseTest.NotCaseTest
+
+                        match
+                            tryDistinguishTaggedUnionCase com myFields otherFields
+                            |> Option.orElseWith byCaseTest
+                        with
+                        | Some test -> Ok(tests @ [ test ])
+                        | None -> Error(other, explainIndistinguishable com myFields otherFields)
+                )
+                (Ok [])
+            |> Result.map List.distinct
+
+    /// Checks added to the type test of an erased union case, or why the type test is not enough
+    [<RequireQualifiedAccess>]
+    type ErasedUnionCaseTests =
+        | Tests of DerivedCaseTest list
+        | Untestable of reason: string
+        | Ambiguous of other: FSharpUnionCase * reason: string
+
+    /// Checks that exclude the other cases from this one: negated type tests, interface members, or negated CaseTests
+    let deriveErasedUnionCaseTests
+        (com: Compiler)
+        (tdef: FSharpEntity)
+        (unionCase: FSharpUnionCase)
+        (payloadType: FSharpUnionCase -> Fable.Type option)
+        : ErasedUnionCaseTests
+        =
+        let display (uc: FSharpUnionCase) =
+            uc.Fields[0].FieldType.Format(FSharpDisplayContext.Empty.WithShortTypeNames(true))
+
+        let describeUntestable (uc: FSharpUnionCase) (typ: Fable.Type) kind =
+            match typ with
+            | Fable.Any -> $"type '%s{display uc}' can hold any value"
+            | _ -> $"type '%s{display uc}' is %s{kind}"
+
+        let byCaseTest (other: FSharpUnionCase) =
+            FsUnionCase.CaseTest other |> Option.map DerivedCaseTest.NotCaseTest
+
+        match payloadType unionCase with
+        | None -> ErasedUnionCaseTests.Tests []
+        | Some myType ->
+            let myKind = tryUntestableKind com myType
+
+            let myMembers =
+                if myKind.IsSome then
+                    tryInterfaceMembers com myType
+                else
+                    None
+
+            match myKind, myMembers with
+            | Some kind, None -> ErasedUnionCaseTests.Untestable(describeUntestable unionCase myType kind)
+            | _ ->
+                let myKey = tryRuntimeTypeTestKey com myType
+
+                let excludeByType (other: FSharpUnionCase) (otherType: Fable.Type) =
+                    let isSubtype = passesTestOf com myType otherType
+
+                    let sameKey = myKey.IsSome && myKey = tryRuntimeTypeTestKey com otherType
+
+                    if not isSubtype && not sameKey then
+                        Ok []
+                    else
+                        match byCaseTest other with
+                        | Some test -> Ok [ test ]
+                        | None when isSubtype -> Error $"'%s{display other}' is a subtype of '%s{display unionCase}'"
+                        | None when display unionCase = display other -> Error $"both have type '%s{display unionCase}'"
+                        | None ->
+                            Error $"types '%s{display unionCase}' and '%s{display other}' look the same at runtime"
+
+                let excludeByMembers (mine: TaggedUnionField list) (other: FSharpUnionCase) (otherType: Fable.Type) =
+                    match tryUntestableKind com otherType with
+                    | None -> Ok [ DerivedCaseTest.NotOfType otherType ]
+                    | Some otherKind ->
+                        let theirs = tryInterfaceMembers com otherType
+
+                        match
+                            theirs
+                            |> Option.bind (tryDistinguishByPresence mine)
+                            |> Option.orElseWith (fun () -> byCaseTest other)
+                        with
+                        | Some test -> Ok [ test ]
+                        | None when theirs.IsSome ->
+                            Error
+                                $"interfaces '%s{display unionCase}' and '%s{display other}' have no required member that tells them apart"
+                        | None -> Error(describeUntestable other otherType otherKind)
+
+                let exclude =
+                    match myMembers with
+                    | Some mine -> excludeByMembers mine
+                    | None -> excludeByType
+
+                tdef.UnionCases
+                |> Seq.filter (fun uc -> uc.Name <> unionCase.Name)
+                |> Seq.fold
+                    (fun acc other ->
+                        match acc, payloadType other with
+                        | ErasedUnionCaseTests.Tests tests, Some otherType ->
+                            match exclude other otherType with
+                            | Ok more -> ErasedUnionCaseTests.Tests(tests @ more)
+                            | Error reason -> ErasedUnionCaseTests.Ambiguous(other, reason)
+                        | _ -> acc
+                    )
+                    (ErasedUnionCaseTests.Tests [])
+                |> function
+                    | ErasedUnionCaseTests.Tests tests ->
+                        tests
+                        |> List.distinct
+                        |> List.sortBy (
+                            function
+                            | DerivedCaseTest.NotOfType _ -> 0
+                            | _ -> 1
+                        )
+                        |> ErasedUnionCaseTests.Tests
+                    | result -> result

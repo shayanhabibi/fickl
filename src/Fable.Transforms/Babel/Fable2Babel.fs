@@ -474,9 +474,10 @@ module Reflection =
             ]
             |> libReflectionCall com ctx r "class"
 
+    // Keep in sync with FSharp2Fable.Util.tryRuntimeTypeTestKey, which predicts these tests
     let transformTypeTest (com: IBabelCompiler) ctx range expr typ : Expression =
         let warnAndEvalToFalse msg =
-            "Cannot type test (evals to false): " + msg |> addWarning com [] range
+            WarningCodes.typeTestEvalsToFalse msg |> addWarningWithCode com [] range
 
             Expression.booleanLiteral (false)
 
@@ -531,7 +532,10 @@ module Reflection =
                 |> libCall com ctx range "Util" "isException" []
             | _ ->
                 match com.GetEntity(entRef) with
-                | Patterns.Try (Util.tryFindAnyEntAttribute [ Atts.stringEnum; Atts.erase; Atts.tsTaggedUnion ]) (att, _) as ent ->
+                | Patterns.Try (Util.tryFindAnyEntAttribute [ Atts.stringEnum
+                                                              Atts.erase
+                                                              Atts.tsTaggedUnion
+                                                              Atts.pojoDefinedByConsArgs ]) (att, _) as ent ->
                     match att with
                     | Atts.stringEnum -> jsTypeof "string" expr
                     | Atts.erase when ent.IsFSharpUnion ->
@@ -541,6 +545,7 @@ module Reflection =
                         | cases when cases |> List.forall (fun c -> List.isEmpty c.UnionCaseFields) ->
                             jsTypeof "string" expr
                         | _ -> warnAndEvalToFalse (ent.FullName + " (erased)")
+                    | Atts.pojoDefinedByConsArgs -> warnAndEvalToFalse (ent.FullName + " (pojo)")
                     | _ -> warnAndEvalToFalse (ent.FullName + " (erased)")
 
                 | Patterns.Try (tryJsConstructorFor ActualConsRef com ctx) cons ->
@@ -917,15 +922,20 @@ module Annotation =
 
                 AbstractMember.abstractProperty (prop, tagType, isComputed = isComputed)
 
-            match tryInlinedInterface com ent uci with
-            | Ok(Some fieldType) ->
+            let inlinedType =
+                if hasExplicitInlineInterface ent then
+                    tryInlinedInterface com ent uci |> Result.defaultValue None
+                else
+                    tryInlinedTaggedUnionCaseType com uci
+
+            match inlinedType with
+            | Some fieldType ->
                 IntersectionTypeAnnotation
                     [|
                         fieldType |> resolveInlineType genArgs |> makeFieldAnnotation com ctx
                         ObjectTypeAnnotation [| tagMember |]
                     |]
-            | Ok None
-            | Error _ ->
+            | None ->
                 let names, types =
                     uci.UnionCaseFields |> List.map (fun fi -> fi.Name, fi.FieldType) |> List.unzip
 
@@ -1627,10 +1637,17 @@ module Util =
 
                 match e.Type with
                 | Fable.DeclaredType(sourceEntRef, _) when com.IsTypeScript ->
-                    let sourceEntRef = com.GetEntity(sourceEntRef)
+                    let sourceEnt = com.GetEntity(sourceEntRef)
                     // Because we use a wrapper type for multi-case unions, TypeScript
                     // won't automatically cast them to implementing interfaces
-                    if sourceEntRef.IsFSharpUnion && List.isMultiple sourceEntRef.UnionCases then
+                    let fromUnion = sourceEnt.IsFSharpUnion && List.isMultiple sourceEnt.UnionCases
+
+                    // The interface value of an inlined case is not assignable to the literal tag type
+                    let toTaggedUnion =
+                        com.TryGetEntity(entRef)
+                        |> Option.exists (fun ent -> hasAttribute Atts.tsTaggedUnion ent.Attributes)
+
+                    if fromUnion || toTaggedUnion then
                         AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                     else
                         jsExpr
@@ -1842,7 +1859,7 @@ module Util =
             // Some (baseExpr, []) // default base constructor
             let range = baseCall |> Option.bind (fun x -> x.Range)
 
-            $"Ignoring base call for %s{entRef.FullName}" |> addWarning com [] range
+            WarningCodes.baseCallIgnored entRef.FullName |> addWarningWithCode com [] range
 
             None
         | Some _, _ ->
@@ -2125,6 +2142,11 @@ module Util =
             |> List.append thisArg
             |> emitExpression range macro
 
+    [<RequireQualifiedAccess>]
+    type JsxPropExpr =
+        | KeyValue of key: string * value: Fable.Expr
+        | Spread of value: Fable.Expr
+
     let transformJsxProps (com: IBabelCompiler) props =
         (Some([], []), props)
         ||> List.fold (fun propsAndChildren prop ->
@@ -2136,7 +2158,7 @@ module Util =
                     | Replacements.Util.ArrayOrListLiteral(children, _) -> Some(props, children)
                     | value -> Some(props, [ value ])
                 else
-                    Some((key, value) :: props, children)
+                    Some(JsxPropExpr.KeyValue(key, value) :: props, children)
             // When the string value exceeds ~100 chars, Fable wraps it in a Let binding.
             // The Let body still contains the tuple with the prop key and a reference to the bound var;
             // we use the bound value (letValue) as the actual prop value.
@@ -2147,7 +2169,15 @@ module Util =
                     | Replacements.Util.ArrayOrListLiteral(children, _) -> Some(props, children)
                     | _ -> Some(props, [ letValue ])
                 else
-                    Some((key, letValue) :: props, children)
+                    Some(JsxPropExpr.KeyValue(key, letValue) :: props, children)
+            | Some(props, children),
+              MaybeCasted(Fable.Call(_,
+                                     {
+                                         Tags = Fable.Tags.Contains "jsx-spread"
+                                         Args = [ value ]
+                                     },
+                                     _,
+                                     _)) -> Some(JsxPropExpr.Spread value :: props, children)
             | Some _, e ->
                 addError com [] e.Range "Cannot detect JSX prop key at compile time"
 
@@ -2301,7 +2331,13 @@ but thanks to the optimisation done below we get
                 |> List.concat
 
             let props =
-                props |> List.rev |> List.map (fun (k, v) -> k, transformAsExpr com ctx v)
+                props
+                |> List.rev
+                |> List.map (
+                    function
+                    | JsxPropExpr.KeyValue(key, value) -> JsxProp.KeyValue(key, transformAsExpr com ctx value)
+                    | JsxPropExpr.Spread value -> JsxProp.Spread(transformAsExpr com ctx value)
+                )
 
             Expression.jsxElement (componentOrTag, props, children)
 
@@ -2359,6 +2395,10 @@ but thanks to the optimisation done below we get
             transformJsxEl com ctx componentOrTag props |> Some
         | Fable.Tags.Contains "jsx", _ ->
             "Expecting a static list or array literal (no generator) for JSX props"
+            |> addErrorAndReturnNull com range
+            |> Some
+        | Fable.Tags.Contains "jsx-spread", _ ->
+            "JSX.spread can only be used as an element of the props list passed to JSX.create"
             |> addErrorAndReturnNull com range
             |> Some
         | Fable.Tags.Contains "jsx-template", args ->
@@ -5062,8 +5102,8 @@ module Compiler =
             member _.AddWatchDependency(fileName) = com.AddWatchDependency(fileName)
             member _.AddSignatureDependency(fileName) = com.AddSignatureDependency(fileName)
 
-            member _.AddLog(msg, severity, ?range, ?fileName: string, ?tag: string) =
-                com.AddLog(msg, severity, ?range = range, ?fileName = fileName, ?tag = tag)
+            member _.AddLog(msg, severity, ?range, ?fileName: string, ?tag: string, ?code: string) =
+                com.AddLog(msg, severity, ?range = range, ?fileName = fileName, ?tag = tag, ?code = code)
 
     let makeCompiler com = BabelCompiler(com)
 

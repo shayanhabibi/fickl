@@ -86,17 +86,30 @@ type TypeScriptTaggedUnionAttribute(tagName: string, caseRules: CaseRules) =
     new(tagName: string) = TypeScriptTaggedUnionAttribute(tagName, CaseRules.LowerFirst)
 
 /// <summary>
-/// Adds a test to a case of a <c>TypeScriptTaggedUnion</c>, checked after the tag matches.
-/// Use it when several cases share a tag value.
+/// Adds a test to a case of a <c>TypeScriptTaggedUnion</c>, checked after the tag matches,
+/// or to a case of an <c>Erase</c> union, checked after its type test. When the type of
+/// an erased case cannot be tested at runtime, the test is used on its own.
+/// Use it when several cases share a tag value and their fields cannot tell them apart,
+/// or when erased cases share a runtime type.
 /// </summary>
 /// <remarks>
-/// The test is a JS expression in <c>Emit</c> syntax, where <c>$0</c> is the tested value:
+/// The test must be true for every value of its case. Its negation is used to test
+/// the other cases sharing the tag, or the erased cases with the same runtime type,
+/// so one case per group may be left without a test.
+///
+/// The test is a JS expression in <c>Emit</c> syntax, where <c>$0</c> is the tested value.
+/// It only applies when targeting JavaScript or TypeScript.
 /// <code>
 /// [&lt;TypeScriptTaggedUnion("state")>]
 /// type Terminal =
 ///     | [&lt;CompiledName("done"); CaseTest("'value' in $0")>] Done of value: float
 ///     | [&lt;CompiledName("done"); CaseTest("'error' in $0")>] DoneError of error: string
 ///     | Pending
+///
+/// [&lt;Erase>]
+/// type Id =
+///     | [&lt;CaseTest("$0.startsWith('n:')")>] Name of string
+///     | Slug of string
 /// </code>
 /// </remarks>
 type CaseTestAttribute(test: string) =

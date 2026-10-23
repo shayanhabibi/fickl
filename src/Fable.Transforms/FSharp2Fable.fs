@@ -43,7 +43,7 @@ let private transformBaseConsCall
         makeCall r Fable.Unit callInfo baseRef
     | None ->
         if not baseCons.IsImplicitConstructor then
-            "Only inheriting from primary constructors is supported" |> addWarning com [] r
+            WarningCodes.nonPrimaryBaseConstructor |> addWarningWithCode com [] r
 
         match makeCallFrom com ctx r Fable.Unit genArgs None baseArgs baseCons with
         | Fable.Call(_baseExpr, info, t, r) when not (com.Options.Language = Rust) ->
@@ -127,8 +127,9 @@ let private transformNewUnion com ctx r fsType (unionCase: FSharpUnionCase) (arg
             | Some(CompiledValue.Float f) -> false, makeFloatConst f
             | Some(CompiledValue.Boolean b) -> false, makeBoolConst b
 
-        match isCompiledValue, com.Options.Language with
-        | true, TypeScript ->
+        match inlined, tryInlinedTaggedUnionCase com unionCase, argExprs, isCompiledValue, com.Options.Language with
+        | None, Some _, [ argExpr ], _, _ -> Fable.TypeCast(argExpr, makeType ctx.GenericArgs fsType)
+        | _, _, _, true, TypeScript ->
             "CompileValue attribute is not supported in TypeScript"
             |> addErrorAndReturnNull com ctx.InlinePath r
         | _ ->
@@ -593,6 +594,18 @@ let private transformDelegate com ctx (delegateType: FSharpType) expr =
         | _ -> return expr
     }
 
+let private makeDerivedCaseTest r (unionExpr: Fable.Expr) (test: DerivedCaseTest) =
+    match test with
+    | DerivedCaseTest.HasField name -> emitExpr r Fable.Boolean [ makeStrConst name; unionExpr ] "$0 in $1"
+    | DerivedCaseTest.LacksField name -> emitExpr r Fable.Boolean [ makeStrConst name; unionExpr ] "!($0 in $1)"
+    | DerivedCaseTest.FieldOfType(name, typ) ->
+        let field =
+            Fable.Get(unionExpr, Fable.FieldInfo.Create(name, fieldType = typ), typ, r)
+
+        Fable.Test(field, Fable.TypeTest typ, r)
+    | DerivedCaseTest.NotOfType typ -> makeUnOp r Fable.Boolean (Fable.Test(unionExpr, Fable.TypeTest typ, r)) UnaryNot
+    | DerivedCaseTest.NotCaseTest macro -> emitExpr r Fable.Boolean [ unionExpr ] $"!(%s{macro})"
+
 let private transformUnionCaseTest
     (com: IFableCompiler)
     (ctx: Context)
@@ -605,51 +618,98 @@ let private transformUnionCaseTest
         let! unionExpr = transformExpr com ctx [] unionExpr
         let unionPattern = getUnionPattern fsType unionCase
 
-        do
-            match unionPattern, FsUnionCase.CaseTest unionCase with
-            | TypeScriptTaggedUnion _, _
-            | _, None -> ()
-            | _, Some _ ->
-                $"CaseTest attribute on '%s{unionCase.Name}' is ignored: it is only supported on TypeScriptTaggedUnion cases"
-                |> addWarning com ctx.InlinePath r
-
         match unionPattern with
         | ErasedUnionCase -> return "Cannot test erased union cases" |> addErrorAndReturnNull com ctx.InlinePath r
 
         | ErasedUnion(tdef, genArgs, rule) ->
+            let payloadType (uc: FSharpUnionCase) =
+                match uc.Fields.Count with
+                | 1 ->
+                    let fi = uc.Fields[0]
+
+                    let typ =
+                        if fi.FieldType.IsGenericParameter then
+                            let name = genParamName fi.FieldType.GenericParameter
+
+                            let index =
+                                tdef.GenericParameters |> Seq.findIndex (fun arg -> genParamName arg = name)
+
+                            genArgs[index]
+                        else
+                            fi.FieldType
+
+                    makeType ctx.GenericArgs typ |> Some
+                | _ -> None
+
+            let supportsCaseTest =
+                match com.Options.Language with
+                | JavaScript
+                | TypeScript -> not (isReplacementCandidate (FsEnt.Ref tdef))
+                | _ -> false
+
             match unionCase.Fields.Count with
             | 0 -> return makeEqOp r unionExpr (transformStringEnum rule unionCase) BinaryEqual
             | 1 ->
-                let fi = unionCase.Fields[0]
+                let fableType = (payloadType unionCase).Value
 
-                let typ =
-                    if fi.FieldType.IsGenericParameter then
-                        let name = genParamName fi.FieldType.GenericParameter
+                let typeTest unionExpr =
+                    Fable.Test(unionExpr, Fable.TypeTest fableType, r)
 
-                        let index =
-                            tdef.GenericParameters |> Seq.findIndex (fun arg -> genParamName arg = name)
+                let anyError =
+                    $"Erased union case '%s{unionCase.Name}' is typed as 'obj' which cannot be tested at runtime (type test always evaluates to true). Use a more specific type or TypeScriptTaggedUnion instead."
 
-                        genArgs[index]
+                let tests: Result<(Fable.Expr -> Fable.Expr) list, string> =
+                    match FsUnionCase.CaseTest unionCase, fableType with
+                    | _, Fable.Any when not supportsCaseTest -> Error anyError
+                    | _, _ when not supportsCaseTest -> Ok [ typeTest ]
+                    | Some macro, _ ->
+                        let caseTest unionExpr =
+                            emitExpr r Fable.Boolean [ unionExpr ] macro
+
+                        if isUntestableType com fableType then
+                            Ok [ caseTest ]
+                        else
+                            Ok [ typeTest; caseTest ]
+                    | None, Fable.Any -> Error anyError
+                    | None, _ ->
+                        match deriveErasedUnionCaseTests com tdef unionCase payloadType with
+                        | ErasedUnionCaseTests.Untestable reason ->
+                            Error
+                                $"Case '%s{unionCase.Name}' of '%s{tdef.DisplayName}' cannot be tested at runtime: %s{reason}. Add a CaseTest attribute to '%s{unionCase.Name}'."
+                        | ErasedUnionCaseTests.Ambiguous(other, reason) ->
+                            Error
+                                $"Cases '%s{unionCase.Name}' and '%s{other.Name}' of '%s{tdef.DisplayName}' cannot be told apart at runtime: %s{reason}. Add a CaseTest attribute to '%s{unionCase.Name}' or '%s{other.Name}'."
+                        | ErasedUnionCaseTests.Tests derived ->
+                            let derived =
+                                derived |> List.map (fun test unionExpr -> makeDerivedCaseTest r unionExpr test)
+
+                            if isUntestableType com fableType then
+                                Ok derived
+                            else
+                                Ok(typeTest :: derived)
+
+                match tests with
+                | Error msg -> return addErrorAndReturnNull com ctx.InlinePath r msg
+                | Ok [] -> return makeBoolConst true
+                | Ok [ test ] -> return test unionExpr
+                | Ok tests ->
+                    let makeTest unionExpr =
+                        tests
+                        |> List.map (fun test -> test unionExpr)
+                        |> List.reduce (fun acc test -> makeLogOp r acc test LogicalAnd)
+
+                    if canHaveSideEffects com unionExpr then
+                        let ident = getIdentUniqueName com ctx "unionValue" |> makeTypedIdent unionExpr.Type
+                        return Fable.Let(ident, unionExpr, makeTest (Fable.IdentExpr ident))
                     else
-                        fi.FieldType
-
-                let fableType = makeType ctx.GenericArgs typ
-
-                match fableType with
-                | Fable.Any ->
-                    return
-                        $"Erased union case '%s{unionCase.Name}' is typed as 'obj' which cannot be tested at runtime (type test always evaluates to true). Use a more specific type or TypeScriptTaggedUnion instead."
-                        |> addErrorAndReturnNull com ctx.InlinePath r
-                | _ ->
-                    let kind = fableType |> Fable.TypeTest
-                    return Fable.Test(unionExpr, kind, r)
+                        return makeTest unionExpr
             | _ ->
                 return
                     "Erased unions with multiple cases cannot have more than one field: "
                     + (getFsTypeFullName fsType)
                     |> addErrorAndReturnNull com ctx.InlinePath r
 
-        | TypeScriptTaggedUnion(_, _, tagName, rule) ->
+        | TypeScriptTaggedUnion(tdef, _, tagName, rule) ->
             let isCompiledValue, value =
                 match FsUnionCase.CompiledValue unionCase with
                 | None -> false, transformStringEnum rule unionCase
@@ -667,19 +727,30 @@ let private transformUnionCaseTest
                     let getTag = Fable.Get(unionExpr, Fable.FieldInfo.Create(tagName), value.Type, r)
                     makeEqOp r getTag value BinaryEqual
 
-                match FsUnionCase.CaseTest unionCase with
-                | Some macro ->
-                    // The union value is tested twice, so bind it first if it is not a plain value
-                    let makeTest unionExpr =
-                        let caseTest = emitExpr r Fable.Boolean [ unionExpr ] macro
-                        makeLogOp r (makeTagTest unionExpr) caseTest LogicalAnd
+                let caseTests: (Fable.Expr -> Fable.Expr) list =
+                    match FsUnionCase.CaseTest unionCase with
+                    | Some macro -> [ fun unionExpr -> emitExpr r Fable.Boolean [ unionExpr ] macro ]
+                    | None ->
+                        match deriveDerivedCaseTests com tdef rule unionCase with
+                        | Ok tests -> tests |> List.map (fun test unionExpr -> makeDerivedCaseTest r unionExpr test)
+                        | Error(other, reason) ->
+                            let tag = taggedUnionTagDisplay rule unionCase
 
-                    if canHaveSideEffects com unionExpr then
-                        let ident = getIdentUniqueName com ctx "unionValue" |> makeTypedIdent unionExpr.Type
-                        return Fable.Let(ident, unionExpr, makeTest (Fable.IdentExpr ident))
-                    else
-                        return makeTest unionExpr
-                | None -> return makeTagTest unionExpr
+                            $"Cases '%s{unionCase.Name}' and '%s{other.Name}' of '%s{tdef.DisplayName}' share the tag value %s{tag} and %s{reason}. Add a CaseTest attribute to '%s{unionCase.Name}' or '%s{other.Name}'."
+                            |> addError com ctx.InlinePath r
+
+                            []
+
+                let makeTest unionExpr =
+                    (makeTagTest unionExpr, caseTests)
+                    ||> List.fold (fun acc test -> makeLogOp r acc (test unionExpr) LogicalAnd)
+
+                // The union value is read once per test, so bind it first if it is not a plain value
+                if canHaveSideEffects com unionExpr && not (List.isEmpty caseTests) then
+                    let ident = getIdentUniqueName com ctx "unionValue" |> makeTypedIdent unionExpr.Type
+                    return Fable.Let(ident, unionExpr, makeTest (Fable.IdentExpr ident))
+                else
+                    return makeTest unionExpr
 
         | OptionUnion _ ->
             let kind =
@@ -1386,7 +1457,10 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
 
                     return Fable.Get(unionExpr, Fable.TupleIndex index, fieldType, r)
             | TypeScriptTaggedUnion(tdef, _, _, _) ->
-                match inlinedInterface com ctx r tdef unionCase with
+                match
+                    inlinedInterface com ctx r tdef unionCase
+                    |> Option.orElseWith (fun () -> tryInlinedTaggedUnionCase com unionCase)
+                with
                 | Some _ -> return Fable.TypeCast(unionExpr, fieldType)
                 | None ->
                     let kind =
@@ -2247,11 +2321,86 @@ let rec private getUsedRootNames (com: Compiler) (usedNames: Set<string>) decls 
         | FSharpImplementationFileDeclaration.InitAction _ -> usedNames
     )
 
+let private warnIgnoredCaseTests (com: FableCompiler) ctx (ent: FSharpEntity) =
+    let reason =
+        if not ent.IsFSharpUnion || hasAttrib Atts.tsTaggedUnion ent.Attributes then
+            None
+        elif not (hasAttrib Atts.erase ent.Attributes) then
+            Some "it is only supported on TypeScriptTaggedUnion and Erase union cases"
+        else
+            match (com :> Compiler).Options.Language with
+            | JavaScript
+            | TypeScript -> None
+            | _ -> Some "on Erase union cases it only applies when targeting JavaScript or TypeScript"
+
+    match reason with
+    | None -> ()
+    | Some reason ->
+        for uci in ent.UnionCases do
+            if (FsUnionCase.CaseTest uci).IsSome then
+                WarningCodes.caseTestIgnored uci.Name reason
+                |> addWarningWithCode (com :> Compiler) ctx.InlinePath (makeRange uci.DeclarationLocation |> Some)
+
+/// Values built in F# only carry the tag if the interface of an inlined case declares the tag member
+let private checkInlinedTaggedUnionCases (com: FableCompiler) ctx (ent: FSharpEntity) =
+    let tagName =
+        if ent.IsFSharpUnion then
+            ent.Attributes
+            |> tryFindAttrib Atts.tsTaggedUnion
+            |> Option.bind (fun att ->
+                match Seq.tryHead att.ConstructorArguments with
+                | Some(_, (:? string as name)) -> Some name
+                | _ -> None
+            )
+        else
+            None
+
+    match tagName with
+    | None -> ()
+    | Some tagName ->
+        for uci in ent.UnionCases do
+            match inlinedTaggedUnionCaseHasTag com tagName uci with
+            | Some false ->
+                let typeName =
+                    uci.Fields[0].FieldType.Format(FSharpDisplayContext.Empty.WithShortTypeNames(true))
+
+                $"Case '%s{uci.Name}' of '%s{ent.DisplayName}' compiles to its '%s{typeName}' value, so the interface must declare a '%s{tagName}' member to carry the tag. Add the member, or name the field to compile the case as an object holding the tag and the field."
+                |> addError (com :> Compiler) ctx.InlinePath (makeRange uci.DeclarationLocation |> Some)
+            | _ -> ()
+
+let private warnDuplicateCompiledNames (com: FableCompiler) ctx (ent: FSharpEntity) =
+    let compiledName (uci: FSharpUnionCase) =
+        match getUnionPattern (ent.AsType()) uci with
+        | StringEnum(_, rule) ->
+            match transformStringEnum rule uci with
+            | Fable.Value(Fable.StringConstant name, _) -> Some name
+            | _ -> None
+        | DiscriminatedUnion _ -> FsUnionCase.CompiledName uci |> Option.defaultValue uci.Name |> Some
+        // TypeScriptTaggedUnion cases sharing a tag are supported and checked separately
+        | _ -> None
+
+    // Beam reports collisions on the Erlang atom itself, see `reportUnionCaseTagCollisions`
+    if ent.IsFSharpUnion && (com :> Compiler).Options.Language <> Beam then
+        ent.UnionCases
+        |> Seq.choose (fun uci -> compiledName uci |> Option.map (fun name -> name, uci))
+        |> Seq.groupBy fst
+        |> Seq.iter (fun (name, cases) ->
+            let _, first = Seq.head cases
+
+            for _, uci in Seq.tail cases do
+                WarningCodes.duplicateCompiledName ent.DisplayName uci.Name first.Name name
+                |> addWarningWithCode com ctx.InlinePath (makeRange uci.DeclarationLocation |> Some)
+        )
+
 let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
     fsDecls
     |> List.collect (fun fsDecl ->
         match fsDecl with
         | FSharpImplementationFileDeclaration.Entity(fsEnt, sub) ->
+            warnIgnoredCaseTests com ctx fsEnt
+            checkInlinedTaggedUnionCases com ctx fsEnt
+            warnDuplicateCompiledNames com ctx fsEnt
+
             match sub with
             | [] when isIgnoredLeafEntity fsEnt -> []
             | [] ->
@@ -2960,9 +3109,8 @@ type FableCompiler(com: Compiler) =
         |> List.filter (fun (i, v) ->
             if ctx.CapturedBindings.Contains(i.Name) && canHaveSideEffects com v then
                 if isIdentUsed i.Name resolved then
-                    $"Inlined argument %s{i.Name} is being captured but is also used somewhere else. "
-                    + "There's a risk of double evaluation."
-                    |> addWarning com [] i.Range
+                    WarningCodes.inlinedArgumentDoubleEvaluation i.Name
+                    |> addWarningWithCode com [] i.Range
 
                     true
                 else
@@ -3008,8 +3156,8 @@ type FableCompiler(com: Compiler) =
         member _.AddWatchDependency(fileName) = com.AddWatchDependency(fileName)
         member _.AddSignatureDependency(fileName) = com.AddSignatureDependency(fileName)
 
-        member _.AddLog(msg, severity, ?range, ?fileName: string, ?tag: string) =
-            com.AddLog(msg, severity, ?range = range, ?fileName = fileName, ?tag = tag)
+        member _.AddLog(msg, severity, ?range, ?fileName: string, ?tag: string, ?code: string) =
+            com.AddLog(msg, severity, ?range = range, ?fileName = fileName, ?tag = tag, ?code = code)
 
 
 let rec attachClassMembers (com: FableCompiler) =

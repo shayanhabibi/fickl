@@ -244,6 +244,9 @@ module Types =
     let rune = "System.Text.Rune"
 
     [<Literal>]
+    let cultureInfo = "System.Globalization.CultureInfo"
+
+    [<Literal>]
     let timer = "System.Timers.Timer"
 
     [<Literal>]
@@ -487,9 +490,6 @@ module Types =
     let iformatProvider = "System.IFormatProvider"
 
     [<Literal>]
-    let cultureInfo = "System.Globalization.CultureInfo"
-
-    [<Literal>]
     let iobserverGeneric = "System.IObserver`1"
 
     [<Literal>]
@@ -689,7 +689,14 @@ module Log =
             FromRange: SourceLocation option
         }
 
-    let private addLog (com: Compiler) (inlinePath: InlinePath list) (range: SourceLocation option) msg severity =
+    let private addLogWithCode
+        (com: Compiler)
+        (inlinePath: InlinePath list)
+        (range: SourceLocation option)
+        msg
+        severity
+        (code: string option)
+        =
         let printInlineSource fromPath (p: InlinePath) =
             let path = Path.getRelativeFileOrDirPath false fromPath false p.FromFile
 
@@ -706,10 +713,21 @@ module Log =
                 file, msg + " - Inline call from " + inlinePath
             | [] -> range |> Option.bind (fun r -> r.File) |> Option.defaultValue com.CurrentFile, msg
 
-        com.AddLog(msg, severity, ?range = range, fileName = actualFile)
+        com.AddLog(msg, severity, ?range = range, fileName = actualFile, ?code = code)
+
+    let private addLog (com: Compiler) (inlinePath: InlinePath list) (range: SourceLocation option) msg severity =
+        addLogWithCode com inlinePath range msg severity None
 
     let addWarning (com: Compiler) inlinePath range warning =
         addLog com inlinePath range warning Severity.Warning
+
+    /// Same as `addWarning`, but tags the warning with a stable code (e.g. "FABLE0001") so it
+    /// can be suppressed via `// fable-disable-line/-next-line/-enable CODE` comments.
+    /// Meant to be used as `WarningCodes.someWarning arg1 arg2 |> addWarningWithCode com inlinePath range`.
+    ///
+    /// Note that a warning coming out of an inlined function is attributed to the file that *defines* it
+    let addWarningWithCode (com: Compiler) inlinePath range ((code, warning): string * string) =
+        addLogWithCode com inlinePath range warning Severity.Warning (Some code)
 
     let addError (com: Compiler) inlinePath range error =
         addLog com inlinePath range error Severity.Error
@@ -938,8 +956,20 @@ module AST =
             | _ -> ValueNone
         | _ -> ValueNone
 
-    /// The interface type a TypeScriptTaggedUnion case compiles as, when InlineInterface applies to the case.
-    /// An error carries the message for a case InlineInterface is applied to but cannot inline.
+    /// <summary>Whether explicit InlineInterface annotations select tag injection for this union.</summary>
+    let hasExplicitInlineInterface (ent: Entity) =
+        let hasAttribute (atts: Attribute seq) =
+            atts
+            |> Seq.exists (fun att ->
+                att.Entity.FullName = Atts.inlineInterface
+                || att.Entity.FullName = Atts.ficklInlineInterface
+            )
+
+        // Explicit annotations preserve selective inlining and tag injection for existing Fickl unions.
+        hasAttribute ent.Attributes
+        || (ent.UnionCases |> List.exists (fun uci -> hasAttribute uci.Attributes))
+
+    /// <summary>Returns the interface type selected by InlineInterface, or an error when the case cannot inline.</summary>
     let tryInlinedInterface (com: Compiler) (ent: Entity) (uci: UnionCase) : Result<Type option, string> =
         let hasAtt (atts: Attribute seq) =
             atts
@@ -962,6 +992,16 @@ module AST =
         | _ ->
             Error
                 $"InlineInterface cannot apply to '%s{uci.Name}': the case must have exactly one field, whose type is an interface"
+
+    /// <summary>Returns the interface type of a tagged union case with a single unnamed interface field.</summary>
+    let tryInlinedTaggedUnionCaseType (com: Compiler) (uci: UnionCase) =
+        match uci.UnionCaseFields with
+        | [ field ] when field.Name = "Item" ->
+            match field.FieldType with
+            | DeclaredType(entRef, _) when com.TryGetEntity(entRef) |> Option.exists _.IsInterface ->
+                Some field.FieldType
+            | _ -> None
+        | _ -> None
 
     // TODO: Improve this, see https://github.com/fable-compiler/Fable/issues/1659#issuecomment-445071965
     // This is mainly used for inlining so a computation or a reference to a mutable value are understood

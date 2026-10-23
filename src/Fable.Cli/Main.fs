@@ -16,7 +16,7 @@ open Fable.Compiler
 open Fable.Compiler.ProjectCracker
 open Fable.Compiler.Util
 
-module private Util =
+module Util =
     type PathResolver with
 
         static member Dummy =
@@ -79,10 +79,16 @@ module private Util =
                 | Severity.Error -> "error"
                 | Severity.Info -> "info"
 
+            // MSBuild-style `<severity> <code>`: the code carries the FABLE prefix, so it replaces the tag
+            let tag =
+                match log.Code with
+                | Some code -> code
+                | None -> log.Tag
+
             match log.Range with
             | Some r ->
-                $"%s{file}(%i{r.start.line},%i{r.start.column}): (%i{r.``end``.line},%i{r.``end``.column}) %s{severity} %s{log.Tag}: %s{log.Message}"
-            | None -> $"%s{file}(1,1): %s{severity} %s{log.Tag}: %s{log.Message}"
+                $"%s{file}(%i{r.start.line},%i{r.start.column}): (%i{r.``end``.line},%i{r.``end``.column}) %s{severity} %s{tag}: %s{log.Message}"
+            | None -> $"%s{file}(1,1): %s{severity} %s{tag}: %s{log.Message}"
 
     let logErrors rootDir (logs: LogEntry seq) =
         logs
@@ -355,6 +361,18 @@ type FsWatcher(delayMs: int) =
 
 type ProjectCracked(cliArgs: CliArgs, crackerResponse: CrackerResponse, sourceFiles: Fable.Compiler.File array) =
 
+    let sourceReader = lazy (snd (Fable.Compiler.File.MakeSourceReader sourceFiles))
+
+    // Shared by every file of the project: a warning can point at any file (inlined calls) and
+    // files compile in parallel. A new ProjectCracked is built on every watch rebuild, so this
+    // never outlives the source it was computed from.
+    let warningSuppression =
+        lazy
+            (WarningSuppression.Resolver.FromCompilerOptions(
+                crackerResponse.ProjectOptions.OtherOptions,
+                sourceReader.Value
+            ))
+
     member _.CliArgs = cliArgs
     member _.ProjectFile = cliArgs.ProjectFile
     member _.FableOptions = cliArgs.CompilerOptions
@@ -392,8 +410,31 @@ type ProjectCracked(cliArgs: CliArgs, crackerResponse: CrackerResponse, sourceFi
             crackerResponse.OutputType,
             ?outDir = cliArgs.OutDir,
             ?watchDependencies = watchDependencies,
-            ?signatureDependencies = signatureDependencies
+            ?signatureDependencies = signatureDependencies,
+            warningSuppression = warningSuppression.Value
         )
+
+    /// Problems with the `fable-disable` directives themselves (typo'd codes, directives that
+    /// suppress nothing). Only valid once every file has been compiled, since a directive in one
+    /// file can be what suppresses a warning raised while compiling another.
+    member _.DirectiveDiagnostics(files: string seq) =
+        warningSuppression.Value.GetDiagnostics(files)
+        |> List.map (fun (file, d) ->
+            let pos: Position =
+                {
+                    line = d.Line
+                    column = 0
+                }
+
+            LogEntry.Make(
+                Severity.Warning,
+                d.Message,
+                fileName = file,
+                range = SourceLocation.Create(pos, pos, file),
+                code = d.Code
+            )
+        )
+        |> Array.ofList
 
     member _.MapSourceFiles(f) =
         ProjectCracked(cliArgs, crackerResponse, Array.map f sourceFiles)
@@ -539,6 +580,8 @@ type FableCompilerState =
         }
 
 and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fableProj: Project) =
+    let activeReplyChannel: ReplyChannel option ref = ref None
+
     let agent =
         MailboxProcessor<FableCompilerMsg>.Start(fun agent ->
             let postTo toMsg work =
@@ -652,6 +695,8 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                                        isTriggeredByDependency,
                                        getSignatureDependents,
                                        replyChannel) ->
+                        activeReplyChannel.Value <- Some replyChannel
+
                         let state =
                             FableCompilerState.Create(
                                 state.FableProj,
@@ -848,6 +893,12 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
             FableCompilerState.Create(fableProj, [||]) |> loop
         )
 
+    do
+        agent.Error.Add(fun e ->
+            activeReplyChannel.Value
+            |> Option.iter (fun channel -> Error e |> channel.Reply)
+        )
+
     member _.GetFableProject() =
         agent.PostAndAsyncReply(GetFableProject)
 
@@ -1004,19 +1055,16 @@ type State =
                 // as some OS use case insensitive paths
                 let importDir = importDir.ToLower()
 
-                // fickl: choosing a target dir reads every dir chosen so far, and GetOrAdd runs its factory outside its
-                // own lock, so two files compiled at once could choose the same dir and write the same output file
-                match this.DeduplicateDic.TryGetValue importDir with
-                | true, targetDir -> targetDir
-                | false, _ ->
-                    lock
-                        this.DeduplicateDic
-                        (fun () ->
-                            this.DeduplicateDic.GetOrAdd(
-                                importDir,
-                                (fun _ -> set this.DeduplicateDic.Values |> addTargetDir)
-                            )
-                        )
+                lock
+                    this.DeduplicateDic
+                    (fun () ->
+                        match this.DeduplicateDic.TryGetValue(importDir) with
+                        | true, targetDir -> targetDir
+                        | false, _ ->
+                            let targetDir = set this.DeduplicateDic.Values |> addTargetDir
+                            this.DeduplicateDic[importDir] <- targetDir
+                            targetDir
+                    )
         }
 
     static member Create(cliArgs, ?watchDelay, ?recompileAllFiles) =
@@ -1630,6 +1678,11 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
 
                         Array.append logs [| log |], deps, sigDeps
                 )
+
+            // Every file is compiled by now, so a directive that still hasn't suppressed anything
+            // really is unused - checking earlier would flag directives that only ever fire for a
+            // warning raised while some later file was being compiled.
+            let logs = Array.append logs (projCracked.DirectiveDiagnostics filesToCompile)
 
             let state =
                 { state with
