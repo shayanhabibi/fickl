@@ -745,7 +745,18 @@ export function trimEnd(str: string, ...chars: string[]) {
 }
 
 export function filter(pred: (char: string) => boolean, x: string) {
-  return x.split("").filter((c) => pred(c)).join("");
+  // Preserve split/filter/join behavior for nonprimitive interop values.
+  if (typeof x !== "string") {
+    return (x as string).split("").filter((c) => pred(c)).join("");
+  }
+  let result = "";
+  for (let i = 0; i < x.length; i++) {
+    const c = x[i];
+    if (pred(c)) {
+      result += c;
+    }
+  }
+  return result;
 }
 
 export function substring(str: string, startIndex: number, length?: number) {

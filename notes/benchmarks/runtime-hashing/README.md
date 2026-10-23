@@ -5,7 +5,7 @@ The later standard-library and full-FCS-context investigations are indexed in [E
 Date: 2026-10-23. These are isolated experiments, not production changes or a release.
 
 | Candidate | Conclusion | Report |
-|---|---|---|
+| --- | --- | --- |
 | Array hash accumulator | Strong microbenchmark result; prioritize | [Array report](array-report.md) |
 | Record hash accumulator, retaining values snapshot | Promising for small/medium records; large records inconclusive | [Record report](record-report.md) |
 | Plain-object hash accumulator, retaining values snapshot | Promising and repeatable in paired tests | [Object report](object-report.md) |
@@ -56,3 +56,22 @@ Wait for each benchmark to finish before starting the next. `prepare-fixture.py`
 Prioritize the array patch, then review record/object patches independently. Before shipping, run the full JS/TS suites against a coherent freshly built runtime and measure representative applications and supported Node/browser engines. No browser-engine, end-to-end application, cold-start, retained-heap or GC-throughput benefit has been established. The benchmark's `hash-lookup` is a small native-Map bucket workload using runtime hashes/equality, not an actual Fable Dictionary timing measurement. The F# fixture supplies actual collection correctness coverage instead.
 
 No production sources were edited and no package was published. Leftover MSBuild workers were stopped after the runs, excluding active Rider evaluations.
+
+## Verifying integrated source changes
+
+`verify-integrated.py` compares complete generated runtimes rather than constructing candidate overlays.
+Build and save an unoptimized runtime first (the resynced baseline is commit `0dffdfcde`), then rebuild
+after applying the source changes. Run each step after the preceding build has finished:
+
+```powershell
+rtk proxy python notes/benchmarks/runtime-hashing/verify-integrated.py save --runtime PATH_TO_BASELINE_RUNTIME
+rtk dotnet run --project src/Fickl.Build -- fable-library javascript
+rtk proxy python notes/benchmarks/runtime-hashing/verify-integrated.py check
+```
+
+Snapshots, source hashes, and detailed results stay under ignored `temp/runtime-resync/`.
+Existing snapshot names are protected; use `check --name candidate2` for another run.
+The checks cover hashes and callback traces, list sharing and constructor counts, sequence disposal,
+private bucket lookups and comparator effects, UTF-16 filtering, and numeric parsing. Historical hash
+variant labels all load the actual combined candidate. The allocation gates intentionally fail against
+an unoptimized candidate. This script performs correctness checks only; timings remain separate.
