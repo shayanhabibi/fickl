@@ -1341,6 +1341,7 @@ let tests =
         (next ()).IsDoneError |> equal true
         calls |> equal 1
 
+#if FABLE_COMPILER
     testCase "Erased CaseTest preserves callable payloads and shared invocation" <| fun () ->
         let first: TaggedUnion.CallableFirst = emitJsExpr () "Object.assign(x => x + 10, { a: 1 })"
         let second: TaggedUnion.CallableSecond = emitJsExpr () "Object.assign(x => x * 2, { b: 'twice' })"
@@ -1445,6 +1446,7 @@ let tests =
         let command = TaggedUnion.InlinedCase.Take(next ())
         command.IsTake |> equal true
         calls |> equal 1
+#endif
 
     testCase "Case testing with TS tagged unions whose cases share a tag is derived from the fields" <| fun () ->
         let describe = function
