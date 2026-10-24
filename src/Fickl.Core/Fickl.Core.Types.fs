@@ -19,6 +19,7 @@ open System
 /// interface or same-type payloads. Construction and extraction still erase to the original
 /// payload; no tag is added and no copy is made. The predicate must recognize the values of
 /// its case. Cases without this attribute retain their ordinary runtime type tests.
+/// <c>Fable.Core.CaseTest</c> retains the payload type test when one exists.
 /// </remarks>
 type CaseTestAttribute(test: string) =
     inherit Attribute()

@@ -86,8 +86,8 @@ type TypeScriptTaggedUnionAttribute(tagName: string, caseRules: CaseRules) =
     new(tagName: string) = TypeScriptTaggedUnionAttribute(tagName, CaseRules.LowerFirst)
 
 /// <summary>
-/// Defines a runtime predicate replacing an erased case's payload type test, or an additional test for a
-/// <c>TypeScriptTaggedUnion</c> case, checked after the tag matches.
+/// Adds a test after a TypeScriptTaggedUnion case's tag matches or an erased case's payload type test passes.
+/// For erased payload types without a runtime type test, the predicate is used on its own.
 /// </summary>
 /// <remarks>
 /// The test must be true for every value of its case. Its negation is used to test
@@ -95,6 +95,7 @@ type TypeScriptTaggedUnionAttribute(tagName: string, caseRules: CaseRules) =
 /// so one case per group may be left without a test.
 ///
 /// The test is a JS expression in <c>Emit</c> syntax, where <c>$0</c> is the tested value.
+/// <c>Fickl.Core.CaseTest</c> replaces the erased payload type test instead.
 /// It only applies when targeting JavaScript or TypeScript.
 /// <code>
 /// [&lt;TypeScriptTaggedUnion("state")>]

@@ -144,6 +144,11 @@ type FsUnionCase(uci: FSharpUnionCase) =
         |> List.tryPick (fun fullName -> Helpers.tryFindAttrib fullName uci.Attributes)
         |> Option.map (fun (att: FSharpAttribute) -> att.ConstructorArguments[0] |> snd |> string<obj>)
 
+    /// <summary>Whether the selected CaseTest replaces the erased payload type test; Fable.Core takes precedence.</summary>
+    static member CaseTestOverridesTypeTest(uci: FSharpUnionCase) =
+        (Helpers.tryFindAttrib Atts.caseTest uci.Attributes).IsNone
+        && (Helpers.tryFindAttrib Atts.ficklCaseTest uci.Attributes).IsSome
+
     interface Fable.UnionCase with
         member _.Name = uci.Name
         member _.FullName = FsUnionCase.FullName uci
@@ -3314,6 +3319,7 @@ module Util =
         | FieldOfType of name: string * typ: Fable.Type
         | NotOfType of typ: Fable.Type
         | NotCaseTest of macro: string
+        | NotCaseTestOfType of typ: Fable.Type * macro: string
 
     let private tryTaggedUnionTagKey (rule: CaseRules) (unionCase: FSharpUnionCase) =
         match transformStringEnum rule unionCase with
@@ -3638,7 +3644,13 @@ module Util =
             | _ -> $"type '%s{display uc}' is %s{kind}"
 
         let byCaseTest (other: FSharpUnionCase) =
-            FsUnionCase.CaseTest other |> Option.map DerivedCaseTest.NotCaseTest
+            FsUnionCase.CaseTest other
+            |> Option.map (fun macro ->
+                match payloadType other with
+                | Some typ when not (FsUnionCase.CaseTestOverridesTypeTest other || isUntestableType com typ) ->
+                    DerivedCaseTest.NotCaseTestOfType(typ, macro)
+                | _ -> DerivedCaseTest.NotCaseTest macro
+            )
 
         match payloadType unionCase with
         | None -> ErasedUnionCaseTests.Tests []

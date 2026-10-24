@@ -605,6 +605,12 @@ let private makeDerivedCaseTest r (unionExpr: Fable.Expr) (test: DerivedCaseTest
         Fable.Test(field, Fable.TypeTest typ, r)
     | DerivedCaseTest.NotOfType typ -> makeUnOp r Fable.Boolean (Fable.Test(unionExpr, Fable.TypeTest typ, r)) UnaryNot
     | DerivedCaseTest.NotCaseTest macro -> emitExpr r Fable.Boolean [ unionExpr ] $"!(%s{macro})"
+    | DerivedCaseTest.NotCaseTestOfType(typ, macro) ->
+        let typeTest = Fable.Test(unionExpr, Fable.TypeTest typ, r)
+        let caseTest = emitExpr r Fable.Boolean [ unionExpr ] macro
+
+        makeLogOp r typeTest caseTest LogicalAnd
+        |> fun test -> makeUnOp r Fable.Boolean test UnaryNot
 
 let private transformUnionCaseTest
     (com: IFableCompiler)
@@ -652,7 +658,15 @@ let private transformUnionCaseTest
                 // Preserve one value even when the predicate repeats a pure allocation.
                 let ident = getIdentUniqueName com ctx "unionValue" |> makeTypedIdent unionExpr.Type
                 let ident = { ident with IsMutable = true }
-                let test = emitExpr r Fable.Boolean [ Fable.IdentExpr ident ] macro
+                let value = Fable.IdentExpr ident
+                let predicate = emitExpr r Fable.Boolean [ value ] macro
+
+                let test =
+                    match payloadType unionCase with
+                    | Some typ when not (FsUnionCase.CaseTestOverridesTypeTest unionCase || isUntestableType com typ) ->
+                        makeLogOp r (Fable.Test(value, Fable.TypeTest typ, r)) predicate LogicalAnd
+                    | _ -> predicate
+
                 return Fable.Let(ident, unionExpr, test)
             | _, 0 -> return makeEqOp r unionExpr (transformStringEnum rule unionCase) BinaryEqual
             | _, 1 ->
@@ -664,18 +678,18 @@ let private transformUnionCaseTest
                 let anyError =
                     $"Erased union case '%s{unionCase.Name}' is typed as 'obj' which cannot be tested at runtime (type test always evaluates to true). Use a more specific type or TypeScriptTaggedUnion instead."
 
-                let tests: Result<(Fable.Expr -> Fable.Expr) list, string> =
+                let tests: Result<(Fable.Expr -> Fable.Expr) list * bool, string> =
                     match FsUnionCase.CaseTest unionCase, fableType with
                     | _, Fable.Any when not supportsCaseTest -> Error anyError
-                    | _, _ when not supportsCaseTest -> Ok [ typeTest ]
+                    | _, _ when not supportsCaseTest -> Ok([ typeTest ], false)
                     | Some macro, _ ->
                         let caseTest unionExpr =
                             emitExpr r Fable.Boolean [ unionExpr ] macro
 
                         if isUntestableType com fableType then
-                            Ok [ caseTest ]
+                            Ok([ caseTest ], true)
                         else
-                            Ok [ typeTest; caseTest ]
+                            Ok([ typeTest; caseTest ], true)
                     | None, Fable.Any -> Error anyError
                     | None, _ ->
                         match deriveErasedUnionCaseTests com tdef unionCase payloadType with
@@ -686,26 +700,36 @@ let private transformUnionCaseTest
                             Error
                                 $"Cases '%s{unionCase.Name}' and '%s{other.Name}' of '%s{tdef.DisplayName}' cannot be told apart at runtime: %s{reason}. Add a CaseTest attribute to '%s{unionCase.Name}' or '%s{other.Name}'."
                         | ErasedUnionCaseTests.Tests derived ->
+                            let hasPredicate =
+                                derived
+                                |> List.exists (
+                                    function
+                                    | DerivedCaseTest.NotCaseTest _
+                                    | DerivedCaseTest.NotCaseTestOfType _ -> true
+                                    | _ -> false
+                                )
+
                             let derived =
                                 derived |> List.map (fun test unionExpr -> makeDerivedCaseTest r unionExpr test)
 
                             if isUntestableType com fableType then
-                                Ok derived
+                                Ok(derived, hasPredicate)
                             else
-                                Ok(typeTest :: derived)
+                                Ok(typeTest :: derived, hasPredicate)
 
                 match tests with
                 | Error msg -> return addErrorAndReturnNull com ctx.InlinePath r msg
-                | Ok [] -> return makeBoolConst true
-                | Ok [ test ] -> return test unionExpr
-                | Ok tests ->
+                | Ok([], _) -> return makeBoolConst true
+                | Ok([ test ], false) -> return test unionExpr
+                | Ok(tests, hasPredicate) ->
                     let makeTest unionExpr =
                         tests
                         |> List.map (fun test -> test unionExpr)
                         |> List.reduce (fun acc test -> makeLogOp r acc test LogicalAnd)
 
-                    if canHaveSideEffects com unionExpr then
+                    if hasPredicate || canHaveSideEffects com unionExpr then
                         let ident = getIdentUniqueName com ctx "unionValue" |> makeTypedIdent unionExpr.Type
+                        let ident = { ident with IsMutable = hasPredicate }
                         return Fable.Let(ident, unionExpr, makeTest (Fable.IdentExpr ident))
                     else
                         return makeTest unionExpr

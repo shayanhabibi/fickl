@@ -493,6 +493,46 @@ module TaggedUnion =
         | [<CaseTest("$0 === $0")>] Values of obj[]
         | Missing
 
+    [<RequireQualifiedAccess; Erase>]
+    type FicklPredicate =
+        | [<Fickl.Core.CaseTest("typeof $0 === 'number'")>] Value of string
+        | Missing
+
+    [<RequireQualifiedAccess; Erase>]
+    type FablePredicate =
+        | [<Fable.Core.CaseTest("typeof $0 === 'number'")>] Value of string
+        | Missing
+
+    [<RequireQualifiedAccess; Erase>]
+    type BothPredicates =
+        | [<Fickl.Core.CaseTest("true"); Fable.Core.CaseTest("true")>] Value of string
+        | Missing
+
+    [<RequireQualifiedAccess; Erase>]
+    type FableAllocation =
+        | [<Fable.Core.CaseTest("$0 === $0")>] Values of obj[]
+        | Missing
+
+    [<RequireQualifiedAccess; Erase>]
+    type FableAllocationFallback =
+        | [<Fable.Core.CaseTest("$0 === $0")>] Values of obj[]
+        | Other of obj[]
+
+    [<RequireQualifiedAccess; Erase>]
+    type FicklAllocationFallback =
+        | [<Fickl.Core.CaseTest("$0 === $0")>] Values of obj[]
+        | Other of obj[]
+
+    [<RequireQualifiedAccess; Erase>]
+    type FicklNullaryPredicate =
+        | [<Fickl.Core.CaseTest("$0 === 42")>] Value
+        | Missing
+
+    [<RequireQualifiedAccess; Erase>]
+    type FablePetPredicate =
+        | Animal of Animal
+        | [<Fable.Core.CaseTest("$0.Bark() === 'woof'")>] Dog of Dog
+
     type Take =
         abstract ``type``: string
         abstract fromIndex: int
@@ -593,7 +633,7 @@ module ErasedCaseTest =
 
     [<Erase; RequireQualifiedAccess>]
     type Id =
-        | [<CaseTest("$0.startsWith('n:')")>] Name of string
+        | [<Fable.Core.CaseTest("$0.startsWith('n:')")>] Name of string
         | Slug of string
         | Count of int
 
@@ -1384,6 +1424,30 @@ let tests =
 
     testCase "Erased CaseTest evaluates a fresh allocation once" <| fun () ->
         (TaggedUnion.ErasedAllocation.Values [||]).IsValues |> equal true
+
+    testCase "Erased CaseTest namespaces preserve override and narrowing semantics" <| fun () ->
+        (unbox<TaggedUnion.FicklPredicate> 42).IsValue |> equal true
+        (unbox<TaggedUnion.FablePredicate> 42).IsValue |> equal false
+        (unbox<TaggedUnion.BothPredicates> 42).IsValue |> equal false
+        (unbox<TaggedUnion.FicklNullaryPredicate> 42).IsValue |> equal true
+
+    testCase "Fable erased CaseTest evaluates a fresh allocation once" <| fun () ->
+        (TaggedUnion.FableAllocation.Values [||]).IsValues |> equal true
+
+    testCase "Negated erased CaseTest evaluates a fresh allocation once in both namespaces" <| fun () ->
+        (TaggedUnion.FableAllocationFallback.Values [||]).IsOther |> equal false
+        (TaggedUnion.FicklAllocationFallback.Values [||]).IsOther |> equal false
+
+    testCase "Fable erased CaseTest guards negated predicates with their payload type" <| fun () ->
+        let animal = TaggedUnion.FablePetPredicate.Animal(TaggedUnion.Animal())
+        let dog = TaggedUnion.FablePetPredicate.Dog(TaggedUnion.Dog())
+        animal.IsAnimal |> equal true
+        dog.IsAnimal |> equal false
+        let describe = function
+            | TaggedUnion.FablePetPredicate.Animal _ -> "animal"
+            | TaggedUnion.FablePetPredicate.Dog _ -> "dog"
+        animal |> describe |> equal "animal"
+        dog |> describe |> equal "dog"
 
     testCase "Erased CaseTest preserves constructor payloads" <| fun () ->
         let ctor: TaggedUnion.Constructable = emitJsExpr () "class { constructor(value) { this.value = value; } }"
