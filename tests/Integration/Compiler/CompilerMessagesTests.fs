@@ -151,6 +151,17 @@ type Implementation() =
       |> Assert.Exists.errorWith "CallableInterface must be implemented with an object expression"
       |> ignore
 
+    testCase "CallableInterface accepts type abbreviations" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Callback = abstract Invoke: int -> int
+type Alias = Callback
+let callback: Alias = { new Alias with member _.Invoke value = value + 1 }
+"""
+      |> Assert.Is.success
+      |> ignore
+
     testCase "Compile Console.WriteLine" <| fun _ ->
       let source = "Console.WriteLine(\"Hello World\")"
       compile source
