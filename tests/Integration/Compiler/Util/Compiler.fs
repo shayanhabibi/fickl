@@ -49,7 +49,8 @@ module Compiler =
               SourceMaps = false
               SourceMapsRoot = None
               NoRestore = false
-              NoCache = false
+              // The up-to-date skip reports no diagnostics for an unchanged project.
+              NoCache = true
               NoGitignore = false
               NoParallelTypeCheck = false
               Exclude = ["Fable.Core"]
