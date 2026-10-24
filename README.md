@@ -1,65 +1,44 @@
-# Fable: F# |> JS
+# Fickl: Fable Performance Lab
 
-[![Nuget](https://img.shields.io/nuget/v/Fable.svg?maxAge=0&colorB=brightgreen)](https://www.nuget.org/packages/Fable) [![Build](https://github.com/fable-compiler/Fable/actions/workflows/build.yml/badge.svg)](https://github.com/fable-compiler/Fable/actions/workflows/build.yml) [![Join the chat at https://gitter.im/fable-compiler/Fable](https://badges.gitter.im/fable-compiler/Fable.svg)](https://gitter.im/fable-compiler/Fable?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+This repository is the fork of [Fable](https://github.com/fable-compiler/fable) that refrains from work on bringing cross-language targetting to parity, and instead focuses on two main objectives, in order of priority:
 
-[Follow us on Twitter!](https://twitter.com/FableCompiler)
+1. Performance and ergonomics of the Fable compiler
+2. Explicit control of expression
+3. Transparency
 
-Fable is an F# to JavaScript compiler powered [FSharp Compiler Services](https://fsharp.github.io/fsharp-compiler-docs/fcs/), designed to make F# a first-class citizen of the JavaScript ecosystem. [Check the website](http://fable.io) for more information and if you find the project useful, don't forget to give us a star!
+## Performance and ergonomics
 
-> Fable actually uses a fork of FCS with a few tweaks. Binaries are in `lib/fcs` folder. See [this PR](https://github.com/ncave/fsharp/pull/2) for more info.
+The fable compiler owns a slice of the F# Compiler, and distributes it as a tool. This includes: a slim version of FSharp.Compiler.Services, and FSharp.Core.
 
-## Getting started
+This means there is no concern for the compiler itself to keep target frameworks beyond anything other than what is in LTS. At the moment, this means .NET 10+.
+This also benefits the ecosystem of plugins, as they also benefit from modern performance constructs.
 
-Check [this page](https://fable.io/docs/2-steps/setup.html).
+Fickl has already made significant strides in improving performance. The difficulty ceiling for completing these tasks is remarkably low in the advent of AI. The importance is in ensuring there is a solid foundation of *behavioural* tests that cover edge cases. There is more yield from prompting AI to try its best to find code utilising/stressing a feature and won't compile, or will compile and provide the wrong runtime behaviour.
 
-## Building
+## Explicit control of expression
 
-### Requirements
+When targeting another language, a sensible collection of ergonomic changes are made to faithfully represent F# semantics in the target language. Beyond this, are a collection of attributes and other compiler recognised constructs that inform our transformation pipeline.
 
-#### Use VSCode Dev Container
+There should be a distinct combination of target related and target agnostic attributes that provide predictable behaviour in the transformation pipeline. Behaviours should **always** have toggles. And the compiler should **always** recognise these toggles and adjust accordingly. Crossing the bounds of generic types can always make this more difficult to apply correctly.
 
-You can use VSCode Dev Container to get a preconfigured environment both with requirements and VSCode extensions.
+The capacity to explicitly control transformation via attributes does not have to be as ergonomic as normal usage. We expect explicit control to be used in exception; however, we acknowledge that some libraries/authors/tools will use them in excess, so we will not attempt to deter users; instead, we will attempt to adjust the balance between implicit and explicit.
 
-1. You need to have docker installed and running.
-2. [Install the Dev Container extension in VSCode](vscode:extension/ms-vscode-remote.remote-containers)
-3. Open the project in VSCode and click on the green button in the bottom left corner.
+## Transparency
 
-#### Use your machine
+Development loops are increasingly becoming agentic, and workflows are increasingly being inhibited/obstructed by the lack of machine readable diagnostics/logs/information.
 
-Make sure the following **requirements** are installed in your system:
+An agent developing bindings for you should be able to run a daemon and iterate over types/methods and see their output in real time, and in isolation.
+Where possible, we will endeavour towards this, where it does not overly diverge the FCS or underlying Fable compiler implementation.
 
-- [dotnet SDK 6 or higher](https://dotnet.microsoft.com/download)
-- [node.js](https://nodejs.org) with npm
-- [Python 3](https://www.python.org/) is installed and available as `python`
-- [Uv](https://docs.astral.sh/uv/)
-- [Rust](https://www.rust-lang.org/tools/install)
-- [Dart](https://dart.dev/get-dart)
-- [Erlang/OTP](https://www.erlang.org/downloads) with [rebar3](https://rebar3.org/) (for Beam/Erlang target)
+---
 
-### Build
+## Fable
 
-Run `dotnet run --project src/Fickl.Build -- --help` to see the build options.
+As much as possible, the development and learnings that are made in this endeavor should be made available upstream.
 
-When using VSCode, you can also run the build tasks from the command palette (Ctrl+Shift+P) by typing `Run Task` and selecting the task you want to run.
+## Contribution
 
-We also configured several debug configurations that you can use from the debug panel (Ctrl+Shift+D). This is useful as you can attach the debugger to the Fable compiler process to check what's going on.
+The principle behind having this *Lab* is the ability to make changes and publish with speed, and without encumbrance.
 
-## Contributing
+Contribution should be made to Fable instead of Fickl. However, if you insist on embarking on this experiment, then you are free to do so. Agentic contributions should endeavour to have full provenance, experimental data, tests, mutations and considered cost/benefit ratios accompanying them.
 
-Just by using Fable you're already contributing! You can help the community a lot by sharing examples and experiences in your personal (or Fable's) blog and/or by editing the [Fable Resources](https://fable.io/resources.html) page.
-
-Send bug reports (ideally with minimal code to reproduce the problem) and feature requests to this [GitHub repository](https://github.com/fable-compiler/Fable/issues). To interact with the community you can use the [Gitter chat](https://gitter.im/fable-compiler/Fable) but please note maintainers are not checking the chat regularly.
-
-If you are up to contribute a fix or a feature yourself, you're more than welcome! Please send first an issue or a minimal Work In Progess PR so we can discuss the implementation details in advance.
-
-### List of changelogs
-
-- [fable-standalone](src/fable-standalone/CHANGELOG.md)
-- [Fable.Core](src/Fable.Core/CHANGELOG.md)
-- [Fable.Cli](src/Fable.Cli/CHANGELOG.md)
-- [fable-library](src/fable-library-ts/CHANGELOG.md)
-- [fable-metadata](src/fable-metadata/CHANGELOG.md)
-- [fable-compiler](src/fable-compiler-js/CHANGELOG.md)
-- [Fable.AST](src/Fable.AST/CHANGELOG.md)
-- [Fable.PublishUtils](src/Fable.PublishUtils/CHANGELOG.md)
-- [Fable.Compiler](src/Fable.Compiler/CHANGELOG.md)
