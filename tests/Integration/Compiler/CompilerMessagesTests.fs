@@ -15,6 +15,142 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "CallableInterface rejects added members on a callable base" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Parent = abstract Invoke<'T>: 'T -> 'T
+[<CallableInterface>]
+type Child =
+    inherit Parent
+    abstract Name: string
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> ignore
+
+    testCase "CallableInterface rejects unrelated identical callable slots" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type First = abstract Invoke<'T>: 'T -> 'T
+[<CallableInterface>]
+type Second = abstract Invoke<'T>: 'T -> 'T
+[<CallableInterface>]
+type Child =
+    inherit First
+    inherit Second
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> ignore
+
+    testCase "CallableInterface rejects distinct instantiations of one callable slot" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Parent<'T> = abstract Invoke: 'T -> 'T
+[<CallableInterface>]
+type First = inherit Parent<int>
+[<CallableInterface>]
+type Second = inherit Parent<string>
+[<CallableInterface>]
+type Child =
+    inherit First
+    inherit Second
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> ignore
+
+    testCase "CallableInterface rejects multiple callable bases" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type First = abstract Invoke: int -> int
+[<CallableInterface>]
+type Second = abstract Invoke: string -> string
+[<CallableInterface>]
+type Child =
+    inherit First
+    inherit Second
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> ignore
+
+    testCase "CallableInterface rejects unsupported targets" <| fun _ ->
+      Compiler.Cached.compileForLanguage Fable.Python Compiler.Settings.standard """
+open Fickl.Core
+[<CallableInterface>]
+type Callback = abstract Invoke<'T>: 'T -> 'T
+"""
+      |> Assert.Exists.errorWith "CallableInterface is only supported for JavaScript and TypeScript"
+      |> ignore
+
+    testCase "CallableInterface rejects curried method groups" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Callback = abstract Invoke: int -> int -> int
+"""
+      |> Assert.Exists.errorWith "CallableInterface requires exactly one instance Invoke method"
+      |> ignore
+
+    testCase "CallableInterface rejects secondary object-expression implementations" <| fun _ ->
+      compile """
+open Fickl.Core
+type Ordinary = abstract Value: int
+[<CallableInterface>]
+type Callback = abstract Invoke: int -> int
+let value =
+    { new Ordinary with member _.Value = 42
+      interface Callback with member _.Invoke value = value }
+"""
+      |> Assert.Exists.errorWith "CallableInterface must be the only interface implemented by an object expression"
+      |> ignore
+
+    testCase "CallableInterface rejects overloaded declarations even when unused" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Callback =
+    abstract Invoke: int -> int
+    abstract Invoke: string -> string
+"""
+      |> Assert.Exists.errorWith "CallableInterface requires exactly one instance Invoke method"
+      |> ignore
+
+    testCase "CallableInterface rejects extra properties" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Callback =
+    abstract Invoke: int -> int
+    abstract Name: string
+"""
+      |> Assert.Exists.errorWith "CallableInterface requires exactly one instance Invoke method"
+      |> ignore
+
+    testCase "CallableInterface rejects inherited declarations" <| fun _ ->
+      compile """
+open Fickl.Core
+type Parent = abstract Value: int
+[<CallableInterface>]
+type Callback =
+    inherit Parent
+    abstract Invoke: int -> int
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> ignore
+
+    testCase "CallableInterface rejects class implementations" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Callback = abstract Invoke: int -> int
+type Implementation() =
+    interface Callback with member _.Invoke value = value
+"""
+      |> Assert.Exists.errorWith "CallableInterface must be implemented with an object expression"
+      |> ignore
+
     testCase "Compile Console.WriteLine" <| fun _ ->
       let source = "Console.WriteLine(\"Hello World\")"
       compile source

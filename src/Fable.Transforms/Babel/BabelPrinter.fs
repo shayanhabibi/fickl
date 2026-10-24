@@ -1146,6 +1146,13 @@ module PrinterExtensions =
 
         member printer.Print(m: AbstractMember) =
             match m with
+            | AbstractCallSignature(parameters, returnType, typeParameters, doc) ->
+                printer.PrintJsDoc(doc)
+                printer.Print(typeParameters)
+                printer.Print("(")
+                printer.PrintParameters(parameters)
+                printer.Print("): ")
+                printer.Print(returnType)
             | AbstractProperty(key, returnType, isComputed, isOptional, doc) ->
                 printer.PrintJsDoc(doc)
 

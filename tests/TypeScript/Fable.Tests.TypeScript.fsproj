@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Fable.Core/Fable.Core.fsproj" />
+    <ProjectReference Include="../../src/Fickl.Core/Fickl.Core.fsproj" />
     <ProjectReference Include="../Js/DllRef/Fable.Tests.DllRef.fsproj" />
     <ProjectReference Include="../../tests_external/Fable.Tests.External.fsproj" />
     <ProjectReference Include="../Js/Project With Spaces/Fable.Tests.Spaces.fsproj" />
@@ -52,6 +53,7 @@
     <!-- <Compile Include="../Js/Main/ImportTests.fs" /> -->
     <Compile Include="../Js/Main/InlineIfLambdaTests.fs" />
     <!-- <Compile Include="../Js/Main/JsInteropTests.fs" /> -->
+    <Compile Include="../Js/Main/CallableInterfaceTests.fs" />
     <!-- <Compile Include="../Js/Main/ListCollectorTests.fs" /> -->
     <Compile Include="../Js/Main/ListTests.fs" />
     <Compile Include="../Js/Main/MapTests.fs" />

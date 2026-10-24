@@ -6,8 +6,10 @@
     <Compile Include="Util/Util.fs" />
     <Compile Include="Lib.fs" />
     <Compile Include="Lib2.fs" />
+    <Compile Include="CallableContracts.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../src/Fable.Core/Fable.Core.fsproj" />
+    <ProjectReference Include="../../../src/Fickl.Core/Fickl.Core.fsproj" />
   </ItemGroup>
 </Project>

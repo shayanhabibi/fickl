@@ -3165,6 +3165,62 @@ module Util =
                || ent.IsValueType
                || (ent |> hasInterface Types.iStructuralComparable))
 
+    let isCallableInterface (entity: FSharpEntity) =
+        entity.Attributes
+        |> Seq.exists (fun attribute -> attribute.AttributeType.TryFullName = Some Atts.callableInterface)
+
+    let rec validateCallableInterface (com: IFableCompiler) (entity: FSharpEntity) =
+        let members =
+            entity.MembersFunctionsAndValues |> Seq.filter _.IsInstanceMember |> Seq.toList
+
+        if com.Options.Language <> JavaScript && com.Options.Language <> TypeScript then
+            Some "CallableInterface is only supported for JavaScript and TypeScript"
+        elif not entity.IsInterface then
+            Some "CallableInterface requires an interface"
+        elif entity.DeclaredInterfaces.Count <> 0 then
+            match members, Seq.toList entity.DeclaredInterfaces with
+            | [], [ parent ] ->
+                match tryDefinition parent with
+                | Some(parentEntity, _) when isCallableInterface parentEntity ->
+                    validateCallableInterface com parentEntity
+                | _ -> Some "CallableInterface inheritance requires a single callable base and no additional members"
+            | [], parents when
+                parents
+                |> List.forall (fun parent ->
+                    match tryDefinition parent with
+                    | Some(parentEntity, _) when isCallableInterface parentEntity ->
+                        (validateCallableInterface com parentEntity).IsNone
+                    | _ -> false
+                )
+                ->
+                // A diamond is one implementation slot only when every path reaches the
+                // same instantiated declaring interface, not merely an equivalent signature.
+                let slots =
+                    entity.AllInterfaces
+                    |> Seq.filter (fun parent ->
+                        match tryDefinition parent with
+                        | Some(parentEntity, _) ->
+                            parentEntity.MembersFunctionsAndValues |> Seq.exists _.IsInstanceMember
+                        | _ -> false
+                    )
+                    |> Seq.distinct
+                    |> Seq.length
+
+                if slots = 1 then
+                    None
+                else
+                    Some "CallableInterface inheritance requires a single callable base and no additional members"
+            | _ -> Some "CallableInterface inheritance requires a single callable base and no additional members"
+        else
+            match members with
+            | [ memberInfo ] when
+                memberInfo.CompiledName = "Invoke"
+                && not memberInfo.IsProperty
+                && memberInfo.CurriedParameterGroups.Count = 1
+                ->
+                None
+            | _ -> Some "CallableInterface requires exactly one instance Invoke method with one argument group"
+
     let makeCallWithArgInfo
         com
         (ctx: Context)
@@ -3208,6 +3264,21 @@ module Util =
                 makeCall r typ callInfo callee
             | _ ->
                 "Only Invoke is supported in delegates"
+                |> addErrorAndReturnNull com ctx.InlinePath r
+
+        | _, Some entity when memb.IsInstanceMember && isCallableInterface entity ->
+            match validateCallableInterface com entity, callInfo.ThisArg, memb.CompiledName with
+            | None, Some callee, "Invoke" ->
+                let callInfo =
+                    { callInfo with
+                        ThisArg = None
+                        GenericArgs = List.skip entity.GenericParameters.Count callInfo.GenericArgs
+                    }
+
+                makeCall r typ callInfo callee
+            | Some error, _, _ -> error |> addErrorAndReturnNull com ctx.InlinePath r
+            | _ ->
+                "Only Invoke is supported on callable interfaces"
                 |> addErrorAndReturnNull com ctx.InlinePath r
 
         // Check if this is an interface or abstract/overriden method

@@ -27,14 +27,16 @@ module Compiler =
   /// NOTE: NOT threadsafe
   ///       -> don't use `parallel`
   module Cached =
-    type private CachedProject(name: string) =
+    type private CachedProject(name: string, ?language) =
         let projDir = IO.Path.Join(__SOURCE_DIRECTORY__, "../" + name) |> Path.normalizeFullPath
         let projFile = IO.Path.Join(projDir, name + ".fsproj") |> Path.normalizeFullPath
 
         let cliArgs =
             // The real CLI always defines these (Entry.fs), and code guarded by them is exactly where
             // Fable warnings - and the comments suppressing them - live.
-            let compilerOptions = CompilerOptionsHelper.Make(define = ["FABLE_COMPILER"; "FABLE_COMPILER_JAVASCRIPT"])
+            let language = defaultArg language JavaScript
+            let defines = ["FABLE_COMPILER"; "FABLE_COMPILER_5"; "FABLE_COMPILER_" + language.ToString().ToUpperInvariant()]
+            let compilerOptions = CompilerOptionsHelper.Make(language=language, define=defines)
             { CliArgs.ProjectFile = projFile
               FableLibraryPath = None
               RootDir = projDir
@@ -100,6 +102,12 @@ module Compiler =
         ]
 
     let compile settings source = compileWithLibrary settings emptyLibrary source
+
+    let compileForLanguage language settings source =
+        CachedProject("TestProject", language).Compile [
+          "Library.fs", emptyLibrary
+          "Program.fs", programFile settings source
+        ]
 
     let compileWithSignedLibrary settings (signature: string) (library: string) source =
         projectWithSignature.Compile [
