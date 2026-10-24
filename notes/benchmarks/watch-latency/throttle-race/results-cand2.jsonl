@@ -1,0 +1,15 @@
+{"mode":"unit","instances":32,"producers":1,"delayMs":1,"sent":96000,"delivered":96000,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":11824,"lossyInstances":0,"seconds":4.7}
+{"mode":"unit","instances":32,"producers":1,"delayMs":1,"sent":96000,"delivered":96000,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":9780,"lossyInstances":0,"seconds":5.0}
+{"mode":"unit","instances":32,"producers":1,"delayMs":1,"sent":96000,"delivered":96000,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":9161,"lossyInstances":0,"seconds":4.1}
+{"mode":"unit","instances":32,"producers":1,"delayMs":1,"sent":96000,"delivered":96000,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":10067,"lossyInstances":0,"seconds":4.9}
+{"mode":"unit","instances":32,"producers":1,"delayMs":1,"sent":96000,"delivered":96000,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":11812,"lossyInstances":0,"seconds":4.4}
+{"mode":"unit","instances":32,"producers":4,"delayMs":1,"sent":384000,"delivered":384000,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":6972,"lossyInstances":0,"seconds":13.8}
+{"mode":"unit","instances":32,"producers":4,"delayMs":1,"sent":384000,"delivered":384000,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":12640,"lossyInstances":0,"seconds":14.3}
+{"mode":"unit","instances":32,"producers":4,"delayMs":1,"sent":384000,"delivered":384000,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":11639,"lossyInstances":0,"seconds":14.0}
+{"mode":"unit","instances":48,"producers":1,"delayMs":5,"sent":28800,"delivered":28800,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":4703,"lossyInstances":0,"seconds":7.4}
+{"mode":"unit","instances":48,"producers":1,"delayMs":5,"sent":28800,"delivered":28800,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":4670,"lossyInstances":0,"seconds":6.5}
+{"mode":"unit","instances":48,"producers":1,"delayMs":10,"sent":28800,"delivered":28800,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":5383,"lossyInstances":0,"seconds":9.8}
+{"mode":"unit","instances":48,"producers":1,"delayMs":10,"sent":28800,"delivered":28800,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":5817,"lossyInstances":0,"seconds":10.1}
+{"mode":"unit","instances":8,"producers":1,"delayMs":200,"sent":320,"delivered":320,"lost":0,"duplicates":0,"spurious":0,"overlappingOnNext":0,"batches":108,"lossyInstances":0,"seconds":17.2}
+{"mode":"fsw","delayMs":10,"rounds":150,"files":8,"roundsLosing":0,"lostWrites":0,"seconds":52.0}
+{"mode":"fsw","delayMs":1,"rounds":300,"files":8,"roundsLosing":0,"lostWrites":0,"seconds":93.3}

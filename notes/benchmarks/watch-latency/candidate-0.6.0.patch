@@ -1,0 +1,77 @@
+diff --git a/src/Fable.Cli/Entry.fs b/src/Fable.Cli/Entry.fs
+index 38d40db88..882e70026 100644
+--- a/src/Fable.Cli/Entry.fs
++++ b/src/Fable.Cli/Entry.fs
+@@ -75,7 +75,7 @@ let knownCliArgs () =
+         [ "--silent" ], [ "Don't print any log during compilation" ]
+         [ "--typedArrays" ], [ "Compile numeric arrays as JS typed arrays (default is true)" ]
+         [ "--watch" ], [ "Alias of watch command" ]
+-        [ "--watchDelay" ], [ "Delay in ms before recompiling after a file changes (default 200)" ]
++        [ "--watchDelay" ], [ "Delay in ms before recompiling after a file changes (default 50)" ]
+         [], []
+         [ "--run" ], [ "The command after the argument will be executed after compilation" ]
+         [ "--runFast" ], [ "The command after the argument will be executed BEFORE compilation" ]
+@@ -405,7 +405,7 @@ type Runner =
+ 
+             let watchDelay =
+                 if watch then
+-                    args.Value("--watchDelay") |> Option.map int |> Option.defaultValue 200 |> Some
++                    args.Value("--watchDelay") |> Option.map int |> Option.defaultValue 50 |> Some
+                 else
+                     None
+ 
+diff --git a/src/Fable.Cli/Main.fs b/src/Fable.Cli/Main.fs
+index 0e9337051..400ccdd94 100644
+--- a/src/Fable.Cli/Main.fs
++++ b/src/Fable.Cli/Main.fs
+@@ -1557,6 +1557,14 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
+                     let newProjCracked, filesToCompile =
+                         getFilesToCompile state changes (Some oldFiles) newProjCracked
+ 
++                    // fickl: new options (defines, references, language version...) can change the
++                    // output of any file, and the new checker starts without the project's results:
++                    // compile everything, as on the first cycle.
++                    let filesToCompile =
++                        match fableCompiler with
++                        | Some _ -> filesToCompile
++                        | None -> newProjCracked.SourceFilePaths
++
+                     newProjCracked, fableCompiler, filesToCompile
+                 else
+                     let changes =
+diff --git a/src/Fable.Compiler/Util.fs b/src/Fable.Compiler/Util.fs
+index 4d403b67b..39224094d 100644
+--- a/src/Fable.Compiler/Util.fs
++++ b/src/Fable.Compiler/Util.fs
+@@ -713,17 +713,26 @@ module Observable =
+                 let events = ResizeArray()
+                 let timer = new Timers.Timer(float ms, AutoReset = false)
+ 
++                // Source callbacks and the timer callback run on different threads: an event added
++                // between the copy and the clear was lost, and Timer.Start/Stop are not thread-safe.
+                 timer.Elapsed.Add(fun _ ->
+-                    let evs = events.ToArray()
+-                    events.Clear()
++                    let evs =
++                        lock events (fun () ->
++                            let evs = events.ToArray()
++                            events.Clear()
++                            evs
++                        )
++
+                     w.OnNext(evs)
+                 )
+ 
+                 let disp =
+                     obs.Subscribe(fun v ->
+-                        events.Add(v)
+-                        timer.Stop()
+-                        timer.Start()
++                        lock events (fun () ->
++                            events.Add(v)
++                            timer.Stop()
++                            timer.Start()
++                        )
+                     )
+ 
+                 { new IDisposable with

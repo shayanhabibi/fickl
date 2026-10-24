@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Concurrency regression for Observable.throttle / FsWatcher. CliDir selects the compiler build under test. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <CliDir Condition="'$(CliDir)' == ''">$(MSBuildThisFileDirectory)../../../../src/Fable.Cli/bin/Release/net10.0/</CliDir>
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharp.Core" Version="10.1.203" />
+    <Reference Include="Fable.Compiler"><HintPath>$(CliDir)Fable.Compiler.dll</HintPath></Reference>
+    <Reference Include="fable"><HintPath>$(CliDir)fable.dll</HintPath></Reference>
+    <Reference Include="Fable.AST"><HintPath>$(CliDir)Fable.AST.dll</HintPath></Reference>
+    <Reference Include="FSharp.Compiler.Service"><HintPath>$(CliDir)FSharp.Compiler.Service.dll</HintPath></Reference>
+    <Reference Include="Fable.Transforms"><HintPath>$(CliDir)Fable.Transforms.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>
