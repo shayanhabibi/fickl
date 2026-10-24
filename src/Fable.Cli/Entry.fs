@@ -75,7 +75,7 @@ let knownCliArgs () =
         [ "--silent" ], [ "Don't print any log during compilation" ]
         [ "--typedArrays" ], [ "Compile numeric arrays as JS typed arrays (default is true)" ]
         [ "--watch" ], [ "Alias of watch command" ]
-        [ "--watchDelay" ], [ "Delay in ms before recompiling after a file changes (default 200)" ]
+        [ "--watchDelay" ], [ "Delay in ms before recompiling after a file changes (default 50)" ]
         [], []
         [ "--run" ], [ "The command after the argument will be executed after compilation" ]
         [ "--runFast" ], [ "The command after the argument will be executed BEFORE compilation" ]
@@ -165,6 +165,10 @@ Arguments:
    When set to '1' or 'true', Fable watch will poll the file system for
    changes. This is required for some file systems, such as network shares,
    Docker mounted volumes, and other virtual file systems.
+
+   DOTNET_TieredPGO
+   When set to '0', non-watch compilations can run 10 to 20%% faster
+   depending on the project, at the cost of slower rebuilds in watch mode.
 """
 
 let generateHelpWithPrefix prefixText =
@@ -401,7 +405,7 @@ type Runner =
 
             let watchDelay =
                 if watch then
-                    args.Value("--watchDelay") |> Option.map int |> Option.defaultValue 200 |> Some
+                    args.Value("--watchDelay") |> Option.map int |> Option.defaultValue 50 |> Some
                 else
                     None
 

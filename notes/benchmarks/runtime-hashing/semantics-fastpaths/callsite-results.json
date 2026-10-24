@@ -1,0 +1,60 @@
+{
+  "checks": 68,
+  "effects": [
+    {
+      "throwing": "none",
+      "runs": [
+        {
+          "trace": [
+            "left",
+            "right"
+          ],
+          "result": true
+        },
+        {
+          "trace": [
+            "left",
+            "right"
+          ],
+          "result": true
+        }
+      ]
+    },
+    {
+      "throwing": "left",
+      "runs": [
+        {
+          "trace": [
+            "left"
+          ],
+          "result": "left"
+        },
+        {
+          "trace": [
+            "left"
+          ],
+          "result": "left"
+        }
+      ]
+    },
+    {
+      "throwing": "right",
+      "runs": [
+        {
+          "trace": [
+            "left",
+            "right"
+          ],
+          "result": "right"
+        },
+        {
+          "trace": [
+            "left",
+            "right"
+          ],
+          "result": "right"
+        }
+      ]
+    }
+  ]
+}

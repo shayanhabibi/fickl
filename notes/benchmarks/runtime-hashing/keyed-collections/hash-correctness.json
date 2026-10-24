@@ -1,0 +1,2959 @@
+{
+  "node": "v26.7.0",
+  "platform": "win32",
+  "correctness": [
+    {
+      "kind": "map",
+      "hashMode": "collision",
+      "operations": 700,
+      "traceCalls": 7106,
+      "matched": true
+    },
+    {
+      "kind": "map",
+      "hashMode": "buckets",
+      "operations": 700,
+      "traceCalls": 1148,
+      "matched": true
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "KeyNotFoundException",
+          "message": "The item was not found in collection"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            8
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {},
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            8
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Exception",
+          "message": "The given key '0' was not present in the dictionary."
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Exception",
+          "message": "The given key '0' was not present in the dictionary."
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Exception",
+          "message": "The given key '0' was not present in the dictionary."
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "ArgumentException",
+          "message": "An item with the same key has already been added. Key: { id = 2 }"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": 2
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            8
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "ArgumentException",
+          "message": "An item with the same key has already been added. Key: { id = 2 }"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mechanism": [
+        {
+          "has": 2,
+          "get": 1
+        },
+        {
+          "has": 0,
+          "get": 2
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "hashMode": "collision",
+      "operations": 700,
+      "traceCalls": 7106,
+      "matched": true
+    },
+    {
+      "kind": "set",
+      "hashMode": "buckets",
+      "operations": 700,
+      "traceCalls": 1148,
+      "matched": true
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Exception",
+          "message": "The given key '0' was not present in the dictionary."
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mechanism": [
+        {
+          "has": 2,
+          "get": 1
+        },
+        {
+          "has": 0,
+          "get": 2
+        }
+      ]
+    }
+  ],
+  "timings": []
+}

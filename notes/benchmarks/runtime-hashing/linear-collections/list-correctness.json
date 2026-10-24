@@ -1,0 +1,52 @@
+{
+  "checks": 48337,
+  "allocations": [
+    {
+      "n": 0,
+      "baseline": 1,
+      "candidate": 1
+    },
+    {
+      "n": 1,
+      "baseline": 3,
+      "candidate": 2
+    },
+    {
+      "n": 8,
+      "baseline": 17,
+      "candidate": 9
+    },
+    {
+      "n": 128,
+      "baseline": 257,
+      "candidate": 129
+    },
+    {
+      "n": 4096,
+      "baseline": 8193,
+      "candidate": 4097
+    }
+  ],
+  "arrayCollectRejected": {
+    "baseline": {
+      "result": [
+        2,
+        2
+      ],
+      "events": [
+        1,
+        2
+      ]
+    },
+    "streaming": {
+      "result": [
+        1,
+        2
+      ],
+      "events": [
+        1,
+        2
+      ]
+    }
+  }
+}

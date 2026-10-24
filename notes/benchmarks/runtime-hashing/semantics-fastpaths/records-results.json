@@ -1,0 +1,32 @@
+{
+  "observations": {
+    "distinctEqual": true,
+    "reference": false,
+    "nanScalar": false,
+    "nanRecordSelf": true,
+    "nanRecordCopy": false,
+    "customSelf": true,
+    "customCalls": 0,
+    "customDirect": false,
+    "nestedCustomSelf": true,
+    "nestedCustomCalls": 0,
+    "shallowBefore": true,
+    "shallowAfter": false,
+    "hashChanged": true,
+    "fieldReadOrder": [
+      [
+        "a.N",
+        "b.N",
+        "a.S",
+        "b.S"
+      ],
+      [
+        "a.N",
+        "b.N",
+        "a.S",
+        "b.S"
+      ]
+    ]
+  },
+  "specializedChecks": 1060
+}

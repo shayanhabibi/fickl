@@ -1,0 +1,5 @@
+{
+  "exitCode": 0,
+  "stdout": "Fickl 0.5.3 (Fable 5.23.0): F# to JavaScript compiler\nMinimum @fable-org/fable-library-js version (when installed from npm): 2.9.0\n\nThanks to the contributor! @ctaggart\nStand with Ukraine! https://standwithukraine.com.ua/\n\nParsing .worktrees\\fickle\\notes\\benchmarks\\runtime-hashing\\representation\\StructFixture.fsproj...\nProject and references (1 source files) parsed in 795ms\n\nStarted Fable compilation...\n\nFable compilation finished in 436ms\n\n",
+  "stderr": "[rtk] /!\\ No hook installed \u00e2\u20ac\u201d run `rtk init -g` for automatic token savings\n"
+}

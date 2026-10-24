@@ -1,0 +1,37 @@
+{
+  "node": "v26.7.0",
+  "checks": 3984,
+  "nullish": {
+    "baseline": true,
+    "original": false,
+    "expanded": true
+  },
+  "traces": [
+    {
+      "value": true,
+      "trace": [
+        "left.N",
+        "right.N",
+        "left.S",
+        "right.S"
+      ]
+    },
+    {
+      "value": false,
+      "trace": [
+        "left.N",
+        "right.N",
+        "left.S",
+        "right.S"
+      ]
+    },
+    {
+      "value": false,
+      "trace": [
+        "left.N",
+        "right.N"
+      ]
+    }
+  ],
+  "timingPerformed": false
+}

@@ -18,12 +18,16 @@ type MutableSet<'T when 'T: equality>(items: 'T seq, comparer: IEqualityComparer
     // new () = MutableSet (Seq.empty, EqualityComparer.Default)
     // new (comparer) = MutableSet (Seq.empty, comparer)
 
-    member private this.TryFindIndex(k) =
+    member private this.TryFindIndex(k: 'T) =
         let h = comparer.GetHashCode(k)
 
-        match hashMap.TryGetValue h with
-        | true, values -> true, h, values.FindIndex(fun v -> comparer.Equals(k, v))
-        | false, _ -> false, h, -1
+        // Every stored bucket is an allocated array, so an undefined native get result means the hash is absent.
+        let bucket: ResizeArray<'T> option =
+            Fable.Core.JsInterop.emitJsExpr (hashMap, h) "$0.get($1)"
+
+        match bucket with
+        | Some values -> true, h, values.FindIndex(fun v -> comparer.Equals(k, v))
+        | None -> false, h, -1
 
     member private this.TryFind(k) =
         match this.TryFindIndex(k) with

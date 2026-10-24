@@ -1,0 +1,1771 @@
+{
+  "node": "v26.7.0",
+  "platform": "win32",
+  "mode": "list",
+  "results": [
+    {
+      "name": "append-0",
+      "checksum": 99,
+      "medianPercent": -4.164644687382402,
+      "medianBaselineNs": 8.164288820946185,
+      "medianCandidateNs": 7.838322260295399,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 6.4043743342346735,
+              "count": 3124224
+            },
+            {
+              "variant": "candidate",
+              "ns": 6.4801758460517584,
+              "count": 3086336
+            },
+            {
+              "variant": "candidate",
+              "ns": 6.524509113115369,
+              "count": 3065472
+            },
+            {
+              "variant": "baseline",
+              "ns": 7.090988893174805,
+              "count": 2820608
+            }
+          ],
+          "baselineNs": 6.747681613704739,
+          "candidateNs": 6.502342479583564,
+          "percent": -3.635902642811184
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 6.183741540683861,
+              "count": 3234304
+            },
+            {
+              "variant": "baseline",
+              "ns": 6.451013583254201,
+              "count": 3100288
+            },
+            {
+              "variant": "baseline",
+              "ns": 9.034061343663268,
+              "count": 2213888
+            },
+            {
+              "variant": "candidate",
+              "ns": 7.1265278664599,
+              "count": 2806528
+            }
+          ],
+          "baselineNs": 7.742537463458735,
+          "candidateNs": 6.65513470357188,
+          "percent": -14.044526939894098
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 6.7002436281858975,
+              "count": 2988160
+            },
+            {
+              "variant": "candidate",
+              "ns": 6.4186829889495955,
+              "count": 3115904
+            },
+            {
+              "variant": "candidate",
+              "ns": 6.79210361877852,
+              "count": 2944640
+            },
+            {
+              "variant": "baseline",
+              "ns": 6.381128251725394,
+              "count": 3134336
+            }
+          ],
+          "baselineNs": 6.540685939955646,
+          "candidateNs": 6.605393303864058,
+          "percent": 0.9893054719708916
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 6.703246321479123,
+              "count": 2983808
+            },
+            {
+              "variant": "baseline",
+              "ns": 9.066997185632221,
+              "count": 2205824
+            },
+            {
+              "variant": "baseline",
+              "ns": 8.321960215168307,
+              "count": 2403328
+            },
+            {
+              "variant": "candidate",
+              "ns": 6.4268922490025915,
+              "count": 3112064
+            }
+          ],
+          "baselineNs": 8.694478700400264,
+          "candidateNs": 6.565069285240858,
+          "percent": -24.491513390692134
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 5.961841590674973,
+              "count": 3354752
+            },
+            {
+              "variant": "candidate",
+              "ns": 8.582935663279311,
+              "count": 2330240
+            },
+            {
+              "variant": "candidate",
+              "ns": 7.093708857311487,
+              "count": 2819456
+            },
+            {
+              "variant": "baseline",
+              "ns": 10.366736051217398,
+              "count": 1929344
+            }
+          ],
+          "baselineNs": 8.164288820946185,
+          "candidateNs": 7.838322260295399,
+          "percent": -3.9925897748067207
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 10.212826797385635,
+              "count": 1958400
+            },
+            {
+              "variant": "baseline",
+              "ns": 7.695148978084216,
+              "count": 2599040
+            },
+            {
+              "variant": "baseline",
+              "ns": 7.269506897273648,
+              "count": 2751232
+            },
+            {
+              "variant": "candidate",
+              "ns": 7.6698409581778915,
+              "count": 2607616
+            }
+          ],
+          "baselineNs": 7.482327937678932,
+          "candidateNs": 8.941333877781762,
+          "percent": 19.49935838491763
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 7.893284943928087,
+              "count": 2533888
+            },
+            {
+              "variant": "candidate",
+              "ns": 8.122011279172531,
+              "count": 2462592
+            },
+            {
+              "variant": "candidate",
+              "ns": 8.732151838605125,
+              "count": 2290432
+            },
+            {
+              "variant": "baseline",
+              "ns": 11.347228268756357,
+              "count": 1764096
+            }
+          ],
+          "baselineNs": 9.620256606342222,
+          "candidateNs": 8.427081558888828,
+          "percent": -12.402736187585528
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 9.61936544600649,
+              "count": 2084992
+            },
+            {
+              "variant": "baseline",
+              "ns": 11.017707305034559,
+              "count": 1815296
+            },
+            {
+              "variant": "baseline",
+              "ns": 24.89158975175052,
+              "count": 804352
+            },
+            {
+              "variant": "candidate",
+              "ns": 12.155593640606776,
+              "count": 1645440
+            }
+          ],
+          "baselineNs": 17.95464852839254,
+          "candidateNs": 10.887479543306632,
+          "percent": -39.36122154610967
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 11.267114490193208,
+              "count": 1775104
+            },
+            {
+              "variant": "candidate",
+              "ns": 11.073143292466877,
+              "count": 1806208
+            },
+            {
+              "variant": "candidate",
+              "ns": 9.02210902765748,
+              "count": 2216832
+            },
+            {
+              "variant": "baseline",
+              "ns": 9.70140203961261,
+              "count": 2061568
+            }
+          ],
+          "baselineNs": 10.484258264902909,
+          "candidateNs": 10.04762616006218,
+          "percent": -4.164644687382402
+        }
+      ]
+    },
+    {
+      "name": "append-1",
+      "checksum": 0,
+      "medianPercent": -60.531233644107566,
+      "medianBaselineNs": 58.11407966855001,
+      "medianCandidateNs": 22.735147703505135,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 52.477140525611254,
+              "count": 382336
+            },
+            {
+              "variant": "candidate",
+              "ns": 18.994746079503987,
+              "count": 1052928
+            },
+            {
+              "variant": "candidate",
+              "ns": 22.01555455762191,
+              "count": 908544
+            },
+            {
+              "variant": "baseline",
+              "ns": 48.9919670846393,
+              "count": 408320
+            }
+          ],
+          "baselineNs": 50.73455380512527,
+          "candidateNs": 20.505150318562947,
+          "percent": -59.58346180135029
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 21.55652934887574,
+              "count": 927872
+            },
+            {
+              "variant": "baseline",
+              "ns": 54.69925840042025,
+              "count": 365696
+            },
+            {
+              "variant": "baseline",
+              "ns": 41.9801182160129,
+              "count": 476416
+            },
+            {
+              "variant": "candidate",
+              "ns": 18.85577561240495,
+              "count": 1060736
+            }
+          ],
+          "baselineNs": 48.33968830821657,
+          "candidateNs": 20.206152480640345,
+          "percent": -58.19966328329471
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 41.89510723860606,
+              "count": 477440
+            },
+            {
+              "variant": "candidate",
+              "ns": 14.506835484170384,
+              "count": 1378688
+            },
+            {
+              "variant": "candidate",
+              "ns": 21.129141311697094,
+              "count": 946560
+            },
+            {
+              "variant": "baseline",
+              "ns": 48.393949365128535,
+              "count": 413312
+            }
+          ],
+          "baselineNs": 45.1445283018673,
+          "candidateNs": 17.81798839793374,
+          "percent": -60.531233644107566
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 20.273878454651587,
+              "count": 986496
+            },
+            {
+              "variant": "baseline",
+              "ns": 56.8326704545457,
+              "count": 352000
+            },
+            {
+              "variant": "baseline",
+              "ns": 59.395488882554325,
+              "count": 336768
+            },
+            {
+              "variant": "candidate",
+              "ns": 18.589121609564504,
+              "count": 1075968
+            }
+          ],
+          "baselineNs": 58.11407966855001,
+          "candidateNs": 19.431500032108048,
+          "percent": -66.56318031200979
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 51.21681415929217,
+              "count": 390528
+            },
+            {
+              "variant": "candidate",
+              "ns": 22.4882851849187,
+              "count": 889472
+            },
+            {
+              "variant": "candidate",
+              "ns": 22.982010222091574,
+              "count": 870272
+            },
+            {
+              "variant": "baseline",
+              "ns": 59.324931266590944,
+              "count": 337536
+            }
+          ],
+          "baselineNs": 55.270872712941554,
+          "candidateNs": 22.735147703505135,
+          "percent": -58.865951291227304
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 29.143597305110184,
+              "count": 686336
+            },
+            {
+              "variant": "baseline",
+              "ns": 58.20618016759727,
+              "count": 343680
+            },
+            {
+              "variant": "baseline",
+              "ns": 82.9850969198083,
+              "count": 241024
+            },
+            {
+              "variant": "candidate",
+              "ns": 30.41735396856189,
+              "count": 659584
+            }
+          ],
+          "baselineNs": 70.59563854370279,
+          "candidateNs": 29.780475636836037,
+          "percent": -57.815417140252656
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 56.32122747747757,
+              "count": 355200
+            },
+            {
+              "variant": "candidate",
+              "ns": 20.199897395294883,
+              "count": 990208
+            },
+            {
+              "variant": "candidate",
+              "ns": 31.49294009471968,
+              "count": 635136
+            },
+            {
+              "variant": "baseline",
+              "ns": 93.9689371257487,
+              "count": 213760
+            }
+          ],
+          "baselineNs": 75.14508230161313,
+          "candidateNs": 25.84641874500728,
+          "percent": -65.60464377260728
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 34.56387552532631,
+              "count": 578688
+            },
+            {
+              "variant": "baseline",
+              "ns": 196.3790220535066,
+              "count": 177024
+            },
+            {
+              "variant": "baseline",
+              "ns": 184.5032098583226,
+              "count": 108416
+            },
+            {
+              "variant": "candidate",
+              "ns": 51.0148853248448,
+              "count": 392064
+            }
+          ],
+          "baselineNs": 190.4411159559146,
+          "candidateNs": 42.789380425085554,
+          "percent": -77.53143788813392
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 175.51363950276246,
+              "count": 115840
+            },
+            {
+              "variant": "candidate",
+              "ns": 33.209517800212495,
+              "count": 602240
+            },
+            {
+              "variant": "candidate",
+              "ns": 82.08349587605932,
+              "count": 287104
+            },
+            {
+              "variant": "baseline",
+              "ns": 383.02121629901876,
+              "count": 52224
+            }
+          ],
+          "baselineNs": 279.2674279008906,
+          "candidateNs": 57.646506838135906,
+          "percent": -79.35795546532762
+        }
+      ]
+    },
+    {
+      "name": "append-8",
+      "checksum": 0,
+      "medianPercent": -75.92998575229707,
+      "medianBaselineNs": 291.75394623280846,
+      "medianCandidateNs": 65.27388192825414,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 329.3799342105262,
+              "count": 60800
+            },
+            {
+              "variant": "candidate",
+              "ns": 84.37710920626417,
+              "count": 237056
+            },
+            {
+              "variant": "candidate",
+              "ns": 68.87911800352563,
+              "count": 290432
+            },
+            {
+              "variant": "baseline",
+              "ns": 390.7855043316833,
+              "count": 51712
+            }
+          ],
+          "baselineNs": 360.08271927110474,
+          "candidateNs": 76.6281136048949,
+          "percent": -78.71930267578269
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 87.11939102564106,
+              "count": 229632
+            },
+            {
+              "variant": "baseline",
+              "ns": 330.4472780126877,
+              "count": 60544
+            },
+            {
+              "variant": "baseline",
+              "ns": 267.8644049657539,
+              "count": 74752
+            },
+            {
+              "variant": "candidate",
+              "ns": 69.57507791629625,
+              "count": 287488
+            }
+          ],
+          "baselineNs": 299.15584148922085,
+          "candidateNs": 78.34723447096866,
+          "percent": -73.8105617189522
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 302.32561653771967,
+              "count": 66176
+            },
+            {
+              "variant": "candidate",
+              "ns": 49.09676405906404,
+              "count": 407424
+            },
+            {
+              "variant": "candidate",
+              "ns": 60.644341773380376,
+              "count": 329856
+            },
+            {
+              "variant": "baseline",
+              "ns": 299.2038121414913,
+              "count": 66944
+            }
+          ],
+          "baselineNs": 300.76471433960546,
+          "candidateNs": 54.87055291622221,
+          "percent": -81.75631970768164
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 83.77001272775976,
+              "count": 238848
+            },
+            {
+              "variant": "baseline",
+              "ns": 296.7178605313127,
+              "count": 67456
+            },
+            {
+              "variant": "baseline",
+              "ns": 286.79003193430424,
+              "count": 70144
+            },
+            {
+              "variant": "candidate",
+              "ns": 64.46247163778878,
+              "count": 310272
+            }
+          ],
+          "baselineNs": 291.75394623280846,
+          "candidateNs": 74.11624218277427,
+          "percent": -74.59631887082263
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 294.02358380149747,
+              "count": 68352
+            },
+            {
+              "variant": "candidate",
+              "ns": 70.1368239452431,
+              "count": 285184
+            },
+            {
+              "variant": "candidate",
+              "ns": 60.41093991126519,
+              "count": 331776
+            },
+            {
+              "variant": "baseline",
+              "ns": 244.2761230468771,
+              "count": 81920
+            }
+          ],
+          "baselineNs": 269.1498534241873,
+          "candidateNs": 65.27388192825414,
+          "percent": -75.74812651843403
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 83.12292220744682,
+              "count": 240640
+            },
+            {
+              "variant": "baseline",
+              "ns": 301.6106695568387,
+              "count": 66432
+            },
+            {
+              "variant": "baseline",
+              "ns": 315.5100176411314,
+              "count": 63488
+            },
+            {
+              "variant": "candidate",
+              "ns": 63.08822416229327,
+              "count": 317056
+            }
+          ],
+          "baselineNs": 308.560343598985,
+          "candidateNs": 73.10557318487005,
+          "percent": -76.30752794342217
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 296.0242069128782,
+              "count": 67584
+            },
+            {
+              "variant": "candidate",
+              "ns": 54.16784012131689,
+              "count": 369280
+            },
+            {
+              "variant": "candidate",
+              "ns": 72.51450116009391,
+              "count": 275840
+            },
+            {
+              "variant": "baseline",
+              "ns": 230.28350515463944,
+              "count": 86912
+            }
+          ],
+          "baselineNs": 263.1538560337588,
+          "candidateNs": 63.3411706407054,
+          "percent": -75.92998575229707
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 73.50107302446003,
+              "count": 272128
+            },
+            {
+              "variant": "baseline",
+              "ns": 244.2740834633369,
+              "count": 82048
+            },
+            {
+              "variant": "baseline",
+              "ns": 226.96503084180173,
+              "count": 88192
+            },
+            {
+              "variant": "candidate",
+              "ns": 50.97006482387451,
+              "count": 392448
+            }
+          ],
+          "baselineNs": 235.6195571525693,
+          "candidateNs": 62.23556892416727,
+          "percent": -73.58641630759529
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 269.33358433735276,
+              "count": 74368
+            },
+            {
+              "variant": "candidate",
+              "ns": 69.899513640429,
+              "count": 286208
+            },
+            {
+              "variant": "candidate",
+              "ns": 46.265587995855554,
+              "count": 432384
+            },
+            {
+              "variant": "baseline",
+              "ns": 286.73878205128295,
+              "count": 69888
+            }
+          ],
+          "baselineNs": 278.03618319431786,
+          "candidateNs": 58.08255081814228,
+          "percent": -79.10971509145315
+        }
+      ]
+    },
+    {
+      "name": "append-32",
+      "checksum": 0,
+      "medianPercent": -81.7471749786962,
+      "medianBaselineNs": 1078.9529274119125,
+      "medianCandidateNs": 193.7257607300255,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 1202.6923076923058,
+              "count": 16640
+            },
+            {
+              "variant": "candidate",
+              "ns": 198.66184879288508,
+              "count": 100736
+            },
+            {
+              "variant": "candidate",
+              "ns": 158.92710439838174,
+              "count": 126592
+            },
+            {
+              "variant": "baseline",
+              "ns": 1160.8680555555554,
+              "count": 17280
+            }
+          ],
+          "baselineNs": 1181.7801816239307,
+          "candidateNs": 178.7944765956334,
+          "percent": -84.8707501296946
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 262.78492647058783,
+              "count": 76160
+            },
+            {
+              "variant": "baseline",
+              "ns": 1215.721153846161,
+              "count": 16640
+            },
+            {
+              "variant": "baseline",
+              "ns": 1192.9985687023086,
+              "count": 16768
+            },
+            {
+              "variant": "candidate",
+              "ns": 176.87446973981875,
+              "count": 113152
+            }
+          ],
+          "baselineNs": 1204.3598612742348,
+          "candidateNs": 219.8296981052033,
+          "percent": -81.7471749786962
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 1135.7959692028958,
+              "count": 17664
+            },
+            {
+              "variant": "candidate",
+              "ns": 196.21874999999898,
+              "count": 102400
+            },
+            {
+              "variant": "candidate",
+              "ns": 179.05211912944108,
+              "count": 111744
+            },
+            {
+              "variant": "baseline",
+              "ns": 1022.1098856209293,
+              "count": 19584
+            }
+          ],
+          "baselineNs": 1078.9529274119125,
+          "candidateNs": 187.63543456472001,
+          "percent": -82.60948834767039
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 270.8865901213132,
+              "count": 73856
+            },
+            {
+              "variant": "baseline",
+              "ns": 1269.008316532266,
+              "count": 15872
+            },
+            {
+              "variant": "baseline",
+              "ns": 1264.3397177419265,
+              "count": 15872
+            },
+            {
+              "variant": "candidate",
+              "ns": 184.3022184551878,
+              "count": 108544
+            }
+          ],
+          "baselineNs": 1266.6740171370961,
+          "candidateNs": 227.5944042882505,
+          "percent": -82.03212498171759
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 1089.8600260416854,
+              "count": 18432
+            },
+            {
+              "variant": "candidate",
+              "ns": 216.06418335635234,
+              "count": 92672
+            },
+            {
+              "variant": "candidate",
+              "ns": 210.3413105652765,
+              "count": 95104
+            },
+            {
+              "variant": "baseline",
+              "ns": 1143.9324817518216,
+              "count": 17536
+            }
+          ],
+          "baselineNs": 1116.8962538967535,
+          "candidateNs": 213.2027469608144,
+          "percent": -80.91114136904223
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 221.00866336633553,
+              "count": 90496
+            },
+            {
+              "variant": "baseline",
+              "ns": 1080.360991379312,
+              "count": 18560
+            },
+            {
+              "variant": "baseline",
+              "ns": 924.687500000002,
+              "count": 21760
+            },
+            {
+              "variant": "candidate",
+              "ns": 166.44285809371553,
+              "count": 120192
+            }
+          ],
+          "baselineNs": 1002.524245689657,
+          "candidateNs": 193.7257607300255,
+          "percent": -80.67620194095579
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 867.3860497237614,
+              "count": 23168
+            },
+            {
+              "variant": "candidate",
+              "ns": 170.21718409586185,
+              "count": 117504
+            },
+            {
+              "variant": "candidate",
+              "ns": 145.89425093196874,
+              "count": 137344
+            },
+            {
+              "variant": "baseline",
+              "ns": 938.17365269461,
+              "count": 21376
+            }
+          ],
+          "baselineNs": 902.7798512091857,
+          "candidateNs": 158.05571751391528,
+          "percent": -82.4923299625911
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 225.2611671469754,
+              "count": 88832
+            },
+            {
+              "variant": "baseline",
+              "ns": 1040.8216059602748,
+              "count": 19328
+            },
+            {
+              "variant": "baseline",
+              "ns": 1076.4715325342431,
+              "count": 18688
+            },
+            {
+              "variant": "candidate",
+              "ns": 193.21500309023352,
+              "count": 103552
+            }
+          ],
+          "baselineNs": 1058.6465692472589,
+          "candidateNs": 209.23808511860446,
+          "percent": -80.23532204261699
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 865.8753453038781,
+              "count": 23168
+            },
+            {
+              "variant": "candidate",
+              "ns": 193.39321627475104,
+              "count": 103424
+            },
+            {
+              "variant": "candidate",
+              "ns": 181.45482888631258,
+              "count": 110336
+            },
+            {
+              "variant": "baseline",
+              "ns": 838.6572526737891,
+              "count": 23936
+            }
+          ],
+          "baselineNs": 852.2662989888336,
+          "candidateNs": 187.4240225805318,
+          "percent": -78.00874881443747
+        }
+      ]
+    },
+    {
+      "name": "append-128",
+      "checksum": 0,
+      "medianPercent": -79.58455693172368,
+      "medianBaselineNs": 5574.43811576356,
+      "medianCandidateNs": 1220.5557001438701,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4962.329101562468,
+              "count": 4096
+            },
+            {
+              "variant": "candidate",
+              "ns": 843.8046034946085,
+              "count": 23808
+            },
+            {
+              "variant": "candidate",
+              "ns": 1368.376358695647,
+              "count": 14720
+            },
+            {
+              "variant": "baseline",
+              "ns": 7464.769345238003,
+              "count": 2688
+            }
+          ],
+          "baselineNs": 6213.549223400236,
+          "candidateNs": 1106.0904810951279,
+          "percent": -82.19873310201535
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 1436.869266055044,
+              "count": 13952
+            },
+            {
+              "variant": "baseline",
+              "ns": 5281.302083333372,
+              "count": 3840
+            },
+            {
+              "variant": "baseline",
+              "ns": 6420.937500000008,
+              "count": 3200
+            },
+            {
+              "variant": "candidate",
+              "ns": 1023.932802287568,
+              "count": 19584
+            }
+          ],
+          "baselineNs": 5851.11979166669,
+          "candidateNs": 1230.401034171306,
+          "percent": -78.97152890419926
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 5503.04418103456,
+              "count": 3712
+            },
+            {
+              "variant": "candidate",
+              "ns": 1299.715358527134,
+              "count": 16512
+            },
+            {
+              "variant": "candidate",
+              "ns": 1014.6434294871855,
+              "count": 19968
+            },
+            {
+              "variant": "baseline",
+              "ns": 6261.593750000004,
+              "count": 3200
+            }
+          ],
+          "baselineNs": 5882.318965517282,
+          "candidateNs": 1157.1793940071598,
+          "percent": -80.32783667817647
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 1109.0757978723616,
+              "count": 18048
+            },
+            {
+              "variant": "baseline",
+              "ns": 5205.367943548386,
+              "count": 3968
+            },
+            {
+              "variant": "baseline",
+              "ns": 5662.222782257987,
+              "count": 3968
+            },
+            {
+              "variant": "candidate",
+              "ns": 1568.9140625000064,
+              "count": 12800
+            }
+          ],
+          "baselineNs": 5433.795362903187,
+          "candidateNs": 1338.9949301861839,
+          "percent": -75.3580169888698
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 5062.752016129018,
+              "count": 3968
+            },
+            {
+              "variant": "candidate",
+              "ns": 2052.759740259737,
+              "count": 9856
+            },
+            {
+              "variant": "candidate",
+              "ns": 1018.9935064934905,
+              "count": 19712
+            },
+            {
+              "variant": "baseline",
+              "ns": 5334.973958333341,
+              "count": 3840
+            }
+          ],
+          "baselineNs": 5198.862987231179,
+          "candidateNs": 1535.8766233766137,
+          "percent": -70.45745142449708
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 1105.2376760563377,
+              "count": 18176
+            },
+            {
+              "variant": "baseline",
+              "ns": 5465.086206896541,
+              "count": 3712
+            },
+            {
+              "variant": "baseline",
+              "ns": 5027.783203124914,
+              "count": 4096
+            },
+            {
+              "variant": "candidate",
+              "ns": 1036.9281045751734,
+              "count": 19584
+            }
+          ],
+          "baselineNs": 5246.434705010727,
+          "candidateNs": 1071.0828903157555,
+          "percent": -79.58455693172368
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 5683.0357142856965,
+              "count": 3584
+            },
+            {
+              "variant": "candidate",
+              "ns": 1105.661311619724,
+              "count": 18176
+            },
+            {
+              "variant": "candidate",
+              "ns": 869.4233425414399,
+              "count": 23168
+            },
+            {
+              "variant": "baseline",
+              "ns": 5465.840517241423,
+              "count": 3712
+            }
+          ],
+          "baselineNs": 5574.43811576356,
+          "candidateNs": 987.542327080582,
+          "percent": -82.28445079894276
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 1204.6694711538535,
+              "count": 16640
+            },
+            {
+              "variant": "baseline",
+              "ns": 5531.761853448372,
+              "count": 3712
+            },
+            {
+              "variant": "baseline",
+              "ns": 6507.6874999999745,
+              "count": 3200
+            },
+            {
+              "variant": "candidate",
+              "ns": 1236.441929133887,
+              "count": 16256
+            }
+          ],
+          "baselineNs": 6019.724676724173,
+          "candidateNs": 1220.5557001438701,
+          "percent": -79.72406105443223
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 5570.791330645001,
+              "count": 3968
+            },
+            {
+              "variant": "candidate",
+              "ns": 1216.2427325581782,
+              "count": 16512
+            },
+            {
+              "variant": "candidate",
+              "ns": 1377.4533991228043,
+              "count": 14592
+            },
+            {
+              "variant": "baseline",
+              "ns": 5244.947916666594,
+              "count": 3840
+            }
+          ],
+          "baselineNs": 5407.869623655797,
+          "candidateNs": 1296.8480658404912,
+          "percent": -76.01924313841347
+        }
+      ]
+    },
+    {
+      "name": "append-1024",
+      "checksum": 0,
+      "medianPercent": -78.7069051201566,
+      "medianBaselineNs": 33771.56250000013,
+      "medianCandidateNs": 6916.140825320455,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 37627.343750000364,
+              "count": 640
+            },
+            {
+              "variant": "candidate",
+              "ns": 6534.407552083602,
+              "count": 3072
+            },
+            {
+              "variant": "candidate",
+              "ns": 7032.914402173819,
+              "count": 2944
+            },
+            {
+              "variant": "baseline",
+              "ns": 38747.18750000028,
+              "count": 640
+            }
+          ],
+          "baselineNs": 38187.26562500032,
+          "candidateNs": 6783.660977128711,
+          "percent": -82.23580330745754
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 10423.958333333398,
+              "count": 1920
+            },
+            {
+              "variant": "baseline",
+              "ns": 36916.87500000001,
+              "count": 640
+            },
+            {
+              "variant": "baseline",
+              "ns": 27488.93229166664,
+              "count": 768
+            },
+            {
+              "variant": "candidate",
+              "ns": 6448.874999999816,
+              "count": 3200
+            }
+          ],
+          "baselineNs": 32202.90364583332,
+          "candidateNs": 8436.416666666606,
+          "percent": -73.80231062561906
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 34288.750000000335,
+              "count": 640
+            },
+            {
+              "variant": "candidate",
+              "ns": 6096.9951923076205,
+              "count": 3328
+            },
+            {
+              "variant": "candidate",
+              "ns": 6170.673076923094,
+              "count": 3328
+            },
+            {
+              "variant": "baseline",
+              "ns": 33254.37499999993,
+              "count": 640
+            }
+          ],
+          "baselineNs": 33771.56250000013,
+          "candidateNs": 6133.8341346153575,
+          "percent": -81.83728059779487
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 7848.47656249994,
+              "count": 2560
+            },
+            {
+              "variant": "baseline",
+              "ns": 32572.03124999961,
+              "count": 640
+            },
+            {
+              "variant": "baseline",
+              "ns": 28745.182291666304,
+              "count": 768
+            },
+            {
+              "variant": "candidate",
+              "ns": 6473.65624999992,
+              "count": 3200
+            }
+          ],
+          "baselineNs": 30658.606770832957,
+          "candidateNs": 7161.06640624993,
+          "percent": -76.64255763551981
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 32029.6875000011,
+              "count": 640
+            },
+            {
+              "variant": "candidate",
+              "ns": 7142.862215908833,
+              "count": 2816
+            },
+            {
+              "variant": "candidate",
+              "ns": 6654.720052083303,
+              "count": 3072
+            },
+            {
+              "variant": "baseline",
+              "ns": 33603.750000000335,
+              "count": 640
+            }
+          ],
+          "baselineNs": 32816.71875000071,
+          "candidateNs": 6898.791133996068,
+          "percent": -78.97781558677033
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 7343.572443181885,
+              "count": 2816
+            },
+            {
+              "variant": "baseline",
+              "ns": 35190.00000000005,
+              "count": 640
+            },
+            {
+              "variant": "baseline",
+              "ns": 32978.906249999796,
+              "count": 640
+            },
+            {
+              "variant": "candidate",
+              "ns": 7171.697443182074,
+              "count": 2816
+            }
+          ],
+          "baselineNs": 34084.45312499993,
+          "candidateNs": 7257.63494318198,
+          "percent": -78.7069051201566
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 34597.812500000204,
+              "count": 640
+            },
+            {
+              "variant": "candidate",
+              "ns": 7609.895833333269,
+              "count": 2688
+            },
+            {
+              "variant": "candidate",
+              "ns": 6222.385817307642,
+              "count": 3328
+            },
+            {
+              "variant": "baseline",
+              "ns": 34589.062500000975,
+              "count": 640
+            }
+          ],
+          "baselineNs": 34593.43750000059,
+          "candidateNs": 6916.140825320455,
+          "percent": -80.00736172772555
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 7993.320312500175,
+              "count": 2560
+            },
+            {
+              "variant": "baseline",
+              "ns": 32869.0624999993,
+              "count": 640
+            },
+            {
+              "variant": "baseline",
+              "ns": 36666.87500000023,
+              "count": 640
+            },
+            {
+              "variant": "candidate",
+              "ns": 7148.295454545529,
+              "count": 2816
+            }
+          ],
+          "baselineNs": 34767.96874999977,
+          "candidateNs": 7570.807883522852,
+          "percent": -78.22476217129336
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 28642.187499999734,
+              "count": 768
+            },
+            {
+              "variant": "candidate",
+              "ns": 6823.743206521788,
+              "count": 2944
+            },
+            {
+              "variant": "candidate",
+              "ns": 6197.175480769018,
+              "count": 3328
+            },
+            {
+              "variant": "baseline",
+              "ns": 26707.682291667352,
+              "count": 768
+            }
+          ],
+          "baselineNs": 27674.934895833543,
+          "candidateNs": 6510.459343645403,
+          "percent": -76.47524965044977
+        }
+      ]
+    },
+    {
+      "name": "append-8192",
+      "checksum": 0,
+      "medianPercent": -80.37908553910256,
+      "medianBaselineNs": 249223.43750000309,
+      "medianCandidateNs": 50257.877604167035,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 198770.31250000244,
+              "count": 128
+            },
+            {
+              "variant": "candidate",
+              "ns": 50980.07812500071,
+              "count": 512
+            },
+            {
+              "variant": "candidate",
+              "ns": 41252.14843749881,
+              "count": 512
+            },
+            {
+              "variant": "baseline",
+              "ns": 174362.50000000087,
+              "count": 128
+            }
+          ],
+          "baselineNs": 186566.40625000166,
+          "candidateNs": 46116.11328124976,
+          "percent": -75.28166286300572
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 44635.351562499534,
+              "count": 512
+            },
+            {
+              "variant": "baseline",
+              "ns": 191267.9687499974,
+              "count": 128
+            },
+            {
+              "variant": "baseline",
+              "ns": 236014.06249999712,
+              "count": 128
+            },
+            {
+              "variant": "candidate",
+              "ns": 46934.960937500495,
+              "count": 512
+            }
+          ],
+          "baselineNs": 213641.01562499726,
+          "candidateNs": 45785.156250000015,
+          "percent": -78.56911692913575
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 322304.6875000009,
+              "count": 128
+            },
+            {
+              "variant": "candidate",
+              "ns": 58942.96875000056,
+              "count": 384
+            },
+            {
+              "variant": "candidate",
+              "ns": 57961.19791666617,
+              "count": 384
+            },
+            {
+              "variant": "baseline",
+              "ns": 308650.0000000001,
+              "count": 128
+            }
+          ],
+          "baselineNs": 315477.34375000047,
+          "candidateNs": 58452.083333333365,
+          "percent": -81.47186018541679
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 59850.52083333405,
+              "count": 384
+            },
+            {
+              "variant": "baseline",
+              "ns": 326623.4374999968,
+              "count": 128
+            },
+            {
+              "variant": "baseline",
+              "ns": 289353.9062499997,
+              "count": 128
+            },
+            {
+              "variant": "candidate",
+              "ns": 40665.23437500003,
+              "count": 512
+            }
+          ],
+          "baselineNs": 307988.67187499825,
+          "candidateNs": 50257.877604167035,
+          "percent": -83.68190709801011
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 188854.68750000457,
+              "count": 128
+            },
+            {
+              "variant": "candidate",
+              "ns": 43617.57812500144,
+              "count": 512
+            },
+            {
+              "variant": "candidate",
+              "ns": 36984.218749999796,
+              "count": 640
+            },
+            {
+              "variant": "baseline",
+              "ns": 221940.6249999949,
+              "count": 128
+            }
+          ],
+          "baselineNs": 205397.65624999974,
+          "candidateNs": 40300.89843750062,
+          "percent": -80.37908553910256
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 56318.489583333074,
+              "count": 384
+            },
+            {
+              "variant": "baseline",
+              "ns": 279421.09374999546,
+              "count": 128
+            },
+            {
+              "variant": "baseline",
+              "ns": 254465.6250000017,
+              "count": 128
+            },
+            {
+              "variant": "candidate",
+              "ns": 47562.10937499894,
+              "count": 512
+            }
+          ],
+          "baselineNs": 266943.3593749986,
+          "candidateNs": 51940.299479166,
+          "percent": -80.54257667215428
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 271661.71874999633,
+              "count": 128
+            },
+            {
+              "variant": "candidate",
+              "ns": 57427.86458333408,
+              "count": 384
+            },
+            {
+              "variant": "candidate",
+              "ns": 53260.15624999947,
+              "count": 512
+            },
+            {
+              "variant": "baseline",
+              "ns": 217360.93750000407,
+              "count": 128
+            }
+          ],
+          "baselineNs": 244511.3281250002,
+          "candidateNs": 55344.01041666677,
+          "percent": -77.36546161641495
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 55856.25000000031,
+              "count": 384
+            },
+            {
+              "variant": "baseline",
+              "ns": 241381.25000000343,
+              "count": 128
+            },
+            {
+              "variant": "baseline",
+              "ns": 257065.62500000274,
+              "count": 128
+            },
+            {
+              "variant": "candidate",
+              "ns": 44836.71875000006,
+              "count": 512
+            }
+          ],
+          "baselineNs": 249223.43750000309,
+          "candidateNs": 50346.48437500019,
+          "percent": -79.79865582465551
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 292149.9999999995,
+              "count": 128
+            },
+            {
+              "variant": "candidate",
+              "ns": 45475.000000001484,
+              "count": 512
+            },
+            {
+              "variant": "candidate",
+              "ns": 45242.96874999934,
+              "count": 512
+            },
+            {
+              "variant": "baseline",
+              "ns": 279006.2500000019,
+              "count": 128
+            }
+          ],
+          "baselineNs": 285578.1250000007,
+          "candidateNs": 45358.98437500041,
+          "percent": -84.11678612463743
+        }
+      ]
+    }
+  ]
+}

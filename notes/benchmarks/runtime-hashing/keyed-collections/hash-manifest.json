@@ -1,0 +1,13 @@
+{
+  "area": "hash",
+  "inputs": {
+    "MutableMap": {
+      "generatedSha256": "842489169aaa629bcaac8082ba8466845b73d3e74cec1ec393ae9a3a4175de53",
+      "sourceSha256": "e1a0e310a4181c2cf42acd8876498a26314cc81e35cf4dcee83064bdd9c69759"
+    },
+    "MutableSet": {
+      "generatedSha256": "fa42ba2dbb0df1010ca9b929aaf6b34ba51775b21a2f44b59ab29b90d1e8a3fa",
+      "sourceSha256": "8b14f62f7267379d997e356cd6b718b042977b4e7f5d96c071b5133f70a535dc"
+    }
+  }
+}

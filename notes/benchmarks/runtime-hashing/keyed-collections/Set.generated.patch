@@ -1,0 +1,20 @@
+--- baseline/Set.js
++++ candidate/Set.js
+@@ -1389,6 +1389,7 @@
+     constructor(comparer, tree) {
+         this.comparer = comparer;
+         this.tree = tree;
++        this.countCache = -1;
+     }
+     GetHashCode() {
+         const this$ = this;
+@@ -1529,7 +1530,8 @@
+     return FSharpSet_$ctor(FSharpSet__get_Comparer(s), SetTreeModule_remove(FSharpSet__get_Comparer(s), value, FSharpSet__get_Tree(s)));
+ }
+ export function FSharpSet__get_Count(s) {
+-    return SetTreeModule_count(FSharpSet__get_Tree(s)) | 0;
++    if (s.countCache < 0) s.countCache = SetTreeModule_count(FSharpSet__get_Tree(s)) | 0;
++    return s.countCache | 0;
+ }
+ export function FSharpSet__Contains(s, value) {
+     return SetTreeModule_mem(FSharpSet__get_Comparer(s), value, FSharpSet__get_Tree(s));

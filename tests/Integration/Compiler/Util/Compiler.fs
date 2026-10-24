@@ -32,7 +32,11 @@ module Compiler =
         let projFile = IO.Path.Join(projDir, name + ".fsproj") |> Path.normalizeFullPath
 
         let cliArgs =
-            let compilerOptions = CompilerOptionsHelper.Make(?language=language)
+            // The real CLI always defines these (Entry.fs), and code guarded by them is exactly where
+            // Fable warnings - and the comments suppressing them - live.
+            let language = defaultArg language JavaScript
+            let defines = ["FABLE_COMPILER"; "FABLE_COMPILER_5"; "FABLE_COMPILER_" + language.ToString().ToUpperInvariant()]
+            let compilerOptions = CompilerOptionsHelper.Make(language=language, define=defines)
             { CliArgs.ProjectFile = projFile
               FableLibraryPath = None
               RootDir = projDir
@@ -56,6 +60,8 @@ module Compiler =
 
         let mutable state = State.Create(cliArgs, recompileAllFiles=true)
 
+        member _.ProjDir = projDir
+
         member _.Compile(files: (string * string) list) =
             for (fileName, content) in files do
                 IO.File.WriteAllText(IO.Path.Join(projDir, fileName), content)
@@ -73,6 +79,8 @@ module Compiler =
 
     let private project = CachedProject("TestProject")
     let private projectWithSignature = CachedProject("TestProjectSignature")
+
+    let projDir = project.ProjDir
 
     let private emptyLibrary = "module Library" + Environment.NewLine
 
@@ -170,6 +178,8 @@ module Compiler =
         let errorOrWarning: Result -> bool = List.isEmpty >> not
         let matching = List.exists
         let withMsg (txt: string) = List.exists (fun m -> m.Message.Contains txt)
+      module Code =
+        let is (code: string) (msg: LogEntry) = msg.Code = Some code
       module Text =
         let contains (txt: string) msg = msg.Message.Contains(txt, StringComparison.InvariantCultureIgnoreCase)
         let isMatch (regex: System.Text.RegularExpressions.Regex) (msg: LogEntry) =
@@ -233,6 +243,16 @@ module Compiler =
       let warning =
         Test.All.warning
         |> orFail expected.All.Warning
+
+    /// Assertions on the stable `FABLExxxx` codes rather than on message text: what a
+    /// `// fable-disable` comment targets is the code, so that's what the tests must pin.
+    module Code =
+      let warning (code: string) =
+        Test.Exists.matching (Test.Is.warning >&> Test.Code.is code)
+        |> orFail (expected.Warning.With code)
+      let noWarning (code: string) =
+        (not << Test.Exists.matching (Test.Is.warning >&> Test.Code.is code))
+        |> orFail (expected.No.Warning.With code)
 
     module Exists =
       let errorWith (txt: string) =

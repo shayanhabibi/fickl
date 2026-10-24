@@ -1,0 +1,35 @@
+{
+  "source": "C:\\Users\\shaya\\RiderProjects\\fable\\src\\fable-library-ts\\Double.ts",
+  "sha256": "13725594a36819de61633f3dcb77808331f208af302d2089d549f0a2617f4bb7",
+  "node": "v26.7.0",
+  "v8": "14.6.202.34-node.28",
+  "checks": 12068,
+  "status": "passed",
+  "interopTraces": [
+    {
+      "outcome": 12,
+      "trace": [
+        "toString",
+        [
+          "replace",
+          "_",
+          ""
+        ]
+      ]
+    },
+    {
+      "outcome": [
+        "Error",
+        "replace failed"
+      ],
+      "trace": [
+        "toString",
+        [
+          "replace",
+          "_",
+          ""
+        ]
+      ]
+    }
+  ]
+}

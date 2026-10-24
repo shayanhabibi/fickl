@@ -4,7 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <RollForward>Major</RollForward>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <PathMap>$(MSBuildThisFileDirectory)=.</PathMap>
+    <!-- A slash in the mapped root selects consistent separators on Windows and Unix. -->
+    <PathMap>$(MSBuildThisFileDirectory)=./mapped</PathMap>
   </PropertyGroup>
 
   <ItemGroup>

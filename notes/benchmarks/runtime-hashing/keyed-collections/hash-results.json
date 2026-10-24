@@ -1,0 +1,7520 @@
+{
+  "node": "v26.7.0",
+  "platform": "win32",
+  "correctness": [
+    {
+      "kind": "map",
+      "hashMode": "collision",
+      "operations": 700,
+      "traceCalls": 7106,
+      "matched": true
+    },
+    {
+      "kind": "map",
+      "hashMode": "buckets",
+      "operations": 700,
+      "traceCalls": 1148,
+      "matched": true
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "KeyNotFoundException",
+          "message": "The item was not found in collection"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            8
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-clear",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {},
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            8
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "hash-throw",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Exception",
+          "message": "The given key '0' was not present in the dictionary."
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Exception",
+          "message": "The given key '0' was not present in the dictionary."
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Exception",
+          "message": "The given key '0' was not present in the dictionary."
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-clear",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "ArgumentException",
+          "message": "An item with the same key has already been added. Key: { id = 2 }"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": 2
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            8
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-add",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "ArgumentException",
+          "message": "An item with the same key has already been added. Key: { id = 2 }"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ],
+          [
+            {
+              "id": 9
+            },
+            9
+          ]
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-delete",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading '0')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mode": "equal-throw",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          [
+            {
+              "id": 1
+            },
+            1
+          ],
+          [
+            {
+              "id": 2
+            },
+            2
+          ]
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "map",
+      "mechanism": [
+        {
+          "has": 2,
+          "get": 1
+        },
+        {
+          "has": 0,
+          "get": 2
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "hashMode": "collision",
+      "operations": 700,
+      "traceCalls": 7106,
+      "matched": true
+    },
+    {
+      "kind": "set",
+      "hashMode": "buckets",
+      "operations": 700,
+      "traceCalls": 1148,
+      "matched": true
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": false
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-clear",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "hash-throw",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "hash throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Exception",
+          "message": "The given key '0' was not present in the dictionary."
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-clear",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [],
+        "count": 0
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": true
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-add",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "value": "updated"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            9
+          ],
+          [
+            "e",
+            9,
+            1
+          ],
+          [
+            "e",
+            9,
+            2
+          ],
+          [
+            "e",
+            2,
+            2
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": 9
+          }
+        ],
+        "count": 3
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-delete",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            1
+          ],
+          [
+            "e",
+            1,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 2
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "has",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "delete",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "get",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "set",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mode": "equal-throw",
+      "operation": "add",
+      "matched": true,
+      "observed": {
+        "value": {
+          "error": "Error",
+          "message": "equal throw"
+        },
+        "trace": [
+          [
+            "h",
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ],
+          [
+            "h",
+            2
+          ],
+          [
+            "e",
+            2,
+            1
+          ]
+        ],
+        "entries": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          }
+        ],
+        "count": 2
+      }
+    },
+    {
+      "kind": "set",
+      "mechanism": [
+        {
+          "has": 2,
+          "get": 1
+        },
+        {
+          "has": 0,
+          "get": 2
+        }
+      ]
+    }
+  ],
+  "timings": [
+    {
+      "kind": "map",
+      "collision": false,
+      "nkeys": 1024,
+      "workload": "hit",
+      "iterations": 133260,
+      "medianChangePercent": -41.24069641627561,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 62.09590274651071,
+                "sum": 133260
+              },
+              {
+                "ns": 46.83250787933371,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 34.20306168392629,
+                "sum": 133260
+              },
+              {
+                "ns": 35.076542098153894,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -36.39895837638994
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 50.306918805342974,
+                "sum": 133260
+              },
+              {
+                "ns": 47.43659012456839,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 35.13507429086012,
+                "sum": 133260
+              },
+              {
+                "ns": 33.96368002401307,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -29.306042855058934
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 75.10956025814212,
+                "sum": 133260
+              },
+              {
+                "ns": 45.012006603631995,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 43.99369653309309,
+                "sum": 133260
+              },
+              {
+                "ns": 32.01710941017568,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -36.7217661831404
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 73.45490019510733,
+                "sum": 133260
+              },
+              {
+                "ns": 44.55125318925394,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 48.2545399969985,
+                "sum": 133260
+              },
+              {
+                "ns": 32.191955575566475,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -31.828558710374743
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 78.15473510430729,
+                "sum": 133260
+              },
+              {
+                "ns": 43.459402671469384,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 30.838961428785836,
+                "sum": 133260
+              },
+              {
+                "ns": 39.22182200210133,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -42.3909220488327
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 72.97088398619213,
+                "sum": 133260
+              },
+              {
+                "ns": 41.463304817649636,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 32.11091100105079,
+                "sum": 133260
+              },
+              {
+                "ns": 35.12982140177095,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -41.24069641627561
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 77.86057331532339,
+                "sum": 133260
+              },
+              {
+                "ns": 41.32522887588177,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 33.20351193156258,
+                "sum": 133260
+              },
+              {
+                "ns": 33.55395467507142,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -43.988742468219854
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 72.61819000450245,
+                "sum": 133260
+              },
+              {
+                "ns": 40.5530541797991,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 33.57721746960854,
+                "sum": 133260
+              },
+              {
+                "ns": 31.28770823953171,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -42.684269156300445
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 70.86522587423104,
+                "sum": 133260
+              },
+              {
+                "ns": 40.787933363349964,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 32.13942668467645,
+                "sum": 133260
+              },
+              {
+                "ns": 31.641903046675882,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -42.87548138639291
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 69.31712441842993,
+                "sum": 133260
+              },
+              {
+                "ns": 39.77562659462704,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 31.265195857721825,
+                "sum": 133260
+              },
+              {
+                "ns": 31.10310670869002,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -42.83002125508122
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 70.741407774276,
+                "sum": 133260
+              },
+              {
+                "ns": 41.202161188653974,
+                "sum": 133260
+              }
+            ],
+            [
+              {
+                "ns": 33.33633498424149,
+                "sum": 133260
+              },
+              {
+                "ns": 37.793786582620555,
+                "sum": 133260
+              }
+            ]
+          ],
+          "changePercent": -36.45894782002463
+        }
+      ]
+    },
+    {
+      "kind": "map",
+      "collision": false,
+      "nkeys": 1024,
+      "workload": "miss",
+      "iterations": 373019,
+      "medianChangePercent": -26.347850441114495,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 28.13636838874164,
+                "sum": 0
+              },
+              {
+                "ns": 16.57904825223382,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 17.2891997458575,
+                "sum": 0
+              },
+              {
+                "ns": 16.542857066262002,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -24.339166771584708
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 27.18279765910049,
+                "sum": 0
+              },
+              {
+                "ns": 19.397939515145296,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 15.85710111281185,
+                "sum": 0
+              },
+              {
+                "ns": 16.27396995863492,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -31.020690052084767
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 25.818255906535565,
+                "sum": 0
+              },
+              {
+                "ns": 20.78500022787041,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 17.26319570852962,
+                "sum": 0
+              },
+              {
+                "ns": 19.456381578418174,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -21.20812936107551
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 28.26853323825337,
+                "sum": 0
+              },
+              {
+                "ns": 19.290170205807247,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 16.569397269308002,
+                "sum": 0
+              },
+              {
+                "ns": 17.16212847066766,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -29.073916450116677
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 27.13186191588111,
+                "sum": 0
+              },
+              {
+                "ns": 18.603341920920858,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 17.998278908044945,
+                "sum": 0
+              },
+              {
+                "ns": 16.723544913261808,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -24.080749819754878
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 25.426854932322417,
+                "sum": 0
+              },
+              {
+                "ns": 17.550044367712967,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 16.56993343502627,
+                "sum": 0
+              },
+              {
+                "ns": 17.10475873883102,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -21.644667897598723
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 26.095721665652384,
+                "sum": 0
+              },
+              {
+                "ns": 19.849391049785524,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 16.80959951101692,
+                "sum": 0
+              },
+              {
+                "ns": 17.02996362115593,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -26.347850441114495
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 27.320324165792943,
+                "sum": 0
+              },
+              {
+                "ns": 16.915760323200615,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 16.576635506502363,
+                "sum": 0
+              },
+              {
+                "ns": 15.68284725442946,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -27.074280796804352
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 27.08843249271493,
+                "sum": 0
+              },
+              {
+                "ns": 17.383564912243212,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 17.038810355504495,
+                "sum": 0
+              },
+              {
+                "ns": 15.91071768462212,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -25.9094936975934
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 32.56456105453073,
+                "sum": 0
+              },
+              {
+                "ns": 20.17698830354477,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 16.202123752409246,
+                "sum": 0
+              },
+              {
+                "ns": 19.723660188890904,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -31.883336044242718
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 25.203005745015716,
+                "sum": 0
+              },
+              {
+                "ns": 17.785421117958975,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 15.65148155992055,
+                "sum": 0
+              },
+              {
+                "ns": 15.526018781885217,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -27.474665585731174
+        }
+      ]
+    },
+    {
+      "kind": "map",
+      "collision": false,
+      "nkeys": 1024,
+      "workload": "update",
+      "iterations": 110778,
+      "medianChangePercent": -39.18143640861273,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 84.76412284027502,
+                "sum": 110778
+              },
+              {
+                "ns": 69.1473036162412,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 57.72536063117174,
+                "sum": 110778
+              },
+              {
+                "ns": 48.41665312607134,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -31.03695014662812
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 128.75932044268794,
+                "sum": 110778
+              },
+              {
+                "ns": 63.35283178970557,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 50.03610825254038,
+                "sum": 110778
+              },
+              {
+                "ns": 53.85455595876468,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -45.92186751120722
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 105.4722056726062,
+                "sum": 110778
+              },
+              {
+                "ns": 59.40349166802076,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 47.068009893661475,
+                "sum": 110778
+              },
+              {
+                "ns": 49.11083428117455,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -41.66584540586709
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 104.93960894762498,
+                "sum": 110778
+              },
+              {
+                "ns": 60.713318528949436,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 47.296394590983155,
+                "sum": 110778
+              },
+              {
+                "ns": 55.68253624365867,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -37.83452402360685
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 102.02477026124318,
+                "sum": 110778
+              },
+              {
+                "ns": 65.11220639477224,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 51.56980627922526,
+                "sum": 110778
+              },
+              {
+                "ns": 52.15385726407799,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -37.94092389455093
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 108.98012240697581,
+                "sum": 110778
+              },
+              {
+                "ns": 63.62905992164557,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 50.41795302316332,
+                "sum": 110778
+              },
+              {
+                "ns": 54.56047229594285,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -39.18143640861273
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 98.98896892884818,
+                "sum": 110778
+              },
+              {
+                "ns": 64.71862644207432,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 47.8551697990573,
+                "sum": 110778
+              },
+              {
+                "ns": 53.70019317915114,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -37.96539326834033
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 98.09077614688756,
+                "sum": 110778
+              },
+              {
+                "ns": 73.80797631298708,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 49.95847550957696,
+                "sum": 110778
+              },
+              {
+                "ns": 49.21735362617079,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -42.305672544716224
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 102.1881601039928,
+                "sum": 110778
+              },
+              {
+                "ns": 66.91671631551219,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 49.24353210926474,
+                "sum": 110778
+              },
+              {
+                "ns": 63.01702504107331,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -33.61483150145892
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 107.41934319088573,
+                "sum": 110778
+              },
+              {
+                "ns": 87.10032677968492,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 50.165195255375316,
+                "sum": 110778
+              },
+              {
+                "ns": 56.27380887901884,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -45.281110054064165
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 105.31062124248625,
+                "sum": 110778
+              },
+              {
+                "ns": 62.41040639838291,
+                "sum": 110778
+              }
+            ],
+            [
+              {
+                "ns": 49.51434400332288,
+                "sum": 110778
+              },
+              {
+                "ns": 50.50100200400757,
+                "sum": 110778
+              }
+            ]
+          ],
+          "changePercent": -40.36803410155152
+        }
+      ]
+    },
+    {
+      "kind": "map",
+      "collision": false,
+      "nkeys": 1024,
+      "workload": "remove-add",
+      "iterations": 75356,
+      "medianChangePercent": -37.163558906281004,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 140.30601411964395,
+                "sum": 75356
+              },
+              {
+                "ns": 114.01879080630738,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 121.88412336111286,
+                "sum": 75356
+              },
+              {
+                "ns": 137.8138436222725,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": 2.112716476475218
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 214.13689686289172,
+                "sum": 75356
+              },
+              {
+                "ns": 138.83300599819543,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 109.93550613089604,
+                "sum": 75356
+              },
+              {
+                "ns": 137.31620574340238,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -29.951049687200825
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 226.46239184670068,
+                "sum": 75356
+              },
+              {
+                "ns": 164.16609161845267,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 101.67339030734261,
+                "sum": 75356
+              },
+              {
+                "ns": 97.19730346621328,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -49.08955639654565
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 218.6249270131109,
+                "sum": 75356
+              },
+              {
+                "ns": 112.25516216359726,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 109.01189022771901,
+                "sum": 75356
+              },
+              {
+                "ns": 125.9037103880239,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -29.002799412845583
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 212.6346939858812,
+                "sum": 75356
+              },
+              {
+                "ns": 151.06560857794815,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 100.21497956367054,
+                "sum": 75356
+              },
+              {
+                "ns": 97.55692977334236,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -45.6222862772285
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 202.49880566908922,
+                "sum": 75356
+              },
+              {
+                "ns": 118.03837783321842,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 105.8920324858023,
+                "sum": 75356
+              },
+              {
+                "ns": 129.77732363713403,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -26.476749577716408
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 202.16837411752215,
+                "sum": 75356
+              },
+              {
+                "ns": 134.3622272944424,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 98.95429693720682,
+                "sum": 75356
+              },
+              {
+                "ns": 102.4324539519093,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -40.15796779128916
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 228.82451297839404,
+                "sum": 75356
+              },
+              {
+                "ns": 173.55220553107813,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 101.08020595573264,
+                "sum": 75356
+              },
+              {
+                "ns": 137.63867508891258,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -40.67278993453354
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 207.15669621529807,
+                "sum": 75356
+              },
+              {
+                "ns": 126.54732204469497,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 106.16672859493805,
+                "sum": 75356
+              },
+              {
+                "ns": 98.599978767448,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -38.638225445984986
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 197.96300228249865,
+                "sum": 75356
+              },
+              {
+                "ns": 118.52009129996271,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 100.0836031636491,
+                "sum": 75356
+              },
+              {
+                "ns": 98.78310950687384,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -37.163558906281004
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 225.87186156377737,
+                "sum": 75356
+              },
+              {
+                "ns": 118.82663623334406,
+                "sum": 75356
+              }
+            ],
+            [
+              {
+                "ns": 119.30834970009137,
+                "sum": 75356
+              },
+              {
+                "ns": 100.2176336323602,
+                "sum": 75356
+              }
+            ]
+          ],
+          "changePercent": -36.31362343166996
+        }
+      ]
+    },
+    {
+      "kind": "map",
+      "collision": true,
+      "nkeys": 16,
+      "workload": "hit",
+      "iterations": 145358,
+      "medianChangePercent": -19.587179933808308,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 77.93310309718179,
+                "sum": 145358
+              },
+              {
+                "ns": 75.02098267725201,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 67.57041236120573,
+                "sum": 145358
+              },
+              {
+                "ns": 68.90160844260377,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -10.775825233548131
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 105.34679893779567,
+                "sum": 145358
+              },
+              {
+                "ns": 83.8282034700527,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 67.84834684021523,
+                "sum": 145358
+              },
+              {
+                "ns": 73.63543802198762,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -25.210105425465514
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 90.20349757151243,
+                "sum": 145358
+              },
+              {
+                "ns": 76.24760935070677,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 69.66936804303825,
+                "sum": 145358
+              },
+              {
+                "ns": 69.51182597449068,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -16.383137011779205
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 96.70812751964075,
+                "sum": 145358
+              },
+              {
+                "ns": 74.67562844838169,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 68.25286533936918,
+                "sum": 145358
+              },
+              {
+                "ns": 68.2349784669574,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -20.361271676299896
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 114.55028275017467,
+                "sum": 145358
+              },
+              {
+                "ns": 75.2397528859779,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 71.6444915312536,
+                "sum": 145358
+              },
+              {
+                "ns": 69.56617454835546,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -25.59637516991422
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 88.53933048060593,
+                "sum": 145358
+              },
+              {
+                "ns": 77.8980173089893,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 67.59311493003477,
+                "sum": 145358
+              },
+              {
+                "ns": 69.808335282543,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -17.445542098954668
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 99.51499057499308,
+                "sum": 145358
+              },
+              {
+                "ns": 74.26560629617943,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 68.95389314657699,
+                "sum": 145358
+              },
+              {
+                "ns": 70.78798552539291,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -19.587179933808308
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 106.02030847975401,
+                "sum": 145358
+              },
+              {
+                "ns": 78.73801235570188,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 67.31655636428736,
+                "sum": 145358
+              },
+              {
+                "ns": 75.60161807399632,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -22.64587933467671
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 107.81931507037746,
+                "sum": 145358
+              },
+              {
+                "ns": 83.5750354297685,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 114.47323160747929,
+                "sum": 145358
+              },
+              {
+                "ns": 70.99781229791212,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -3.0948178874015464
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 103.73904429065018,
+                "sum": 145358
+              },
+              {
+                "ns": 79.87658058036145,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 84.91930268715791,
+                "sum": 145358
+              },
+              {
+                "ns": 70.46808569187894,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -15.373548145374262
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 109.03011874131356,
+                "sum": 145358
+              },
+              {
+                "ns": 77.62765035292283,
+                "sum": 145358
+              }
+            ],
+            [
+              {
+                "ns": 70.45845429904125,
+                "sum": 145358
+              },
+              {
+                "ns": 79.06066401574002,
+                "sum": 145358
+              }
+            ]
+          ],
+          "changePercent": -19.89665416000189
+        }
+      ]
+    },
+    {
+      "kind": "map",
+      "collision": true,
+      "nkeys": 16,
+      "workload": "miss",
+      "iterations": 85364,
+      "medianChangePercent": -26.686862755564523,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 144.87723161988526,
+                "sum": 0
+              },
+              {
+                "ns": 135.46108429783285,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 187.55330115739557,
+                "sum": 0
+              },
+              {
+                "ns": 110.19399278384095,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": 6.209988801041422
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 173.98434937444193,
+                "sum": 0
+              },
+              {
+                "ns": 130.8408696874569,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 124.23855489433625,
+                "sum": 0
+              },
+              {
+                "ns": 113.1179419895963,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -22.13357621314981
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 189.18513659153433,
+                "sum": 0
+              },
+              {
+                "ns": 144.6804273464225,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 168.14113677897024,
+                "sum": 0
+              },
+              {
+                "ns": 149.44824516189686,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -4.875070613785848
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 191.98022585633134,
+                "sum": 0
+              },
+              {
+                "ns": 128.61862143292453,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 109.9093294597226,
+                "sum": 0
+              },
+              {
+                "ns": 122.65123471252818,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -27.460573817214563
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 148.21236118270048,
+                "sum": 0
+              },
+              {
+                "ns": 166.99896912047421,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 110.80900613841409,
+                "sum": 0
+              },
+              {
+                "ns": 169.4953376130465,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -11.07415349509806
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 223.19830373459638,
+                "sum": 0
+              },
+              {
+                "ns": 127.91926338971838,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 141.78810739890253,
+                "sum": 0
+              },
+              {
+                "ns": 115.62719647626922,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -26.686862755564523
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 215.67991190665566,
+                "sum": 0
+              },
+              {
+                "ns": 130.0712244037295,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 112.99376786467165,
+                "sum": 0
+              },
+              {
+                "ns": 110.86523593083963,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -35.25429701131908
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 186.19090014526302,
+                "sum": 0
+              },
+              {
+                "ns": 127.86654795932611,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 118.1739374912116,
+                "sum": 0
+              },
+              {
+                "ns": 109.91987254580638,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -27.371946943586913
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 150.33386439248196,
+                "sum": 0
+              },
+              {
+                "ns": 129.5018977554928,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 160.4763131999422,
+                "sum": 0
+              },
+              {
+                "ns": 126.79466754135134,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": 2.6569937081119654
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 204.49721193945607,
+                "sum": 0
+              },
+              {
+                "ns": 188.07811255330162,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 112.55915842744336,
+                "sum": 0
+              },
+              {
+                "ns": 135.91209409118437,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -36.70736874772382
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 259.1853708823362,
+                "sum": 0
+              },
+              {
+                "ns": 182.75033972165792,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 116.10749261983925,
+                "sum": 0
+              },
+              {
+                "ns": 143.74326413945087,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -41.20168374622823
+        }
+      ]
+    },
+    {
+      "kind": "map",
+      "collision": true,
+      "nkeys": 16,
+      "workload": "update",
+      "iterations": 100968,
+      "medianChangePercent": -31.780048837840035,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 158.5759844703289,
+                "sum": 100968
+              },
+              {
+                "ns": 111.62546549402074,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 83.38186356073331,
+                "sum": 100968
+              },
+              {
+                "ns": 100.08715632675569,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -32.09917270551439
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 154.59056334680517,
+                "sum": 100968
+              },
+              {
+                "ns": 95.91256635765731,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 96.90297916171315,
+                "sum": 100968
+              },
+              {
+                "ns": 93.23548054829065,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -24.09737158400992
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 134.86550194120846,
+                "sum": 100968
+              },
+              {
+                "ns": 89.34117740274431,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 80.60276523254964,
+                "sum": 100968
+              },
+              {
+                "ns": 98.0924649393862,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -20.298881953556048
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 150.93594009983445,
+                "sum": 100968
+              },
+              {
+                "ns": 92.61350130734603,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 81.17522383329035,
+                "sum": 100968
+              },
+              {
+                "ns": 82.2151572775501,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -32.91284916655807
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 174.6890103795254,
+                "sum": 100968
+              },
+              {
+                "ns": 110.20719435860721,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 82.90052293796097,
+                "sum": 100968
+              },
+              {
+                "ns": 88.33194675540935,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -39.89654237382288
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 162.4504793597946,
+                "sum": 100968
+              },
+              {
+                "ns": 103.68829728230726,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 96.52563188336993,
+                "sum": 100968
+              },
+              {
+                "ns": 81.7635290389055,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -33.008950002789284
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 150.28127723635288,
+                "sum": 100968
+              },
+              {
+                "ns": 123.49358212502821,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 83.85429046826914,
+                "sum": 100968
+              },
+              {
+                "ns": 102.9147848823372,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -31.780048837840035
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 141.73203391173737,
+                "sum": 100968
+              },
+              {
+                "ns": 93.05225417954337,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 80.05407653910032,
+                "sum": 100968
+              },
+              {
+                "ns": 98.30738451786885,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -24.031772949123066
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 138.8241819190226,
+                "sum": 100968
+              },
+              {
+                "ns": 90.59206877426246,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 104.95998732271666,
+                "sum": 100968
+              },
+              {
+                "ns": 85.34783297678561,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -17.04693118974744
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 141.73500515014655,
+                "sum": 100968
+              },
+              {
+                "ns": 89.73635211156056,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 85.82521194834273,
+                "sum": 100968
+              },
+              {
+                "ns": 104.29343950558942,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -17.865150270415786
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 171.10272561603318,
+                "sum": 100968
+              },
+              {
+                "ns": 109.5109341573567,
+                "sum": 100968
+              }
+            ],
+            [
+              {
+                "ns": 84.52281911100401,
+                "sum": 100968
+              },
+              {
+                "ns": 80.06497107994446,
+                "sum": 100968
+              }
+            ]
+          ],
+          "changePercent": -41.34719231991
+        }
+      ]
+    },
+    {
+      "kind": "map",
+      "collision": true,
+      "nkeys": 16,
+      "workload": "remove-add",
+      "iterations": 57177,
+      "medianChangePercent": -22.378055378547646,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 281.42959581650047,
+                "sum": 57177
+              },
+              {
+                "ns": 218.496948073525,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 195.3442817916343,
+                "sum": 57177
+              },
+              {
+                "ns": 199.54702065516216,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -21.010134934210424
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 357.4566696398946,
+                "sum": 57177
+              },
+              {
+                "ns": 217.9040523287342,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 211.36121167602423,
+                "sum": 57177
+              },
+              {
+                "ns": 221.02418804764628,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -24.849684169569354
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 368.64298581597893,
+                "sum": 57177
+              },
+              {
+                "ns": 211.2177973660786,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 246.90872203857907,
+                "sum": 57177
+              },
+              {
+                "ns": 200.83075362470873,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -22.785004840944367
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 329.7339839445934,
+                "sum": 57177
+              },
+              {
+                "ns": 222.73816394704565,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 206.41166902775825,
+                "sum": 57177
+              },
+              {
+                "ns": 210.87500218619715,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -24.46919309753125
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 355.1375553106999,
+                "sum": 57177
+              },
+              {
+                "ns": 226.72578134564318,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 245.35739895412573,
+                "sum": 57177
+              },
+              {
+                "ns": 206.29623799779583,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -22.378055378547646
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 301.9588295993157,
+                "sum": 57177
+              },
+              {
+                "ns": 205.52494884306455,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 209.43736117669533,
+                "sum": 57177
+              },
+              {
+                "ns": 192.19791174773397,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -20.857515060448193
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 333.5432079332584,
+                "sum": 57177
+              },
+              {
+                "ns": 220.84404568271083,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 218.94992741836805,
+                "sum": 57177
+              },
+              {
+                "ns": 225.69039998601096,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -19.7960767488376
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 327.8975811952358,
+                "sum": 57177
+              },
+              {
+                "ns": 229.6080591846346,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 193.01642268744882,
+                "sum": 57177
+              },
+              {
+                "ns": 200.43898770484876,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -29.42575251360561
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 347.83916609825314,
+                "sum": 57177
+              },
+              {
+                "ns": 207.49077426237614,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 243.31986637983732,
+                "sum": 57177
+              },
+              {
+                "ns": 243.24466131486264,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -12.38280302720096
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 346.87549189359765,
+                "sum": 57177
+              },
+              {
+                "ns": 229.84941497454525,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 192.3833009776623,
+                "sum": 57177
+              },
+              {
+                "ns": 271.0390541651327,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -19.645857214772988
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 368.3334207810815,
+                "sum": 57177
+              },
+              {
+                "ns": 218.96391905836762,
+                "sum": 57177
+              }
+            ],
+            [
+              {
+                "ns": 202.16695524424765,
+                "sum": 57177
+              },
+              {
+                "ns": 200.88672018469103,
+                "sum": 57177
+              }
+            ]
+          ],
+          "changePercent": -31.371445418240373
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "collision": false,
+      "nkeys": 1024,
+      "workload": "hit",
+      "iterations": 160686,
+      "medianChangePercent": -40.54584874378081,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 39.664314252642725,
+                "sum": 160686
+              },
+              {
+                "ns": 37.60875247376915,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 30.321869982450217,
+                "sum": 160686
+              },
+              {
+                "ns": 29.95967290243116,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -21.988934257895597
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 62.78953984790113,
+                "sum": 160686
+              },
+              {
+                "ns": 36.984553725900255,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 36.354753992257855,
+                "sum": 160686
+              },
+              {
+                "ns": 30.23412120533008,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -33.26035565701917
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 64.41382572221764,
+                "sum": 160686
+              },
+              {
+                "ns": 48.09753183226862,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 29.182380543421676,
+                "sum": 160686
+              },
+              {
+                "ns": 29.35289944363382,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -47.9738923613037
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 58.97838019491345,
+                "sum": 160686
+              },
+              {
+                "ns": 38.615685249492344,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 29.00252666691564,
+                "sum": 160686
+              },
+              {
+                "ns": 29.021196619494933,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -40.54584874378081
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 63.83070087002206,
+                "sum": 160686
+              },
+              {
+                "ns": 40.119861095552594,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 29.812180277061245,
+                "sum": 160686
+              },
+              {
+                "ns": 29.511594040550744,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -42.93078055964885
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 57.930373523514106,
+                "sum": 160686
+              },
+              {
+                "ns": 36.093996987918594,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 36.873778673935064,
+                "sum": 160686
+              },
+              {
+                "ns": 28.61917030730464,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -30.34470890366
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 58.262698679412516,
+                "sum": 160686
+              },
+              {
+                "ns": 38.055586672147484,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 30.37787984018527,
+                "sum": 160686
+              },
+              {
+                "ns": 29.65535267540876,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -37.672029463072555
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 61.9705512614673,
+                "sum": 160686
+              },
+              {
+                "ns": 38.25286583772225,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 30.939845412791737,
+                "sum": 160686
+              },
+              {
+                "ns": 28.969543084025652,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -40.224160948807
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 67.40412979350988,
+                "sum": 160686
+              },
+              {
+                "ns": 38.26842413153503,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 31.974783117382458,
+                "sum": 160686
+              },
+              {
+                "ns": 28.821428126904696,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -42.46735884947874
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 78.42500280048951,
+                "sum": 160686
+              },
+              {
+                "ns": 48.0564579365953,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 27.392554422912664,
+                "sum": 160686
+              },
+              {
+                "ns": 35.785320438616274,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -50.0496954309724
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 65.16124615709799,
+                "sum": 160686
+              },
+              {
+                "ns": 44.2720585489674,
+                "sum": 160686
+              }
+            ],
+            [
+              {
+                "ns": 29.85325417273739,
+                "sum": 160686
+              },
+              {
+                "ns": 30.488654892147636,
+                "sum": 160686
+              }
+            ]
+          ],
+          "changePercent": -44.85964832464705
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "collision": false,
+      "nkeys": 1024,
+      "workload": "miss",
+      "iterations": 608674,
+      "medianChangePercent": -19.904201701693893,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 28.155630107413852,
+                "sum": 0
+              },
+              {
+                "ns": 21.220390553892337,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 19.742259403228715,
+                "sum": 0
+              },
+              {
+                "ns": 17.350010021784392,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -24.877969248581657
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 30.05566197997626,
+                "sum": 0
+              },
+              {
+                "ns": 20.06903531282647,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 17.62454121582352,
+                "sum": 0
+              },
+              {
+                "ns": 16.210976647597374,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -32.49731232136689
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 21.268527980495328,
+                "sum": 0
+              },
+              {
+                "ns": 17.1324879985018,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 15.40939813430441,
+                "sum": 0
+              },
+              {
+                "ns": 15.494336869982265,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -19.52365265234385
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 22.846876981766343,
+                "sum": 0
+              },
+              {
+                "ns": 17.462056864594526,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 15.145381600002876,
+                "sum": 0
+              },
+              {
+                "ns": 16.126202203478222,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -22.420216017932894
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 21.663484886820537,
+                "sum": 0
+              },
+              {
+                "ns": 17.47109290030379,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 15.230320335680732,
+                "sum": 0
+              },
+              {
+                "ns": 15.873028912028705,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -20.522077900268666
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 21.99814679122261,
+                "sum": 0
+              },
+              {
+                "ns": 18.37223209797083,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 15.375554073280231,
+                "sum": 0
+              },
+              {
+                "ns": 17.154010192648624,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -19.422197261971842
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 23.192217837463218,
+                "sum": 0
+              },
+              {
+                "ns": 19.928073155744293,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 16.12373783010365,
+                "sum": 0
+              },
+              {
+                "ns": 16.053749626236428,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -25.37738796473148
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 21.25094878374992,
+                "sum": 0
+              },
+              {
+                "ns": 17.111130095913683,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 15.724016468586496,
+                "sum": 0
+              },
+              {
+                "ns": 15.185633031803043,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -19.426552462527567
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 22.428754965711757,
+                "sum": 0
+              },
+              {
+                "ns": 16.981339764800932,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 14.98749741240712,
+                "sum": 0
+              },
+              {
+                "ns": 16.578332572115688,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -19.904201701693893
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 20.913822505971776,
+                "sum": 0
+              },
+              {
+                "ns": 16.954067366111442,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 15.266793061638191,
+                "sum": 0
+              },
+              {
+                "ns": 15.27451476488231,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -19.347743088700554
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 20.401890010087286,
+                "sum": 0
+              },
+              {
+                "ns": 17.08336482254958,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 15.317394861617247,
+                "sum": 0
+              },
+              {
+                "ns": 14.880872191025233,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -19.4396111551839
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "collision": false,
+      "nkeys": 1024,
+      "workload": "update",
+      "iterations": 180275,
+      "medianChangePercent": -40.12621568547456,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 42.10900013867616,
+                "sum": 180275
+              },
+              {
+                "ns": 35.08695049230074,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 28.579115240605997,
+                "sum": 180275
+              },
+              {
+                "ns": 29.83719317708891,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -24.32723745194242
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 53.682429621411636,
+                "sum": 180275
+              },
+              {
+                "ns": 38.26653723478153,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 28.251282762445417,
+                "sum": 180275
+              },
+              {
+                "ns": 28.15642767993243,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -38.65324171548477
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 57.02343641658828,
+                "sum": 180275
+              },
+              {
+                "ns": 38.40798779642201,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 27.531271668285356,
+                "sum": 180275
+              },
+              {
+                "ns": 27.776452641794517,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -42.044536413258626
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 55.61891554569096,
+                "sum": 180275
+              },
+              {
+                "ns": 36.951324365552395,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 27.38039106920318,
+                "sum": 180275
+              },
+              {
+                "ns": 29.12051033143976,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -38.96429192058248
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 56.35723200665345,
+                "sum": 180275
+              },
+              {
+                "ns": 39.62390791846032,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 28.65566495632159,
+                "sum": 180275
+              },
+              {
+                "ns": 28.231867979476043,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -40.73050916025552
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 58.623214533351316,
+                "sum": 180275
+              },
+              {
+                "ns": 37.51213423936057,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 31.26112883095056,
+                "sum": 180275
+              },
+              {
+                "ns": 28.708362224374827,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -37.61972903733014
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 61.19983358757427,
+                "sum": 180275
+              },
+              {
+                "ns": 37.536541395093785,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 28.759950076271213,
+                "sum": 180275
+              },
+              {
+                "ns": 28.39162390791896,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -42.11700197194558
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 55.468589654694775,
+                "sum": 180275
+              },
+              {
+                "ns": 37.228678407988575,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 31.437526001937933,
+                "sum": 180275
+              },
+              {
+                "ns": 28.346692553044388,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -35.50595416193356
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 59.168492580776935,
+                "sum": 180275
+              },
+              {
+                "ns": 36.91415892386659,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 28.668423242269142,
+                "sum": 180275
+              },
+              {
+                "ns": 27.857440022187962,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -41.16954270175892
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 57.832200804325495,
+                "sum": 180275
+              },
+              {
+                "ns": 37.36180834835431,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 28.984606850644063,
+                "sum": 180275
+              },
+              {
+                "ns": 28.01164886978104,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -40.12621568547456
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 57.921508805988644,
+                "sum": 180275
+              },
+              {
+                "ns": 53.92594647066787,
+                "sum": 180275
+              }
+            ],
+            [
+              {
+                "ns": 28.56691166273939,
+                "sum": 180275
+              },
+              {
+                "ns": 36.74164470947107,
+                "sum": 180275
+              }
+            ]
+          ],
+          "changePercent": -41.60926038892108
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "collision": false,
+      "nkeys": 1024,
+      "workload": "remove-add",
+      "iterations": 108094,
+      "medianChangePercent": -23.824786324789848,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 120.89477676837022,
+                "sum": 108094
+              },
+              {
+                "ns": 131.67520861472303,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 95.13756545229298,
+                "sum": 108094
+              },
+              {
+                "ns": 113.31896312468776,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -17.46583496023967
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 161.0894221695937,
+                "sum": 108094
+              },
+              {
+                "ns": 104.38969785557346,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 105.31851906673553,
+                "sum": 108094
+              },
+              {
+                "ns": 98.2024904250003,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -23.3382235588086
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 159.37332321867598,
+                "sum": 108094
+              },
+              {
+                "ns": 115.54757895905215,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 94.55011378984912,
+                "sum": 108094
+              },
+              {
+                "ns": 116.88807889428743,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -23.09126333819169
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 171.3231076655525,
+                "sum": 108094
+              },
+              {
+                "ns": 108.20119525597823,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 101.39045645457045,
+                "sum": 108094
+              },
+              {
+                "ns": 98.15623438859497,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -28.61204240291656
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 165.340351915925,
+                "sum": 108094
+              },
+              {
+                "ns": 115.88432290414498,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 93.89697855570095,
+                "sum": 108094
+              },
+              {
+                "ns": 132.50504190796354,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -19.494254688526713
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 166.32097988787316,
+                "sum": 108094
+              },
+              {
+                "ns": 140.707162284671,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 124.53512683405502,
+                "sum": 108094
+              },
+              {
+                "ns": 98.0664976779494,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -27.497973659070507
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 152.74020759709904,
+                "sum": 108094
+              },
+              {
+                "ns": 124.3519529298602,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 95.86563546542993,
+                "sum": 108094
+              },
+              {
+                "ns": 115.20990989323757,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -23.824786324789848
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 167.56896775028937,
+                "sum": 108094
+              },
+              {
+                "ns": 103.66440320461848,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 100.3321183414431,
+                "sum": 108094
+              },
+              {
+                "ns": 99.57721982718299,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -26.29618639298601
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 169.233259940421,
+                "sum": 108094
+              },
+              {
+                "ns": 123.6460858141958,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 101.998260773035,
+                "sum": 108094
+              },
+              {
+                "ns": 118.99365367180586,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -24.545066885667456
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 162.4243713804651,
+                "sum": 108094
+              },
+              {
+                "ns": 101.60323422207038,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 102.89100227579789,
+                "sum": 108094
+              },
+              {
+                "ns": 100.81133087868092,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -22.84809283877297
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 154.52569060262482,
+                "sum": 108094
+              },
+              {
+                "ns": 128.74442614761477,
+                "sum": 108094
+              }
+            ],
+            [
+              {
+                "ns": 96.36150017577636,
+                "sum": 108094
+              },
+              {
+                "ns": 114.70941957925733,
+                "sum": 108094
+              }
+            ]
+          ],
+          "changePercent": -25.487756288413664
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "collision": true,
+      "nkeys": 16,
+      "workload": "hit",
+      "iterations": 223839,
+      "medianChangePercent": -21.95263202774873,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 78.99114988897949,
+                "sum": 223839
+              },
+              {
+                "ns": 63.30085463212521,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 47.971979860521955,
+                "sum": 223839
+              },
+              {
+                "ns": 49.385942574797916,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -31.578782122730043
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 81.32720392782369,
+                "sum": 223839
+              },
+              {
+                "ns": 56.07378517595047,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 53.37631065185116,
+                "sum": 223839
+              },
+              {
+                "ns": 51.35744888067138,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -23.77510510246705
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 69.52497107296185,
+                "sum": 223839
+              },
+              {
+                "ns": 56.215404822216115,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 47.29292035793285,
+                "sum": 223839
+              },
+              {
+                "ns": 50.84413350666863,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -21.95263202774873
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 78.99517063603838,
+                "sum": 223839
+              },
+              {
+                "ns": 61.361067553016554,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 61.20247141918842,
+                "sum": 223839
+              },
+              {
+                "ns": 56.82075062879768,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -15.911666221053189
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 77.42261178793835,
+                "sum": 223839
+              },
+              {
+                "ns": 64.67326962683208,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 48.69660782973495,
+                "sum": 223839
+              },
+              {
+                "ns": 56.10282390468146,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -26.24738261870352
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 72.7281662266198,
+                "sum": 223839
+              },
+              {
+                "ns": 57.118285910853565,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 53.26149598595228,
+                "sum": 223839
+              },
+              {
+                "ns": 52.429201345610814,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -18.603322931253963
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 66.58625172556992,
+                "sum": 223839
+              },
+              {
+                "ns": 56.28152377378365,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 47.109306242432595,
+                "sum": 223839
+              },
+              {
+                "ns": 54.964058988827176,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -16.924218073927122
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 75.31842082925618,
+                "sum": 223839
+              },
+              {
+                "ns": 55.36434669561346,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 57.24694981660746,
+                "sum": 223839
+              },
+              {
+                "ns": 51.00943088559354,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -17.1609365545467
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 74.2886628335554,
+                "sum": 223839
+              },
+              {
+                "ns": 56.59112129700396,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 47.493064211334115,
+                "sum": 223839
+              },
+              {
+                "ns": 52.942963469279086,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -23.260854724192505
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 71.28427128426961,
+                "sum": 223839
+              },
+              {
+                "ns": 57.118285910853565,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 53.66535769012784,
+                "sum": 223839
+              },
+              {
+                "ns": 50.32054289020018,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -19.015708992221303
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 73.34423402534888,
+                "sum": 223839
+              },
+              {
+                "ns": 55.184753327168025,
+                "sum": 223839
+              }
+            ],
+            [
+              {
+                "ns": 47.1700641979284,
+                "sum": 223839
+              },
+              {
+                "ns": 51.4820920393664,
+                "sum": 223839
+              }
+            ]
+          ],
+          "changePercent": -23.245208517265304
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "collision": true,
+      "nkeys": 16,
+      "workload": "miss",
+      "iterations": 146682,
+      "medianChangePercent": -24.235936115119085,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 115.63791058207234,
+                "sum": 0
+              },
+              {
+                "ns": 81.50420637842014,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 75.44620335146854,
+                "sum": 0
+              },
+              {
+                "ns": 76.78583602623446,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -22.78055966690745
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 113.14544388541442,
+                "sum": 0
+              },
+              {
+                "ns": 81.38967289783342,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 78.83925771396629,
+                "sum": 0
+              },
+              {
+                "ns": 76.59699213264396,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -20.098616426257777
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 98.96374469941797,
+                "sum": 0
+              },
+              {
+                "ns": 82.20436045322393,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 75.98546515591575,
+                "sum": 0
+              },
+              {
+                "ns": 76.6010826140895,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -15.776263354167908
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 111.1908754993782,
+                "sum": 0
+              },
+              {
+                "ns": 108.05552146820986,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 79.83733518768862,
+                "sum": 0
+              },
+              {
+                "ns": 92.26626307249803,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -21.502199972011702
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 123.74183608077433,
+                "sum": 0
+              },
+              {
+                "ns": 82.23163032956059,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 80.40932084373115,
+                "sum": 0
+              },
+              {
+                "ns": 74.18769855878436,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -24.943235603691114
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 113.19248442208153,
+                "sum": 0
+              },
+              {
+                "ns": 101.29122864427998,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 75.18918476704879,
+                "sum": 0
+              },
+              {
+                "ns": 73.4384587065907,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -30.70446172868432
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 125.02420201524691,
+                "sum": 0
+              },
+              {
+                "ns": 81.30309104048062,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 76.43473636846808,
+                "sum": 0
+              },
+              {
+                "ns": 72.83511269275976,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -27.65385187265985
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 116.06672938738457,
+                "sum": 0
+              },
+              {
+                "ns": 80.0752648586752,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 74.69560000545556,
+                "sum": 0
+              },
+              {
+                "ns": 73.90954582020863,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -24.235936115119085
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 118.85984647059966,
+                "sum": 0
+              },
+              {
+                "ns": 80.61384491621274,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 74.08407302873356,
+                "sum": 0
+              },
+              {
+                "ns": 78.82357753507517,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -23.344452343193687
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 114.85867386591579,
+                "sum": 0
+              },
+              {
+                "ns": 80.60975443476102,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 74.40381232871152,
+                "sum": 0
+              },
+              {
+                "ns": 72.92373979084152,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -24.628466397177796
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 118.66145812028638,
+                "sum": 0
+              },
+              {
+                "ns": 91.18228548833255,
+                "sum": 0
+              }
+            ],
+            [
+              {
+                "ns": 73.51276911958827,
+                "sum": 0
+              },
+              {
+                "ns": 72.35925335078042,
+                "sum": 0
+              }
+            ]
+          ],
+          "changePercent": -30.485407874520366
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "collision": true,
+      "nkeys": 16,
+      "workload": "update",
+      "iterations": 159947,
+      "medianChangePercent": -30.995501597012808,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 60.326858271800255,
+                "sum": 159947
+              },
+              {
+                "ns": 59.635379219369966,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 49.31008396531173,
+                "sum": 159947
+              },
+              {
+                "ns": 48.740520297348965,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -18.265442264797972
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 82.62549469512183,
+                "sum": 159947
+              },
+              {
+                "ns": 59.70852845005275,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 51.46142159590345,
+                "sum": 159947
+              },
+              {
+                "ns": 51.23322100445653,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -27.84954691007654
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 91.46842391541824,
+                "sum": 159947
+              },
+              {
+                "ns": 61.43159921723832,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 49.89840384627389,
+                "sum": 159947
+              },
+              {
+                "ns": 54.935072242683916,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -31.436585854533238
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 84.66366984063323,
+                "sum": 159947
+              },
+              {
+                "ns": 62.24811968964738,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 52.13101839984584,
+                "sum": 159947
+              },
+              {
+                "ns": 60.25370904112315,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -23.50190015362592
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 108.48155951659152,
+                "sum": 159947
+              },
+              {
+                "ns": 64.24878240917141,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 53.68590845717795,
+                "sum": 159947
+              },
+              {
+                "ns": 52.62243118032828,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -38.45416013638411
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 86.20793137726342,
+                "sum": 159947
+              },
+              {
+                "ns": 59.88671247350701,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 52.362970233888085,
+                "sum": 159947
+              },
+              {
+                "ns": 54.1235534270724,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -27.11127468182063
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 91.53219503960702,
+                "sum": 159947
+              },
+              {
+                "ns": 61.94927069591646,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 50.271027277788704,
+                "sum": 159947
+              },
+              {
+                "ns": 51.50393567869408,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -33.6890858653516
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 87.52399232245239,
+                "sum": 159947
+              },
+              {
+                "ns": 62.023045133700364,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 52.240429642319455,
+                "sum": 159947
+              },
+              {
+                "ns": 50.95375343082611,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -30.995501597012808
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 92.51126935797656,
+                "sum": 159947
+              },
+              {
+                "ns": 62.19685270745819,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 49.33634266350745,
+                "sum": 159947
+              },
+              {
+                "ns": 50.17349497021356,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -35.67898290974488
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 84.07159871707576,
+                "sum": 159947
+              },
+              {
+                "ns": 60.93018312316077,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 51.73963875533733,
+                "sum": 159947
+              },
+              {
+                "ns": 51.78402845942562,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -28.605244776353377
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 90.41620036636593,
+                "sum": 159947
+              },
+              {
+                "ns": 61.346571051657065,
+                "sum": 159947
+              }
+            ],
+            [
+              {
+                "ns": 50.22476195239707,
+                "sum": 159947
+              },
+              {
+                "ns": 51.38139508712545,
+                "sum": 159947
+              }
+            ]
+          ],
+          "changePercent": -33.04935321742812
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "collision": true,
+      "nkeys": 16,
+      "workload": "remove-add",
+      "iterations": 85322,
+      "medianChangePercent": -29.72499822568764,
+      "blocks": [
+        {
+          "samples": [
+            [
+              {
+                "ns": 140.77143058062657,
+                "sum": 85322
+              },
+              {
+                "ns": 133.78729987576432,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 122.01542392348104,
+                "sum": 85322
+              },
+              {
+                "ns": 116.07088441433801,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -13.284014701679602
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 205.74881038888083,
+                "sum": 85322
+              },
+              {
+                "ns": 141.04216966316497,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 127.05749982419475,
+                "sum": 85322
+              },
+              {
+                "ns": 116.64986756053567,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -29.72499822568764
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 238.6559152387365,
+                "sum": 85322
+              },
+              {
+                "ns": 134.26197229319553,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 117.58397599681507,
+                "sum": 85322
+              },
+              {
+                "ns": 124.00201589273728,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -35.21737627325104
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 203.5911019432232,
+                "sum": 85322
+              },
+              {
+                "ns": 137.11000679777212,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 129.66292398208427,
+                "sum": 85322
+              },
+              {
+                "ns": 117.53123461710048,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -27.445449322824356
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 199.3354586155987,
+                "sum": 85322
+              },
+              {
+                "ns": 141.9985466819822,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 118.2684419024419,
+                "sum": 85322
+              },
+              {
+                "ns": 116.27364571857879,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -31.286633039523025
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 196.4475750685652,
+                "sum": 85322
+              },
+              {
+                "ns": 134.93002976957663,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 118.23093692131035,
+                "sum": 85322
+              },
+              {
+                "ns": 117.53006258643778,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -28.854274982492157
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 210.9209816928763,
+                "sum": 85322
+              },
+              {
+                "ns": 133.0477485291082,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 117.80666182226831,
+                "sum": 85322
+              },
+              {
+                "ns": 114.3292468530942,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -32.51249655003503
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 197.23752373362117,
+                "sum": 85322
+              },
+              {
+                "ns": 152.53393028761897,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 119.20723846136138,
+                "sum": 85322
+              },
+              {
+                "ns": 181.44206652445754,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -14.044070340982785
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 203.09181688192876,
+                "sum": 85322
+              },
+              {
+                "ns": 133.99592133329725,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 118.19460397083081,
+                "sum": 85322
+              },
+              {
+                "ns": 116.73776986005642,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -30.3052745036706
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 203.21488010126632,
+                "sum": 85322
+              },
+              {
+                "ns": 134.9792550573138,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 124.85642624411345,
+                "sum": 85322
+              },
+              {
+                "ns": 116.45531047092308,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -28.646977688751218
+        },
+        {
+          "samples": [
+            [
+              {
+                "ns": 203.10119312720897,
+                "sum": 85322
+              },
+              {
+                "ns": 137.2108014345718,
+                "sum": 85322
+              }
+            ],
+            [
+              {
+                "ns": 115.40985912191172,
+                "sum": 85322
+              },
+              {
+                "ns": 116.53266449451156,
+                "sum": 85322
+              }
+            ]
+          ],
+          "changePercent": -31.84415262380179
+        }
+      ]
+    }
+  ]
+}

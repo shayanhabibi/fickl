@@ -1,0 +1,4512 @@
+{
+  "timestamp": "2026-10-23T09:57:49+0800",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "cpu_count": 24,
+  "node": "v26.7.0",
+  "v8": "14.6.202.34-node.28",
+  "rounds": 7,
+  "iterations": {
+    "array-0": 17718493,
+    "array-1": 9144412,
+    "array-4": 8381835,
+    "array-32": 2048184,
+    "array-1024": 61606,
+    "record-4": 1234211,
+    "record-16": 595766,
+    "record-64": 19037,
+    "object-4": 802572,
+    "object-16": 382769,
+    "object-64": 106956,
+    "nested": 172136,
+    "hash-lookup": 197515
+  },
+  "summary": [
+    {
+      "name": "array-0",
+      "median_ns": {
+        "baseline": 6.885805694649088,
+        "array": 5.0589178210584835,
+        "record": 7.81658462714634,
+        "object": 5.613790066683437,
+        "combined": 5.099028455749595
+      },
+      "min_ns": {
+        "baseline": 5.341182232597321,
+        "array": 3.5169300233377645,
+        "record": 4.7206441315296965,
+        "object": 5.238741240578418,
+        "combined": 3.795142171515376
+      },
+      "max_ns": {
+        "baseline": 28.85950289338941,
+        "array": 9.240949554795659,
+        "record": 10.815654581910552,
+        "object": 22.109137611195262,
+        "combined": 15.406276368989168
+      },
+      "percent_change": {
+        "array": -26.53121442288542,
+        "record": 13.517356919039326,
+        "object": -18.473010775690714,
+        "combined": -25.948702564871752
+      }
+    },
+    {
+      "name": "array-1",
+      "median_ns": {
+        "baseline": 9.924716865338084,
+        "array": 6.810673009921252,
+        "record": 13.693225983256225,
+        "object": 8.079404121336617,
+        "combined": 9.255904042818717
+      },
+      "min_ns": {
+        "baseline": 8.248064501030797,
+        "array": 6.272223954913669,
+        "record": 8.104359252404638,
+        "object": 7.276400057215267,
+        "combined": 5.667975152475635
+      },
+      "max_ns": {
+        "baseline": 29.155794817643827,
+        "array": 18.43290744117828,
+        "record": 29.486346415712678,
+        "object": 46.65041338907302,
+        "combined": 11.384931037665408
+      },
+      "percent_change": {
+        "array": -31.376651824623636,
+        "record": 37.9709483812037,
+        "object": -18.593102141242856,
+        "combined": -6.738860479286668
+      }
+    },
+    {
+      "name": "array-4",
+      "median_ns": {
+        "baseline": 14.349912638461632,
+        "array": 8.722171219070765,
+        "record": 17.0024940839327,
+        "object": 15.280019232065529,
+        "combined": 11.744659731431124
+      },
+      "min_ns": {
+        "baseline": 10.49943121046883,
+        "array": 7.356980899767178,
+        "record": 11.69304812132427,
+        "object": 10.948915124194171,
+        "combined": 6.576388105945774
+      },
+      "max_ns": {
+        "baseline": 48.22427308578612,
+        "array": 20.745958373077013,
+        "record": 37.33962789770975,
+        "object": 61.118072593889046,
+        "combined": 29.48532153162166
+      },
+      "percent_change": {
+        "array": -39.217948995083106,
+        "record": 18.485000656808424,
+        "object": 6.481618509028131,
+        "combined": -18.15518305001891
+      }
+    },
+    {
+      "name": "array-32",
+      "median_ns": {
+        "baseline": 65.01012604336333,
+        "array": 30.255728977474696,
+        "record": 64.38630513664788,
+        "object": 53.31674302699366,
+        "combined": 32.689152927666676
+      },
+      "min_ns": {
+        "baseline": 44.2344535451893,
+        "array": 24.367732586525438,
+        "record": 50.22356389855599,
+        "object": 50.495219179526835,
+        "combined": 25.889226749159246
+      },
+      "max_ns": {
+        "baseline": 152.26092968209878,
+        "array": 68.96768063806763,
+        "record": 127.70459099377796,
+        "object": 191.34316057541702,
+        "combined": 60.011454049050265
+      },
+      "percent_change": {
+        "array": -53.45997490099712,
+        "record": -0.959574984209921,
+        "object": -17.987017912517032,
+        "combined": -49.71682887391694
+      }
+    },
+    {
+      "name": "array-1024",
+      "median_ns": {
+        "baseline": 2111.1920916793815,
+        "array": 763.0425607895331,
+        "record": 2134.7255137486604,
+        "object": 1774.5836444502165,
+        "combined": 724.8238807908322
+      },
+      "min_ns": {
+        "baseline": 1528.864071681329,
+        "array": 673.2347498620255,
+        "record": 1605.7380774599872,
+        "object": 1588.721877739182,
+        "combined": 685.6426322111478
+      },
+      "max_ns": {
+        "baseline": 3435.6897055481622,
+        "array": 1382.4643703535367,
+        "record": 3705.8728045969565,
+        "object": 5991.25734506379,
+        "combined": 1937.2139077362585
+      },
+      "percent_change": {
+        "array": -63.85726510643763,
+        "record": 1.114698286433935,
+        "object": -15.94399905891104,
+        "combined": -65.66755419142085
+      }
+    },
+    {
+      "name": "record-4",
+      "median_ns": {
+        "baseline": 95.57271811708048,
+        "array": 82.60653972456905,
+        "record": 104.47046736741112,
+        "object": 78.95035775892447,
+        "combined": 74.02056860617833
+      },
+      "min_ns": {
+        "baseline": 73.59244083872201,
+        "array": 70.22170439252285,
+        "record": 61.90797197561846,
+        "object": 71.72857801461822,
+        "combined": 62.449937652475946
+      },
+      "max_ns": {
+        "baseline": 261.67186972081777,
+        "array": 477.06162074394086,
+        "record": 306.03827060364875,
+        "object": 272.5616608505353,
+        "combined": 199.58985943246333
+      },
+      "percent_change": {
+        "array": -13.56681974517805,
+        "record": 9.309925913617455,
+        "object": -17.392369585840328,
+        "combined": -22.550524810333318
+      }
+    },
+    {
+      "name": "record-16",
+      "median_ns": {
+        "baseline": 265.7457793831807,
+        "array": 201.84031985712508,
+        "record": 225.45714256939806,
+        "object": 225.4534498444022,
+        "combined": 184.54561018923542
+      },
+      "min_ns": {
+        "baseline": 188.1142931956506,
+        "array": 176.89797672240448,
+        "record": 160.13384449599334,
+        "object": 173.50419459989337,
+        "combined": 151.59978917897294
+      },
+      "max_ns": {
+        "baseline": 456.0134348049399,
+        "array": 1015.8995310239255,
+        "record": 489.7164322905306,
+        "object": 651.2486446020757,
+        "combined": 361.4226055196168
+      },
+      "percent_change": {
+        "array": -24.047591526904334,
+        "record": -15.160593296080227,
+        "object": -15.16198286659549,
+        "combined": -30.55558187317895
+      }
+    },
+    {
+      "name": "record-64",
+      "median_ns": {
+        "baseline": 6186.011451384141,
+        "array": 5317.592057572097,
+        "record": 5820.108210327254,
+        "object": 5522.246152229865,
+        "combined": 5185.128959394862
+      },
+      "min_ns": {
+        "baseline": 4632.505121605293,
+        "array": 4691.894731312703,
+        "record": 4285.281294321583,
+        "object": 4475.694699795135,
+        "combined": 4319.404317907236
+      },
+      "max_ns": {
+        "baseline": 8928.497137153952,
+        "array": 33507.40137626727,
+        "record": 12243.515259757312,
+        "object": 18824.27378263382,
+        "combined": 14413.851972474658
+      },
+      "percent_change": {
+        "array": -14.038438186494673,
+        "record": -5.915010729167259,
+        "object": -10.730101364519061,
+        "combined": -16.179771082792417
+      }
+    },
+    {
+      "name": "object-4",
+      "median_ns": {
+        "baseline": 112.07480450352098,
+        "array": 109.39442193348377,
+        "record": 136.78099908793217,
+        "object": 142.19658796967755,
+        "combined": 99.44877219738538
+      },
+      "min_ns": {
+        "baseline": 96.91940411576769,
+        "array": 102.99075970754029,
+        "record": 96.57488673913365,
+        "object": 85.29988586693777,
+        "combined": 82.03687644223824
+      },
+      "max_ns": {
+        "baseline": 166.62554886041355,
+        "array": 517.728378263882,
+        "record": 226.95035460992938,
+        "object": 271.6589913428329,
+        "combined": 304.62400881167054
+      },
+      "percent_change": {
+        "array": -2.3916013790173496,
+        "record": 22.044378925180297,
+        "object": 26.876498780963963,
+        "combined": -11.265718786722434
+      }
+    },
+    {
+      "name": "object-16",
+      "median_ns": {
+        "baseline": 281.93688621596834,
+        "array": 327.56989202364844,
+        "record": 368.1876013992776,
+        "object": 329.1112916667756,
+        "combined": 220.0076286219625
+      },
+      "min_ns": {
+        "baseline": 236.96224093382705,
+        "array": 233.88675676452368,
+        "record": 222.9193064224117,
+        "object": 189.87796817401613,
+        "combined": 187.69362200178176
+      },
+      "max_ns": {
+        "baseline": 376.5947608087383,
+        "array": 1152.6202487662274,
+        "record": 626.2126765751673,
+        "object": 504.8339860333522,
+        "combined": 592.3802606794175
+      },
+      "percent_change": {
+        "array": 16.185539402149907,
+        "record": 30.592206766886033,
+        "object": 16.732257379997773,
+        "combined": -21.965645724897097
+      }
+    },
+    {
+      "name": "object-64",
+      "median_ns": {
+        "baseline": 992.7437450914382,
+        "array": 1218.4599274468005,
+        "record": 1122.751411795505,
+        "object": 909.6815512921208,
+        "combined": 682.930363887954
+      },
+      "min_ns": {
+        "baseline": 772.5597441938754,
+        "array": 775.8162234937732,
+        "record": 789.2731590560585,
+        "object": 632.9331687796864,
+        "combined": 607.9331687796864
+      },
+      "max_ns": {
+        "baseline": 1157.5133699839175,
+        "array": 5726.510901679199,
+        "record": 2340.8803620180265,
+        "object": 1793.078462171363,
+        "combined": 2022.6214518119582
+      },
+      "percent_change": {
+        "array": 22.73660080674418,
+        "record": 13.095793083248509,
+        "object": -8.366931971116752,
+        "combined": -31.20778979825739
+      }
+    },
+    {
+      "name": "nested",
+      "median_ns": {
+        "baseline": 334.8108472370686,
+        "array": 331.08879025886444,
+        "record": 418.31400752893245,
+        "object": 305.22435748477915,
+        "combined": 274.35574197146434
+      },
+      "min_ns": {
+        "baseline": 259.8857879815957,
+        "array": 242.54252451549894,
+        "record": 219.00474043779437,
+        "object": 267.37172933029717,
+        "combined": 216.46256448389627
+      },
+      "max_ns": {
+        "baseline": 440.101431426314,
+        "array": 1386.4810382488274,
+        "record": 457.51324534089326,
+        "object": 680.9580796579448,
+        "combined": 746.3691499744407
+      },
+      "percent_change": {
+        "array": -1.1116894834559132,
+        "record": 24.940398729894795,
+        "object": -8.836777540645269,
+        "combined": -18.056495410615526
+      }
+    },
+    {
+      "name": "hash-lookup",
+      "median_ns": {
+        "baseline": 180.20200997392575,
+        "array": 176.0149862035792,
+        "record": 165.68615041895558,
+        "object": 152.84560666278512,
+        "combined": 163.54251575829625
+      },
+      "min_ns": {
+        "baseline": 124.76672657772805,
+        "array": 116.20383262030732,
+        "record": 109.66306356479168,
+        "object": 122.33399994937123,
+        "combined": 112.60461230792578
+      },
+      "max_ns": {
+        "baseline": 203.56732400070857,
+        "array": 342.1471786952873,
+        "record": 223.57390577930818,
+        "object": 335.63172417284795,
+        "combined": 227.43082803837592
+      },
+      "percent_change": {
+        "array": -2.323516686052718,
+        "record": -8.055326107111982,
+        "object": -15.180964582525448,
+        "combined": -9.244899220624703
+      }
+    }
+  ],
+  "raw": [
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 152.6291,
+      "nsPerOp": 8.614112949673542,
+      "checksum": 0
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 95.5667,
+      "nsPerOp": 10.45083051813501,
+      "checksum": 722549050
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 129.2937,
+      "nsPerOp": 15.425464710293152,
+      "checksum": -1897621340
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 133.1527000000001,
+      "nsPerOp": 65.01012604336333,
+      "checksum": 1139659264
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 131.62919999999997,
+      "nsPerOp": 2136.6295490698953,
+      "checksum": 1243622400
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 128.93780000000004,
+      "nsPerOp": 104.46981918002679,
+      "checksum": 753700740
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 171.21309999999994,
+      "nsPerOp": 287.38313364643153,
+      "checksum": -643526576
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 117.7630999999999,
+      "nsPerOp": 6186.011451384141,
+      "checksum": -616582400
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 109.80999999999995,
+      "nsPerOp": 136.82261529183668,
+      "checksum": -958061144
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 121.29629999999997,
+      "nsPerOp": 316.8916500552552,
+      "checksum": -417199232
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 106.6561999999999,
+      "nsPerOp": 997.1969781966407,
+      "checksum": -131744896
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "nested",
+      "count": 172136,
+      "ms": 73.43039999999996,
+      "nsPerOp": 426.58363154714857,
+      "checksum": -36558000
+    },
+    {
+      "round": 1,
+      "variant": "baseline",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 40.20759999999996,
+      "nsPerOp": 203.56732400070857,
+      "checksum": 25175031
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 144.3731,
+      "nsPerOp": 8.14815910134118,
+      "checksum": 0
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 113.1832,
+      "nsPerOp": 12.377307584128975,
+      "checksum": 722549050
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 125.27030000000002,
+      "nsPerOp": 14.945450489063553,
+      "checksum": -1897621340
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 108.23760000000004,
+      "nsPerOp": 52.84564277428202,
+      "checksum": 1139659264
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 85.16809999999998,
+      "nsPerOp": 1382.4643703535367,
+      "checksum": 1243622400
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 588.7947,
+      "nsPerOp": 477.06162074394086,
+      "checksum": 753700740
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 605.2384,
+      "nsPerOp": 1015.8995310239255,
+      "checksum": -643526576
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 637.8804,
+      "nsPerOp": 33507.40137626727,
+      "checksum": -616582400
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 415.5143000000003,
+      "nsPerOp": 517.728378263882,
+      "checksum": -958061144
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 441.18730000000005,
+      "nsPerOp": 1152.6202487662274,
+      "checksum": -417199232
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 612.4847000000004,
+      "nsPerOp": 5726.510901679199,
+      "checksum": -131744896
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "nested",
+      "count": 172136,
+      "ms": 238.66330000000016,
+      "nsPerOp": 1386.4810382488274,
+      "checksum": -36558000
+    },
+    {
+      "round": 1,
+      "variant": "array",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 57.54370000000017,
+      "nsPerOp": 291.3383793635935,
+      "checksum": 25175031
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 191.63710000000003,
+      "nsPerOp": 10.815654581910552,
+      "checksum": 0
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 211.98430000000008,
+      "nsPerOp": 23.181840450758354,
+      "checksum": 722549050
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 243.91869999999994,
+      "nsPerOp": 29.10087110996577,
+      "checksum": -1897621340
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 261.5625000000001,
+      "nsPerOp": 127.70459099377796,
+      "checksum": 1139659264
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 228.3040000000001,
+      "nsPerOp": 3705.8728045969565,
+      "checksum": 1243622400
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 167.71669999999995,
+      "nsPerOp": 135.8898113855734,
+      "checksum": 753700740
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 247.26530000000002,
+      "nsPerOp": 415.03761543961895,
+      "checksum": -643526576
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 187.3225,
+      "nsPerOp": 9839.917003729579,
+      "checksum": -616582400
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 182.14400000000023,
+      "nsPerOp": 226.95035460992938,
+      "checksum": -958061144
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 239.6948000000002,
+      "nsPerOp": 626.2126765751673,
+      "checksum": -417199232
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 160.95539999999983,
+      "nsPerOp": 1504.8749018287876,
+      "checksum": -131744896
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "nested",
+      "count": 172136,
+      "ms": 72.00690000000031,
+      "nsPerOp": 418.31400752893245,
+      "checksum": -36558000
+    },
+    {
+      "round": 1,
+      "variant": "record",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 44.159200000000055,
+      "nsPerOp": 223.57390577930818,
+      "checksum": 25175031
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 391.7406,
+      "nsPerOp": 22.109137611195262,
+      "checksum": 0
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 426.5906,
+      "nsPerOp": 46.65041338907302,
+      "checksum": 722549050
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 512.2816,
+      "nsPerOp": 61.118072593889046,
+      "checksum": -1897621340
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 391.90599999999995,
+      "nsPerOp": 191.34316057541702,
+      "checksum": 1139659264
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 369.0973999999999,
+      "nsPerOp": 5991.25734506379,
+      "checksum": 1243622400
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 336.3986,
+      "nsPerOp": 272.5616608505353,
+      "checksum": 753700740
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 387.99180000000024,
+      "nsPerOp": 651.2486446020757,
+      "checksum": -643526576
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 358.3577,
+      "nsPerOp": 18824.27378263382,
+      "checksum": -616582400
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 154.32160000000022,
+      "nsPerOp": 192.28380755869904,
+      "checksum": -958061144
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 193.23480000000018,
+      "nsPerOp": 504.8339860333522,
+      "checksum": -417199232
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 191.7805000000003,
+      "nsPerOp": 1793.078462171363,
+      "checksum": -131744896
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "nested",
+      "count": 172136,
+      "ms": 93.34140000000025,
+      "nsPerOp": 542.2537993214683,
+      "checksum": -36558000
+    },
+    {
+      "round": 1,
+      "variant": "object",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 47.05229999999938,
+      "nsPerOp": 238.22140090625712,
+      "checksum": 25175031
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 272.976,
+      "nsPerOp": 15.406276368989168,
+      "checksum": 0
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 103.51669999999996,
+      "nsPerOp": 11.32021391862046,
+      "checksum": 722549050
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 247.14110000000005,
+      "nsPerOp": 29.48532153162166,
+      "checksum": -1897621340
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 122.91449999999998,
+      "nsPerOp": 60.011454049050265,
+      "checksum": 1139659264
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 119.34399999999994,
+      "nsPerOp": 1937.2139077362585,
+      "checksum": 1243622400
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 246.336,
+      "nsPerOp": 199.58985943246333,
+      "checksum": 753700740
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 215.32330000000002,
+      "nsPerOp": 361.4226055196168,
+      "checksum": -643526576
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 274.39650000000006,
+      "nsPerOp": 14413.851972474658,
+      "checksum": -616582400
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 244.48270000000002,
+      "nsPerOp": 304.62400881167054,
+      "checksum": -958061144
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 226.74479999999994,
+      "nsPerOp": 592.3802606794175,
+      "checksum": -417199232
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 216.33149999999978,
+      "nsPerOp": 2022.6214518119582,
+      "checksum": -131744896
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "nested",
+      "count": 172136,
+      "ms": 128.47700000000032,
+      "nsPerOp": 746.3691499744407,
+      "checksum": -36558000
+    },
+    {
+      "round": 1,
+      "variant": "combined",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 44.92099999999982,
+      "nsPerOp": 227.43082803837592,
+      "checksum": 25175031
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 511.3469,
+      "nsPerOp": 28.85950289338941,
+      "checksum": 0
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 266.61260000000004,
+      "nsPerOp": 29.155794817643827,
+      "checksum": 722549050
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 404.2079000000001,
+      "nsPerOp": 48.22427308578612,
+      "checksum": -1897621340
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 311.85839999999985,
+      "nsPerOp": 152.26092968209878,
+      "checksum": 1139659264
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 211.65910000000008,
+      "nsPerOp": 3435.6897055481622,
+      "checksum": 1243622400
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 322.95830000000024,
+      "nsPerOp": 261.67186972081777,
+      "checksum": 753700740
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 271.67729999999983,
+      "nsPerOp": 456.0134348049399,
+      "checksum": -643526576
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 169.9717999999998,
+      "nsPerOp": 8928.497137153952,
+      "checksum": -616582400
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 133.72899999999981,
+      "nsPerOp": 166.62554886041355,
+      "checksum": -958061144
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 144.14879999999994,
+      "nsPerOp": 376.5947608087383,
+      "checksum": -417199232
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 123.80299999999988,
+      "nsPerOp": 1157.5133699839175,
+      "checksum": -131744896
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "nested",
+      "count": 172136,
+      "ms": 74.75330000000031,
+      "nsPerOp": 434.2688339452544,
+      "checksum": -36558000
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 39.115600000000086,
+      "nsPerOp": 198.03862997747052,
+      "checksum": 25175031
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 99.47800000000001,
+      "nsPerOp": 5.614360092588011,
+      "checksum": 0
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 104.10850000000002,
+      "nsPerOp": 11.384931037665408,
+      "checksum": 722549050
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 100.97289999999998,
+      "nsPerOp": 12.046634179747034,
+      "checksum": -1897621340
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 66.97080000000005,
+      "nsPerOp": 32.69764825816433,
+      "checksum": 1139659264
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 43.5403,
+      "nsPerOp": 706.7542122520533,
+      "checksum": 1243622400
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 98.18619999999999,
+      "nsPerOp": 79.55382021388561,
+      "checksum": 753700740
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 125.32179999999994,
+      "nsPerOp": 210.35406518666716,
+      "checksum": -643526576
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 116.01589999999999,
+      "nsPerOp": 6094.232284498607,
+      "checksum": -616582400
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 87.46260000000007,
+      "nsPerOp": 108.97788609620079,
+      "checksum": -958061144
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 162.11660000000006,
+      "nsPerOp": 423.5363887880159,
+      "checksum": -417199232
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 94.78919999999994,
+      "nsPerOp": 886.2448109502967,
+      "checksum": -131744896
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "nested",
+      "count": 172136,
+      "ms": 50.537700000000086,
+      "nsPerOp": 293.59169493888606,
+      "checksum": -36558000
+    },
+    {
+      "round": 2,
+      "variant": "combined",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 32.30209999999988,
+      "nsPerOp": 163.54251575829625,
+      "checksum": 25175031
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 136.21299999999997,
+      "nsPerOp": 7.687617677191845,
+      "checksum": 0
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 122.43289999999999,
+      "nsPerOp": 13.388821501043477,
+      "checksum": 722549050
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 159.58329999999995,
+      "nsPerOp": 19.039184140465654,
+      "checksum": -1897621340
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 211.95030000000008,
+      "nsPerOp": 103.48206020552846,
+      "checksum": 1139659264
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 188.98659999999995,
+      "nsPerOp": 3067.665487127876,
+      "checksum": 1243622400
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 266.0445000000002,
+      "nsPerOp": 215.55836076651417,
+      "checksum": 753700740
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 238.67509999999993,
+      "nsPerOp": 400.61886713911156,
+      "checksum": -643526576
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 222.26199999999994,
+      "nsPerOp": 11675.263959657506,
+      "checksum": -616582400
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 218.0259000000001,
+      "nsPerOp": 271.6589913428329,
+      "checksum": -958061144
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 190.92279999999982,
+      "nsPerOp": 498.79378946570864,
+      "checksum": -417199232
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 188.0884000000001,
+      "nsPerOp": 1758.5586596357389,
+      "checksum": -131744896
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "nested",
+      "count": 172136,
+      "ms": 117.2174,
+      "nsPerOp": 680.9580796579448,
+      "checksum": -36558000
+    },
+    {
+      "round": 2,
+      "variant": "object",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 66.29230000000007,
+      "nsPerOp": 335.63172417284795,
+      "checksum": 25175031
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 176.064,
+      "nsPerOp": 9.936736719087792,
+      "checksum": 0
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 269.6353,
+      "nsPerOp": 29.486346415712678,
+      "checksum": 722549050
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 312.9746,
+      "nsPerOp": 37.33962789770975,
+      "checksum": -1897621340
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 221.73490000000004,
+      "nsPerOp": 108.25926772204062,
+      "checksum": 1139659264
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 219.9106999999999,
+      "nsPerOp": 3569.631204752782,
+      "checksum": 1243622400
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 377.71579999999994,
+      "nsPerOp": 306.03827060364875,
+      "checksum": 753700740
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 291.7564000000002,
+      "nsPerOp": 489.7164322905306,
+      "checksum": -643526576
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 233.07979999999998,
+      "nsPerOp": 12243.515259757312,
+      "checksum": -616582400
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 155.10899999999992,
+      "nsPerOp": 193.26490333577536,
+      "checksum": -958061144
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 206.64710000000014,
+      "nsPerOp": 539.874179988453,
+      "checksum": -417199232
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 250.37120000000004,
+      "nsPerOp": 2340.8803620180265,
+      "checksum": -131744896
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "nested",
+      "count": 172136,
+      "ms": 73.92880000000014,
+      "nsPerOp": 429.4790165915331,
+      "checksum": -36558000
+    },
+    {
+      "round": 2,
+      "variant": "record",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 41.15020000000004,
+      "nsPerOp": 208.33961977571343,
+      "checksum": 25175031
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 163.7357,
+      "nsPerOp": 9.240949554795659,
+      "checksum": 0
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 168.55809999999997,
+      "nsPerOp": 18.43290744117828,
+      "checksum": 722549050
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 173.88919999999996,
+      "nsPerOp": 20.745958373077013,
+      "checksum": -1897621340
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 141.2584999999999,
+      "nsPerOp": 68.96768063806763,
+      "checksum": 1139659264
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 57.928800000000024,
+      "nsPerOp": 940.3110086679873,
+      "checksum": 1243622400
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 213.5208,
+      "nsPerOp": 173.00186110802773,
+      "checksum": 753700740
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 225.5023000000001,
+      "nsPerOp": 378.508172671821,
+      "checksum": -643526576
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 208.1355000000001,
+      "nsPerOp": 10933.209014025324,
+      "checksum": -616582400
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 159.25530000000003,
+      "nsPerOp": 198.4311687923327,
+      "checksum": -958061144
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 159.5554000000002,
+      "nsPerOp": 416.8451468117851,
+      "checksum": -417199232
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 158.07410000000027,
+      "nsPerOp": 1477.9357866786368,
+      "checksum": -131744896
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "nested",
+      "count": 172136,
+      "ms": 94.07500000000027,
+      "nsPerOp": 546.515545847471,
+      "checksum": -36558000
+    },
+    {
+      "round": 2,
+      "variant": "array",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 67.57919999999967,
+      "nsPerOp": 342.1471786952873,
+      "checksum": 25175031
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 144.3758,
+      "nsPerOp": 8.14831148450379,
+      "checksum": 0
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 125.21650000000002,
+      "nsPerOp": 13.693225983256225,
+      "checksum": 722549050
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 142.51210000000003,
+      "nsPerOp": 17.0024940839327,
+      "checksum": -1897621340
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 131.875,
+      "nsPerOp": 64.38630513664788,
+      "checksum": 1139659264
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 150.50030000000004,
+      "nsPerOp": 2442.948738759212,
+      "checksum": 1243622400
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 142.97490000000005,
+      "nsPerOp": 115.84315809857476,
+      "checksum": 753700740
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 134.3197,
+      "nsPerOp": 225.45714256939806,
+      "checksum": -643526576
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 110.79739999999993,
+      "nsPerOp": 5820.108210327254,
+      "checksum": -616582400
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 109.77659999999992,
+      "nsPerOp": 136.78099908793217,
+      "checksum": -958061144
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 142.7290999999998,
+      "nsPerOp": 372.88573526069194,
+      "checksum": -417199232
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 136.00559999999996,
+      "nsPerOp": 1271.6032761135418,
+      "checksum": -131744896
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "nested",
+      "count": 172136,
+      "ms": 74.97349999999983,
+      "nsPerOp": 435.5480550262574,
+      "checksum": -36558000
+    },
+    {
+      "round": 3,
+      "variant": "record",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 40.56970000000001,
+      "nsPerOp": 205.40060248588722,
+      "checksum": 25175031
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 174.0278,
+      "nsPerOp": 9.821817239197488,
+      "checksum": 0
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 141.4631,
+      "nsPerOp": 15.469895713360247,
+      "checksum": 722549050
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 166.87720000000002,
+      "nsPerOp": 19.909387383550264,
+      "checksum": -1897621340
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 155.0761,
+      "nsPerOp": 75.71394952797209,
+      "checksum": 1139659264
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 132.47940000000006,
+      "nsPerOp": 2150.4301529071854,
+      "checksum": 1243622400
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 166.16840000000002,
+      "nsPerOp": 134.63532572631425,
+      "checksum": 753700740
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 227.1069,
+      "nsPerOp": 381.20151200303474,
+      "checksum": -643526576
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 155.6932999999999,
+      "nsPerOp": 8178.4577401901515,
+      "checksum": -616582400
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 114.12300000000005,
+      "nsPerOp": 142.19658796967755,
+      "checksum": -958061144
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 125.97360000000003,
+      "nsPerOp": 329.1112916667756,
+      "checksum": -417199232
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 112.99039999999991,
+      "nsPerOp": 1056.419462208758,
+      "checksum": -131744896
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "nested",
+      "count": 172136,
+      "ms": 74.67890000000011,
+      "nsPerOp": 433.8366175582105,
+      "checksum": -36558000
+    },
+    {
+      "round": 3,
+      "variant": "object",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 47.19820000000027,
+      "nsPerOp": 238.96007898134454,
+      "checksum": 25175031
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 118.95590000000001,
+      "nsPerOp": 6.713657871467964,
+      "checksum": 0
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 84.63979999999998,
+      "nsPerOp": 9.255904042818717,
+      "checksum": 722549050
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 98.4418,
+      "nsPerOp": 11.744659731431124,
+      "checksum": -1897621340
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 68.14580000000001,
+      "nsPerOp": 33.27132718544819,
+      "checksum": 1139659264
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 51.66980000000001,
+      "nsPerOp": 838.713761646593,
+      "checksum": 1243622400
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 122.75470000000007,
+      "nsPerOp": 99.46005990871907,
+      "checksum": 753700740
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 151.29449999999997,
+      "nsPerOp": 253.94953723441748,
+      "checksum": -643526576
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 136.49980000000005,
+      "nsPerOp": 7170.236907075698,
+      "checksum": -616582400
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 98.09670000000006,
+      "nsPerOp": 122.2279122620775,
+      "checksum": -958061144
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 104.10940000000005,
+      "nsPerOp": 271.99015594261823,
+      "checksum": -417199232
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 121.90550000000007,
+      "nsPerOp": 1139.772429784211,
+      "checksum": -131744896
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "nested",
+      "count": 172136,
+      "ms": 63.89890000000014,
+      "nsPerOp": 371.2117163173313,
+      "checksum": -36558000
+    },
+    {
+      "round": 3,
+      "variant": "combined",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 35.02060000000006,
+      "nsPerOp": 177.30602739032508,
+      "checksum": 25175031
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 122.34770000000002,
+      "nsPerOp": 6.905084986629507,
+      "checksum": 0
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 90.75569999999996,
+      "nsPerOp": 9.924716865338084,
+      "checksum": 722549050
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 138.325,
+      "nsPerOp": 16.502949533127293,
+      "checksum": -1897621340
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 141.34180000000003,
+      "nsPerOp": 69.00835081223173,
+      "checksum": 1139659264
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 133.0605999999999,
+      "nsPerOp": 2159.864298931921,
+      "checksum": 1243622400
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 117.95690000000002,
+      "nsPerOp": 95.57271811708048,
+      "checksum": 753700740
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 158.32230000000004,
+      "nsPerOp": 265.7457793831807,
+      "checksum": -643526576
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 121.02829999999994,
+      "nsPerOp": 6357.530073015703,
+      "checksum": -616582400
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 104.8461000000002,
+      "nsPerOp": 130.6376250355111,
+      "checksum": -958061144
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 125.40190000000007,
+      "nsPerOp": 327.61770153800353,
+      "checksum": -417199232
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 111.79330000000004,
+      "nsPerOp": 1045.2270092374438,
+      "checksum": -131744896
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "nested",
+      "count": 172136,
+      "ms": 75.75729999999999,
+      "nsPerOp": 440.101431426314,
+      "checksum": -36558000
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 35.59259999999995,
+      "nsPerOp": 180.20200997392575,
+      "checksum": 25175031
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 122.37109999999998,
+      "nsPerOp": 6.906405640705447,
+      "checksum": 0
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 65.49340000000001,
+      "nsPerOp": 7.162122616522528,
+      "checksum": 722549050
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 98.49860000000001,
+      "nsPerOp": 11.751436290502022,
+      "checksum": -1897621340
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 91.1336,
+      "nsPerOp": 44.494830542568444,
+      "checksum": 1139659264
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 56.44040000000007,
+      "nsPerOp": 916.1510242508857,
+      "checksum": 1243622400
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 186.34299999999996,
+      "nsPerOp": 150.98147723525392,
+      "checksum": 753700740
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 179.95780000000002,
+      "nsPerOp": 302.06121195234374,
+      "checksum": -643526576
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 125.85099999999989,
+      "nsPerOp": 6610.863056153799,
+      "checksum": -616582400
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 133.9293,
+      "nsPerOp": 166.87512148442758,
+      "checksum": -958061144
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 152.3487,
+      "nsPerOp": 398.0173420522561,
+      "checksum": -417199232
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 130.3216,
+      "nsPerOp": 1218.4599274468005,
+      "checksum": -131744896
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "nested",
+      "count": 172136,
+      "ms": 93.75299999999993,
+      "nsPerOp": 544.6449319142998,
+      "checksum": -36558000
+    },
+    {
+      "round": 3,
+      "variant": "array",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 48.3273999999999,
+      "nsPerOp": 244.67711313064777,
+      "checksum": 25175031
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 138.49810000000002,
+      "nsPerOp": 7.81658462714634,
+      "checksum": 0
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 147.4173,
+      "nsPerOp": 16.12102560558295,
+      "checksum": 722549050
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 145.48479999999995,
+      "nsPerOp": 17.357153892912464,
+      "checksum": -1897621340
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 156.92560000000003,
+      "nsPerOp": 76.61694457138618,
+      "checksum": 1139659264
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 131.51189999999997,
+      "nsPerOp": 2134.7255137486604,
+      "checksum": 1243622400
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 128.93859999999984,
+      "nsPerOp": 104.47046736741112,
+      "checksum": 753700740
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 160.16039999999998,
+      "nsPerOp": 268.83105111738496,
+      "checksum": -643526576
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 123.77369999999996,
+      "nsPerOp": 6501.743972264535,
+      "checksum": -616582400
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 120.99350000000004,
+      "nsPerOp": 150.75719063211778,
+      "checksum": -958061144
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 140.9308000000001,
+      "nsPerOp": 368.1876013992776,
+      "checksum": -417199232
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 120.08500000000004,
+      "nsPerOp": 1122.751411795505,
+      "checksum": -131744896
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "nested",
+      "count": 172136,
+      "ms": 78.75450000000001,
+      "nsPerOp": 457.51324534089326,
+      "checksum": -36558000
+    },
+    {
+      "round": 4,
+      "variant": "record",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 32.72550000000001,
+      "nsPerOp": 165.68615041895558,
+      "checksum": 25175031
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 89.6364,
+      "nsPerOp": 5.0589178210584835,
+      "checksum": 0
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 57.355800000000016,
+      "nsPerOp": 6.272223954913669,
+      "checksum": 722549050
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 73.1078,
+      "nsPerOp": 8.722171219070765,
+      "checksum": -1897621340
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 61.34159999999997,
+      "nsPerOp": 29.949262370958845,
+      "checksum": 1139659264
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 47.00799999999998,
+      "nsPerOp": 763.0425607895331,
+      "checksum": 1243622400
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 101.95390000000009,
+      "nsPerOp": 82.60653972456905,
+      "checksum": 753700740
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 116.15409999999997,
+      "nsPerOp": 194.9659765746954,
+      "checksum": -643526576
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 89.31959999999992,
+      "nsPerOp": 4691.894731312703,
+      "checksum": -616582400
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 85.73119999999994,
+      "nsPerOp": 106.82057186146531,
+      "checksum": -958061144
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 100.0797,
+      "nsPerOp": 261.4623963800621,
+      "checksum": -417199232
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 84.46109999999999,
+      "nsPerOp": 789.6808033209917,
+      "checksum": -131744896
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "nested",
+      "count": 172136,
+      "ms": 44.54230000000007,
+      "nsPerOp": 258.7622577496867,
+      "checksum": -36558000
+    },
+    {
+      "round": 4,
+      "variant": "array",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 22.951999999999998,
+      "nsPerOp": 116.20383262030732,
+      "checksum": 25175031
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 94.6377,
+      "nsPerOp": 5.341182232597321,
+      "checksum": 0
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 85.13469999999998,
+      "nsPerOp": 9.310024526453969,
+      "checksum": 722549050
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 120.27860000000004,
+      "nsPerOp": 14.349912638461632,
+      "checksum": -1897621340
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 98.28120000000001,
+      "nsPerOp": 47.98455607504014,
+      "checksum": 1139659264
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 94.18719999999996,
+      "nsPerOp": 1528.864071681329,
+      "checksum": 1243622400
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 90.82859999999994,
+      "nsPerOp": 73.59244083872201,
+      "checksum": 753700740
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 112.07209999999998,
+      "nsPerOp": 188.1142931956506,
+      "checksum": -643526576
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 97.09390000000008,
+      "nsPerOp": 5100.2731522824015,
+      "checksum": -616582400
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 79.65129999999999,
+      "nsPerOp": 99.24505215731422,
+      "checksum": -958061144
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 90.70180000000005,
+      "nsPerOp": 236.96224093382705,
+      "checksum": -417199232
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 82.62990000000013,
+      "nsPerOp": 772.5597441938754,
+      "checksum": -131744896
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "nested",
+      "count": 172136,
+      "ms": 57.63300000000004,
+      "nsPerOp": 334.8108472370686,
+      "checksum": -36558000
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 29.728700000000117,
+      "nsPerOp": 150.51363187606063,
+      "checksum": 25175031
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 74.2047,
+      "nsPerOp": 4.187980320899752,
+      "checksum": 0
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 52.56399999999999,
+      "nsPerOp": 5.74820994504622,
+      "checksum": 722549050
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 55.12219999999999,
+      "nsPerOp": 6.576388105945774,
+      "checksum": -1897621340
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 53.211900000000014,
+      "nsPerOp": 25.98003890275484,
+      "checksum": 1139659264
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 44.65350000000001,
+      "nsPerOp": 724.8238807908322,
+      "checksum": 1243622400
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 85.96000000000004,
+      "nsPerOp": 69.64773446355609,
+      "checksum": 753700740
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 109.94600000000003,
+      "nsPerOp": 184.54561018923542,
+      "checksum": -643526576
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 95.92050000000006,
+      "nsPerOp": 5038.635289173718,
+      "checksum": -616582400
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 65.84050000000002,
+      "nsPerOp": 82.03687644223824,
+      "checksum": -958061144
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 73.04229999999995,
+      "nsPerOp": 190.82605958162745,
+      "checksum": -417199232
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 65.02210000000014,
+      "nsPerOp": 607.9331687796864,
+      "checksum": -131744896
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "nested",
+      "count": 172136,
+      "ms": 39.11160000000018,
+      "nsPerOp": 227.21336617558313,
+      "checksum": -36558000
+    },
+    {
+      "round": 4,
+      "variant": "combined",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 26.30269999999996,
+      "nsPerOp": 133.1681138141405,
+      "checksum": 25175031
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 98.61040000000001,
+      "nsPerOp": 5.5653943030030835,
+      "checksum": 0
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 73.48310000000004,
+      "nsPerOp": 8.035847466190285,
+      "checksum": 722549050
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 91.77200000000005,
+      "nsPerOp": 10.948915124194171,
+      "checksum": -1897621340
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 109.20249999999999,
+      "nsPerOp": 53.31674302699366,
+      "checksum": 1139659264
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 104.13059999999996,
+      "nsPerOp": 1690.2671817680089,
+      "checksum": 1243622400
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 95.95709999999997,
+      "nsPerOp": 77.74772709042455,
+      "checksum": 753700740
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 134.3175000000001,
+      "nsPerOp": 225.4534498444022,
+      "checksum": -643526576
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 94.29610000000014,
+      "nsPerOp": 4953.306718495568,
+      "checksum": -616582400
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 71.94820000000004,
+      "nsPerOp": 89.64703478317216,
+      "checksum": -958061144
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 82.88040000000001,
+      "nsPerOp": 216.5285067495017,
+      "checksum": -417199232
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 72.43880000000013,
+      "nsPerOp": 677.2766371218083,
+      "checksum": -131744896
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "nested",
+      "count": 172136,
+      "ms": 52.54009999999994,
+      "nsPerOp": 305.22435748477915,
+      "checksum": -36558000
+    },
+    {
+      "round": 4,
+      "variant": "object",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 30.189300000000003,
+      "nsPerOp": 152.84560666278512,
+      "checksum": 25175031
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 77.6539,
+      "nsPerOp": 4.382646989221939,
+      "checksum": 0
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 52.94400000000002,
+      "nsPerOp": 5.789765378025401,
+      "checksum": 722549050
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 56.6755,
+      "nsPerOp": 6.761705521523628,
+      "checksum": -1897621340
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 53.02589999999998,
+      "nsPerOp": 25.889226749159246,
+      "checksum": 1139659264
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 42.23969999999997,
+      "nsPerOp": 685.6426322111478,
+      "checksum": 1243622400
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 77.07639999999998,
+      "nsPerOp": 62.449937652475946,
+      "checksum": 753700740
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 109.06849999999997,
+      "nsPerOp": 183.07271646921774,
+      "checksum": -643526576
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 94.13490000000002,
+      "nsPerOp": 4944.838997741242,
+      "checksum": -616582400
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 68.16870000000006,
+      "nsPerOp": 84.9377999730866,
+      "checksum": -958061144
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 74.75289999999995,
+      "nsPerOp": 195.29507352998795,
+      "checksum": -417199232
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 72.09080000000017,
+      "nsPerOp": 674.0229627136409,
+      "checksum": -131744896
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "nested",
+      "count": 172136,
+      "ms": 37.26099999999997,
+      "nsPerOp": 216.46256448389627,
+      "checksum": -36558000
+    },
+    {
+      "round": 5,
+      "variant": "combined",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 26.851400000000012,
+      "nsPerOp": 135.9461306736198,
+      "checksum": 25175031
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 103.28310000000002,
+      "nsPerOp": 5.8291131192703585,
+      "checksum": 0
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 104.36299999999997,
+      "nsPerOp": 11.412762242121197,
+      "checksum": 722549050
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 105.9837,
+      "nsPerOp": 12.64445076764217,
+      "checksum": -1897621340
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 156.61950000000002,
+      "nsPerOp": 76.46749510786142,
+      "checksum": 1139659264
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 130.0621,
+      "nsPerOp": 2111.1920916793815,
+      "checksum": 1243622400
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 227.0793,
+      "nsPerOp": 183.98742192380396,
+      "checksum": 753700740
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 210.76530000000002,
+      "nsPerOp": 353.7719507323346,
+      "checksum": -643526576
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 127.25389999999993,
+      "nsPerOp": 6684.556390187526,
+      "checksum": -616582400
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 89.94809999999984,
+      "nsPerOp": 112.07480450352098,
+      "checksum": -958061144
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 100.31510000000003,
+      "nsPerOp": 262.0773887122521,
+      "checksum": -417199232
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 86.03370000000018,
+      "nsPerOp": 804.3840457758347,
+      "checksum": -131744896
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "nested",
+      "count": 172136,
+      "ms": 46.328500000000076,
+      "nsPerOp": 269.13893665473853,
+      "checksum": -36558000
+    },
+    {
+      "round": 5,
+      "variant": "baseline",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 24.74850000000015,
+      "nsPerOp": 125.29934435359415,
+      "checksum": 25175031
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 62.314700000000016,
+      "nsPerOp": 3.5169300233377645,
+      "checksum": 0
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 60.0564,
+      "nsPerOp": 6.567551855712538,
+      "checksum": 722549050
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 63.45139999999998,
+      "nsPerOp": 7.570108454771536,
+      "checksum": -1897621340
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 61.96930000000003,
+      "nsPerOp": 30.255728977474696,
+      "checksum": 1139659264
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 44.754999999999995,
+      "nsPerOp": 726.4714475862739,
+      "checksum": 1243622400
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 86.66840000000002,
+      "nsPerOp": 70.22170439252285,
+      "checksum": 753700740
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 117.09979999999996,
+      "nsPerOp": 196.55334476959067,
+      "checksum": -643526576
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 91.70100000000002,
+      "nsPerOp": 4816.987970793718,
+      "checksum": -616582400
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 87.05509999999992,
+      "nsPerOp": 108.47014348868379,
+      "checksum": -958061144
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 101.75889999999993,
+      "nsPerOp": 265.8493765169069,
+      "checksum": -417199232
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 90.73919999999998,
+      "nsPerOp": 848.3787725793783,
+      "checksum": -131744896
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "nested",
+      "count": 172136,
+      "ms": 47.06490000000008,
+      "nsPerOp": 273.4169493888558,
+      "checksum": -36558000
+    },
+    {
+      "round": 5,
+      "variant": "array",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 29.30510000000004,
+      "nsPerOp": 148.3689846340786,
+      "checksum": 25175031
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 83.64270000000002,
+      "nsPerOp": 4.7206441315296965,
+      "checksum": 0
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 78.52430000000001,
+      "nsPerOp": 8.58713496286038,
+      "checksum": 722549050
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 98.00920000000002,
+      "nsPerOp": 11.69304812132427,
+      "checksum": -1897621340
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 107.07399999999996,
+      "nsPerOp": 52.277529753186215,
+      "checksum": 1139659264
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 109.97270000000003,
+      "nsPerOp": 1785.0972307892093,
+      "checksum": 1243622400
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 82.09809999999993,
+      "nsPerOp": 66.51869088834886,
+      "checksum": 753700740
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 98.93779999999992,
+      "nsPerOp": 166.06822141579065,
+      "checksum": -643526576
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 87.10979999999995,
+      "nsPerOp": 4575.81551715081,
+      "checksum": -616582400
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 89.04059999999981,
+      "nsPerOp": 110.94406483156627,
+      "checksum": -958061144
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 99.22689999999989,
+      "nsPerOp": 259.2344207603016,
+      "checksum": -417199232
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 101.60480000000007,
+      "nsPerOp": 949.9682112270473,
+      "checksum": -131744896
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "nested",
+      "count": 172136,
+      "ms": 61.63719999999989,
+      "nsPerOp": 358.0726867128311,
+      "checksum": -36558000
+    },
+    {
+      "round": 5,
+      "variant": "record",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 23.229299999999967,
+      "nsPerOp": 117.60777662455999,
+      "checksum": 25175031
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 95.1377,
+      "nsPerOp": 5.369401336784116,
+      "checksum": 0
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 73.88140000000001,
+      "nsPerOp": 8.079404121336617,
+      "checksum": 722549050
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 128.07459999999998,
+      "nsPerOp": 15.280019232065529,
+      "checksum": -1897621340
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 103.42349999999999,
+      "nsPerOp": 50.495219179526835,
+      "checksum": 1139659264
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 107.72469999999998,
+      "nsPerOp": 1748.607278511833,
+      "checksum": 1243622400
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 97.44139999999993,
+      "nsPerOp": 78.95035775892447,
+      "checksum": 753700740
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 111.86399999999992,
+      "nsPerOp": 187.7649949812509,
+      "checksum": -643526576
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 93.20350000000008,
+      "nsPerOp": 4895.913221621057,
+      "checksum": -616582400
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 121.05009999999993,
+      "nsPerOp": 150.827713899812,
+      "checksum": -958061144
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 164.85829999999987,
+      "nsPerOp": 430.6991945533726,
+      "checksum": -417199232
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 96.91200000000003,
+      "nsPerOp": 906.0922248401215,
+      "checksum": -131744896
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "nested",
+      "count": 172136,
+      "ms": 46.25200000000018,
+      "nsPerOp": 268.69452061161047,
+      "checksum": -36558000
+    },
+    {
+      "round": 5,
+      "variant": "object",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 26.08120000000008,
+      "nsPerOp": 132.04667999898783,
+      "checksum": 25175031
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 90.34710000000001,
+      "nsPerOp": 5.099028455749595,
+      "checksum": 0
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 100.50869999999998,
+      "nsPerOp": 10.991269859669487,
+      "checksum": 722549050
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 99.44619999999998,
+      "nsPerOp": 11.864490293593224,
+      "checksum": -1897621340
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 55.34889999999996,
+      "nsPerOp": 27.023402194334082,
+      "checksum": 1139659264
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 51.547000000000025,
+      "nsPerOp": 836.720449306886,
+      "checksum": 1243622400
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 91.35699999999997,
+      "nsPerOp": 74.02056860617833,
+      "checksum": 753700740
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 101.85329999999999,
+      "nsPerOp": 170.9619212912452,
+      "checksum": -643526576
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 98.70929999999998,
+      "nsPerOp": 5185.128959394862,
+      "checksum": -616582400
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 74.3850000000001,
+      "nsPerOp": 92.68327327641646,
+      "checksum": -958061144
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 71.8433,
+      "nsPerOp": 187.69362200178176,
+      "checksum": -417199232
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 66.61360000000013,
+      "nsPerOp": 622.8131194135918,
+      "checksum": -131744896
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "nested",
+      "count": 172136,
+      "ms": 39.27620000000002,
+      "nsPerOp": 228.169586838314,
+      "checksum": -36558000
+    },
+    {
+      "round": 6,
+      "variant": "combined",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 22.24109999999996,
+      "nsPerOp": 112.60461230792578,
+      "checksum": 25175031
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 92.82260000000001,
+      "nsPerOp": 5.238741240578418,
+      "checksum": 0
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 71.05429999999998,
+      "nsPerOp": 7.77024263561178,
+      "checksum": 722549050
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 98.56139999999999,
+      "nsPerOp": 11.758928683277587,
+      "checksum": -1897621340
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 103.75529999999998,
+      "nsPerOp": 50.65721634384409,
+      "checksum": 1139659264
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 109.32500000000005,
+      "nsPerOp": 1774.5836444502165,
+      "checksum": 1243622400
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 88.52819999999997,
+      "nsPerOp": 71.72857801461822,
+      "checksum": 753700740
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 109.24360000000001,
+      "nsPerOp": 183.3666238086766,
+      "checksum": -643526576
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 85.2038,
+      "nsPerOp": 4475.694699795135,
+      "checksum": -616582400
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 68.45929999999998,
+      "nsPerOp": 85.29988586693777,
+      "checksum": -958061144
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 72.67939999999999,
+      "nsPerOp": 189.87796817401613,
+      "checksum": -417199232
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 97.29590000000007,
+      "nsPerOp": 909.6815512921208,
+      "checksum": -131744896
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "nested",
+      "count": 172136,
+      "ms": 46.02430000000004,
+      "nsPerOp": 267.37172933029717,
+      "checksum": -36558000
+    },
+    {
+      "round": 6,
+      "variant": "object",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 24.16280000000006,
+      "nsPerOp": 122.33399994937123,
+      "checksum": 25175031
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 98.17620000000001,
+      "nsPerOp": 5.540888832927271,
+      "checksum": 0
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 75.73470000000003,
+      "nsPerOp": 8.282074342232177,
+      "checksum": 722549050
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 105.89399999999995,
+      "nsPerOp": 12.633749053757317,
+      "checksum": -1897621340
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 104.81260000000003,
+      "nsPerOp": 51.17342973092263,
+      "checksum": 1139659264
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 101.02359999999999,
+      "nsPerOp": 1639.8337824237897,
+      "checksum": 1243622400
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 81.62369999999999,
+      "nsPerOp": 66.13431576934575,
+      "checksum": 753700740
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 102.82780000000002,
+      "nsPerOp": 172.59763061336167,
+      "checksum": -643526576
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 88.95330000000001,
+      "nsPerOp": 4672.653254189211,
+      "checksum": -616582400
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 77.50829999999996,
+      "nsPerOp": 96.57488673913365,
+      "checksum": -958061144
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 85.3266000000001,
+      "nsPerOp": 222.9193064224117,
+      "checksum": -417199232
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 86.21080000000006,
+      "nsPerOp": 806.0398668611397,
+      "checksum": -131744896
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "nested",
+      "count": 172136,
+      "ms": 49.03530000000001,
+      "nsPerOp": 284.86371241344057,
+      "checksum": -36558000
+    },
+    {
+      "round": 6,
+      "variant": "record",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 28.451999999999998,
+      "nsPerOp": 144.04981900108854,
+      "checksum": 25175031
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 66.2091,
+      "nsPerOp": 3.7367229820278736,
+      "checksum": 0
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 58.80459999999999,
+      "nsPerOp": 6.430659510966915,
+      "checksum": 722549050
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 62.255600000000015,
+      "nsPerOp": 7.427442797430397,
+      "checksum": -1897621340
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 49.90960000000001,
+      "nsPerOp": 24.367732586525438,
+      "checksum": 1139659264
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 42.80500000000001,
+      "nsPerOp": 694.8186864915756,
+      "checksum": 1243622400
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 87.93459999999999,
+      "nsPerOp": 71.24762297532592,
+      "checksum": 753700740
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 120.24959999999999,
+      "nsPerOp": 201.84031985712508,
+      "checksum": -643526576
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 101.231,
+      "nsPerOp": 5317.592057572097,
+      "checksum": -616582400
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 82.65750000000003,
+      "nsPerOp": 102.99075970754029,
+      "checksum": -958061144
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 89.52459999999996,
+      "nsPerOp": 233.88675676452368,
+      "checksum": -417199232
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 82.97820000000002,
+      "nsPerOp": 775.8162234937732,
+      "checksum": -131744896
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "nested",
+      "count": 172136,
+      "ms": 41.750299999999925,
+      "nsPerOp": 242.54252451549894,
+      "checksum": -36558000
+    },
+    {
+      "round": 6,
+      "variant": "array",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 30.07640000000015,
+      "nsPerOp": 152.27400450598765,
+      "checksum": 25175031
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 122.0061,
+      "nsPerOp": 6.885805694649088,
+      "checksum": 0
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 77.66139999999999,
+      "nsPerOp": 8.492771323076868,
+      "checksum": 722549050
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 96.47030000000001,
+      "nsPerOp": 11.50944870663763,
+      "checksum": -1897621340
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 90.6003,
+      "nsPerOp": 44.2344535451893,
+      "checksum": 1139659264
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 98.28190000000006,
+      "nsPerOp": 1595.3300003246447,
+      "checksum": 1243622400
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 94.2464,
+      "nsPerOp": 76.36165939211367,
+      "checksum": 753700740
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 114.61969999999997,
+      "nsPerOp": 192.39046874108286,
+      "checksum": -643526576
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 96.54830000000015,
+      "nsPerOp": 5071.613174344705,
+      "checksum": -616582400
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 77.7847999999999,
+      "nsPerOp": 96.91940411576769,
+      "checksum": -958061144
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 93.8710000000001,
+      "nsPerOp": 245.24190830500925,
+      "checksum": -417199232
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 106.17989999999986,
+      "nsPerOp": 992.7437450914382,
+      "checksum": -131744896
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "nested",
+      "count": 172136,
+      "ms": 53.271600000000035,
+      "nsPerOp": 309.4739043546965,
+      "checksum": -36558000
+    },
+    {
+      "round": 6,
+      "variant": "baseline",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 35.97939999999994,
+      "nsPerOp": 182.16034225248686,
+      "checksum": 25175031
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 72.9646,
+      "nsPerOp": 4.117991298695662,
+      "checksum": 0
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 62.279600000000016,
+      "nsPerOp": 6.810673009921252,
+      "checksum": 722549050
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 61.66500000000002,
+      "nsPerOp": 7.356980899767178,
+      "checksum": -1897621340
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 59.68390000000005,
+      "nsPerOp": 29.13991125797294,
+      "checksum": 1139659264
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 41.47529999999995,
+      "nsPerOp": 673.2347498620255,
+      "checksum": 1243622400
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 91.30110000000008,
+      "nsPerOp": 73.97527651268712,
+      "checksum": 753700740
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 105.38980000000004,
+      "nsPerOp": 176.89797672240448,
+      "checksum": -643526576
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 93.1350000000001,
+      "nsPerOp": 4892.314965593324,
+      "checksum": -616582400
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 87.79689999999994,
+      "nsPerOp": 109.39442193348377,
+      "checksum": -958061144
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 125.38359999999989,
+      "nsPerOp": 327.56989202364844,
+      "checksum": -417199232
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 130.9804999999999,
+      "nsPerOp": 1224.6204046523794,
+      "checksum": -131744896
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "nested",
+      "count": 172136,
+      "ms": 56.99229999999989,
+      "nsPerOp": 331.08879025886444,
+      "checksum": -36558000
+    },
+    {
+      "round": 7,
+      "variant": "array",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 34.76559999999995,
+      "nsPerOp": 176.0149862035792,
+      "checksum": 25175031
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 94.1489,
+      "nsPerOp": 5.31359523634431,
+      "checksum": 0
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 74.1096,
+      "nsPerOp": 8.104359252404638,
+      "checksum": 722549050
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 103.02909999999997,
+      "nsPerOp": 12.291950390338151,
+      "checksum": -1897621340
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 102.8671,
+      "nsPerOp": 50.22356389855599,
+      "checksum": 1139659264
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 98.92309999999998,
+      "nsPerOp": 1605.7380774599872,
+      "checksum": 1243622400
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 76.40750000000003,
+      "nsPerOp": 61.90797197561846,
+      "checksum": 753700740
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 95.40229999999997,
+      "nsPerOp": 160.13384449599334,
+      "checksum": -643526576
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 81.57889999999998,
+      "nsPerOp": 4285.281294321583,
+      "checksum": -616582400
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 78.86149999999998,
+      "nsPerOp": 98.26096599432822,
+      "checksum": -958061144
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 112.95339999999987,
+      "nsPerOp": 295.0954753389117,
+      "checksum": -417199232
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 84.41749999999979,
+      "nsPerOp": 789.2731590560585,
+      "checksum": -131744896
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "nested",
+      "count": 172136,
+      "ms": 37.69860000000017,
+      "nsPerOp": 219.00474043779437,
+      "checksum": -36558000
+    },
+    {
+      "round": 7,
+      "variant": "record",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 21.66009999999983,
+      "nsPerOp": 109.66306356479168,
+      "checksum": 25175031
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 99.46790000000001,
+      "nsPerOp": 5.613790066683437,
+      "checksum": 0
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 66.53839999999997,
+      "nsPerOp": 7.276400057215267,
+      "checksum": 722549050
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 99.59209999999996,
+      "nsPerOp": 11.8818969831785,
+      "checksum": -1897621340
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 103.98860000000002,
+      "nsPerOp": 50.77112212574652,
+      "checksum": 1139659264
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 97.87480000000005,
+      "nsPerOp": 1588.721877739182,
+      "checksum": 1243622400
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 90.7586,
+      "nsPerOp": 73.53572444257911,
+      "checksum": 753700740
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 103.36790000000008,
+      "nsPerOp": 173.50419459989337,
+      "checksum": -643526576
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 105.12699999999995,
+      "nsPerOp": 5522.246152229865,
+      "checksum": -616582400
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 71.31639999999993,
+      "nsPerOp": 88.85981569254837,
+      "checksum": -958061144
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 74.25150000000008,
+      "nsPerOp": 193.98514508750728,
+      "checksum": -417199232
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 67.69600000000014,
+      "nsPerOp": 632.9331687796864,
+      "checksum": -131744896
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "nested",
+      "count": 172136,
+      "ms": 47.50729999999999,
+      "nsPerOp": 275.9870102709485,
+      "checksum": -36558000
+    },
+    {
+      "round": 7,
+      "variant": "object",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 28.1715999999999,
+      "nsPerOp": 142.63017998632964,
+      "checksum": 25175031
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 67.24419999999999,
+      "nsPerOp": 3.795142171515376,
+      "checksum": 0
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 51.83030000000002,
+      "nsPerOp": 5.667975152475635,
+      "checksum": 722549050
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 72.143,
+      "nsPerOp": 8.607065159359497,
+      "checksum": -1897621340
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 66.95340000000004,
+      "nsPerOp": 32.689152927666676,
+      "checksum": 1139659264
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 42.56129999999996,
+      "nsPerOp": 690.8629029639964,
+      "checksum": 1243622400
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 89.57159999999993,
+      "nsPerOp": 72.57397641084054,
+      "checksum": 753700740
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 90.31799999999998,
+      "nsPerOp": 151.59978917897294,
+      "checksum": -643526576
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 82.22850000000005,
+      "nsPerOp": 4319.404317907236,
+      "checksum": -616582400
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 79.81479999999999,
+      "nsPerOp": 99.44877219738538,
+      "checksum": -958061144
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 84.21209999999996,
+      "nsPerOp": 220.0076286219625,
+      "checksum": -417199232
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 73.0435,
+      "nsPerOp": 682.930363887954,
+      "checksum": -131744896
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "nested",
+      "count": 172136,
+      "ms": 47.22649999999999,
+      "nsPerOp": 274.35574197146434,
+      "checksum": -36558000
+    },
+    {
+      "round": 7,
+      "variant": "combined",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 33.22029999999995,
+      "nsPerOp": 168.19127661190265,
+      "checksum": 25175031
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "array-0",
+      "count": 17718493,
+      "ms": 107.82169999999999,
+      "nsPerOp": 6.0852635717947345,
+      "checksum": 0
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "array-1",
+      "count": 9144412,
+      "ms": 75.42370000000003,
+      "nsPerOp": 8.248064501030797,
+      "checksum": 722549050
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "array-4",
+      "count": 8381835,
+      "ms": 88.00450000000001,
+      "nsPerOp": 10.49943121046883,
+      "checksum": -1897621340
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "array-32",
+      "count": 2048184,
+      "ms": 92.54979999999995,
+      "nsPerOp": 45.186272327095594,
+      "checksum": 1139659264
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "array-1024",
+      "count": 61606,
+      "ms": 94.54319999999996,
+      "nsPerOp": 1534.6427296042586,
+      "checksum": 1243622400
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "record-4",
+      "count": 1234211,
+      "ms": 93.02459999999996,
+      "nsPerOp": 75.37171520914978,
+      "checksum": 753700740
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "record-16",
+      "count": 595766,
+      "ms": 124.52530000000002,
+      "nsPerOp": 209.017130886959,
+      "checksum": -643526576
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "record-64",
+      "count": 19037,
+      "ms": 88.18899999999996,
+      "nsPerOp": 4632.505121605293,
+      "checksum": -616582400
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "object-4",
+      "count": 802572,
+      "ms": 84.32030000000009,
+      "nsPerOp": 105.06259874503482,
+      "checksum": -958061144
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "object-16",
+      "count": 382769,
+      "ms": 107.91669999999999,
+      "nsPerOp": 281.93688621596834,
+      "checksum": -417199232
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "object-64",
+      "count": 106956,
+      "ms": 85.47910000000002,
+      "nsPerOp": 799.1987359287933,
+      "checksum": -131744896
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "nested",
+      "count": 172136,
+      "ms": 44.73569999999995,
+      "nsPerOp": 259.8857879815957,
+      "checksum": -36558000
+    },
+    {
+      "round": 7,
+      "variant": "baseline",
+      "name": "hash-lookup",
+      "count": 197515,
+      "ms": 24.643299999999954,
+      "nsPerOp": 124.76672657772805,
+      "checksum": 25175031
+    }
+  ]
+}

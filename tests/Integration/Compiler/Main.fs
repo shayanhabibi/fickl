@@ -8,6 +8,10 @@ let allTests =
         CompilerMessages.tests
         CodeServicesApi.tests
         IwsamWarnings.tests
+
+        WarningSuppression.tests
+        IgnoredArgument.tests
+        BehaviorWarning.tests
         AnonRecordInInterface.tests
         CompilerHelpers.tests
         Inflate.tests

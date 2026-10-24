@@ -1,0 +1,9 @@
+{
+  "source": "C:\\Users\\shaya\\RiderProjects\\fable",
+  "commit": "26e40937dd0ccdfbbe2f8281fb3bcb4aea8848b9",
+  "source_sha256": {
+    "Util.ts": "5aebd4ef68a779e08837760d794be540267f68172e3a37fbaf583d05c37ad432",
+    "Types.ts": "0698f3726ea9ab6355a7ab371f9ba2868be324988641090b42a7ec4d095bb0d9"
+  },
+  "node": "v26.7.0"
+}

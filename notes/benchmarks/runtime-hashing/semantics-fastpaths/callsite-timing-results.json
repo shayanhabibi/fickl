@@ -1,0 +1,1659 @@
+{
+  "checks": 68,
+  "effects": [
+    {
+      "throwing": "none",
+      "runs": [
+        {
+          "trace": [
+            "left",
+            "right"
+          ],
+          "result": true
+        },
+        {
+          "trace": [
+            "left",
+            "right"
+          ],
+          "result": true
+        }
+      ]
+    },
+    {
+      "throwing": "left",
+      "runs": [
+        {
+          "trace": [
+            "left"
+          ],
+          "result": "left"
+        },
+        {
+          "trace": [
+            "left"
+          ],
+          "result": "left"
+        }
+      ]
+    },
+    {
+      "throwing": "right",
+      "runs": [
+        {
+          "trace": [
+            "left",
+            "right"
+          ],
+          "result": "right"
+        },
+        {
+          "trace": [
+            "left",
+            "right"
+          ],
+          "result": "right"
+        }
+      ]
+    }
+  ],
+  "node": "v26.7.0",
+  "timings": {
+    "same": {
+      "medianChangePercent": -5.526595233985243,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.4392607932867,
+              "calls": 5636096,
+              "sum": 5636096
+            },
+            {
+              "variant": "candidate",
+              "ns": 13.12606877011803,
+              "calls": 1908736,
+              "sum": 1908736
+            },
+            {
+              "variant": "candidate",
+              "ns": 12.649460469395661,
+              "calls": 1982464,
+              "sum": 1982464
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.489279354319853,
+              "calls": 5570560,
+              "sum": 5570560
+            }
+          ],
+          "changePercent": 188.6869388880248
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 4.058334675241024,
+              "calls": 6160384,
+              "sum": 6160384
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.474332706121886,
+              "calls": 5595136,
+              "sum": 5595136
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.258159813023007,
+              "calls": 5873664,
+              "sum": 5873664
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.253351323119779,
+              "calls": 5881856,
+              "sum": 5881856
+            }
+          ],
+          "changePercent": -4.818859218734206
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.725462733407505,
+              "calls": 5292032,
+              "sum": 5292032
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.035899314729197,
+              "calls": 6201344,
+              "sum": 6201344
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.194087772578977,
+              "calls": 5963776,
+              "sum": 5963776
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.277179621848742,
+              "calls": 5849088,
+              "sum": 5849088
+            }
+          ],
+          "changePercent": -8.582538742050016
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 4.065364019848534,
+              "calls": 6152192,
+              "sum": 6152192
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.314737266066381,
+              "calls": 5799936,
+              "sum": 5799936
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.260322006842751,
+              "calls": 5873664,
+              "sum": 5873664
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.035786435972593,
+              "calls": 6201344,
+              "sum": 6201344
+            }
+          ],
+          "changePercent": -5.526595233985243
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.3084449929478135,
+              "calls": 5808128,
+              "sum": 5808128
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.000018558527184,
+              "calls": 6250496,
+              "sum": 6250496
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.06028260575965,
+              "calls": 6160384,
+              "sum": 6160384
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.341726723639766,
+              "calls": 5758976,
+              "sum": 5758976
+            }
+          ],
+          "changePercent": -6.819177371584528
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 4.164163087269774,
+              "calls": 6004736,
+              "sum": 6004736
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.257461781947345,
+              "calls": 5873664,
+              "sum": 5873664
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.203013507995198,
+              "calls": 5955584,
+              "sum": 5955584
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.045992213369212,
+              "calls": 6184960,
+              "sum": 6184960
+            }
+          ],
+          "changePercent": -2.9586988995893293
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.3292885638297856,
+              "calls": 5775360,
+              "sum": 5775360
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.056090092753987,
+              "calls": 6168576,
+              "sum": 6168576
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.048913606598137,
+              "calls": 6176768,
+              "sum": 6176768
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.256780776019867,
+              "calls": 5873664,
+              "sum": 5873664
+            }
+          ],
+          "changePercent": -5.602862281402821
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 4.237769943004499,
+              "calls": 5906432,
+              "sum": 5906432
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.658024485518279,
+              "calls": 5373952,
+              "sum": 5373952
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.154061038477897,
+              "calls": 6021120,
+              "sum": 6021120
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.022948575428194,
+              "calls": 6217728,
+              "sum": 6217728
+            }
+          ],
+          "changePercent": -6.256941152716422
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.194741720681673,
+              "calls": 5963776,
+              "sum": 5963776
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.124772355363187,
+              "calls": 6062080,
+              "sum": 6062080
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.014701692879434,
+              "calls": 6234112,
+              "sum": 6234112
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.266340372948649,
+              "calls": 5865472,
+              "sum": 5865472
+            }
+          ],
+          "changePercent": -3.801027360670728
+        }
+      ]
+    },
+    "mixed": {
+      "medianChangePercent": 2.744086315747696,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 27.38494873046878,
+              "calls": 917504,
+              "sum": 917504
+            },
+            {
+              "variant": "candidate",
+              "ns": 30.156154258578542,
+              "calls": 835584,
+              "sum": 835584
+            },
+            {
+              "variant": "candidate",
+              "ns": 35.099424164870655,
+              "calls": 712704,
+              "sum": 712704
+            },
+            {
+              "variant": "baseline",
+              "ns": 29.498995267427897,
+              "calls": 851968,
+              "sum": 851968
+            }
+          ],
+          "changePercent": 14.717042872171548
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 28.55384327540896,
+              "calls": 876544,
+              "sum": 876544
+            },
+            {
+              "variant": "baseline",
+              "ns": 27.119054203539623,
+              "calls": 925696,
+              "sum": 925696
+            },
+            {
+              "variant": "baseline",
+              "ns": 27.4096897670201,
+              "calls": 917504,
+              "sum": 917504
+            },
+            {
+              "variant": "candidate",
+              "ns": 28.85661575029489,
+              "calls": 868352,
+              "sum": 868352
+            }
+          ],
+          "changePercent": 5.284763310704488
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 27.202558939435804,
+              "calls": 925696,
+              "sum": 925696
+            },
+            {
+              "variant": "candidate",
+              "ns": 28.45922399450244,
+              "calls": 884736,
+              "sum": 884736
+            },
+            {
+              "variant": "candidate",
+              "ns": 27.624731665259027,
+              "calls": 909312,
+              "sum": 909312
+            },
+            {
+              "variant": "baseline",
+              "ns": 27.481297084263524,
+              "calls": 917504,
+              "sum": 917504
+            }
+          ],
+          "changePercent": 2.560352794900478
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 28.333649811921077,
+              "calls": 884736,
+              "sum": 884736
+            },
+            {
+              "variant": "baseline",
+              "ns": 27.272251674107213,
+              "calls": 917504,
+              "sum": 917504
+            },
+            {
+              "variant": "baseline",
+              "ns": 27.28042602539062,
+              "calls": 917504,
+              "sum": 917504
+            },
+            {
+              "variant": "candidate",
+              "ns": 28.002033758601122,
+              "calls": 892928,
+              "sum": 892928
+            }
+          ],
+          "changePercent": 3.2684112791786513
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 27.822487571022773,
+              "calls": 901120,
+              "sum": 901120
+            },
+            {
+              "variant": "candidate",
+              "ns": 28.232287485665093,
+              "calls": 892928,
+              "sum": 892928
+            },
+            {
+              "variant": "candidate",
+              "ns": 28.138550924598682,
+              "calls": 892928,
+              "sum": 892928
+            },
+            {
+              "variant": "baseline",
+              "ns": 28.15725344036692,
+              "calls": 892928,
+              "sum": 892928
+            }
+          ],
+          "changePercent": 0.6986409579753383
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 28.234191334575677,
+              "calls": 892928,
+              "sum": 892928
+            },
+            {
+              "variant": "baseline",
+              "ns": 27.644416877815143,
+              "calls": 909312,
+              "sum": 909312
+            },
+            {
+              "variant": "baseline",
+              "ns": 27.873313210227174,
+              "calls": 901120,
+              "sum": 901120
+            },
+            {
+              "variant": "candidate",
+              "ns": 27.481951032366037,
+              "calls": 917504,
+              "sum": 917504
+            }
+          ],
+          "changePercent": 0.3573854308970281
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 27.089130772953485,
+              "calls": 925696,
+              "sum": 925696
+            },
+            {
+              "variant": "candidate",
+              "ns": 28.02107224770643,
+              "calls": 892928,
+              "sum": 892928
+            },
+            {
+              "variant": "candidate",
+              "ns": 27.701602970157634,
+              "calls": 909312,
+              "sum": 909312
+            },
+            {
+              "variant": "baseline",
+              "ns": 27.145304722068673,
+              "calls": 925696,
+              "sum": 925696
+            }
+          ],
+          "changePercent": 2.744086315747696
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 27.863880504261363,
+              "calls": 901120,
+              "sum": 901120
+            },
+            {
+              "variant": "baseline",
+              "ns": 26.776765522203902,
+              "calls": 933888,
+              "sum": 933888
+            },
+            {
+              "variant": "baseline",
+              "ns": 26.883951822916742,
+              "calls": 933888,
+              "sum": 933888
+            },
+            {
+              "variant": "candidate",
+              "ns": 27.884077592329522,
+              "calls": 901120,
+              "sum": 901120
+            }
+          ],
+          "changePercent": 3.889699681139347
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 26.812744140624932,
+              "calls": 933888,
+              "sum": 933888
+            },
+            {
+              "variant": "candidate",
+              "ns": 28.116152702121383,
+              "calls": 892928,
+              "sum": 892928
+            },
+            {
+              "variant": "candidate",
+              "ns": 28.240014872419774,
+              "calls": 892928,
+              "sum": 892928
+            },
+            {
+              "variant": "baseline",
+              "ns": 29.600055401141827,
+              "calls": 851968,
+              "sum": 851968
+            }
+          ],
+          "changePercent": -0.10038850701544755
+        }
+      ]
+    },
+    "distinctEqual": {
+      "medianChangePercent": 2.568649869650197,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 49.735383064516164,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "candidate",
+              "ns": 51.310628255207824,
+              "calls": 491520,
+              "sum": 491520
+            },
+            {
+              "variant": "candidate",
+              "ns": 50.30857774077853,
+              "calls": 499712,
+              "sum": 499712
+            },
+            {
+              "variant": "baseline",
+              "ns": 49.93266444052395,
+              "calls": 507904,
+              "sum": 507904
+            }
+          ],
+          "changePercent": 1.9576569821412315
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 50.83027824026678,
+              "calls": 499712,
+              "sum": 499712
+            },
+            {
+              "variant": "baseline",
+              "ns": 54.93687220982171,
+              "calls": 458752,
+              "sum": 458752
+            },
+            {
+              "variant": "baseline",
+              "ns": 50.012600806451005,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "candidate",
+              "ns": 51.2687174479165,
+              "calls": 491520,
+              "sum": 491520
+            }
+          ],
+          "changePercent": -2.7160472998730256
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 49.22347530241986,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "candidate",
+              "ns": 50.844886654713015,
+              "calls": 499712,
+              "sum": 499712
+            },
+            {
+              "variant": "candidate",
+              "ns": 51.36250813802072,
+              "calls": 491520,
+              "sum": 491520
+            },
+            {
+              "variant": "baseline",
+              "ns": 49.87477948588706,
+              "calls": 507904,
+              "sum": 507904
+            }
+          ],
+          "changePercent": 3.1374316440471617
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 51.09963338883208,
+              "calls": 499712,
+              "sum": 499712
+            },
+            {
+              "variant": "baseline",
+              "ns": 49.62079448084602,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "baseline",
+              "ns": 49.2508426789309,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "candidate",
+              "ns": 51.97091829978843,
+              "calls": 483328,
+              "sum": 483328
+            }
+          ],
+          "changePercent": 4.246834228160012
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 49.110049293155456,
+              "calls": 516096,
+              "sum": 516096
+            },
+            {
+              "variant": "candidate",
+              "ns": 51.00402832031263,
+              "calls": 491520,
+              "sum": 491520
+            },
+            {
+              "variant": "candidate",
+              "ns": 50.27615906762274,
+              "calls": 499712,
+              "sum": 499712
+            },
+            {
+              "variant": "baseline",
+              "ns": 49.74128969253977,
+              "calls": 507904,
+              "sum": 507904
+            }
+          ],
+          "changePercent": 2.457071828426738
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 54.70275878906206,
+              "calls": 458752,
+              "sum": 458752
+            },
+            {
+              "variant": "baseline",
+              "ns": 49.37803206905307,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "baseline",
+              "ns": 53.559527480810786,
+              "calls": 466944,
+              "sum": 466944
+            },
+            {
+              "variant": "candidate",
+              "ns": 50.87890625000046,
+              "calls": 499712,
+              "sum": 499712
+            }
+          ],
+          "changePercent": 2.568649869650197
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 49.33688256048366,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "candidate",
+              "ns": 53.41565362338353,
+              "calls": 475136,
+              "sum": 475136
+            },
+            {
+              "variant": "candidate",
+              "ns": 50.69840227971339,
+              "calls": 499712,
+              "sum": 499712
+            },
+            {
+              "variant": "baseline",
+              "ns": 49.435523248488444,
+              "calls": 507904,
+              "sum": 507904
+            }
+          ],
+          "changePercent": 5.408038865081077
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 51.406453450520786,
+              "calls": 491520,
+              "sum": 491520
+            },
+            {
+              "variant": "baseline",
+              "ns": 49.58850491431471,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "baseline",
+              "ns": 49.480216733870584,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "candidate",
+              "ns": 50.778048155738006,
+              "calls": 499712,
+              "sum": 499712
+            }
+          ],
+          "changePercent": 3.145069307685544
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 49.72140404485839,
+              "calls": 507904,
+              "sum": 507904
+            },
+            {
+              "variant": "candidate",
+              "ns": 51.60461425781268,
+              "calls": 491520,
+              "sum": 491520
+            },
+            {
+              "variant": "candidate",
+              "ns": 50.97717285156289,
+              "calls": 491520,
+              "sum": 491520
+            },
+            {
+              "variant": "baseline",
+              "ns": 50.626360783811634,
+              "calls": 499712,
+              "sum": 499712
+            }
+          ],
+          "changePercent": 2.226280061663388
+        }
+      ]
+    },
+    "distinctUnequal": {
+      "medianChangePercent": 2.770749759258706,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 42.092853702910915,
+              "calls": 598016,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 44.08342633928562,
+              "calls": 573440,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.807896205357224,
+              "calls": 573440,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 43.75819614955304,
+              "calls": 573440,
+              "sum": 0
+            }
+          ],
+          "changePercent": 2.376526199371054
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 43.09993260343294,
+              "calls": 581632,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.844306098089994,
+              "calls": 589824,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.989553532130465,
+              "calls": 581632,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.496403224032086,
+              "calls": 581632,
+              "sum": 0
+            }
+          ],
+          "changePercent": 0.8883163363844648
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 42.33314827696927,
+              "calls": 598016,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.43468034771114,
+              "calls": 581632,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.77859933035744,
+              "calls": 573440,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.242180811215874,
+              "calls": 598016,
+              "sum": 0
+            }
+          ],
+          "changePercent": 3.1190544787983
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 43.74197823660712,
+              "calls": 573440,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.12094659674633,
+              "calls": 598016,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.1067329302225,
+              "calls": 598016,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.390666263204196,
+              "calls": 581632,
+              "sum": 0
+            }
+          ],
+          "changePercent": 3.4489433748585485
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 45.618768948226986,
+              "calls": 548864,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.62688337053523,
+              "calls": 573440,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.49124532350365,
+              "calls": 581632,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 43.88218470982189,
+              "calls": 573440,
+              "sum": 0
+            }
+          ],
+          "changePercent": -2.662345893110707
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 44.739123358242864,
+              "calls": 565248,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.13984241224386,
+              "calls": 598016,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 43.57050506161988,
+              "calls": 581632,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 44.44668534873179,
+              "calls": 565248,
+              "sum": 0
+            }
+          ],
+          "changePercent": 4.054891078548839
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 42.73427327473954,
+              "calls": 589824,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.01689040492955,
+              "calls": 581632,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.87259347098223,
+              "calls": 573440,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.09118150684969,
+              "calls": 598016,
+              "sum": 0
+            }
+          ],
+          "changePercent": 2.4332661694971947
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 43.4446522887321,
+              "calls": 581632,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.144524561216045,
+              "calls": 598016,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.48250325520789,
+              "calls": 589824,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.527178697183196,
+              "calls": 581632,
+              "sum": 0
+            }
+          ],
+          "changePercent": 2.770749759258706
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 42.35455238655826,
+              "calls": 598016,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.55038924955921,
+              "calls": 581632,
+              "sum": 0
+            },
+            {
+              "variant": "candidate",
+              "ns": 43.615897042411014,
+              "calls": 573440,
+              "sum": 0
+            },
+            {
+              "variant": "baseline",
+              "ns": 42.343348672945396,
+              "calls": 598016,
+              "sum": 0
+            }
+          ],
+          "changePercent": 2.9143404991021304
+        }
+      ]
+    },
+    "nestedSame": {
+      "medianChangePercent": -3.817059355146779,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.4050824934614905,
+              "calls": 5677056,
+              "sum": 5677056
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.141976551899595,
+              "calls": 6037504,
+              "sum": 6037504
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.291697298542933,
+              "calls": 5832704,
+              "sum": 5832704
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.423792742300726,
+              "calls": 5652480,
+              "sum": 5652480
+            }
+          ],
+          "changePercent": -4.476237060400257
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 4.176925471315084,
+              "calls": 5988352,
+              "sum": 5988352
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.260883836732923,
+              "calls": 5873664,
+              "sum": 5873664
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.301946935519338,
+              "calls": 5816320,
+              "sum": 5816320
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.119485914305028,
+              "calls": 6070272,
+              "sum": 6070272
+            }
+          ],
+          "changePercent": -3.1113470967507384
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.402165041876791,
+              "calls": 5685248,
+              "sum": 5685248
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.144461022303313,
+              "calls": 6037504,
+              "sum": 6037504
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.572008327095759,
+              "calls": 5472256,
+              "sum": 5472256
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.445456070323769,
+              "calls": 5627904,
+              "sum": 5627904
+            }
+          ],
+          "changePercent": -1.4823392767196464
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 4.251413159383672,
+              "calls": 5881856,
+              "sum": 5881856
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.383024765737007,
+              "calls": 5709824,
+              "sum": 5709824
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.351789251691638,
+              "calls": 5750784,
+              "sum": 5750784
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.162697441246552,
+              "calls": 6012928,
+              "sum": 6012928
+            }
+          ],
+          "changePercent": -3.6715540383403633
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.3933895852068385,
+              "calls": 5693440,
+              "sum": 5693440
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.154160687712622,
+              "calls": 6021120,
+              "sum": 6021120
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.219518840642238,
+              "calls": 5931008,
+              "sum": 5931008
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.359688895089357,
+              "calls": 5734400,
+              "sum": 5734400
+            }
+          ],
+          "changePercent": -4.334463044006642
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 4.158523102222396,
+              "calls": 6012928,
+              "sum": 6012928
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.42177183203693,
+              "calls": 5660672,
+              "sum": 5660672
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.353371644631332,
+              "calls": 5750784,
+              "sum": 5750784
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.1727535060194905,
+              "calls": 5996544,
+              "sum": 5996544
+            }
+          ],
+          "changePercent": -5.058229185728402
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.3662053491595145,
+              "calls": 5726208,
+              "sum": 5726208
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.203282163428534,
+              "calls": 5955584,
+              "sum": 5955584
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.1578079764133875,
+              "calls": 6012928,
+              "sum": 6012928
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.382937197363762,
+              "calls": 5709824,
+              "sum": 5709824
+            }
+          ],
+          "changePercent": -4.4353192854945656
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 4.175339058224967,
+              "calls": 5988352,
+              "sum": 5988352
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.3858319863504525,
+              "calls": 5701632,
+              "sum": 5701632
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.366903891720298,
+              "calls": 5726208,
+              "sum": 5726208
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.243299696180597,
+              "calls": 5898240,
+              "sum": 5898240
+            }
+          ],
+          "changePercent": -3.817059355146779
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 4.221049581820556,
+              "calls": 5922816,
+              "sum": 5922816
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.1151514593159915,
+              "calls": 6078464,
+              "sum": 6078464
+            },
+            {
+              "variant": "candidate",
+              "ns": 4.253793360463081,
+              "calls": 5881856,
+              "sum": 5881856
+            },
+            {
+              "variant": "baseline",
+              "ns": 4.212924299568903,
+              "calls": 5939200,
+              "sum": 5939200
+            }
+          ],
+          "changePercent": -0.7710370286287183
+        }
+      ]
+    },
+    "nestedDistinct": {
+      "medianChangePercent": 3.0099216697334175,
+      "blocks": [
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 93.50511955492367,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 98.96200856854723,
+              "calls": 253952,
+              "sum": 253952
+            },
+            {
+              "variant": "candidate",
+              "ns": 109.0279715401773,
+              "calls": 229376,
+              "sum": 229376
+            },
+            {
+              "variant": "baseline",
+              "ns": 93.15888375946855,
+              "calls": 270336,
+              "sum": 270336
+            }
+          ],
+          "changePercent": 11.424793434015035
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 95.38040161133007,
+              "calls": 262144,
+              "sum": 262144
+            },
+            {
+              "variant": "baseline",
+              "ns": 96.29058837890351,
+              "calls": 262144,
+              "sum": 262144
+            },
+            {
+              "variant": "baseline",
+              "ns": 93.42447916666447,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 96.77925109863317,
+              "calls": 262144,
+              "sum": 262144
+            }
+          ],
+          "changePercent": 1.288556146869091
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 93.46073035037925,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 98.17466735839719,
+              "calls": 262144,
+              "sum": 262144
+            },
+            {
+              "variant": "candidate",
+              "ns": 95.43571472167903,
+              "calls": 262144,
+              "sum": 262144
+            },
+            {
+              "variant": "baseline",
+              "ns": 94.49240944602076,
+              "calls": 270336,
+              "sum": 270336
+            }
+          ],
+          "changePercent": 3.0099216697334175
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 95.81642150878825,
+              "calls": 262144,
+              "sum": 262144
+            },
+            {
+              "variant": "baseline",
+              "ns": 92.88367069128854,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "baseline",
+              "ns": 93.39969519413027,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 95.89462280273561,
+              "calls": 262144,
+              "sum": 262144
+            }
+          ],
+          "changePercent": 2.913667787945995
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 93.33200165719948,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 95.23629853219583,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 95.35614938446875,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "baseline",
+              "ns": 93.14371744791512,
+              "calls": 270336,
+              "sum": 270336
+            }
+          ],
+          "changePercent": 2.2076487122859367
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 95.75691223144555,
+              "calls": 262144,
+              "sum": 262144
+            },
+            {
+              "variant": "baseline",
+              "ns": 93.60795454545675,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "baseline",
+              "ns": 93.59907670454315,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 95.59478759765815,
+              "calls": 262144,
+              "sum": 262144
+            }
+          ],
+          "changePercent": 2.2139492044873865
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 93.57984138257491,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 100.263829385084,
+              "calls": 253952,
+              "sum": 253952
+            },
+            {
+              "variant": "candidate",
+              "ns": 97.6963043212882,
+              "calls": 262144,
+              "sum": 262144
+            },
+            {
+              "variant": "baseline",
+              "ns": 93.88390743371403,
+              "calls": 270336,
+              "sum": 270336
+            }
+          ],
+          "changePercent": 5.599154479925339
+        },
+        {
+          "samples": [
+            {
+              "variant": "candidate",
+              "ns": 95.46012878417984,
+              "calls": 262144,
+              "sum": 262144
+            },
+            {
+              "variant": "baseline",
+              "ns": 94.16947798295541,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "baseline",
+              "ns": 92.95580314867277,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 97.49183654784999,
+              "calls": 262144,
+              "sum": 262144
+            }
+          ],
+          "changePercent": 3.1137878137925235
+        },
+        {
+          "samples": [
+            {
+              "variant": "baseline",
+              "ns": 93.2206587357948,
+              "calls": 270336,
+              "sum": 270336
+            },
+            {
+              "variant": "candidate",
+              "ns": 95.46241760254037,
+              "calls": 262144,
+              "sum": 262144
+            },
+            {
+              "variant": "candidate",
+              "ns": 102.67659505208323,
+              "calls": 245760,
+              "sum": 245760
+            },
+            {
+              "variant": "baseline",
+              "ns": 93.25580018939371,
+              "calls": 270336,
+              "sum": 270336
+            }
+          ],
+          "changePercent": 6.254169452088276
+        }
+      ]
+    }
+  }
+}

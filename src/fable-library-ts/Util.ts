@@ -442,11 +442,12 @@ export function dateHash(x: Date): number {
 
 export function arrayHash<T>(x: ArrayLike<T>): number {
   const len = x.length;
-  const hashes: number[] = new Array(len);
+  let hash = 0;
   for (let i = 0; i < len; i++) {
-    hashes[i] = structuralHash(x[i]);
+    const elementHash = structuralHash(x[i]);
+    hash = ((hash << 5) + hash) ^ elementHash;
   }
-  return combineHashCodes(hashes);
+  return hash;
 }
 
 export function structuralHash<T>(x: T): number {
@@ -471,8 +472,14 @@ export function structuralHash<T>(x: T): number {
         return dateHash(x);
       } else if (Object.getPrototypeOf(x)?.constructor === Object) {
         // TODO: check call-stack to prevent cyclic objects?
-        const hashes = Object.values(x).map((v) => structuralHash(v));
-        return combineHashCodes(hashes);
+        // Snapshot values before user hashing can mutate the object.
+        const values = Object.values(x);
+        let hash = 0;
+        for (let i = 0; i < values.length; i++) {
+          const fieldHash = structuralHash(values[i]);
+          hash = ((hash << 5) + hash) ^ fieldHash;
+        }
+        return hash;
       } else {
         // Classes don't implement GetHashCode by default, but must use identity hashing
         return numberHash(ObjectRef.id(x));

@@ -1,0 +1,76 @@
+{
+  "node": "v26.7.0",
+  "correctness": {
+    "structObservations": {
+      "dotnet": [
+        1,
+        9,
+        7,
+        7,
+        4,
+        5,
+        6,
+        8,
+        9
+      ],
+      "baseline": [
+        9,
+        9,
+        7,
+        7,
+        4,
+        5,
+        6,
+        8,
+        9
+      ],
+      "candidate": [
+        9,
+        9,
+        7,
+        7,
+        4,
+        5,
+        6,
+        8,
+        9
+      ],
+      "fullConformance": false
+    },
+    "dotnetKernelCases": 5,
+    "kernelDifferentials": 1036,
+    "boundaries": [
+      {
+        "name": "baseline",
+        "boxedFields": [
+          "X",
+          "Y"
+        ],
+        "boxedIsPoint": true,
+        "boxedHash": -2087723215,
+        "closureFields": [
+          "X",
+          "Y"
+        ],
+        "interfaceResult": 6,
+        "unsafeScalarHasX": false
+      },
+      {
+        "name": "candidate",
+        "boxedFields": [
+          "X",
+          "Y"
+        ],
+        "boxedIsPoint": true,
+        "boxedHash": -2087723215,
+        "closureFields": [
+          "X",
+          "Y"
+        ],
+        "interfaceResult": 6,
+        "unsafeScalarHasX": false
+      }
+    ]
+  },
+  "timings": []
+}

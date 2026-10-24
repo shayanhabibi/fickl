@@ -1,0 +1,20 @@
+--- baseline/Map.js
++++ candidate/Map.js
+@@ -1019,6 +1019,7 @@
+     constructor(comparer, tree) {
+         this.comparer = comparer;
+         this.tree = tree;
++        this.countCache = -1;
+     }
+     GetHashCode() {
+         const this$ = this;
+@@ -1227,7 +1228,8 @@
+     return [FSharpMap_$ctor(m.comparer, patternInput[0]), FSharpMap_$ctor(m.comparer, patternInput[1])];
+ }
+ export function FSharpMap__get_Count(m) {
+-    return MapTreeModule_size(m.tree) | 0;
++    if (m.countCache < 0) m.countCache = MapTreeModule_size(m.tree) | 0;
++    return m.countCache | 0;
+ }
+ export function FSharpMap__ContainsKey(m, key) {
+     return MapTreeModule_mem(m.comparer, key, m.tree);

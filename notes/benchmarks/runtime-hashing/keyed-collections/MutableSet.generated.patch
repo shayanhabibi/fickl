@@ -1,0 +1,25 @@
+--- baseline/MutableSet.js
++++ candidate/MutableSet.js
+@@ -118,17 +118,11 @@
+ }
+ function HashSet__TryFindIndex_2B595(this$, k) {
+     const h = this$.comparer.GetHashCode(k) | 0;
+-    let matchValue;
+-    let outArg = defaultOf();
+-    matchValue = [tryGetValue(this$.hashMap, h, new FSharpRef(() => outArg, (v) => {
+-            outArg = v;
+-        })), outArg];
+-    if (matchValue[0]) {
+-        return [true, h, matchValue[1].findIndex((v_1) => this$.comparer.Equals(k, v_1))];
+-    }
+-    else {
+-        return [false, h, -1];
+-    }
++    const bucket = this$.hashMap.get(h);
++    if (bucket !== undefined) {
++        return [true, h, bucket.findIndex((pair) => this$.comparer.Equals(k, pair))];
++    }
++    return [false, h, -1];
+ }
+ function HashSet__TryFind_2B595(this$, k) {
+     const matchValue = HashSet__TryFindIndex_2B595(this$, k);

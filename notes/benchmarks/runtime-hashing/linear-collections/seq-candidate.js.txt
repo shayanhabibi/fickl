@@ -1,0 +1,11 @@
+export function filter(f, xs) {
+    return generate(() => ofSeq(xs), (e) => {
+        while (e["System.Collections.IEnumerator.MoveNext"]()) {
+            const x = e["System.Collections.Generic.IEnumerator`1.get_Current"]();
+            if (f(x)) {
+                return some(x);
+            }
+        }
+        return undefined;
+    }, (e) => { disposeSafe(e); });
+}

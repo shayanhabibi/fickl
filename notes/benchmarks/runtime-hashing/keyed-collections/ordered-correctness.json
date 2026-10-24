@@ -1,0 +1,59 @@
+{
+  "node": "v26.7.0",
+  "platform": "win32",
+  "correctness": {
+    "map": {
+      "operations": 300,
+      "traceCalls": 1139,
+      "matched": true
+    },
+    "set": {
+      "operations": 300,
+      "traceCalls": 1182,
+      "matched": true
+    }
+  },
+  "timings": [],
+  "interopCounterexamples": [
+    {
+      "kind": "map",
+      "baseline": {
+        "fields": [
+          "comparer",
+          "tree"
+        ],
+        "frozenCount": 1,
+        "mutatedTreeCount": 2
+      },
+      "candidate": {
+        "fields": [
+          "comparer",
+          "tree",
+          "countCache"
+        ],
+        "frozenCount": "TypeError",
+        "mutatedTreeCount": 1
+      }
+    },
+    {
+      "kind": "set",
+      "baseline": {
+        "fields": [
+          "comparer",
+          "tree"
+        ],
+        "frozenCount": 1,
+        "mutatedTreeCount": 2
+      },
+      "candidate": {
+        "fields": [
+          "comparer",
+          "tree",
+          "countCache"
+        ],
+        "frozenCount": "TypeError",
+        "mutatedTreeCount": 1
+      }
+    }
+  ]
+}

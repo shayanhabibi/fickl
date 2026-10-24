@@ -1,0 +1,13 @@
+{
+  "area": "ordered",
+  "inputs": {
+    "Map": {
+      "generatedSha256": "7b7fa952f80f4bd46b85ddf9118656e4c58744b46dca7a17497ca05fa52a3cad",
+      "sourceSha256": "2fd6624ddabfcd78d08dea5e3765e1fa635311d49b84d6831247b223934d1a93"
+    },
+    "Set": {
+      "generatedSha256": "6e0e8f0bd97a5a836c96559670769778d0753bb747aceb34d3e53972d59500ba",
+      "sourceSha256": "430d34b819677a777583ca06a8017c6081fe441947a07199cf3c7a4607f786b0"
+    }
+  }
+}

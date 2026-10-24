@@ -95,7 +95,6 @@ function _Big_() {
       x.s = n.s;
       x.e = n.e;
       x.c = n.c.slice();
-      normalize(x);
     } else {
       if (typeof n !== 'string') {
         if (Big.strict === true) {
@@ -122,15 +121,6 @@ function _Big_() {
   Big.strict = STRICT;
 
   return Big;
-}
-
-function normalize(x) {
-  // x = round(x, DP, 0);
-  if (x.c.length > 1 && !x.c[0]) {
-    let i = x.c.findIndex(x => x);
-    x.c = x.c.slice(i);
-    x.e = x.e - i;
-  }
 }
 
 /*
@@ -167,17 +157,14 @@ function parse(x, n) {
 
   nl = n.length;
 
-  // Determine leading zeros before decimal point.
-  for (i = 0; i < e && i < nl && n.charAt(i) == '0';) ++i;
-
-  // original version (ignores decimal point).
-  // // Determine leading zeros.
-  // for (i = 0; i < nl && n.charAt(i) == '0';) ++i;
+  // Determine leading zeros.
+  for (i = 0; i < nl && n.charAt(i) == '0';) ++i;
 
   if (i == nl) {
 
-    // Zero.
-    x.c = [x.e = 0];
+    // Zero, keeping the scale: 0.00 is c = [0], e = -2.
+    x.c = [0];
+    x.e = nl > e ? e - nl : 0;
   } else {
 
     x.e = e - i - 1;
@@ -193,8 +180,7 @@ function parse(x, n) {
     // for (e = 0; i <= nl;) x.c[e++] = +n.charAt(i++);
   }
 
-  x = round(x, Big.DP + 1, Big.RM);
-  return x;
+  return fit(x);
 }
 
 
@@ -218,21 +204,14 @@ function round(x, sd, rm, more) {
     more =
       rm === 3 && (more || !!xc[0]) || sd === 0 && (
       rm === 1 && xc[0] >= 5 ||
-      rm === 2 && (xc[0] > 5 || xc[0] === 5 && (more || xc[1] !== UNDEFINED))
+      rm === 2 && (xc[0] > 5 || xc[0] === 5 && (more || xc.some((d, i) => i > 0 && d)))
     );
 
     xc.length = 1;
 
-    if (more) {
-
-      // 1, 0.1, 0.01, 0.001, 0.0001 etc.
-      x.e = x.e - sd + 1;
-      xc[0] = 1;
-    } else {
-
-      // Zero.
-      xc[0] = x.e = 0;
-    }
+    // 1, 0.1, 0.01, 0.001, 0.0001 etc., or zero at the same place.
+    x.e = x.e - sd + 1;
+    xc[0] = more ? 1 : 0;
   } else if (sd < xc.length) {
 
     // xc[sd] is the digit after the digit that may be rounded up.
@@ -240,7 +219,7 @@ function round(x, sd, rm, more) {
     more =
       rm === 1 && xc[sd] >= 5 ||
       rm === 2 && (xc[sd] > 5 || xc[sd] === 5 &&
-        (more || xc[sd + 1] !== UNDEFINED || xc[sd - 1] & 1)) ||
+        (more || xc.some((d, i) => i > sd && d) || xc[sd - 1] & 1)) ||
       rm === 3 && (more || !isZero);
 
     // Remove any digits after the required precision.
@@ -259,16 +238,67 @@ function round(x, sd, rm, more) {
       }
     }
 
-    // Remove trailing zeros.
-    for (sd = xc.length; !xc[--sd];) xc.pop();
   }
 
   return x;
 }
 
 
-function hasNonzeroDigit(x) {
-  return x.c.some(d => d !== 0);
+// Largest System.Decimal mantissa, 2^96 - 1.
+var MAX_MANTISSA = '79228162514264337593543950335'.split('').map(Number),
+  OVERFLOW = 'Value was either too large or too small for a Decimal.';
+
+
+/*
+ * Return the number of decimal places of Big x.
+ */
+function scaleOf(x) {
+  return x.c.length - x.e - 1;
+}
+
+
+/*
+ * Pad Big x with trailing zeros up to dp decimal places.
+ */
+function padScale(x, dp) {
+  if (!x.c[0]) {
+    x.e = Math.min(x.e, -dp);
+  } else {
+    for (; scaleOf(x) < dp;) x.c.push(0);
+  }
+  return x;
+}
+
+
+/*
+ * Return true if the digits c, padded with zeros to the length of MAX_MANTISSA, exceed it.
+ */
+function exceedsMax(c) {
+  for (var i = 0; i < MAX_MANTISSA.length; i++) {
+    var d = i < c.length ? c[i] : 0;
+    if (d !== MAX_MANTISSA[i]) return d > MAX_MANTISSA[i];
+  }
+  return false;
+}
+
+
+/*
+ * Round Big x half to even so that it fits a System.Decimal: at most Big.DP decimal places
+ * and a mantissa no larger than MAX_MANTISSA. Throws when no decimal place is left to drop.
+ */
+function fit(x) {
+  var scale = scaleOf(x),
+    dp = Math.min(scale, Big.DP, Big.DP - x.e);
+
+  if (x.e > Big.DP) throw Error(OVERFLOW);
+  if (dp < scale) round(x, x.e + 1 + dp, 2);
+  if (x.e > Big.DP) throw Error(OVERFLOW);
+
+  // Both the value and the mantissa itself must not exceed MAX_MANTISSA.
+  if (x.e === Big.DP && exceedsMax(x.c)) throw Error(OVERFLOW);
+  if (x.c.length === MAX_MANTISSA.length && exceedsMax(x.c)) round(x, x.c.length - 1, 2);
+
+  return x;
 }
 
 
@@ -283,6 +313,7 @@ function stringify(x, doExponential, isNonzero) {
 
   // Exponential notation?
   if (doExponential) {
+    if (!x.c[0]) e = 0;
     s = s.charAt(0) + (n > 1 ? '.' + s.slice(1) : '') + (e < 0 ? 'e' : 'e+') + e;
 
   // Normal notation.
@@ -370,28 +401,40 @@ P.cmp = function (y) {
  * if necessary, to a maximum of Big.DP decimal places using rounding mode Big.RM.
  */
 P.div = function (y) {
-  var
-    Big = this.constructor,
-    x = new Big(this),
-    y = new Big(y),
-    a = x.c,   // dividend
-    b = y.c,   // divisor
-    k = x.s == y.s ? 1 : -1,
+  var Big = this.constructor,
     dp = Big.DP;
 
   if (dp !== ~~dp || dp < 0 || dp > MAX_DP) {
     throw Error(INVALID_DP);
   }
 
+  return divide(new Big(this), new Big(y), dp, 2);
+};
+
+
+/*
+ * Return Big x divided by Big y to dp decimal places using rounding mode rm.
+ * Both are modified.
+ */
+function divide(x, y, dp, rm) {
+  var
+    a = x.c,   // dividend
+    b = y.c,   // divisor
+    k = x.s == y.s ? 1 : -1;
+
   // Divisor is zero?
   if (!b[0]) {
     throw Error(DIV_BY_ZERO);
   }
 
+  // Scale of the exact quotient is at least the scale of x less the scale of y.
+  var minScale = Math.max(0, scaleOf(x) - scaleOf(y));
+
   // Dividend is 0? Return +-0.
   if (!a[0]) {
     y.s = k;
-    y.c = [y.e = 0];
+    y.c = [0];
+    y.e = -minScale;
     return y;
   }
 
@@ -471,11 +514,20 @@ P.div = function (y) {
     p--;
   }
 
+  var exact = r[0] === UNDEFINED;
+
   // Round?
-  if (qi > p) round(q, p, Big.RM, r[0] !== UNDEFINED);
+  if (qi > p) round(q, p, rm, !exact);
+  fit(q);
+
+  if (!q.c[0]) {
+    q.e = 0;
+  } else if (exact) {
+    for (; scaleOf(q) > minScale && !q.c[q.c.length - 1];) q.c.pop();
+  }
 
   return q;
-};
+}
 
 
 /*
@@ -545,6 +597,7 @@ P.minus = P.sub = function (y) {
 
   // Either zero?
   if (!xc[0] || !yc[0]) {
+    var dp = Math.max(scaleOf(x), scaleOf(y));
     if (yc[0]) {
       y.s = -b;
     } else if (xc[0]) {
@@ -552,7 +605,7 @@ P.minus = P.sub = function (y) {
     } else {
       y.s = 1;
     }
-    return y;
+    return padScale(y, dp);
   }
 
   // Determine which is the bigger number. Prepend zeros to equalise exponents.
@@ -607,8 +660,8 @@ P.minus = P.sub = function (y) {
     xc[j] -= yc[j];
   }
 
-  // Remove trailing zeros.
-  for (; xc[--b] === 0;) xc.pop();
+  // The result keeps the larger scale.
+  var dp = xc.length - ye - 1;
 
   // Remove leading zeros and adjust exponent accordingly.
   for (; xc[0] === 0;) {
@@ -622,13 +675,14 @@ P.minus = P.sub = function (y) {
     y.s = 1;
 
     // Result must be zero.
-    xc = [ye = 0];
+    xc = [0];
+    ye = -dp;
   }
 
   y.c = xc;
   y.e = ye;
 
-  return y;
+  return fit(y);
 };
 
 
@@ -654,12 +708,7 @@ P.mod = function (y) {
 
   if (ygtx) return new Big(x);
 
-  a = Big.DP;
-  b = Big.RM;
-  Big.DP = Big.RM = 0;
-  x = x.div(y);
-  Big.DP = a;
-  Big.RM = b;
+  x = divide(x, new Big(y), 0, 0);
 
   return this.minus(x.times(y));
 };
@@ -687,6 +736,7 @@ P.plus = P.add = function (y) {
 
   // Either zero?
   if (!xc[0] || !yc[0]) {
+    var dp = Math.max(scaleOf(x), scaleOf(y));
     if (!yc[0]) {
       if (xc[0]) {
         y = new Big(x);
@@ -694,7 +744,7 @@ P.plus = P.add = function (y) {
         y.s = x.s;
       }
     }
-    return y;
+    return padScale(y, dp);
   }
 
   xc = xc.slice();
@@ -734,13 +784,10 @@ P.plus = P.add = function (y) {
     ++ye;
   }
 
-  // Remove trailing zeros.
-  for (e = xc.length; xc[--e] === 0;) xc.pop();
-
   y.c = xc;
   y.e = ye;
 
-  return y;
+  return fit(y);
 };
 
 
@@ -876,7 +923,9 @@ P.times = P.mul = function (y) {
 
   // Return signed 0 if either 0.
   if (!xc[0] || !yc[0]) {
-    y.c = [y.e = 0];
+    var dp = scaleOf(x) + scaleOf(y);
+    y.c = [0];
+    y.e = -dp;
     return y;
   }
 
@@ -920,11 +969,9 @@ P.times = P.mul = function (y) {
   if (b) ++y.e;
   else c.shift();
 
-  // Remove trailing zeros.
-  for (i = c.length; !c[--i];) c.pop();
   y.c = c;
 
-  return y;
+  return fit(y);
 };
 
 
@@ -937,7 +984,7 @@ P.times = P.mul = function (y) {
  */
 P.toExponential = function (dp, rm) {
   var x = this,
-    n = hasNonzeroDigit(x);
+    n = x.c[0];
 
   if (dp !== UNDEFINED) {
     if (dp !== ~~dp || dp < 0 || dp > MAX_DP) {
@@ -947,7 +994,7 @@ P.toExponential = function (dp, rm) {
     for (; x.c.length < dp;) x.c.push(0);
   }
 
-  return stringify(x, true, n);
+  return stringify(x, true, !!n);
 };
 
 
@@ -968,14 +1015,13 @@ P.toFixed = function (dp, rm) {
     if (dp !== ~~dp || dp < 0 || dp > MAX_DP) {
       throw Error(INVALID_DP);
     }
-    x = new x.constructor(x);
-    x = round(x, dp + x.e + 1, rm);
+    x = round(new x.constructor(x), dp + x.e + 1, rm);
 
     // x.e may have changed if the value is rounded up.
     for (dp = dp + x.e + 1; x.c.length < dp;) x.c.push(0);
   }
 
-  return stringify(x, false, hasNonzeroDigit(x));
+  return stringify(x, false, !!x.c[0]);
 };
 
 
@@ -988,7 +1034,7 @@ P.toFixed = function (dp, rm) {
 P.toJSON = P.toString = function () {
   var x = this,
     Big = x.constructor;
-  return stringify(x, x.e <= Big.NE || x.e >= Big.PE, hasNonzeroDigit(x));
+  return stringify(x, x.e <= Big.NE || x.e >= Big.PE, !!x.c[0]);
 };
 
 
@@ -1016,17 +1062,18 @@ P.toNumber = function () {
 P.toPrecision = function (sd, rm) {
   var x = this,
     Big = x.constructor,
-    n = hasNonzeroDigit(x);
+    n = x.c[0];
 
   if (sd !== UNDEFINED) {
     if (sd !== ~~sd || sd < 1 || sd > MAX_DP) {
       throw Error(INVALID + 'precision');
     }
     x = round(new Big(x), sd, rm);
+    if (!x.c[0]) x.e = 0;
     for (; x.c.length < sd;) x.c.push(0);
   }
 
-  return stringify(x, sd <= x.e || x.e <= Big.NE || x.e >= Big.PE, n);
+  return stringify(x, sd <= x.e || x.e <= Big.NE || x.e >= Big.PE, !!n);
 };
 
 

@@ -1,0 +1,17 @@
+--- baseline/StructFixture.js
++++ candidate/StructFixture.js
+@@ -18,9 +18,11 @@
+ export function localKernel(iterations, seed) {
+     let checksum = seed;
+     for (let i = 0; i <= (iterations - 1); i++) {
+-        const p = new Point(checksum + i, checksum - i);
+-        const q = new Point(p.Y + 3, p.Y);
+-        checksum = (((q.X ^ p.X) + q.Y) | 0);
++        const pX = (checksum + i) | 0;
++        const pY = (checksum - i) | 0;
++        const qX = (pY + 3) | 0;
++        const qY = pY;
++        checksum = (((qX ^ pX) + qY) | 0);
+     }
+     return checksum | 0;
+ }

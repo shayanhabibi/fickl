@@ -23,9 +23,13 @@ type MutableMap<'Key, 'Value when 'Key: equality>
     member private this.TryFindIndex(k) =
         let h = comparer.GetHashCode(k)
 
-        match hashMap.TryGetValue h with
-        | true, pairs -> true, h, pairs.FindIndex(fun pair -> comparer.Equals(k, pair.Key))
-        | false, _ -> false, h, -1
+        // Every stored bucket is an allocated array, so an undefined native get result means the hash is absent.
+        let bucket: ResizeArray<KeyValuePair<'Key, 'Value>> option =
+            Fable.Core.JsInterop.emitJsExpr (hashMap, h) "$0.get($1)"
+
+        match bucket with
+        | Some pairs -> true, h, pairs.FindIndex(fun pair -> comparer.Equals(k, pair.Key))
+        | None -> false, h, -1
 
     member this.TryFind(k) =
         match this.TryFindIndex(k) with

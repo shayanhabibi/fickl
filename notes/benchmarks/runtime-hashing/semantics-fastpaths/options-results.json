@@ -1,0 +1,22 @@
+{
+  "checks": 27,
+  "hashes": [
+    0,
+    0,
+    0,
+    5381,
+    189936718
+  ],
+  "runs": {
+    "baseline": {
+      "status": 1,
+      "stdout": "CHECKS: 1887; FAILURES: 1814,1822\n",
+      "stderr": "\r\nnode:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\nException {\r\n  message: 'F# semantic assertions failed',\r\n  innerException: undefined\r\n}\r\n\r\nNode.js v26.7.0\r\n"
+    },
+    "candidate": {
+      "status": 0,
+      "stdout": "CHECKS: 1887; FAILURES: \n",
+      "stderr": ""
+    }
+  }
+}

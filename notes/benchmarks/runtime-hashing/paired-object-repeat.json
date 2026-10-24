@@ -1,0 +1,541 @@
+{
+  "variant": "object",
+  "node": "v26.7.0",
+  "v8": "14.6.202.34-node.28",
+  "method": "11 alternating ABBA/BAAB blocks; 2 samples per variant per block",
+  "results": [
+    {
+      "name": "control-number",
+      "iterations": 5106411,
+      "baseline_ns": 4.768192376210998,
+      "candidate_ns": 4.639824330630656,
+      "median_paired_change_percent": -1.464832107082803,
+      "candidate_wins": 8,
+      "rounds": [
+        {
+          "baseline_ns": 4.845565701624875,
+          "candidate_ns": 4.774586299457682,
+          "ratio": 0.985351678929172,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 4.768192376210998,
+          "candidate_ns": 4.788656847245553,
+          "ratio": 1.0042918719338285,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 4.913431370878681,
+          "candidate_ns": 4.639824330630656,
+          "ratio": 0.9443144679155059,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 4.760192628442953,
+          "candidate_ns": 4.618116324753333,
+          "ratio": 0.9701532448832659,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 4.979661840772305,
+          "candidate_ns": 5.381499844019613,
+          "ratio": 1.0806958416246566,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 4.759663881344451,
+          "candidate_ns": 4.900574983094786,
+          "ratio": 1.0296052631578958,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 4.63658330674911,
+          "candidate_ns": 4.626595861555229,
+          "ratio": 0.9978459472130388,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 4.686442199815108,
+          "candidate_ns": 4.64958656872704,
+          "ratio": 0.9921356906760693,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 4.769318411698542,
+          "candidate_ns": 4.568081182654512,
+          "ratio": 0.9578058725224929,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 4.763365111033959,
+          "candidate_ns": 4.607747006654942,
+          "ratio": 0.9673302170311194,
+          "checksum": 713248786
+        },
+        {
+          "baseline_ns": 5.071810710105385,
+          "candidate_ns": 4.634801233194896,
+          "ratio": 0.9138356098267301,
+          "checksum": 713248786
+        }
+      ]
+    },
+    {
+      "name": "array-32",
+      "iterations": 492095,
+      "baseline_ns": 50.27840152816003,
+      "candidate_ns": 49.14935124315427,
+      "median_paired_change_percent": -1.7973731165345397,
+      "candidate_wins": 6,
+      "rounds": [
+        {
+          "baseline_ns": 50.453469350430304,
+          "candidate_ns": 49.54663225596668,
+          "ratio": 0.9820262688346546,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 48.389843424542065,
+          "candidate_ns": 48.860281043294506,
+          "ratio": 1.0097218256034663,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 51.80889868826147,
+          "candidate_ns": 49.24069539418219,
+          "ratio": 0.9504293015465861,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 48.317499669779174,
+          "candidate_ns": 49.14935124315427,
+          "ratio": 1.0172163621681647,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 50.27840152816003,
+          "candidate_ns": 48.47844420284723,
+          "ratio": 0.9642001879414428,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 49.464127861490155,
+          "candidate_ns": 49.62171938345232,
+          "ratio": 1.0031859759541997,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 53.290116745750275,
+          "candidate_ns": 49.57020494010342,
+          "ratio": 0.9301950899564598,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 50.324632438858345,
+          "candidate_ns": 52.64613540068473,
+          "ratio": 1.0461305497789155,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 49.25105924668982,
+          "candidate_ns": 48.18317601276148,
+          "ratio": 0.9783175580330262,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 48.699742935815124,
+          "candidate_ns": 48.90620713480148,
+          "ratio": 1.0042395336513064,
+          "checksum": 159788320
+        },
+        {
+          "baseline_ns": 50.34790030380306,
+          "candidate_ns": 48.0234507564597,
+          "ratio": 0.9538322445758919,
+          "checksum": 159788320
+        }
+      ]
+    },
+    {
+      "name": "object-4",
+      "iterations": 279008,
+      "baseline_ns": 89.88792436059164,
+      "candidate_ns": 75.1512501433655,
+      "median_paired_change_percent": -17.003089455673283,
+      "candidate_wins": 10,
+      "rounds": [
+        {
+          "baseline_ns": 98.56688697098329,
+          "candidate_ns": 76.59242745727772,
+          "ratio": 0.777060428821552,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 91.50364864089926,
+          "candidate_ns": 73.2007684367468,
+          "ratio": 0.7999764984674977,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 87.53996301181249,
+          "candidate_ns": 74.85609731620514,
+          "ratio": 0.8551077101335328,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 90.54704524601426,
+          "candidate_ns": 75.1512501433655,
+          "ratio": 0.8299691054432672,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 89.88792436059164,
+          "candidate_ns": 73.36671349925469,
+          "ratio": 0.8162021096953916,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 88.27775547654568,
+          "candidate_ns": 74.96971413006158,
+          "ratio": 0.8492480775633235,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 94.82685084298697,
+          "candidate_ns": 73.30470810872833,
+          "ratio": 0.7730374620381023,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 113.51251577015739,
+          "candidate_ns": 79.66904174790685,
+          "ratio": 0.701852489193548,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 87.23298256680818,
+          "candidate_ns": 75.31934568184406,
+          "ratio": 0.863427381084443,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 87.36882096570727,
+          "candidate_ns": 77.16122835187474,
+          "ratio": 0.8831666434203219,
+          "checksum": -1222256640
+        },
+        {
+          "baseline_ns": 87.04929607753195,
+          "candidate_ns": 87.14821797224427,
+          "ratio": 1.0011363893698142,
+          "checksum": -1222256640
+        }
+      ]
+    },
+    {
+      "name": "object-16",
+      "iterations": 117300,
+      "baseline_ns": 209.2502131287293,
+      "candidate_ns": 165.46973572037473,
+      "median_paired_change_percent": -22.10832734095174,
+      "candidate_wins": 11,
+      "rounds": [
+        {
+          "baseline_ns": 209.2502131287293,
+          "candidate_ns": 162.98849104859067,
+          "ratio": 0.7789167265904826,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 204.87212276214876,
+          "candidate_ns": 177.37468030690462,
+          "ratio": 0.8657824105861003,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 225.66879795396335,
+          "candidate_ns": 190.07971014492622,
+          "ratio": 0.8422950441899489,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 217.34185848252423,
+          "candidate_ns": 165.46973572037473,
+          "ratio": 0.7613339504671606,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 208.7080136402406,
+          "candidate_ns": 162.7003410059675,
+          "ratio": 0.7795596257574536,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 205.5289855072457,
+          "candidate_ns": 169.17817561807246,
+          "ratio": 0.8231353606915375,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 211.878942881504,
+          "candidate_ns": 162.09676044330797,
+          "ratio": 0.765044219301975,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 214.45609548167306,
+          "candidate_ns": 160.88576300084947,
+          "ratio": 0.7502037311622994,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 222.01065643648434,
+          "candidate_ns": 166.39641943733784,
+          "ratio": 0.7494974435379982,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 209.02046035805435,
+          "candidate_ns": 161.88491048592775,
+          "ratio": 0.7744931295654842,
+          "checksum": -889423712
+        },
+        {
+          "baseline_ns": 203.190537084398,
+          "candidate_ns": 170.23273657289002,
+          "ratio": 0.8377985462097652,
+          "checksum": -889423712
+        }
+      ]
+    },
+    {
+      "name": "object-64",
+      "iterations": 36058,
+      "baseline_ns": 669.5726329801994,
+      "candidate_ns": 534.9672749459111,
+      "median_paired_change_percent": -19.139357023731364,
+      "candidate_wins": 11,
+      "rounds": [
+        {
+          "baseline_ns": 673.7672638526795,
+          "candidate_ns": 525.7654334683061,
+          "ratio": 0.7803368635957738,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 669.5726329801994,
+          "candidate_ns": 526.2216429086545,
+          "ratio": 0.7859067366097323,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 732.3797770258958,
+          "candidate_ns": 534.9672749459111,
+          "ratio": 0.7304506373979186,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 698.9600088745958,
+          "candidate_ns": 589.7137944422852,
+          "ratio": 0.843701766846133,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 655.2429419268929,
+          "candidate_ns": 532.7888402018953,
+          "ratio": 0.8131164887257036,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 650.1774918187409,
+          "candidate_ns": 525.7377003716103,
+          "ratio": 0.8086064297626864,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 652.859282267464,
+          "candidate_ns": 582.554495534966,
+          "ratio": 0.8923124957520395,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 649.3274724055691,
+          "candidate_ns": 523.2292417771323,
+          "ratio": 0.8058017934136075,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 639.6056353652548,
+          "candidate_ns": 554.5177214487753,
+          "ratio": 0.8669681609858098,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 670.6223306894501,
+          "candidate_ns": 543.4064562649038,
+          "ratio": 0.810301762105418,
+          "checksum": -313565248
+        },
+        {
+          "baseline_ns": 794.8097509567962,
+          "candidate_ns": 553.4361306783566,
+          "ratio": 0.6963127088112938,
+          "checksum": -313565248
+        }
+      ]
+    },
+    {
+      "name": "nested",
+      "iterations": 155764,
+      "baseline_ns": 159.56800030815796,
+      "candidate_ns": 143.20671015125473,
+      "median_paired_change_percent": -10.5999761604337,
+      "candidate_wins": 9,
+      "rounds": [
+        {
+          "baseline_ns": 156.45110551860597,
+          "candidate_ns": 144.655376081767,
+          "ratio": 0.9246043714568948,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 162.87813615469616,
+          "candidate_ns": 143.20671015125473,
+          "ratio": 0.8792261105888504,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 167.60098610718597,
+          "candidate_ns": 137.84378932230942,
+          "ratio": 0.8224521378063616,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 159.56800030815796,
+          "candidate_ns": 142.5791582137088,
+          "ratio": 0.8935322742552374,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 190.5234842453968,
+          "candidate_ns": 138.27264322950273,
+          "ratio": 0.7257511785340107,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 169.37418145399718,
+          "candidate_ns": 182.8227318250704,
+          "ratio": 1.0794014191278964,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 157.1749569862123,
+          "candidate_ns": 146.97812074677094,
+          "ratio": 0.9351242943852955,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 158.10842043090992,
+          "candidate_ns": 160.32266762538399,
+          "ratio": 1.0140046127109446,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 170.31920084230183,
+          "candidate_ns": 161.1344726637738,
+          "ratio": 0.9460734424944129,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 156.19334377648448,
+          "candidate_ns": 139.63688657199287,
+          "ratio": 0.894000238395663,
+          "checksum": -1813276972
+        },
+        {
+          "baseline_ns": 155.88069130222675,
+          "candidate_ns": 135.29955573816716,
+          "ratio": 0.8679686663426698,
+          "checksum": -1813276972
+        }
+      ]
+    },
+    {
+      "name": "hash-lookup",
+      "iterations": 117229,
+      "baseline_ns": 216.75737232254738,
+      "candidate_ns": 214.43414172261276,
+      "median_paired_change_percent": -3.837632304288574,
+      "candidate_wins": 7,
+      "rounds": [
+        {
+          "baseline_ns": 221.9527591295702,
+          "candidate_ns": 205.7204275392598,
+          "ratio": 0.9268658265210643,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 244.73509114638614,
+          "candidate_ns": 204.5556133721193,
+          "ratio": 0.8358246151540489,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 234.39251379777795,
+          "candidate_ns": 267.5536769911872,
+          "ratio": 1.1414770576760784,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 216.34237262111066,
+          "candidate_ns": 218.58968344010526,
+          "ratio": 1.0103877515614124,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 210.03335352173428,
+          "candidate_ns": 215.9832464663186,
+          "ratio": 1.0283283242628825,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 270.0658540122312,
+          "candidate_ns": 219.17273029711174,
+          "ratio": 0.8115529121544757,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 213.6881658975145,
+          "candidate_ns": 204.33766388862716,
+          "ratio": 0.9562423030324858,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 216.0374139504706,
+          "candidate_ns": 214.43414172261276,
+          "ratio": 0.9925787288482104,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 211.87931313923718,
+          "candidate_ns": 223.48267067022897,
+          "ratio": 1.0547639944602172,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 217.7238567248786,
+          "candidate_ns": 209.3684156650617,
+          "ratio": 0.9616236769571143,
+          "checksum": 14944446
+        },
+        {
+          "baseline_ns": 216.75737232254738,
+          "candidate_ns": 206.91424476878296,
+          "ratio": 0.9545891913696145,
+          "checksum": 14944446
+        }
+      ]
+    }
+  ],
+  "sink": -235633664
+}

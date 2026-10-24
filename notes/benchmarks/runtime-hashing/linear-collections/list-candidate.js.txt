@@ -1,0 +1,13 @@
+export function append(xs, ys) {
+    const root = FSharpList_get_Empty();
+    let node = root;
+    let rest = xs;
+    while (!FSharpList__get_IsEmpty(rest)) {
+        const next = new FSharpList(head(rest), undefined);
+        node.tail = next;
+        node = next;
+        rest = FSharpList__get_Tail(rest);
+    }
+    node.tail = ys;
+    return FSharpList__get_Tail(root);
+}

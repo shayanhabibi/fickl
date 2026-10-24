@@ -14,12 +14,13 @@ export function tryParse(str: string, defValue: FSharpRef<number>): boolean {
 }
 
 export function parse(str: string): number {
-  const defValue = new FSharpRef(0);
-  if (tryParse(str, defValue)) {
-    return defValue.contents;
-  } else {
-    throw new Exception(`The input string ${str} was not in a correct format.`);
+  if (str != null && /\S/.test(str)) {
+    const v = +str.replace("_", "");
+    if (!Number.isNaN(v)) {
+      return v;
+    }
   }
+  throw new Exception(`The input string ${str} was not in a correct format.`);
 }
 
 // JS Number.isFinite function evals false for NaN

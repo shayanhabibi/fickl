@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "exit_code": 1,
+    "stdout": "CHECKS: 1887; FAILURES: 1814,1822"
+  },
+  "array": {
+    "exit_code": 1,
+    "stdout": "CHECKS: 1887; FAILURES: 1814,1822"
+  },
+  "record": {
+    "exit_code": 1,
+    "stdout": "CHECKS: 1887; FAILURES: 1814,1822"
+  },
+  "object": {
+    "exit_code": 1,
+    "stdout": "CHECKS: 1887; FAILURES: 1814,1822"
+  },
+  "combined": {
+    "exit_code": 1,
+    "stdout": "CHECKS: 1887; FAILURES: 1814,1822"
+  }
+}

@@ -1,0 +1,25 @@
+--- baseline/MutableMap.js
++++ candidate/MutableMap.js
+@@ -203,17 +203,11 @@
+ }
+ function Dictionary__TryFindIndex_2B595(this$, k) {
+     const h = this$.comparer.GetHashCode(k) | 0;
+-    let matchValue;
+-    let outArg = defaultOf();
+-    matchValue = [tryGetValue(this$.hashMap, h, new FSharpRef(() => outArg, (v) => {
+-            outArg = v;
+-        })), outArg];
+-    if (matchValue[0]) {
+-        return [true, h, matchValue[1].findIndex((pair) => this$.comparer.Equals(k, pair[0]))];
+-    }
+-    else {
+-        return [false, h, -1];
+-    }
++    const bucket = this$.hashMap.get(h);
++    if (bucket !== undefined) {
++        return [true, h, bucket.findIndex((pair) => this$.comparer.Equals(k, pair[0]))];
++    }
++    return [false, h, -1];
+ }
+ export function Dictionary__TryFind_2B595(this$, k) {
+     const matchValue = Dictionary__TryFindIndex_2B595(this$, k);

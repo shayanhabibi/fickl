@@ -1,0 +1,5 @@
+{
+  "exitCode": 0,
+  "stdout": "OBSERVATIONS=[|1; 9; 7; 7; 4; 5; 6; 8; 9|]\nKERNEL=0,123\nKERNEL=1,128\nKERNEL=2,130\nKERNEL=100,39905\nKERNEL=10000,1140139363\n",
+  "stderr": "[rtk] /!\\ No hook installed \u00e2\u20ac\u201d run `rtk init -g` for automatic token savings\n"
+}

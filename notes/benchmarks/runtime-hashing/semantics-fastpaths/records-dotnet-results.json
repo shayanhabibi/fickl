@@ -1,0 +1,5 @@
+{
+  "exit_code": 0,
+  "stdout": "distinctEqual=true reference=false\nnanScalar=false nanRecordSelf=false nanRecordCopy=false objectEquals=true\ncustomSelf=false calls=1\nnestedCustomSelf=false callsDelta=1\nshallowBefore=true\nshallowAfter=false\nstringFilterUtf16=[|55357; 56832|] length=2\nstringFilterNull=result:\"\"\n",
+  "stderr": "[rtk] /!\\ No hook installed \u00e2\u20ac\u201d run `rtk init -g` for automatic token savings\n"
+}

@@ -1,0 +1,12 @@
+{
+  "source": "C:\\Users\\shaya\\RiderProjects\\fable\\src\\fable-library-ts\\String.ts",
+  "sha256": "587c2a5eebcc926df008ba182ec4a83ba273d28e96eb18f6dca0d8ac81df30dc",
+  "node": "v26.7.0",
+  "v8": "14.6.202.34-node.28",
+  "checks": 6044,
+  "status": "passed",
+  "utf16Trace": [
+    55357,
+    56832
+  ]
+}
