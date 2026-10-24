@@ -75,7 +75,7 @@ let knownCliArgs () =
         [ "--silent" ], [ "Don't print any log during compilation" ]
         [ "--typedArrays" ], [ "Compile numeric arrays as JS typed arrays (default is true)" ]
         [ "--watch" ], [ "Alias of watch command" ]
-        [ "--watchDelay" ], [ "Delay in ms before recompiling after a file changes (default 200)" ]
+        [ "--watchDelay" ], [ "Delay in ms before recompiling after a file changes (default 50)" ]
         [], []
         [ "--run" ], [ "The command after the argument will be executed after compilation" ]
         [ "--runFast" ], [ "The command after the argument will be executed BEFORE compilation" ]
@@ -405,7 +405,7 @@ type Runner =
 
             let watchDelay =
                 if watch then
-                    args.Value("--watchDelay") |> Option.map int |> Option.defaultValue 200 |> Some
+                    args.Value("--watchDelay") |> Option.map int |> Option.defaultValue 50 |> Some
                 else
                     None
 

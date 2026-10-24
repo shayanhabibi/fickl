@@ -1535,12 +1535,22 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
                     let newProjCracked =
                         ProjectCracked.Init({ cliArgs with NoCache = true }, evaluateOnly = true)
 
-                    // If only source files have changed, keep the project checker to speed up recompilation
+                    // Compiler options affect every source, even when its contents are unchanged.
+                    let compilerOptionsChanged =
+                        oldProjCracked.ProjectOptions.OtherOptions
+                        <> newProjCracked.ProjectOptions.OtherOptions
+
                     let fableCompiler =
-                        if oldProjCracked.ProjectOptions.OtherOptions = newProjCracked.ProjectOptions.OtherOptions then
-                            Some fableCompiler
-                        else
+                        if compilerOptionsChanged then
                             None
+                        else
+                            Some fableCompiler
+
+                    let changes =
+                        if compilerOptionsChanged then
+                            HashSet newProjCracked.SourceFilePaths :> ISet<_>
+                        else
+                            changes
 
                     let oldFiles =
                         oldProjCracked.SourceFiles

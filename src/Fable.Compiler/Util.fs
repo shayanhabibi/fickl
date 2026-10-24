@@ -713,17 +713,30 @@ module Observable =
                 let events = ResizeArray()
                 let timer = new Timers.Timer(float ms, AutoReset = false)
 
+                // Source callbacks and the timer callback run on different threads: an event added
+                // between the copy and the clear was lost, and Timer.Start/Stop are not thread-safe.
                 timer.Elapsed.Add(fun _ ->
-                    let evs = events.ToArray()
-                    events.Clear()
+                    let evs =
+                        lock
+                            events
+                            (fun () ->
+                                let evs = events.ToArray()
+                                events.Clear()
+                                evs
+                            )
+
                     w.OnNext(evs)
                 )
 
                 let disp =
                     obs.Subscribe(fun v ->
-                        events.Add(v)
-                        timer.Stop()
-                        timer.Start()
+                        lock
+                            events
+                            (fun () ->
+                                events.Add(v)
+                                timer.Stop()
+                                timer.Start()
+                            )
                     )
 
                 { new IDisposable with
