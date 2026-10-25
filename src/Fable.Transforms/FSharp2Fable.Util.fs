@@ -2682,6 +2682,41 @@ module Util =
                 || isPojoDefinedByConsArgsFSharpEntity ent
             )
 
+    // fickl: isMangledAbstractEntity for a Fable entity, so TypeScript declarations name abstract members
+    // as the JavaScript calls them
+    let isMangledAbstractFableEntity (ent: Fable.Entity) =
+        match ent.FullName with
+        | fullName when fullName.StartsWith("System.", StringComparison.Ordinal) ->
+            match fullName with
+            | Types.object
+            | Types.idisposable
+            | Types.iobservableGeneric
+            | Types.iobserverGeneric
+            | Types.ienumerableGeneric
+            | Types.icomparer
+            | Types.icomparerGeneric
+            | Types.iequalityComparer
+            | Types.iequalityComparerGeneric
+            | Types.icomparable
+            | Types.icomparableGeneric -> false
+            | _ -> true
+        | fullName when fullName.StartsWithAny("Fable.Core.JS.", "Fable.Core.Py.") -> false
+        | _ when ent.IsInterface ->
+            ent.Attributes
+            |> Seq.tryFind (fun att -> att.Entity.FullName = Atts.mangle)
+            |> Option.map (fun att ->
+                match att.ConstructorArgs with
+                | (:? bool as value) :: _ -> value
+                | _ -> true
+            )
+            |> Option.defaultValue false
+        | _ ->
+            not (
+                isGlobalOrImportedEntity ent
+                || (ent |> hasAttribute Atts.attachMembers)
+                || isPojoDefinedByConsArgsEntity ent
+            )
+
     let getMangledAbstractMemberName (ent: FSharpEntity) memberName overloadHash =
         // TODO: Error if entity doesn't have fullName?
         let entityName = defaultArg ent.TryFullName ""

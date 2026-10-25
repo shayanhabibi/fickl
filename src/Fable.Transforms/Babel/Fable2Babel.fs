@@ -4552,11 +4552,9 @@ but thanks to the optimisation done below we get
             hasAttribute Atts.callableInterface ent.Attributes
             && memb.CompiledName = "Invoke"
 
-        // TODO: replicate the mangling logic from FSharp2Fable.Util.getAbstractMemberInfo
-        // let info = FSharp2Fable.Util.getAbstractMemberInfo com ent memb
-        let isMangled =
-            (ent.IsAbstractClass && not (hasAttribute Atts.attachMembers ent.Attributes))
-            || hasAttribute Atts.mangle ent.Attributes
+        // fickl: the mangling logic of FSharp2Fable.Util.getAbstractMemberInfo, so the members are named as
+        // the JavaScript calls them
+        let isMangled = FSharp2Fable.Util.isMangledAbstractFableEntity ent
 
         let isGetter = memb.IsGetter
         let isSetter = memb.IsSetter
@@ -4565,7 +4563,7 @@ but thanks to the optimisation done below we get
             if isMangled then
                 getMangledMemberName ent memb
             elif isGetter || isSetter then
-                memb.CompiledName |> Naming.removeGetSetPrefix
+                memb.DisplayName
             else
                 memb.CompiledName
 

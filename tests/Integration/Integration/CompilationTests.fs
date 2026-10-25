@@ -168,4 +168,15 @@ let declarationTests =
                     (File.ReadAllText actual |> normalize)
                     (File.ReadAllText expected |> normalize)
                     $"{Path.GetFileName actual} differs from {Path.GetFileName expected}"
+
+            // Mangled members are the quoted keys: the declarations must name those the JavaScript calls
+            let mangledKeys pattern file =
+                Regex.Matches(File.ReadAllText(Path.Combine(outDir, file)), pattern)
+                |> Seq.map _.Groups[1].Value
+                |> Set.ofSeq
+
+            Expect.equal
+                (mangledKeys "\"(Mangling\\.[^\"]+)\"\\(" "Mangling.d.ts")
+                (mangledKeys "\\[\"(Mangling\\.[^\"]+)\"\\]" "Mangling.js")
+                "Mangling.d.ts names members other than those Mangling.js calls"
         })
