@@ -1125,7 +1125,14 @@ let private getFilesToCompile
                 let wasDeleted =
                     (path.EndsWith(".fs") || path.EndsWith(".fsx")) && not (IO.File.Exists outPath)
 
-                wasDeleted)
+                // fickl: also when declarations were asked for and this file has none yet
+                let lacksDeclarations () =
+                    Fickl.Declarations.isEnabled ()
+                    && state.CliArgs.CompilerOptions.Language = JavaScript
+                    && IO.File.Exists outPath
+                    && not (IO.File.Exists(Fickl.Declarations.getPath outPath))
+
+                wasDeleted || lacksDeclarations ())
         )
 
     Log.verbose (lazy $"""Files to compile:{Log.newLine}    {filesToCompile |> String.concat $"{Log.newLine}    "}""")
@@ -1149,7 +1156,14 @@ let private areCompiledFilesUpToDate (state: State) (filesToCompile: string[]) =
                 if IO.File.Exists(outPath) then
                     foundCompiledFile <- true
 
-                    let upToDate = IO.File.GetLastWriteTime(source) < IO.File.GetLastWriteTime(outPath)
+                    let upToDate =
+                        IO.File.GetLastWriteTime(source) < IO.File.GetLastWriteTime(outPath)
+                        // fickl: declarations that were asked for must exist too
+                        && not (
+                            Fickl.Declarations.isEnabled ()
+                            && state.CliArgs.CompilerOptions.Language = JavaScript
+                            && not (IO.File.Exists(Fickl.Declarations.getPath outPath))
+                        )
 
                     if not upToDate then
                         Log.verbose (

@@ -179,10 +179,10 @@ module Js =
 
     let compileFile (com: Compiler) (cliArgs: CliArgs) pathResolver isSilent (outPath: string) =
         async {
-            let babel =
-                FSharp2Fable.Compiler.transformFile com
-                |> FableTransforms.transformFile com
-                |> Fable2Babel.Compiler.transformFile com
+            let file =
+                FSharp2Fable.Compiler.transformFile com |> FableTransforms.transformFile com
+
+            let babel = Fable2Babel.Compiler.transformFile com file
 
             if not (isSilent || babel.IsEmpty) then
                 use writer = new BabelWriter(com, cliArgs, pathResolver, com.CurrentFile, outPath)
@@ -190,6 +190,25 @@ module Js =
                 do! BabelPrinter.run writer babel
                 // TODO: Check also if file has actually changed with other printers
                 do! writer.WriteToFileIfChanged()
+
+            // fickl: the TypeScript declarations of this JavaScript, from the same Fable AST. A file of
+            // interfaces has no JavaScript but still declares types.
+            if
+                not isSilent
+                && com.Options.Language = JavaScript
+                && Fickl.Declarations.isEnabled ()
+            then
+                let declarations = Fickl.Declarations.transformFile com babel file
+
+                if not declarations.IsEmpty then
+                    let dtsPath = Fickl.Declarations.getPath outPath
+                    let cliArgs = { cliArgs with SourceMaps = false }
+
+                    use dtsWriter =
+                        new BabelWriter(com, cliArgs, pathResolver, com.CurrentFile, dtsPath)
+
+                    do! Fickl.Declarations.print dtsWriter declarations
+                    do! dtsWriter.WriteToFileIfChanged()
         }
 
 module Python =

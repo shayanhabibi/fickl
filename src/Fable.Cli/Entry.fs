@@ -94,6 +94,11 @@ let knownCliArgs () =
             "Type-check package sources instead of reusing them from Fickl's package cache"
             "(JavaScript and TypeScript; the cache is keyed by package contents and options)"
         ]
+        [ "--declaration" ],
+        [
+            "Also write a TypeScript declaration file (.d.ts) next to each JavaScript file,"
+            "describing what that JavaScript exports (JavaScript only)"
+        ]
         [ "--server" ],
         [
             "Compile through a background compile server that keeps check results between compilations,"
@@ -593,6 +598,7 @@ let private execute (argv: string array) (inServer: bool) =
 
         Timings.setEnabled (args.FlagEnabled "--timings")
         PackageCache.setEnabled (not (args.FlagEnabled "--noPackageCache"))
+        Fickl.Declarations.setEnabled (args.FlagEnabled "--declaration")
 
         // Override the logger now that we know the verbosity level
         do

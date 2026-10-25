@@ -1,0 +1,22 @@
+import { Shape_$union, NumberOrText, Point } from "./Shapes.js";
+import { float64, int32 } from "./fable_modules/fable-library-js.5.24.0/Int32.js";
+import { FSharpList } from "./fable_modules/fable-library-js.5.24.0/List.js";
+import { Option } from "./fable_modules/fable-library-js.5.24.0/Option.js";
+import { TypeInfo } from "./fable_modules/fable-library-js.5.24.0/Reflection.js";
+import { INamed } from "./Contracts.js";
+export declare const origin: Point;
+export declare let counter: { (): int32, (value: int32): void };
+export declare function describe(color: string, value: NumberOrText): string;
+export declare function scale(factor: float64, shapes: FSharpList<Shape_$union>): FSharpList<Shape_$union>;
+export declare function firstOr<T>(fallback: T, items: FSharpList<T>): T;
+export declare class Greeter {
+    readonly name: string;
+    readonly greeting: Option<string>;
+    constructor(name: string, greeting?: string);
+}
+export declare function Greeter_$reflection(): TypeInfo;
+export declare function Greeter_$ctor_27AED5E3(name: string, greeting?: string): Greeter;
+export declare function Greeter__Greet(_: Greeter): string;
+export declare function Greeter__Greet_Z524259A4(_: Greeter, times: int32): string;
+export declare function makeAdder(a: int32, b: int32): int32;
+export declare function nameOf(named: INamed): string;

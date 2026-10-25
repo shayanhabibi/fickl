@@ -23,6 +23,20 @@ let private runDotnet (arguments: string list) =
     if child.ExitCode <> 0 then
         failwith $"dotnet {arguments.Head} failed with exit code {child.ExitCode}"
 
+/// fable-library-js ships declaration files, so the .d.ts files written by `--declaration` can import its types.
+/// The TypeScript build of the library is its source; tsc writes declarations only, next to the JavaScript.
+let private emitLibraryDeclarations () =
+    let tsBuildDir = Path.Combine(Paths.root, "temp", "fable-library-ts")
+    let jsOutDir = Path.Combine(Paths.root, "temp", "fable-library-js")
+
+    SimpleExec.Command.Run(
+        "npx",
+        $"tsc --project \"{tsBuildDir}\" --declaration --emitDeclarationOnly --outDir \"{jsOutDir}\"",
+        workingDirectory = Paths.root
+    )
+    // The bundled big.js has a hand-written declaration file, which tsc reads but does not emit
+    File.Copy(Path.Combine(tsBuildDir, "lib", "big.d.ts"), Path.Combine(jsOutDir, "lib", "big.d.ts"), true)
+
 let private version () =
     XDocument.Load(Path.Combine(Paths.root, "src", "Fickl.Branding.targets")).Descendants(XName.Get "FicklVersion")
     |> Seq.exactlyOne
@@ -79,6 +93,7 @@ let publish =
                         // CLI payloads are generated files under temp; never rely on leftover build outputs.
                         BuildFableLibraryJavaScript().Run(true)
                         BuildFableLibraryTypeScript().Run(true)
+                        emitLibraryDeclarations ()
                         BuildFableLibraryRust().Run(true)
                         BuildFableLibraryDart().Run(true)
                         BuildFableLibraryBeam().Run(true)
@@ -133,6 +148,14 @@ let publish =
                                     || id.StartsWith("Fickl.linux-", StringComparison.Ordinal)
                                     || id.StartsWith("Fickl.osx-", StringComparison.Ordinal)
                                 then
+                                    if
+                                        not (
+                                            archive.Entries
+                                            |> Seq.exists (fun e -> e.FullName = "fable-library-js/List.d.ts")
+                                        )
+                                    then
+                                        failwith $"Missing fable-library-js declarations in {path}"
+
                                     for language in [ "js"; "ts"; "rust"; "dart"; "beam"; "php" ] do
                                         let prefix = $"fable-library-{language}/"
 

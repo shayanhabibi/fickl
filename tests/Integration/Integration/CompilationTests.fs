@@ -127,3 +127,45 @@ let tests =
 
     |> Seq.toList
     |> testList "Compilation"
+
+/// fickl: `--declaration` writes a .d.ts next to each JavaScript file. Each `<file>.d.ts.expected` here is
+/// compared with the declaration file compiled from the project in the same folder.
+/// The switch is process-wide, so Main runs this after the parallel compilations rather than among them.
+let declarationTests =
+    testCaseAsync
+        "Declarations"
+        (async {
+            let dir = Path.Combine(__SOURCE_DIRECTORY__, "declarations")
+            let outDir = Path.Combine(Path.GetTempPath(), "fickl-declarations-test")
+
+            if Directory.Exists outDir then
+                Directory.Delete(outDir, true)
+
+            let exitCode =
+                Fable.Cli.Entry.main
+                    [|
+                        Path.Combine(dir, "declarations.fsproj")
+                        "--cwd"
+                        $"'%s{dir}'"
+                        "--outDir"
+                        outDir
+                        "--exclude"
+                        "Fable.Core"
+                        "--declaration"
+                        "--noCache"
+                    |]
+
+            Expect.equal exitCode 0 "Expected exit code to be 0"
+
+            let normalize content =
+                Regex.Replace(content, @"(/fable-library-js)[^/]+", "$1").ReplaceLineEndings().Trim()
+
+            for expected in Directory.GetFileSystemEntries(dir, "*.d.ts.expected") do
+                let actual = Path.Combine(outDir, Path.GetFileNameWithoutExtension expected)
+                Expect.isTrue (File.Exists actual) $"No declaration file was produced for {expected}"
+
+                Expect.equal
+                    (File.ReadAllText actual |> normalize)
+                    (File.ReadAllText expected |> normalize)
+                    $"{Path.GetFileName actual} differs from {Path.GetFileName expected}"
+        })

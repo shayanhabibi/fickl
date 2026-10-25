@@ -1,0 +1,56 @@
+import { int32, float64 } from "./fable_modules/fable-library-js.5.24.0/Int32.js";
+import { Record, Union } from "./fable_modules/fable-library-js.5.24.0/Types.js";
+import { TypeInfo } from "./fable_modules/fable-library-js.5.24.0/Reflection.js";
+import { IComparable, IEquatable } from "./fable_modules/fable-library-js.5.24.0/Util.js";
+export type Color = 
+    | "red"
+    | "dark-blue"
+export type NumberOrText = 
+    | float64
+    | string
+export type Shape_$union = 
+    | Shape<0>
+    | Shape<1>
+    | Shape<2>
+export type Shape_$cases = {
+    0: ["Circle", [float64]],
+    1: ["Rect", [float64, float64]],
+    2: ["Empty", []]
+}
+/**
+ * A plain union
+ */
+export declare class Shape<Tag extends keyof Shape_$cases> extends Union<Tag, Shape_$cases[Tag][0]> {
+    constructor(tag: Tag, fields: Shape_$cases[Tag][1]);
+    readonly tag: Tag;
+    readonly fields: Shape_$cases[Tag][1];
+    cases(): string[];
+    static readonly Empty: Shape<2>;
+}
+export declare function Shape_$reflection(): TypeInfo;
+export declare class Point extends Record implements IEquatable<Point>, IComparable<Point> {
+    readonly X: float64;
+    readonly Y: float64;
+    constructor(X: float64, Y: float64);
+}
+export declare function Point_$reflection(): TypeInfo;
+export interface IArea {
+    Area(): float64
+}
+export declare class Square implements IArea {
+    readonly side: float64;
+    "Name@": string;
+    constructor(side: float64);
+    Area(): float64;
+}
+export declare function Square_$reflection(): TypeInfo;
+export declare function Square_$ctor_5E38073B(side: float64): Square;
+export declare function Square__get_Side(_: Square): float64;
+export declare function Square__get_Name(__: Square): string;
+export declare function Square__set_Name_Z721C83C5(__: Square, v: string): void;
+export declare function Square_get_Unit(): Square;
+declare class Hidden extends Record implements IEquatable<Hidden>, IComparable<Hidden> {
+    readonly Secret: int32;
+    constructor(Secret: int32);
+}
+export declare function area(shape: Shape_$union): float64;

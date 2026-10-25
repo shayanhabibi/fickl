@@ -47,6 +47,8 @@
     <ProjectReference Include="..\Fable.Compiler\Fable.Compiler.fsproj" />
     <ProjectReference Include="..\Fable.Transforms\Fable.Transforms.fsproj" />
     <ProjectReference Include="..\Fable.Transforms\Babel\Fable.Transforms.Babel.fsproj" />
+    <!-- fickl: TypeScript declarations for JavaScript output (`declaration`) -->
+    <ProjectReference Include="..\Fickl.Declarations\Fickl.Declarations.fsproj" />
     <ProjectReference Include="..\Fable.Transforms\Python\Fable.Transforms.Python.fsproj" />
     <ProjectReference Include="..\Fable.Transforms\Rust\Fable.Transforms.Rust.fsproj" />
     <ProjectReference Include="..\Fable.Transforms\Dart\Fable.Transforms.Dart.fsproj" />

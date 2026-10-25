@@ -160,6 +160,8 @@ let private computeKey (cliArgs: CliArgs) (response: CrackerResponse) (sources: 
     add $"lib {cliArgs.FableLibraryPath} exclude %A{cliArgs.Exclude} replace %A{cliArgs.Replace}"
     // Python declares a library's exports (__all__), in package sources too
     add $"output {response.OutputType}"
+    // fickl: an entry holds the declaration files of its JavaScript when they were asked for
+    add $"declarations {Fickl.Declarations.isEnabled ()}"
 
     for option in response.ProjectOptions.OtherOptions do
         if option.StartsWith("-r:", StringComparison.Ordinal) then
@@ -663,6 +665,12 @@ let save (cliArgs: CliArgs) (compiled: CompiledFile list) =
                                 if File.Exists f.OutPath then
                                     Directory.CreateDirectory(IO.Path.GetDirectoryName outPath) |> ignore
                                     File.Copy(f.OutPath, outPath, true)
+
+                                    // fickl: restoring an entry copies every file, its declarations included
+                                    let dtsPath = Fickl.Declarations.getPath f.OutPath
+
+                                    if Fickl.Declarations.isEnabled () && File.Exists dtsPath then
+                                        File.Copy(dtsPath, Fickl.Declarations.getPath outPath, true)
 
                                 f.File,
                                 {

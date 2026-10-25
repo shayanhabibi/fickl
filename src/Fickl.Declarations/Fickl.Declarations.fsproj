@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- TypeScript declaration files for Fable's JavaScript output; used by Fable.Cli's `declaration` switch -->
+  <PropertyGroup>
+    <!-- Same settings as the Fable.Transforms projects it extends -->
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+    <TargetFramework>net10.0</TargetFramework>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Declarations.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Fable.AST/Fable.AST.fsproj" />
+    <ProjectReference Include="../Fable.Transforms/Fable.Transforms.fsproj" />
+    <ProjectReference Include="../Fable.Transforms/Babel/Fable.Transforms.Babel.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="../../lib/fcs/FSharp.Core.dll" />
+    <Reference Include="../../lib/fcs/FSharp.Compiler.Service.dll" />
+  </ItemGroup>
+</Project>
