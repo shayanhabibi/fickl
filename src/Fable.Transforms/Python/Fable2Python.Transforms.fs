@@ -5436,6 +5436,13 @@ let transformImports (_com: IPythonCompiler) (imports: Import list) : Statement 
                 | None, { Name = name } :: _ -> name.Name
                 | _ -> ""
 
+            // fickl: files precompiled by the package cache record where they were compiled, which may be another
+            // project's fable_modules (the printed import is this project's): order them as this project's copies
+            let name =
+                match name.IndexOf("/" + Fable.Naming.fableModules + "/", StringComparison.Ordinal) with
+                | -1 -> name
+                | i -> "." + name.Substring(i)
+
             match name with
             | name when name.StartsWith(".", StringComparison.Ordinal) -> "D" + name
             | name when name.StartsWith("__", StringComparison.Ordinal) -> "A" + name
