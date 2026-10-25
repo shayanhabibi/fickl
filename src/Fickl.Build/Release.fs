@@ -150,6 +150,11 @@ let publish =
                                 if value "id" <> id || value "version" <> releaseVersion then
                                     failwith $"Unexpected package identity: {path}"
 
+                                // A PackagePath ending in `\` gains a second separator when packed on Linux
+                                match archive.Entries |> Seq.tryFind (fun e -> e.FullName.Contains "//") with
+                                | Some entry -> failwith $"Malformed entry {entry.FullName} in {path}"
+                                | None -> ()
+
                                 for dependency in
                                     document.Descendants() |> Seq.filter (fun e -> e.Name.LocalName = "dependency") do
                                     let dependencyId = dependency.Attribute(XName.Get "id").Value
