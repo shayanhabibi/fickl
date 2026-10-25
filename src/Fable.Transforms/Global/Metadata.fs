@@ -49,4 +49,7 @@ let isSystemPackage (pkgName: string) =
     || pkgName = "NETStandard.Library"
     || pkgName = "FSharp.Core"
     || pkgName = "Fable.Core"
+    // fickl: Fickl.Core holds only attributes the compiler reads, so like Fable.Core it stays a reference instead of
+    // being compiled from its sources; a compiled assembly that uses its attributes must still be able to find them
+    || pkgName = "Fickl.Core"
     || pkgName = "testhost"

@@ -705,11 +705,47 @@ module Helpers =
 
         sanitizedName
 
+    /// fickl: whether `[<NoOverloadSuffix>]` is on the member, or on the property it accesses
+    let hasNoOverloadSuffixOnMember (memb: FSharpMemberOrFunctionOrValue) =
+        let has (atts: FSharpAttribute seq) =
+            atts
+            |> Seq.exists (fun att -> att.AttributeType.TryFullName = Some Atts.ficklNoOverloadSuffix)
+
+        has memb.Attributes
+        || (memb.IsPropertyGetterMethod || memb.IsPropertySetterMethod)
+           && memb.DeclaringEntity
+              |> Option.exists (fun ent ->
+                  ent.MembersFunctionsAndValues
+                  |> Seq.exists (fun prop ->
+                      prop.IsProperty && prop.DisplayName = memb.DisplayName && has prop.Attributes
+                  )
+              )
+
+    /// fickl: the methods of the entity that share the member's compiled name, the member included. Properties are
+    /// left out: FCS lists a property beside its accessors.
+    let getOverloads (ent: FSharpEntity) (memb: FSharpMemberOrFunctionOrValue) =
+        ent.MembersFunctionsAndValues
+        |> Seq.filter (fun m ->
+            not m.IsProperty
+            && m.CompiledName = memb.CompiledName
+            && m.IsInstanceMember = memb.IsInstanceMember
+        )
+        |> Seq.length
+
+    /// fickl: `[<NoOverloadSuffix>]` on a member drops its overload hash; on a type, it drops the hash of each
+    /// member that is not overloaded
+    let hasNoOverloadSuffix (ent: FSharpEntity) (memb: FSharpMemberOrFunctionOrValue) =
+        hasNoOverloadSuffixOnMember memb
+        || ent.Attributes
+           |> Seq.exists (fun att -> att.AttributeType.TryFullName = Some Atts.ficklNoOverloadSuffix)
+           && getOverloads ent memb <= 1
+
     let getOverloadSuffixFrom (ent: FSharpEntity) (memb: FSharpMemberOrFunctionOrValue) =
         match ent.CompiledName with
         // HACK for compiling FSharpMap/FSharpSet in fable-library
         | "FSharpMap"
         | "FSharpSet" -> ""
+        | _ when hasNoOverloadSuffix ent memb -> ""
         | _ ->
             let entGenParams = ent.GenericParameters |> Seq.mapToList TypeHelpers.genParamName
 
@@ -728,9 +764,12 @@ module Helpers =
     let private getMemberMangledName trimRootModule (memb: FSharpMemberOrFunctionOrValue) =
         if memb.IsExtensionMember then
             let overloadSuffix =
-                memb.CurriedParameterGroups
-                |> Seq.mapToList (Seq.mapToList (fun p -> TypeHelpers.makeType Map.empty p.Type))
-                |> OverloadSuffix.getExtensionHash
+                if hasNoOverloadSuffixOnMember memb then
+                    ""
+                else
+                    memb.CurriedParameterGroups
+                    |> Seq.mapToList (Seq.mapToList (fun p -> TypeHelpers.makeType Map.empty p.Type))
+                    |> OverloadSuffix.getExtensionHash
 
             let entName =
                 memb.ApparentEnclosingEntity
@@ -2015,6 +2054,18 @@ module Util =
     open Patterns
     open TypeHelpers
     open Identifiers
+
+    /// fickl: `[<NoOverloadSuffix>]` on an overloaded member would give its overloads one name
+    let checkNoOverloadSuffix (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        match memb.DeclaringEntity with
+        | Some ent when
+            not memb.IsExtensionMember
+            && hasNoOverloadSuffixOnMember memb
+            && getOverloads ent memb > 1
+            ->
+            $"%s{memb.DisplayName} is overloaded, so [<NoOverloadSuffix>] would give its overloads the same name"
+            |> addError com [] (Some(makeRange memb.DeclarationLocation))
+        | _ -> ()
 
     let isUnitArg (ident: Fable.Ident) =
         ident.IsCompilerGenerated && ident.Type = Fable.Unit

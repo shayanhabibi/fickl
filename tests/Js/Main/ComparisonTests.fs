@@ -39,6 +39,15 @@ exception Ex of int
 [<ReferenceEquality>]
 type RTest2 = { a2: int; b2: int }
 
+[<ReferenceEquality>]
+type RUnionTest = RCase of int
+
+[<NoEquality; NoComparison>]
+type NoEqRecord = { n: int }
+
+[<NoEquality; NoComparison>]
+type NoEqUnion = NoEqCase of int
+
 type Test(i: int) =
     member x.Value = i
     override x.GetHashCode() = i
@@ -115,6 +124,45 @@ let genericCompare (a: 'T) (b: 'T) : int =
 
 let tests =
   testList "Comparison" [
+    testCase "ReferenceEquality records compare by reference" <| fun () ->
+        let a = { a2 = 1; b2 = 2 }
+        let b = { a2 = 1; b2 = 2 }
+        a = b |> equal false
+        a = a |> equal true
+        a.Equals(b) |> equal false
+        genericEquals a b |> equal false
+        genericEquals a a |> equal true
+        [ a ] |> List.contains b |> equal false
+        [ a ] |> List.contains a |> equal true
+        [ a ] = [ b ] |> equal false
+        { contents = a } = { contents = b } |> equal false
+        genericHash a |> equal (genericHash a)
+        let d = Dictionary<RTest2, int>()
+        d[a] <- 1
+        d.ContainsKey(b) |> equal false
+        d.ContainsKey(a) |> equal true
+
+    testCase "ReferenceEquality unions compare by reference" <| fun () ->
+        let a = RCase 1
+        let b = RCase 1
+        a = b |> equal false
+        a = a |> equal true
+        a.Equals(b) |> equal false
+        genericEquals a b |> equal false
+        [ a ] |> List.contains b |> equal false
+
+    testCase "NoEquality records and unions are equal only to themselves" <| fun () ->
+        let a = { n = 1 }
+        let b = { n = 1 }
+        (box a).Equals(box b) |> equal false
+        (box a).Equals(box a) |> equal true
+        genericEquals a b |> equal false
+        genericEquals a a |> equal true
+        let c = NoEqCase 1
+        (box c).Equals(box (NoEqCase 1)) |> equal false
+        (box c).Equals(box c) |> equal true
+        genericEquals c (NoEqCase 1) |> equal false
+
     testCase "Typed array equality works" <| fun () ->
         let xs1 = [| 1; 2; 3 |]
         let xs2 = [| 1; 2; 3 |]
