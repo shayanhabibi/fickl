@@ -335,6 +335,38 @@ let tests =
         equal 2 xs.Length
         Array.sum xs |> equal 10
 
+    testCase "Array.blit and Array.Copy within one array keep the source" <| fun () -> // #64
+        let a = [| 1..5 |]
+        Array.blit a 0 a 1 4
+        a |> equal [| 1; 1; 2; 3; 4 |]
+        let b = [| 1..5 |]
+        Array.blit b 1 b 0 4
+        b |> equal [| 2; 3; 4; 5; 5 |]
+        let c = [| 1..5 |]
+        System.Array.Copy(c, 0, c, 2, 3)
+        c |> equal [| 1; 2; 1; 2; 3 |]
+        let d = [| 1uy..5uy |]
+        Array.blit d 0 d 1 4
+        d |> equal [| 1uy; 1uy; 2uy; 3uy; 4uy |]
+        let e = [| "a"; "b"; "c" |]
+        Array.blit e 0 e 1 2
+        e |> equal [| "a"; "a"; "b" |]
+
+    testCase "Slices clamp negative bounds to zero" <| fun () -> // #65
+        let xs = [| 1; 2; 3 |]
+        let mutable lo = -2
+        let mutable hi = -1
+        xs.[-1..1] |> equal [| 1; 2 |]
+        xs.[0..-2] |> equal [||]
+        xs.[lo..1] |> equal [| 1; 2 |]
+        xs.[..hi] |> equal [||]
+        xs.[1..] |> equal [| 2; 3 |]
+        xs.[2..1] |> equal [||]
+        xs.[1..10] |> equal [| 2; 3 |]
+        "hello".[-2..1] |> equal "he"
+        "hello".[lo..2] |> equal "hel"
+        "hello".[0..-2] |> equal ""
+
     testCase "Array.blit works" <| fun () ->
         let xs = [| 1..10 |]
         let ys = Array.zeroCreate 20

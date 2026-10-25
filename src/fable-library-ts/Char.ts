@@ -223,3 +223,14 @@ export function parse(input: string) {
     throw new Exception("String must be exactly one character long.");
   }
 }
+
+// Char.ToUpper and Char.ToLower use simple case mapping, which keeps one character: JS's full mapping can expand
+// ('ß' to "SS", 'İ' to "i̇"), and .NET leaves such a character unchanged
+function oneChar(c: string, mapped: string) {
+  return mapped.length === c.length ? mapped : c;
+}
+
+export function toUpper(c: string) { return oneChar(c, c.toLocaleUpperCase()); }
+export function toUpperInvariant(c: string) { return oneChar(c, c.toUpperCase()); }
+export function toLower(c: string) { return oneChar(c, c.toLocaleLowerCase()); }
+export function toLowerInvariant(c: string) { return oneChar(c, c.toLowerCase()); }

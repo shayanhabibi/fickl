@@ -406,7 +406,11 @@ let toString com (ctx: Context) r (args: Expr list) =
         |> addErrorAndReturnNull com ctx.InlinePath r
     | head :: tail ->
         match head.Type with
-        | String -> head
+        | String ->
+            match head with
+            | Value(StringConstant _, _) -> head
+            // `string` of a null string is empty
+            | _ -> emitExpr r String [ head ] "($0 ?? \"\")"
         | Char -> TypeCast(head, String)
         | Builtin BclGuid when tail.IsEmpty -> head
         | Builtin BclDateOnly -> Helper.LibCall(com, dateOnlyModule com, "toString", String, args)
@@ -1753,18 +1757,14 @@ let valueTypes (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
     | _ -> None
 
 let chars (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
-    let icall r t args argTypes memb =
-        match args, argTypes with
-        | thisArg :: args, _ :: argTypes ->
-            let info = makeCallInfo None args argTypes
-            getField thisArg memb |> makeCall r t info |> Some
-        | _ -> None
-
     match i.CompiledName with
-    | "ToUpper" -> icall r t args i.SignatureArgTypes "toLocaleUpperCase"
-    | "ToUpperInvariant" -> icall r t args i.SignatureArgTypes "toUpperCase"
-    | "ToLower" -> icall r t args i.SignatureArgTypes "toLocaleLowerCase"
-    | "ToLowerInvariant" -> icall r t args i.SignatureArgTypes "toLowerCase"
+    | "ToUpper"
+    | "ToUpperInvariant"
+    | "ToLower"
+    | "ToLowerInvariant" ->
+        // A char's case mapping keeps it one character, unlike String's
+        Helper.LibCall(com, "Char", Naming.lowerFirst i.CompiledName, t, List.truncate 1 args, ?loc = r)
+        |> Some
     | "ToString" -> toString com ctx r args |> Some
     | "GetUnicodeCategory"
     | "IsControl"
@@ -2987,12 +2987,21 @@ let intrinsicFunctions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisAr
     | "GetArray", _, [ ar; idx ] -> arrayGetItem com r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
     | "SetArray", _, [ ar; idx; value ] -> setExpr r ar idx value |> Some
     | ("GetArraySlice" | "GetStringSlice"), None, [ ar; lower; upper ] ->
+        // .NET clamps a negative bound to 0, where JS's slice counts it from the end
+        let nonNegative =
+            function
+            | Value(NumberConstant(NumberValue.Int32 v, _), _) as e when v >= 0 -> e
+            | Value(NewOption(None, _, _), _) as e -> e
+            | e -> Helper.GlobalCall("Math", Int32.Number, [ makeIntConst 0; e ], memb = "max")
+
         let upper =
             match upper with
             | Value(NewOption(None, _, _), _) -> getExpr None (Int32.Number) ar (makeStrConst "length")
-            | _ -> add upper (makeIntConst 1)
+            | Value(NumberConstant(NumberValue.Int32 v, _), _) -> makeIntConst (max 0 (v + 1))
+            | _ -> add upper (makeIntConst 1) |> nonNegative
 
-        Helper.InstanceCall(ar, "slice", t, [ lower; upper ], ?loc = r) |> Some
+        Helper.InstanceCall(ar, "slice", t, [ nonNegative lower; upper ], ?loc = r)
+        |> Some
     | "SetArraySlice", None, args ->
         Helper.LibCall(com, "Array", "setSlice", t, args, i.SignatureArgTypes, ?loc = r)
         |> Some

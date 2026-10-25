@@ -20,7 +20,8 @@ function formatDateLike(rep: any, format: string | undefined): string {
 
 const fsFormatRegExp = /(^|[^%])%([0+\- ]*)(\*|\d+)?(?:\.(\d+))?(\w)/g;
 const interpolateRegExp = /(?:(^|[^%])%([0+\- ]*)(\d+)?(?:\.(\d+))?(\w))?%P\(\)/g;
-const formatRegExp = /\{(\d+)(,-?\d+)?(?:\:([a-zA-Z])(\d{0,2})|\:(.+?))?\}/g;
+// `{{` and `}}` are matched too, so escaped braces and holes are read left to right as in .NET
+const formatRegExp = /\{\{|\}\}|\{(\d+)(,-?\d+)?(?:\:([a-zA-Z])(\d{0,2})|\:(.+?))?\}/g;
 
 function isLessThan(x: Numeric, y: number) {
   return numericCompare(x, y) < 0;
@@ -272,6 +273,11 @@ function formatReplacement(rep: any, flags: any, padLength: any, precision: any,
     rep = formatDateLike(rep, undefined);
   } else if (format === "A" && typeof rep === "string") {
     rep = "\"" + rep + "\"";
+  } else if (format === "s" && rep == null) {
+    // sprintf "%s" prints a null string as nothing, "%O" and "%A" as <null>
+    rep = "";
+  } else if ((format === "O" || format === "A") && rep === null) {
+    rep = "<null>";
   } else {
     rep = toString(rep);
   }
@@ -379,7 +385,9 @@ export function format(str: string | object, ...args: any[]) {
     str2 = str;
   }
 
-  return str2.replace(formatRegExp, (_, idx: number, padLength, format, precision, pattern) => {
+  return str2.replace(formatRegExp, (match: string, idx: number, padLength, format, precision, pattern) => {
+    if (match === "{{") { return "{"; }
+    if (match === "}}") { return "}"; }
     if (idx < 0 || idx >= args.length) {
       throw new Exception("Index must be greater or equal to zero and less than the arguments' length.")
     }
