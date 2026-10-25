@@ -15,6 +15,15 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "A static abstract member called from non-inline generic code is reported" <| fun _ -> // #78
+      compile """
+type IAdd<'T when 'T :> IAdd<'T>> =
+    static abstract Add: 'T * 'T -> 'T
+let addGeneric<'T when 'T :> IAdd<'T>> (a: 'T) (b: 'T) = 'T.Add(a, b)
+"""
+      |> Assert.Exists.errorWith "Static abstract member Add of IAdd can only be called where the type is known"
+      |> ignore
+
     testCase "CallableInterface rejects added members on a callable base" <| fun _ ->
       compile """
 open Fickl.Core

@@ -753,6 +753,28 @@ type ITesting =
 // let getOne<'T when 'T :> IOne>() = 'T.GetOne()
 // let getTwo<'T when 'T :> IOne>() = 'T.Two
 
+#nowarn "3535" // static abstract interface members
+
+type IAddable<'T when 'T :> IAddable<'T>> =
+    static abstract Add: 'T * 'T -> 'T
+    static abstract Zero: 'T
+
+type Meters =
+    { M: int }
+    interface IAddable<Meters> with
+        static member Add(a, b) = { M = a.M + b.M }
+        static member Zero = { M = 0 }
+
+type Words =
+    { W: string }
+    interface IAddable<Words> with
+        static member Add(a, b) = { W = a.W + b.W }
+        static member Zero = { W = "" }
+
+let inline addTwoStatic<'T when 'T :> IAddable<'T>> (a: 'T) (b: 'T) = 'T.Add(a, b)
+let inline zeroOfStatic<'T when 'T :> IAddable<'T>> () = 'T.Zero
+let inline sumStatic<'T when 'T :> IAddable<'T>> (xs: 'T list) = List.fold (fun acc x -> 'T.Add(acc, x)) 'T.Zero xs
+
 type TypeWithByRefMember() =
     static member DoubleIntByRef (x: byref<int>) : unit = x <- 2 * x
 
@@ -917,6 +939,13 @@ let walkLazyTree (tree: LazyTree<Lazy<'a>>) : string =
 
 let tests =
   testList "Types" [
+    testCase "Static abstract interface members can be called from inline functions" <| fun () -> // #78
+        (addTwoStatic { M = 1 } { M = 2 }).M |> equal 3
+        (zeroOfStatic<Meters> ()).M |> equal 0
+        (sumStatic [ { M = 1 }; { M = 2 }; { M = 3 } ]).M |> equal 6
+        (sumStatic [ { W = "a" }; { W = "b" } ]).W |> equal "ab"
+        (addTwoStatic { W = "x" } { W = "y" }).W |> equal "xy"
+
 
     testCase "Unit arguments work" <| fun () ->
         update () |> equal ((), ())

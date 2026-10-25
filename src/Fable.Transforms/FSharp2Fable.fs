@@ -338,6 +338,37 @@ let private transformTraitCall
                     )
                 else
                     resolveMemberCall entity entGenArgs traitName isInstance argTypes thisArg args
+                    |> Option.orElseWith (fun () ->
+                        // A static abstract interface member called on a type param resolved here, see #78: the
+                        // type implements it as a static member named after the slot
+                        match entity, com.Options.Language with
+                        | :? FsEnt as fsEnt, (JavaScript | TypeScript) when not isInstance ->
+                            fsEnt.FSharpEntity.TryGetMembersFunctionsAndValues()
+                            |> Seq.tryPick (fun memb ->
+                                if memb.IsInstanceMember then
+                                    None
+                                else
+                                    memb.ImplementedAbstractSignatures
+                                    |> Seq.tryFind (fun s -> s.Name = traitName && s.DeclaringType.HasTypeDefinition)
+                                    |> Option.bind (fun s ->
+                                        let iface = s.DeclaringType.TypeDefinition
+
+                                        tryFindAbstractMember com iface traitName false None
+                                        |> Option.map (fun abstractMemb -> iface, abstractMemb)
+                                    )
+                            )
+                            |> Option.map (fun (iface, abstractMemb) ->
+                                let info = getAbstractMemberInfo com iface abstractMemb
+                                let cons = FsEnt.Ref fsEnt.FSharpEntity |> entityIdent com
+
+                                if info.isGetter then
+                                    Fable.Get(cons, Fable.FieldInfo.Create(info.name), typ, r)
+                                else
+                                    let callInfo = Fable.CallInfo.Create(args = args, sigArgTypes = argTypes)
+                                    makeCall r typ callInfo (getField cons info.name)
+                            )
+                        | _ -> None
+                    )
             | Fable.AnonymousRecordType(sortedFieldNames, entGenArgs, _isStruct) when
                 isInstance && List.isEmpty args && Option.isSome thisArg
                 ->

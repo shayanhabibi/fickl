@@ -2862,6 +2862,61 @@ module Util =
                 let memberName = genParam.FullName + "." + memberName
                 let callee = makeIdentExpr memberName
                 makeCall r typ callInfo callee
+            // Once a function is inlined its generic parameter is resolved: call the concrete type's static member
+            | _ when
+                (match com.Options.Language with
+                 | JavaScript
+                 | TypeScript -> true
+                 | _ -> false)
+                ->
+                let implementsInterface (entRef: Fable.EntityRef) =
+                    (com.GetEntity entRef).AllInterfaces
+                    |> Seq.exists (fun i -> i.Entity.FullName = FsEnt.FullName entity)
+
+                let concrete =
+                    match genParamOpt |> Option.bind (fun p -> ctx.GenericArgs.TryFind(genParamName p)) with
+                    | Some(Fable.DeclaredType(entRef, _)) -> Some entRef
+                    | _ ->
+                        // In `'T :> IAdd<'T>` the interface's generic argument is the type the member is called on
+                        callInfo.GenericArgs
+                        |> List.tryPick (
+                            function
+                            | Fable.DeclaredType(entRef, _) when implementsInterface entRef -> Some entRef
+                            | _ -> None
+                        )
+
+                // While an inline function is precompiled, it is the precompiled function that has the parameter
+                let genParamOpt =
+                    genParamOpt
+                    |> Option.orElse (ctx.PrecompilingInlineFunction |> tryFindGenParam entity)
+
+                match concrete, genParamOpt with
+                | Some entRef, _ ->
+                    let info = getAbstractMemberInfo com entity memb
+                    let cons = entityIdent com entRef
+
+                    if info.isGetter then
+                        Fable.Get(cons, Fable.FieldInfo.Create(info.name), typ, r)
+                    else
+                        makeCall r typ callInfo (getField cons info.name)
+                // Precompiling an inline function: resolve the call where it is inlined, as a trait call on the type
+                | None, Some genParam when ctx.PrecompilingInlineFunction.IsSome ->
+                    let sourceType = Fable.GenericParam(genParamName genParam, genParam.IsMeasure, [])
+
+                    Fable.Unresolved(
+                        Fable.UnresolvedTraitCall(
+                            [ sourceType ],
+                            memb.CompiledName,
+                            false,
+                            callInfo.SignatureArgTypes,
+                            callInfo.Args
+                        ),
+                        typ,
+                        r
+                    )
+                | None, _ ->
+                    $"Static abstract member %s{memb.DisplayName} of %s{entity.DisplayName} can only be called where the type is known, e.g. from an inline function: in generic code JavaScript has no type to call it on"
+                    |> addErrorAndReturnNull com ctx.InlinePath r
             | _ ->
                 // TODO: add support for static interface calls in other languages
                 $"Unexpected static interface/override call: %s{memb.FullName}"
