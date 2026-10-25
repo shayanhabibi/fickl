@@ -1,4 +1,4 @@
-import { Exception, IComparable, IEquatable, IHashable, combineHashCodes, compare, compareArrays, equalArrays, equals, sameConstructor, numberHash, structuralHash } from "./Util.ts";
+import { Exception, IComparable, IEquatable, IHashable, combineHashCodes, compare, compareArrays, equalArrays, equals, fieldName, sameConstructor, numberHash, structuralHash } from "./Util.ts";
 
 // This type is only used internally for .ts files in the library
 // F# Result type is in Choice.fs
@@ -122,13 +122,13 @@ function recordToJSON<T>(self: T) {
   const o: any = {};
   const keys = Object.keys(self as any);
   for (let i = 0; i < keys.length; i++) {
-    o[keys[i]] = (self as any)[keys[i]];
+    o[fieldName(keys[i])] = (self as any)[keys[i]];
   }
   return o;
 }
 
 function recordToString<T>(self: T) {
-  return "{ " + Object.entries(self as any).map(([k, v]) => k + " = " + toStringQuoted(v)).join("\n  ") + " }";
+  return "{ " + Object.entries(self as any).map(([k, v]) => fieldName(k) + " = " + toStringQuoted(v)).join("\n  ") + " }";
 }
 
 function recordGetHashCode<T>(self: T) {

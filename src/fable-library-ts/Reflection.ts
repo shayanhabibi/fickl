@@ -1,5 +1,5 @@
 import { FSharpRef, Record, Union } from "./Types.ts";
-import { Exception, MutableArray, combineHashCodes, equalArraysWith, IEquatable, stringHash } from "./Util.ts";
+import { Exception, MutableArray, combineHashCodes, equalArraysWith, fieldKey, IEquatable, stringHash } from "./Util.ts";
 import Decimal from "./Decimal.ts";
 import { Some, some } from "./Option.ts";
 
@@ -494,13 +494,13 @@ export function getUnionCaseFields(uci: CaseInfo): FieldInfo[] {
 // without adding a __fields__ to every anonymous record being created
 export function getRecordFields(v: any, t: TypeInfo): MutableArray<any> {
   if (t.fields != null) {
-    return t.fields().map(([key, _]) => v[key]);
+    return t.fields().map(([key, _]) => v[fieldKey(key)]);
   }
   return Object.keys(v).map((k) => v[k]);
 }
 
 export function getRecordField(v: any, field: FieldInfo): any {
-  return v[field[0]];
+  return v[fieldKey(field[0])];
 }
 
 export function getTupleFields(v: any): MutableArray<any> {
@@ -541,7 +541,7 @@ export function makeRecord(t: TypeInfo, values: MutableArray<any>): any {
   return t.construct != null
     ? new t.construct(...values)
     : fields.reduce((obj, [key, _t], i) => {
-      obj[key] = values[i];
+      obj[fieldKey(key)] = values[i];
       return obj;
     }, {} as any);
 }
@@ -586,7 +586,7 @@ export function createInstance(t: TypeInfo, consArgs?: any[]): any {
 }
 
 export function getValue(propertyInfo: PropertyInfo, v: any): any {
-  return v[propertyInfo[0]];
+  return v[fieldKey(propertyInfo[0])];
 }
 
 // Fable.Core.Reflection

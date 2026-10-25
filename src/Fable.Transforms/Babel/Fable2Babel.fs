@@ -154,10 +154,11 @@ module Lib =
         )
 
     let sanitizeMemberName memberName =
-        if memberName = "constructor" then
-            memberName + "$"
-        else
-            memberName
+        match memberName with
+        // Assigning `__proto__` (also as an object literal key) replaces the object's prototype
+        | "constructor"
+        | "__proto__" -> memberName + "$"
+        | _ -> memberName
 
 module Reflection =
     open Lib
@@ -182,7 +183,8 @@ module Reflection =
                 if fi.IsStatic then
                     None
                 else
-                    let fieldName = sanitizeMemberName fi.Name |> Expression.stringLiteral
+                    // The F# name: the runtime maps it to the escaped property (see fieldKey in Util.ts)
+                    let fieldName = fi.Name |> Expression.stringLiteral
 
                     let typeInfo = transformTypeInfoFor Reflection com ctx r genMap fi.FieldType
 
@@ -563,12 +565,6 @@ module Annotation =
         | Fable.Any -> true
         | _ -> false
 
-    let isInRefOrAnyType (com: IBabelCompiler) =
-        function
-        | Replacements.Util.IsInRefType com _ -> true
-        | Fable.Any -> true
-        | _ -> false
-
     let makeTypeParamDecl (com: IBabelCompiler) (ctx: Context) genArgs =
         // Maybe there's a way to represent measurements in TypeScript
         genArgs
@@ -803,11 +799,9 @@ module Annotation =
         | Replacements.Util.FSharpChoice genArgs ->
             $"FSharpChoice$%d{List.length genArgs}%s{Util.UnionHelpers.UNION_SUFFIX}"
             |> makeFableLibImportTypeAnnotation com ctx genArgs "Choice"
+        // An inref parameter gets a reference cell like a byref (struct receivers are annotated as the struct)
         | Replacements.Util.FSharpReference genArg ->
-            if isInRefOrAnyType com typ then
-                makeTypeAnnotation com ctx genArg
-            else
-                makeFableLibImportTypeAnnotation com ctx [ genArg ] "Types" "FSharpRef"
+            makeFableLibImportTypeAnnotation com ctx [ genArg ] "Types" "FSharpRef"
 
     let makeFunctionTypeAnnotation com ctx _typ argTypes returnType =
         let funcTypeParams =

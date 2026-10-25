@@ -19,6 +19,9 @@ type JSKiller =
 type JSKiller2 =
    { ``s p a c e`` : float; ``s*y*m*b*o*l`` : float }
 
+type PrototypeFields =
+   { __proto__: int; constructor: int; other: string }
+
 type Child =
     { a: string; b: int }
     member x.Sum() = (int x.a) + x.b
@@ -163,6 +166,31 @@ let tests =
     testCase "Records with key/reserved words are mapped correctly" <| fun () ->
         let x = { ``for`` = 1.0; ``class`` = 2.0 }
         equal 2. x.``class``
+
+    testCase "Records with fields named __proto__ and constructor keep them" <| fun () -> // #51
+        let x = { __proto__ = 1; constructor = 2; other = "o" }
+        let y = { x with __proto__ = 9 }
+        equal 1 x.__proto__
+        equal 2 x.constructor
+        equal 9 y.__proto__
+        equal 2 y.constructor
+        equal true (x = { __proto__ = 1; constructor = 2; other = "o" })
+        equal (-1) (compare x y)
+        let a = {| __proto__ = 3; x = 4 |}
+        equal 3 a.__proto__
+        equal true (a = {| __proto__ = 3; x = 4 |})
+        let printed = sprintf "%A" x
+        equal true (printed.Contains "__proto__ = 1" && printed.Contains "constructor = 2" && not (printed.Contains "$"))
+
+    testCase "Reflection uses the F# names of fields named __proto__ and constructor" <| fun () -> // #51
+        let x = { __proto__ = 1; constructor = 2; other = "o" }
+        let fields = Reflection.FSharpType.GetRecordFields(typeof<PrototypeFields>)
+        fields |> Array.map (fun f -> f.Name) |> equal [| "__proto__"; "constructor"; "other" |]
+        fields |> Array.map (fun f -> Reflection.FSharpValue.GetRecordField(x, f) |> string) |> equal [| "1"; "2"; "o" |]
+        let made = Reflection.FSharpValue.MakeRecord(typeof<PrototypeFields>, [| box 4; box 5; box "m" |]) :?> PrototypeFields
+        equal 4 made.__proto__
+        equal 5 made.constructor
+        Reflection.FSharpValue.GetRecordFields(box {| __proto__ = 3; x = 4 |}) |> Array.map string |> equal [| "3"; "4" |]
 
     testCase "Records with special characters are mapped correctly" <| fun () ->
         let x = { ``s p a c e`` = 1.0; ``s*y*m*b*o*l`` = 2.0 }
