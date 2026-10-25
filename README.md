@@ -1,10 +1,15 @@
 # Fickl: Fable Performance Lab
 
-This repository is the fork of [Fable](https://github.com/fable-compiler/fable) that refrains from work on bringing cross-language targetting to parity, and instead focuses on two main objectives, in order of priority:
+This repository is the fork of [Fable](https://github.com/fable-compiler/fable) that refrains from work on bringing cross-language targetting to parity, and instead focuses on three main objectives, in order of priority:
 
 1. Performance and ergonomics of the Fable compiler
 2. Explicit control of expression
 3. Transparency
+
+> ### Fable Compatibility
+> Fickl is fully compatible with compiling **any** fable code. However, since fickl includes bug fixes that are not yet upstream, there might be differences in the compiled output.
+>
+> In contrast, you cannot expect fickl only attributes (which are contained in `Fickl.` prefixed modules) to exist in fable.
 
 ## Performance and ergonomics
 
