@@ -996,6 +996,12 @@ export function curry20<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, 
 }
 
 // More performant method to copy arrays, see #2352
+// The `Failure` active pattern: in .NET it matches only an exception whose type is System.Exception. A JS error
+// that is not a Fable exception (TypeError, SyntaxError, ...) has no .NET type and still matches.
+export function failurePattern(e: any): string | undefined {
+  return e instanceof Exception && e.constructor !== Exception ? undefined : e?.message;
+}
+
 export function copyToArray<T>(source: MutableArray<T>, sourceIndex: number, target: MutableArray<T>, targetIndex: number, count: number): void {
   if (ArrayBuffer.isView(source) && ArrayBuffer.isView(target)) {
     (target as any).set((source as any).subarray(sourceIndex, sourceIndex + count), targetIndex);

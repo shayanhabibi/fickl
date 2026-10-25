@@ -1260,6 +1260,25 @@ let tests =
             invalidArg "arg" "This is invalid"
         )
 
+    testCase "invalidArg and invalidOp raise the .NET exception types" <| fun () -> // #66
+        (try invalidArg "p" "bad" with :? ArgumentNullException -> "null" | :? ArgumentException -> "arg" | _ -> "other")
+        |> equal "arg"
+        (try invalidArg "p" "bad" with e -> e.Message) |> equal "bad (Parameter 'p')"
+        (try invalidOp "nope" with :? InvalidOperationException as e -> e.Message | _ -> "other") |> equal "nope"
+        (try nullArg "q" with :? ArgumentNullException -> "null" | _ -> "other") |> equal "null"
+
+    testCase "Failure matches System.Exception only" <| fun () -> // #66
+        (try failwith "f" with Failure m -> m | _ -> "other") |> equal "f"
+        (match exn "plain" with Failure m -> m | _ -> "no") |> equal "plain"
+        (try invalidArg "p" "bad" with Failure _ -> "failure" | _ -> "not") |> equal "not"
+        (try invalidOp "x" with Failure _ -> "failure" | _ -> "not") |> equal "not"
+        (try raise (ArgumentOutOfRangeException()) with Failure _ -> "failure" | _ -> "not") |> equal "not"
+#if FABLE_COMPILER
+        // A JS error has no .NET type: it still matches
+        (try JsInterop.emitJsExpr<obj> () "JSON.parse('{')" |> ignore; "none" with Failure _ -> "failure" | _ -> "other")
+        |> equal "failure"
+#endif
+
     testCase "Pattern matching optimization works (switch statement)" <| fun () ->
         let mutable x = ""
         let i = 4
