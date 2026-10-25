@@ -94,6 +94,11 @@ let private steps =
         step "inline body using a new helper" [
             "Lib.fs", "let inline inc x = x + 10", "let bump x = x + 100\nlet inline inc x = bump x"
         ]
+        // The compiler names the values of a let rec that is not all functions, and a top-level pattern
+        step "let rec value body" [ "Lib.fs", "recursed <- 5", "recursed <- 6" ]
+        step "let rec value body again" [ "Lib.fs", "recursed <- 6", "recursed <- 7" ]
+        step "let rec value in another file" [ "Other.fs", "Lib.recursed + 1", "Lib.recursed + 2" ]
+        step "top-level pattern" [ "Lib.fs", "let first, second = 1, 2", "let first, second = 3, 4" ]
     ]
 
 let private outputs (outDir: string) =

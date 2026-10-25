@@ -82,3 +82,25 @@ type InlineInterfaceAttribute() =
                  ||| AttributeTargets.Field)>]
 type CurriedAttribute() =
     inherit Attribute()
+
+/// <summary>
+/// Drops the overload hash from the compiled name of a member, so JavaScript can call it by a predictable name.
+/// </summary>
+/// <remarks>
+/// Fickl names a method of a class after its type and adds a hash of its parameter types, because JavaScript has
+/// no overloading: <c>Counter__Add_Z524259A4</c>. The hash is there even when the method is not overloaded.
+/// <code>
+/// type Counter() =
+///     [&lt;NoOverloadSuffix>]
+///     member _.Add(x: int) = x + 1     // Counter__Add
+/// </code>
+/// On a member that is overloaded, the attribute is an error. On a type, it drops the hash of every member that is
+/// not overloaded, and overloaded members keep theirs. On a property, it applies to its getter and setter.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method
+                 ||| AttributeTargets.Property
+                 ||| AttributeTargets.Constructor
+                 ||| AttributeTargets.Class
+                 ||| AttributeTargets.Struct)>]
+type NoOverloadSuffixAttribute() =
+    inherit Attribute()

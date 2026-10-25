@@ -180,3 +180,55 @@ let declarationTests =
                 (mangledKeys "\\[\"(Mangling\\.[^\"]+)\"\\]" "Mangling.js")
                 "Mangling.d.ts names members other than those Mangling.js calls"
         })
+
+/// fickl: a compiled assembly that uses Fickl.Core attributes needs Fickl.Core as a reference. Compiled from its
+/// sources into the project instead, the assembly's attributes could not be resolved and the compiler crashed (#34).
+/// The consumer in `dllAttributes` references the compiled Support.dll, and Fickl.Core as a project.
+let dllAttributeTests =
+    testCaseAsync
+        "Fickl.Core attributes in a compiled assembly"
+        (async {
+            let dir = Path.Combine(__SOURCE_DIRECTORY__, "dllAttributes")
+
+            let run (workingDir: string) (fileName: string) (args: string list) =
+                let info =
+                    System.Diagnostics.ProcessStartInfo(
+                        fileName,
+                        args,
+                        WorkingDirectory = workingDir,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    )
+
+                use p = System.Diagnostics.Process.Start info
+                let output = p.StandardOutput.ReadToEndAsync()
+                let error = p.StandardError.ReadToEndAsync()
+                p.WaitForExit()
+                p.ExitCode, output.Result + error.Result
+
+            let exitCode, log =
+                run dir "dotnet" [ "build"; Path.Combine("Support", "Support.fsproj"); "-c"; "Release" ]
+
+            Expect.equal exitCode 0 $"Building Support.dll failed:{System.Environment.NewLine}{log}"
+
+            let outDir = Path.Combine(Path.GetTempPath(), "fickl-dll-attributes-test")
+
+            if Directory.Exists outDir then
+                Directory.Delete(outDir, true)
+
+            let exitCode =
+                Fable.Cli.Entry.main
+                    [|
+                        Path.Combine(dir, "Consumer", "Consumer.fsproj")
+                        "--outDir"
+                        outDir
+                        "--exclude"
+                        "Fable.Core"
+                        "--noCache"
+                    |]
+
+            Expect.equal exitCode 0 "Expected exit code to be 0"
+            File.WriteAllText(Path.Combine(outDir, "package.json"), """{ "type": "module" }""")
+            let exitCode, log = run outDir "node" [ "Program.js" ]
+            Expect.equal exitCode 0 $"The compiled program failed:{System.Environment.NewLine}{log}"
+        })

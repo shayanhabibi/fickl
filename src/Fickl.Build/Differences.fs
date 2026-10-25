@@ -91,16 +91,17 @@ let private runProcess (workingDirectory: string) (fileName: string) (arguments:
     let stderr = child.StandardError.ReadToEndAsync()
     child.WaitForExit()
 
-    child.ExitCode, (stdout.Result + stderr.Result).ReplaceLineEndings("\n")
+    // Fable colours some of its output, and the codes would end up in the README table
+    let log = Regex.Replace(stdout.Result + stderr.Result, @"\x1b\[[0-9;]*[A-Za-z]", "")
+
+    child.ExitCode, log.ReplaceLineEndings("\n")
 
 /// The first line of a log matching a pattern, without the file position before it.
 let private firstMatch (pattern: string) (log: string) =
-    let found = Regex.Match(log, pattern, RegexOptions.Multiline)
-
-    if found.Success then
-        Some(found.Groups[1].Value.Trim())
-    else
-        None
+    // A line that matches but holds nothing, such as a bare `error` before the message, does not count
+    Regex.Matches(log, pattern, RegexOptions.Multiline)
+    |> Seq.map (fun found -> found.Groups[1].Value.Trim())
+    |> Seq.tryFind (String.IsNullOrEmpty >> not)
 
 let private lastLine (log: string) =
     log.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)

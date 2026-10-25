@@ -119,6 +119,9 @@ module Atts =
     let ficklCurried = "Fickl.Core.CurriedAttribute" // typeof<Fickl.Core.CurriedAttribute>.FullName
 
     [<Literal>]
+    let ficklNoOverloadSuffix = "Fickl.Core.NoOverloadSuffixAttribute" // typeof<Fickl.Core.NoOverloadSuffixAttribute>.FullName
+
+    [<Literal>]
     let stringEnum = "Fable.Core.StringEnumAttribute" // typeof<Fable.Core.StringEnumAttribute>.FullName
 
     [<Literal>]

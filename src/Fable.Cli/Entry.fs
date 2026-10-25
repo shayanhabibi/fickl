@@ -74,6 +74,16 @@ let knownCliArgs () =
         [ "--timings" ], [ "Print a per-phase timing and allocation report after each compilation" ]
         [ "--silent" ], [ "Don't print any log during compilation" ]
         [ "--typedArrays" ], [ "Compile numeric arrays as JS typed arrays (default is true)" ]
+        [ "--clampByteArrays" ],
+        [
+            "Compile byte arrays as Uint8ClampedArray, as canvas pixel data is (JavaScript and TypeScript)."
+            "Out-of-range values clamp to 0 or 255 instead of wrapping as on .NET"
+        ]
+        [ "--temporal" ],
+        [
+            "Represent DateTime, DateTimeOffset, DateOnly, TimeOnly and TimeSpan with the JS Temporal API"
+            "(experimental; needs a runtime with Temporal; JavaScript and TypeScript)"
+        ]
         [ "--watch" ], [ "Alias of watch command" ]
         [ "--watchDelay" ], [ "Delay in ms before recompiling after a file changes (default 50)" ]
         [], []
@@ -98,6 +108,11 @@ let knownCliArgs () =
         [
             "Also write a TypeScript declaration file (.d.ts) next to each JavaScript file,"
             "describing what that JavaScript exports (JavaScript only)"
+        ]
+        [ "--strictOptions" ],
+        [
+            "Keep `Some null` apart from `None` for options of types that can be null, as .NET does,"
+            "by wrapping and unwrapping them at runtime (JavaScript and TypeScript; value options stay erased)"
         ]
         [ "--server" ],
         [
@@ -337,7 +352,8 @@ type Runner =
                 | Some c when String.IsNullOrWhiteSpace c -> defaultConfiguration
                 | Some configurationArg -> configurationArg
 
-            let jsTemporal = args.FlagEnabled "--test:js-temporal"
+            // fickl: --temporal is the documented name of Fable's --test:js-temporal
+            let jsTemporal = args.FlagEnabled("--temporal", "--test:js-temporal")
 
             let define =
                 args.Values "--define"
@@ -345,8 +361,13 @@ type Runner =
                     [
                         "FABLE_COMPILER"
                         "FABLE_COMPILER_5"
+                        // fickl: tells Fickl apart from Fable, e.g. to open Fickl.Core where Fable.Core has the same attribute
+                        "FICKL_COMPILER"
                         if jsTemporal then
                             "FABLE_COMPILER_JAVASCRIPT_TEMPORAL"
+                        // fickl: Fickl's options travel as defines, see Fickl.Options
+                        if args.FlagEnabled "--strictOptions" then
+                            Fickl.Options.strictOptionsDefine
                         match language with
                         | Php -> "FABLE_COMPILER_PHP"
                         | Rust -> "FABLE_COMPILER_RUST"
@@ -381,7 +402,9 @@ type Runner =
                     optimizeFSharpAst = args.FlagEnabled "--optimize",
                     noReflection = args.FlagEnabled "--noReflection",
                     verbosity = verbosity,
-                    jsTemporal = jsTemporal
+                    jsTemporal = jsTemporal,
+                    // fickl: ClampByteArrays had no flag
+                    clampByteArrays = args.FlagEnabled "--clampByteArrays"
                 )
 
             let cliArgs =
