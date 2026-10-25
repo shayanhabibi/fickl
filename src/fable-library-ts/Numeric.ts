@@ -119,3 +119,14 @@ export function toHex(x: Numeric) {
         return x[symbol]().toHex();
     }
 }
+
+// fickl: printf's %o, which like %x shows negative integers in two's complement
+export function toOctal(x: Numeric) {
+    if (typeof x === "number") {
+        return (Number(x) >>> 0).toString(8);
+    } else if (typeof x === "bigint") {
+        return BigInt.asUintN(64, x).toString(8);
+    } else {
+        return String(x);
+    }
+}
