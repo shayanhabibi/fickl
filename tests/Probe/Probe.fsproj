@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <WarningLevel>0</WarningLevel>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>FS0025;FS0064;FS3370</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.fs" />
+    <Compile Include="Numbers.fs" />
+    <Compile Include="Names.fs" />
+    <Compile Include="Values.fs" />
+    <Compile Include="Boxing.fs" />
+    <Compile Include="Odd.fs" />
+    <Compile Include="Deep.fs" />
+    <Compile Include="Weird1.fs" />
+    <Compile Include="Weird2.fs" />
+    <Compile Include="Main.fs" />
+  </ItemGroup>
+</Project>
