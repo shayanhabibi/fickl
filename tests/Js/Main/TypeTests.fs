@@ -753,6 +753,26 @@ type ITesting =
 // let getOne<'T when 'T :> IOne>() = 'T.GetOne()
 // let getTwo<'T when 'T :> IOne>() = 'T.Two
 
+type ExplicitAsThen =
+    val mutable Value: int
+    new() as x = { Value = 1 } then x.Value <- x.Value + 10
+    new(v) = { Value = v }
+
+type ExplicitThenNoAs =
+    val mutable N: int
+    val mutable Log: string list
+    new(n) = { N = n; Log = [] } then ignore n
+
+type ExplicitLogger =
+    val Name: string
+    val mutable Log: string list
+    new(name) as this =
+        { Name = name; Log = [] }
+        then
+            this.Log <- [ "created " + this.Name ]
+            this.Add "ready"
+    member this.Add s = this.Log <- this.Log @ [ s ]
+
 #nowarn "3535" // static abstract interface members
 
 type IAddable<'T when 'T :> IAddable<'T>> =
@@ -939,6 +959,14 @@ let walkLazyTree (tree: LazyTree<Lazy<'a>>) : string =
 
 let tests =
   testList "Types" [
+    testCase "Explicit constructors with `as x ... then` work" <| fun () -> // #79
+        ExplicitAsThen().Value |> equal 11
+        ExplicitAsThen(5).Value |> equal 5
+        ExplicitThenNoAs(3).N |> equal 3
+        let logger = ExplicitLogger("a")
+        logger.Log |> equal [ "created a"; "ready" ]
+        logger.Name |> equal "a"
+
     testCase "Static abstract interface members can be called from inline functions" <| fun () -> // #78
         (addTwoStatic { M = 1 } { M = 2 }).M |> equal 3
         (zeroOfStatic<Meters> ()).M |> equal 0

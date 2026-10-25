@@ -423,6 +423,33 @@ let private derefByRefReceiver
         Replacements.Api.getRefCell com transformed.Range valueType transformed
     | _ -> transformed
 
+/// The steps of an explicit constructor body that constructs the object and then runs more code: the steps before
+/// the construction (without the System.Object constructor call), the construction, and the steps after it
+let private explicitConstructionSteps (body: FSharpExpr) =
+    let rec flatten (e: FSharpExpr) =
+        match e with
+        | FSharpExprPatterns.Sequential(first, second) -> flatten first @ flatten second
+        | e -> [ e ]
+
+    let isObjectConstructor (e: FSharpExpr) =
+        match e with
+        | FSharpExprPatterns.NewObject(memb, _, []) ->
+            memb.DeclaringEntity
+            |> Option.exists (fun ent -> ent.TryFullName = Some Types.object)
+        | _ -> false
+
+    let isConstruction (e: FSharpExpr) =
+        match e with
+        | FSharpExprPatterns.NewRecord(fsType, _) ->
+            fsType.HasTypeDefinition && not fsType.TypeDefinition.IsFSharpRecord
+        | _ -> false
+
+    let steps = flatten body |> List.filter (isObjectConstructor >> not)
+
+    match List.tryFindIndex isConstruction steps with
+    | Some i when i < steps.Length - 1 -> Some(List.take i steps, steps[i], List.skip (i + 1) steps)
+    | _ -> None
+
 let private transformCallee com ctx callee (calleeType: FSharpType) =
     trampoline {
         let! transformed = transformExprOpt com ctx callee
@@ -1746,6 +1773,48 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
 
             return makeCallFrom com ctx (makeRangeFrom fsExpr) typ genArgs None args memb
 
+        // An explicit constructor followed by more code: `new(...) as x = { Field = ... } then ...`. F# writes it as the
+        // System.Object constructor call, the object construction (a NewRecord of the class), then the `as x`
+        // binding, `init@` flag and `then` statements, which read the object with `ldarg 0`. Bind the constructed
+        // object, so they refer to it, and return it
+        | FSharpExprPatterns.Sequential _ as sequential when
+            ctx.BoundConstructorThis.IsNone
+            && (
+                match ctx.EnclosingMember with
+                | Some memb -> memb.IsConstructor && not memb.IsImplicitConstructor
+                | None -> false
+            )
+            && explicitConstructionSteps sequential |> Option.isSome
+            ->
+            let before, construct, after = explicitConstructionSteps sequential |> Option.get
+            let! before = transformExprList com ctx before
+            let! constructed = transformExpr com ctx [] construct
+
+            // `as x` adds compiler-generated `init@` fields to the class, which the construction does not set
+            let constructed =
+                match constructed with
+                | Fable.Value(Fable.NewRecord(args, entRef, genArgs), r) ->
+                    let fields = (com.GetEntity entRef).FSharpFields
+                    let missing = fields |> List.skip (min args.Length fields.Length)
+
+                    let defaults =
+                        missing
+                        |> List.map (fun field -> Replacements.Api.defaultof com ctx None field.FieldType)
+
+                    Fable.Value(Fable.NewRecord(args @ defaults, entRef, genArgs), r)
+                | constructed -> constructed
+
+            let thisIdent = getIdentUniqueName com ctx "this" |> makeTypedIdent constructed.Type
+            let ctx = { ctx with BoundConstructorThis = Some thisIdent }
+            let! after = transformExprList com ctx after
+
+            return
+                Fable.Let(thisIdent, constructed, Fable.Sequential(after @ [ Fable.IdentExpr thisIdent ]))
+                |> fun body ->
+                    match before with
+                    | [] -> body
+                    | before -> Fable.Sequential(before @ [ body ])
+
         | FSharpExprPatterns.Sequential(first, second) ->
             let exprs =
                 match ctx.CaptureBaseConsCall with
@@ -1943,6 +2012,15 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                     (fun (ident, value) body -> Fable.Let(ident, value, body))
                     (arrBinding @ idxBinding)
                     reference
+
+        // In `new() as x = { ... } then ...`, F# reads the object under construction with `ldarg 0`
+        | FSharpExprPatterns.ILAsm("[I_ldarg 0us]", [], []) ->
+            let r = makeRangeFrom fsExpr
+
+            return
+                match ctx.BoundConstructorThis with
+                | Some i -> identWithRange r i |> Fable.IdentExpr
+                | None -> Fable.Value(makeType ctx.GenericArgs fsExpr.Type |> Fable.ThisValue, r)
 
         // | FSharpExprPatterns.ILFieldSet _
         | expr ->
