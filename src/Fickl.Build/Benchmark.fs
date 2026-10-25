@@ -64,7 +64,8 @@ let private workloads =
         {
             Name = "jssuite"
             Label = "Fable JS test suite"
-            Source = None
+            // Upstream's suite at 5.24.0: Fickl's own suite uses features upstream Fable rejects
+            Source = Some("https://github.com/fable-compiler/Fable.git", "be20361ffaf44ccc91a430501caec6e65db31db2")
             Directory = "tests/Js/Main"
             Project = "Fable.Tests.fsproj"
             Language = "javascript"
