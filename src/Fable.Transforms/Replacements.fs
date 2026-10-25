@@ -1478,6 +1478,54 @@ let getMangledNames (i: CallInfo) (thisArg: Expr option) =
 
     moduleName, mangledName
 
+#if !FABLE_COMPILER
+/// The names a runtime library module exports, read once per library directory; None if the file is not found.
+let private libraryModuleExports =
+    Collections.Concurrent.ConcurrentDictionary<string, Set<string> option>()
+
+let private exportRegex =
+    System.Text.RegularExpressions.Regex(
+        @"^export\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:function\*?|class|const|let|var)\s+([A-Za-z0-9_$]+)",
+        System.Text.RegularExpressions.RegexOptions.Multiline
+        ||| System.Text.RegularExpressions.RegexOptions.Compiled
+    )
+
+/// Members of BCL types and FSharp.Core modules implemented in F# in the runtime library are called by their mangled
+/// names. A member the library does not implement would compile to an import the module does not export, which fails
+/// when the module loads; report it as unsupported instead.
+let private isMissingLibraryMember (com: ICompiler) (moduleName: string) (mangledName: string) =
+    // LibraryDir is relative to the file being compiled
+    let libraryDir =
+        try
+            IO.Path.GetFullPath(IO.Path.Combine(IO.Path.GetDirectoryName(com.CurrentFile), com.LibraryDir))
+        with _ ->
+            com.LibraryDir
+
+    let exports =
+        libraryModuleExports.GetOrAdd(
+            libraryDir + "|" + moduleName,
+            fun _ ->
+                [ ".js"; ".ts" ]
+                |> List.tryPick (fun ext ->
+                    let path = IO.Path.Combine(libraryDir, moduleName + ext)
+
+                    if IO.File.Exists path then
+                        exportRegex.Matches(IO.File.ReadAllText path)
+                        |> Seq.map (fun m -> m.Groups[1].Value)
+                        |> Set.ofSeq
+                        |> Some
+                    else
+                        None
+                )
+        )
+
+    match exports with
+    | Some exports -> not (exports.Contains mangledName)
+    | None -> false
+#else
+let private isMissingLibraryMember (_com: ICompiler) (_moduleName: string) (_mangledName: string) = false
+#endif
+
 let bclType (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
     | "ToString", Some callee, [] -> Helper.InstanceCall(callee, "toString", t, args, ?loc = r) |> Some
@@ -1491,14 +1539,29 @@ let bclType (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
             | Some callee -> callee :: args
             | _ -> args
 
-        Helper.LibCall(com, moduleName, mangledName, t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
-        |> Some
+        if isMissingLibraryMember com moduleName mangledName then
+            None
+        else
+            Helper.LibCall(
+                com,
+                moduleName,
+                mangledName,
+                t,
+                args,
+                i.SignatureArgTypes,
+                genArgs = i.GenericArgs,
+                ?loc = r
+            )
+            |> Some
 
 let fsharpModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     let moduleName, mangledName = getMangledNames i thisArg
 
-    Helper.LibCall(com, moduleName, mangledName, t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
-    |> Some
+    if isMissingLibraryMember com moduleName mangledName then
+        None
+    else
+        Helper.LibCall(com, moduleName, mangledName, t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
+        |> Some
 
 /// Matches printf("constant") where constant has no format specifiers.
 /// These can be passed directly to console.log/error instead of going through toConsole.
