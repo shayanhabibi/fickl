@@ -139,6 +139,27 @@ overloaded ones), 8- and 9-element tuples, `use` of a null disposable, `lock`, e
 literals, `$$"""…{{x}}…"""` interpolation, event `RemoveHandler`, closures over `for` in sequence expressions, nested
 `try`/`finally` order, and the laziness of `Seq.groupBy` / `Seq.sortBy`.
 
+## Third round: `%A` formatting (2026-10-26)
+
+`tests/Probe/Batch4.fs`. `%A` prints from the runtime value, which has lost the static type, so most of F#'s structured
+format is not reproduced. #18 tracks it.
+
+| Case | .NET | JS | Status |
+| --- | --- | --- | --- |
+| `sprintf "%A" ()` (also `%O`, inside a format, before another argument) | `()`, `<null>` | the source of a function | bug (#91) |
+| Numeric suffixes: `2.0`, `1.5f`, `1.50M`, `5L`, `7uy`, `nan` (also inside unions: `Circle 2.0`) | as written | `2`, `1.5`, `1.50`, `5`, `7`, `NaN` | limit (#18) |
+| `'c'` | `'c'` | `"c"` | limit (#18) |
+| Tuples, struct tuples, options, value options, `Some None` | `(1, "a")`, `struct (1, "a")`, `Some 1`, `None` | `1,a`, `1`, `undefined` | limit (#18) |
+| Arrays `[\| 1; 2 \|]`, `[\|\|]`, jagged | `[\|1; 2\|]`, `[\|\|]` | `1,2`, empty | limit (#18) |
+| Lists longer than 100, lines longer than 80 | truncated with `...`, wrapped | all items, one line | limit (#18) |
+| Nested records | indented under their field, `Some { … }` | flush, without `Some` | limit (#18) |
+| `Map` with string values; `Dictionary`, `ResizeArray` | `map [(1, "a")]`, `seq [[1, a]]`, `seq [1; 2]` | `map [(1, a)]`, `[1,a]`, `1,2` | limit (#18) |
+| Functions; `TimeSpan`; `Guid`; enums; `DateTime` | `<fun:…>`; `01:30:00`; unquoted; `Monday`; culture date | JS source; `5400000`; quoted; `1`; `01/02/2024 03:04:05` | limit (#18) |
+| `sprintf "[%10A]" 42` | `[42]` (width ignored) | padded | limit (#18) |
+
+Worked: `%A` of integers, strings (quoted and escaped), booleans, lists, sequences up to their first items, unions
+with and without fields, flat records, anonymous records, sets, and `%O` / `string` of records and unions.
+
 ## What worked
 
 Explicit interface implementations next to class members of the same name, interface inheritance, generic interface
