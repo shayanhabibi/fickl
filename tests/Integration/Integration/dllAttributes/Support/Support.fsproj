@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Support.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../../src/Fable.Core/Fable.Core.fsproj" />
+    <ProjectReference Include="../../../../../src/Fickl.Core/Fickl.Core.fsproj" />
+  </ItemGroup>
+</Project>
