@@ -2,7 +2,7 @@
 
 `tests/Probe` runs about 500 small checks on .NET and as JavaScript and lists the results that differ
 (`python tests/Probe/run.py`). Every check is valid F# that .NET compiles and runs. The cases below are what it found
-with Fickl 0.6.7, compared with upstream Fable 5.13 on the same sources: all of them also happen in Fable except
+with Fickl 0.6.7, compared with upstream Fable 5.24.0 (the latest release) on the same sources: all of them also happen in Fable except
 the `%o` format, which Fickl already fixes.
 
 Status: **bug** (Fickl's output is wrong and can be fixed), **limit** (JavaScript has no cheap equivalent; documented),
