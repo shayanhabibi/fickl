@@ -1877,6 +1877,7 @@ let private transformPrimaryConstructor
         let bodyCtx, args = bindMemberArgs com ctx args
         let bodyCtx = { bodyCtx with CaptureBaseConsCall = captureBaseCall }
         let body = transformExpr com bodyCtx [] body |> run
+        checkNoOverloadSuffix com memb
         let consName, _ = getMemberDeclarationName com memb
 
         let cons: Fable.MemberDecl =
@@ -2135,6 +2136,7 @@ let private transformMemberFunctionOrValue
     args
     (body: FSharpExpr)
     =
+    checkNoOverloadSuffix com memb
     let name, _ = getMemberDeclarationName com memb
     let attributes = memb.Attributes |> Seq.map (fun x -> FsAtt(x) :> Fable.Attribute)
 

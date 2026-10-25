@@ -747,8 +747,51 @@ module PojoDefinedByConsArgs =
         ]
 #endif
 
+// fickl: [<NoOverloadSuffix>] drops the overload hash from compiled member names
+type NoSuffixCounter(start: int) =
+    [<NoOverloadSuffix>]
+    member _.Add(x: int) = start + x
+    member _.Sub(x: int) = start - x
+    [<NoOverloadSuffix>]
+    member val Label = "" with get, set
+
+[<NoOverloadSuffix>]
+type NoSuffixCalc(seed: int) =
+    new() = NoSuffixCalc(0)
+    member _.Twice(x: int) = seed + x * 2
+    member _.Over(x: int) = x
+    member _.Over(x: string) = x.Length
+    static member Make(x: int) = NoSuffixCalc(x)
+
 let tests =
   testList "JsInterop" [
+    testCase "NoOverloadSuffix members work" <| fun _ ->
+        let c = NoSuffixCounter(10)
+        c.Add 1 |> equal 11
+        c.Sub 1 |> equal 9
+        c.Label <- "a"
+        c.Label |> equal "a"
+        let k = NoSuffixCalc(1)
+        k.Twice 2 |> equal 5
+        k.Over 3 |> equal 3
+        k.Over "four" |> equal 4
+        (NoSuffixCalc.Make 5).Twice 1 |> equal 7
+        NoSuffixCalc().Twice 1 |> equal 2
+
+#if FABLE_COMPILER
+    testCase "NoOverloadSuffix members compile to names without the hash" <| fun _ ->
+        let c = NoSuffixCounter(10)
+        emitJsExpr (c, 1) "NoSuffixCounter__Add($0, $1)" |> equal 11
+        emitJsStatement (c, "b") "NoSuffixCounter__set_Label($0, $1)"
+        c.Label |> equal "b"
+        emitJsExpr (NoSuffixCalc(1), 2) "NoSuffixCalc__Twice($0, $1)" |> equal 5
+        let made: NoSuffixCalc = emitJsExpr 5 "NoSuffixCalc_Make($0)"
+        made.Twice 1 |> equal 7
+        // Overloaded members keep their hash, so the two Over methods stay apart
+        let noPlainOver: bool = emitJsExpr () "typeof NoSuffixCalc__Over === 'undefined'"
+        noPlainOver |> equal true
+#endif
+
     testCase "Class with attached members works" <| fun _ ->
         let x = ClassWithAttachments(2)
         equal 2 x.Times
