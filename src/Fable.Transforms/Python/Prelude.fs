@@ -180,6 +180,9 @@ module Naming =
         uniqueIndex <- uniqueIndex + 1
         idx
 
+    // fickl: a compile server starts each compilation from the index a fresh process would use
+    let resetUniqueIndex () = uniqueIndex <- 0
+
     let preventConflicts conflicts originalName =
         let rec check originalName n =
             let name =

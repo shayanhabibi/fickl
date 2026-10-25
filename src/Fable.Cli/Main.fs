@@ -397,7 +397,8 @@ type ProjectCracked(cliArgs: CliArgs, crackerResponse: CrackerResponse, sourceFi
         let fableLibDir = Path.getRelativePath currentFile crackerResponse.FableLibDir
 
         let watchDependencies, signatureDependencies =
-            if cliArgs.IsWatch then
+            // fickl: a compile server recompiles dependents of changed files, as watch mode does
+            if cliArgs.IsWatch || ServerMode.collectsDependencies then
                 Some(HashSet()), Some(HashSet())
             else
                 None, None
@@ -697,20 +698,26 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                                        replyChannel) ->
                         activeReplyChannel.Value <- Some replyChannel
 
-                        let state =
-                            FableCompilerState.Create(
-                                state.FableProj,
-                                filesToCompile,
-                                sourceFiles,
-                                pathResolver,
-                                isSilent,
-                                isTriggeredByDependency,
-                                getSignatureDependents,
-                                replyChannel
-                            )
+                        // fickl: nothing changed since the last compilation in this process
+                        if Array.isEmpty filesToCompile then
+                            Ok([||], []) |> replyChannel.Reply
+                            return! loop state
+                        else
 
-                        typeCheck sourceFiles (Array.last filesToCompile)
-                        return! loop state
+                            let state =
+                                FableCompilerState.Create(
+                                    state.FableProj,
+                                    filesToCompile,
+                                    sourceFiles,
+                                    pathResolver,
+                                    isSilent,
+                                    isTriggeredByDependency,
+                                    getSignatureDependents,
+                                    replyChannel
+                                )
+
+                            typeCheck sourceFiles (Array.last filesToCompile)
+                            return! loop state
 
                     | FSharpFileTypeChecked file ->
                         // It seems when there's a pair .fsi/.fs the F# compiler gives the .fsi extension to the implementation file
@@ -864,7 +871,8 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                                         Log.always msg
                                     // Avoid log pollution in CI. Also, if output is redirected don't try to rewrite
                                     // the same line as it seems to cause problems, see #2727
-                                    else if not isCi && not Console.IsOutputRedirected then
+                                    // fickl: a compile server's output reaches the client as lines
+                                    else if not isCi && not Console.IsOutputRedirected && not ServerMode.isServer then
                                         let maxWidth = Console.WindowWidth - 3 // for the "..." when message is too long
 
                                         // If the message is longer than the terminal width it will jump to next line
@@ -1877,6 +1885,18 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
                     OtherLogs = otherLogs
                     ExitCode = exitCode
                 |}
+    }
+
+/// fickl: one compilation of a compile server, which keeps the state for the next request. A Fable
+/// error drops it, as the project may need cracking again.
+let compileInServer (state: State) (changes: ISet<string>) =
+    async {
+        try
+            let! result = compilationCycle state changes
+            return result.ExitCode, Some result.State
+        with Fable.FableError e ->
+            Log.error e
+            return 1, None
     }
 
 type FileWatcherMsg = | Changes of timeStamp: DateTime * changes: ISet<string>

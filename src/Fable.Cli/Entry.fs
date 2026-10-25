@@ -94,6 +94,11 @@ let knownCliArgs () =
             "Type-check package sources instead of reusing them from Fickl's package cache"
             "(JavaScript and TypeScript; the cache is keyed by package contents and options)"
         ]
+        [ "--server" ],
+        [
+            "Compile through a background compile server that keeps check results between compilations,"
+            "so recompiling a project only rechecks what changed (also FICKL_SERVER=1; FICKL_SERVER=0 disables it)"
+        ]
         [ "--noGitignore" ],
         [
             "Don't generate a `.gitignore` file in the `fable_modules` folder"
@@ -243,7 +248,9 @@ type Runner =
             verbosity: Fable.Verbosity,
             ?fsprojPath: string,
             ?watch,
-            ?precompile
+            ?precompile,
+            // fickl: how a compile server compiles, keeping state between requests
+            ?compile: Fable.Compiler.Util.CliArgs -> Result<unit, string>
         )
         =
         result {
@@ -414,13 +421,16 @@ type Runner =
                 |> startCompilationAsync
                 |> Async.RunSynchronously
 
-            return!
-                // In CI builds, it may happen that two parallel Fable compilations try to precompile
-                // the same library at the same time, use a lock file to prevent issues in that case.
-                match outDir, precompile, watch with
-                | Some outDir, true, false -> File.withLock outDir startCompilation
-                | _ -> startCompilation ()
-                |> Result.mapEither ignore fst
+            match compile with
+            | Some compile -> return! compile cliArgs
+            | None ->
+                return!
+                    // In CI builds, it may happen that two parallel Fable compilations try to precompile
+                    // the same library at the same time, use a lock file to prevent issues in that case.
+                    match outDir, precompile, watch with
+                    | Some outDir, true, false -> File.withLock outDir startCompilation
+                    | _ -> startCompilation ()
+                    |> Result.mapEither ignore fst
         }
 
 let clean (args: CliArgs) language rootDir =
@@ -526,20 +536,19 @@ let private logPrelude commands language =
 
         Log.always ("Stand with Ukraine! https://standwithukraine.com.ua/" + "\n")
 
-[<EntryPoint>]
-let main argv =
+let private createLogger level =
+    use factory =
+        LoggerFactory.Create(fun builder ->
+            builder.SetMinimumLevel(level).AddCustomConsole(fun options -> options.UseNoPrefixMsgStyle <- true)
+            |> ignore
+        )
 
-    let createLogger level =
-        use factory =
-            LoggerFactory.Create(fun builder ->
-                builder.SetMinimumLevel(level).AddCustomConsole(fun options -> options.UseNoPrefixMsgStyle <- true)
-                |> ignore
-            )
+    factory.CreateLogger("")
 
-        factory.CreateLogger("")
-
-    // Set an initial logger in case, we fail to parse the CLI args
-    Log.setLogger Verbosity.Normal (createLogger LogLevel.Information)
+/// fickl: runs a command line. A compile server runs the compilations of its requests here too (`inServer`),
+/// logging through the logger that answers the request.
+let private execute (argv: string array) (inServer: bool) =
+    let originalArgv = argv
 
     result {
         let! argv, runProc =
@@ -586,9 +595,42 @@ let main argv =
         PackageCache.setEnabled (not (args.FlagEnabled "--noPackageCache"))
 
         // Override the logger now that we know the verbosity level
-        Log.setLogger verbosity (createLogger level)
+        do
+            if inServer then
+                CompileServer.setRequestVerbosity verbosity
+            else
+                Log.setLogger verbosity (createLogger level)
+                logPrelude commands language
 
-        logPrelude commands language
+        // fickl: compile through a compile server when asked to, or in this process when it can't be reached
+        let compileHere (fsprojPath: string option) =
+            let watch = args.FlagEnabled("--watch")
+
+            if inServer then
+                Runner.Run(
+                    args,
+                    language,
+                    rootDir,
+                    runProc,
+                    verbosity,
+                    ?fsprojPath = fsprojPath,
+                    compile = CompileServer.compile
+                )
+            else
+                match
+                    (if
+                         CompileServer.isRequested (args.FlagEnabled "--server")
+                         && not watch
+                         && Option.isNone runProc
+                     then
+                         CompileServer.tryCompile originalArgv
+                     else
+                         None)
+                with
+                | Some 0 -> Ok()
+                | Some _ -> Error CompileServer.alreadyReported
+                | None ->
+                    Runner.Run(args, language, rootDir, runProc, verbosity, ?fsprojPath = fsprojPath, watch = watch)
 
         match commands with
         | [ "--help" ] -> return printHelp ()
@@ -601,22 +643,25 @@ let main argv =
         | [ "precompile"; path ] ->
             return! Runner.Run(args, language, rootDir, runProc, verbosity, fsprojPath = path, precompile = true)
         | [ "precompile" ] -> return! Runner.Run(args, language, rootDir, runProc, verbosity, precompile = true)
-        | [ path ] ->
-            return!
-                Runner.Run(
-                    args,
-                    language,
-                    rootDir,
-                    runProc,
-                    verbosity,
-                    fsprojPath = path,
-                    watch = args.FlagEnabled("--watch")
-                )
-        | [] -> return! Runner.Run(args, language, rootDir, runProc, verbosity, watch = args.FlagEnabled("--watch"))
+        | [ path ] -> return! compileHere (Some path)
+        | [] -> return! compileHere None
         | _ -> return! "Unexpected arguments" |> generateHelpWithPrefix |> Error
     }
     |> function
         | Ok _ -> 0
+        | Error msg when msg = CompileServer.alreadyReported -> 1
         | Error msg ->
             Log.error msg
             1
+
+[<EntryPoint>]
+let main argv =
+    // fickl: the compile server started by a client (see CompileServer.fs)
+    if argv.Length = 2 && argv[0] = "--compile-server" then
+        CompileServer.serve argv[1] (fun request -> execute request.Args true)
+        0
+    else
+        // Set an initial logger in case, we fail to parse the CLI args
+        Log.setLogger Verbosity.Normal (createLogger LogLevel.Information)
+
+        execute argv false
