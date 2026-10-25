@@ -34,6 +34,30 @@ Runtime sweeps use cold `--noCache` runs, configurations interleaved, 4–5 runs
 ("Fable compilation finished in"), which excludes project cracking. Glutinum's compile times range 4.2–6.8 s within one
 configuration, so it is not used to rank settings; the JS test suite stays within ±0.2 s.
 
+## FCS merged with dotnet/fsharp main (2026-10-25)
+
+fickle-fsharp `trial/rebase-dotnet-main` merges 950 upstream commits (2025-11-21 to 2026-10-23) into
+`fickle_slim`. Three upstream changes needed Fable-specific patches (all under `FABLE_CLI`): interpolated
+strings lowered to `String.Concat` (#19971) would break Fable's string templates, so the PrintfFormat lowering
+is kept; FS1113 moved into post-inference checks, which would reject inline functions using internal values;
+and FCS now defaults to net11.0, so `fcs-fork` passes the target framework. JS, TypeScript, Python and
+integration suites pass. Generated JS and Python for the test suites differ from the current compiler only in
+names (delegate lambdas take the delegate's parameter names) and in which of two equivalent interface members a
+TS tagged-union test checks.
+
+Dev builds of both compilers, `--noCache`, interleaved, separate package caches. The machine was not idle
+(an unrelated WebKit build started part way), so read the ratios, not the absolute times.
+
+| Workload | Current FCS | Merged FCS | |
+| --- | --- | --- | --- |
+| Python bench, `--noPackageCache`, type check | 11.2 s, 12.6 GB allocated | 2.5 s, 1.3 GB | Output identical; an upstream fix removes a pathological case these packages hit |
+| Python bench, `--noPackageCache`, process wall (median of 5) | 8.59 s | 2.97 s | |
+| JS suite, cache hit, median of 8 alternating | 13.8 s wall, 4.5 s check, 8.2 GB | 11.6 s, 3.9 s, 6.3 GB | Under load |
+| Sutil / Fantomas / Ionide / JS suite, `--noPackageCache`, compile phase | | −7% / −1.5% / −7% / −5% | Median of 5 |
+
+An earlier five-run cache-hit comparison showed the merged FCS 5–13% slower in wall time on four projects while
+the focused eight-run JS suite comparison above shows it faster; this needs a rerun on an idle machine.
+
 ## End to end against upstream (Fickl 0.5.3, 2026-10-22)
 
 [Comparison image](benchmarks/fickl-0.5.3.png), [raw timings](benchmarks/fickl-0.5.3.csv),
