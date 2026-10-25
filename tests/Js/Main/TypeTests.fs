@@ -774,6 +774,27 @@ let inline inlinedFunc(n: 't[]) =
 let genericByrefFunc(n: byref<'t[]>) =
     inlinedFunc n
 
+[<Struct>]
+type MutableStructRecord = { mutable X: int; mutable Y: int }
+
+[<Struct>]
+type MutableStructVal =
+    val mutable A: int
+    new(a) = { A = a }
+    member this.Bump() = this.A <- this.A + 1
+
+let readInRef (x: inref<int>) = x + 1
+let multiplyInRefs (a: inref<int>) (b: inref<int>) = a * b
+let readStructInRef (p: inref<MutableStructRecord>) = p.X + p.Y
+let bumpStructByRef (p: byref<MutableStructRecord>) = p.X <- p.X + 100
+let bumpStructValByRef (p: byref<MutableStructVal>) = p.Bump()
+let incrementByRef (x: byref<int>) = x <- x + 1
+let incrementByteByRef (x: byref<byte>) = x <- x + 1uy
+let inline readInRefInline (x: inref<int>) = x * 3
+
+type StaticInRef =
+    static member Read(x: inref<int>) = x + 2
+
 [<Fable.Core.AttachMembers>]
 type GenericClassWithStaticMember<'T>() =
     static member Length(xs: 'T list) = xs.Length
@@ -1708,6 +1729,48 @@ let tests =
         let mutable arr = [| 1; 2; 3 |]
         let result = genericByrefFunc &arr
         result |> equal 3
+
+    testCase "inref of an immutable value reads the value" <| fun () -> // #52
+        let x = 5
+        readInRef &x |> equal 6
+        multiplyInRefs &x &x |> equal 25
+        StaticInRef.Read &x |> equal 7
+        readInRefInline &x |> equal 15
+        let s = { X = 1; Y = 2 }
+        readStructInRef &s |> equal 3
+        let mutable m = 3
+        readInRef &m |> equal 4
+
+    testCase "Fields and members through a byref to a struct reach the struct" <| fun () -> // #53
+        let mutable s = { X = 1; Y = 2 }
+        bumpStructByRef &s
+        bumpStructByRef &s
+        s.X |> equal 201
+        s.Y |> equal 2
+        let mutable v = MutableStructVal(1)
+        bumpStructValByRef &v
+        v.A |> equal 2
+
+    testCase "byref to an array element works" <| fun () -> // #49
+        let a = [| 1; 2 |]
+        incrementByRef &a.[1]
+        incrementByRef &a.[0]
+        incrementByRef &a.[0]
+        a |> equal [| 3; 3 |]
+        let structs = [| { X = 1; Y = 2 } |]
+        bumpStructByRef &structs.[0]
+        structs.[0].X |> equal 101
+        let bytes = [| 1uy; 2uy |]
+        incrementByteByRef &bytes.[1]
+        bytes.[1] |> equal 3uy
+        let mutable calls = 0
+        let next () =
+            calls <- calls + 1
+            calls
+        let b = [| 0; 0; 0 |]
+        incrementByRef &b.[next ()]
+        b |> equal [| 0; 1; 0 |]
+        calls |> equal 1
 
     testCase "mangled method on interface works"
     <| fun () ->
