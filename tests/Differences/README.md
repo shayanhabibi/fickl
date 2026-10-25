@@ -21,3 +21,15 @@ A case is a folder with a `Main.fs`, plus any other `.fs` files, which compile f
 `Issues` is `none` or Fickl issue numbers. `Args` is optional: extra options for both compilers.
 
 Fickl compiles a case with `src/Fickl.Core` referenced, and Fable with the latest `Fable.Core` package, so a case using a Fickl attribute fails to type-check with Fable.
+
+Fickl defines `FICKL_COMPILER` and Fable does not. When Fable gains an attribute that Fickl has, Fable's version lives in `Fable.Core` rather than `Fickl.Core`, so a case picks the one each compiler has:
+
+```fsharp
+#if FICKL_COMPILER
+open Fickl.Core
+#else
+open Fable.Core
+#endif
+```
+
+Once Fable passes the case, it leaves the table as usual.

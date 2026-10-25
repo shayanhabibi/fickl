@@ -345,6 +345,8 @@ type Runner =
                     [
                         "FABLE_COMPILER"
                         "FABLE_COMPILER_5"
+                        // fickl: tells Fickl apart from Fable, e.g. to open Fickl.Core where Fable.Core has the same attribute
+                        "FICKL_COMPILER"
                         if jsTemporal then
                             "FABLE_COMPILER_JAVASCRIPT_TEMPORAL"
                         match language with
