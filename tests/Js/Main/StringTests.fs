@@ -279,6 +279,14 @@ let tests = testList "Strings" [
         let x = 3.14159
         $"{{0}} {x:F2} {{y}}" |> equal "{0} 3.14 {y}"
 
+    testCase "sprintf \"%A\" of unit prints ()" <| fun () -> // #91
+        sprintf "%A" () |> equal "()"
+        sprintf "%O" () |> equal "<null>"
+        sprintf "x%Ay" () |> equal "x()y"
+        sprintf "%A|%A" () 1 |> equal "()|1"
+        let f () = ()
+        sprintf "%A" (f ()) |> equal "()"
+
     testCase "sprintf with escaped percent symbols works" <| fun () -> // See #195
         let r, r1, r2 = "Ratio", 0.213849, 0.799898
         sprintf "%s1: %.2f%% %s2: %.2f%%" r (r1*100.) r (r2*100.)

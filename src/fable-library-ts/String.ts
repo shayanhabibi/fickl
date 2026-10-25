@@ -269,6 +269,9 @@ function formatReplacement(rep: any, flags: any, padLength: any, precision: any,
         rep = String(rep);
         break;
     }
+  } else if (rep === unitArgument) {
+    // As .NET prints (): "()" for %A, and <null> for %O
+    rep = format === "A" ? "()" : format === "O" ? "<null>" : "";
   } else if (rep instanceof Date || isNetDateFormattable(rep)) {
     rep = formatDateLike(rep, undefined);
   } else if (format === "A" && typeof rep === "string") {
@@ -298,8 +301,14 @@ function formatReplacement(rep: any, flags: any, padLength: any, precision: any,
   return rep;
 }
 
+// A unit argument is erased, so the printer is applied to nothing; None is passed as undefined
+const unitArgument = Symbol("unit");
+
 function createPrinter(cont: (...args: any[]) => any, _strParts: string[], _matches: RegExpExecArray[], _result = "", padArg = -1) {
   return (...args: any[]) => {
+    if (args.length === 0) {
+      args = [unitArgument];
+    }
     // Make copies of the values passed by reference because the function can be used multiple times
     let result = _result;
     const strParts = _strParts.slice();
