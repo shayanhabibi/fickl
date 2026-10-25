@@ -399,6 +399,44 @@ let toChar com (ctx: Context) r (arg: Expr) =
         let code = toInt com ctx r UInt16.Number [ arg ]
         Helper.GlobalCall("String", Char, [ code ], memb = "fromCharCode")
 
+/// `string` of an option or tuple, with formatters for the items whose static types need one (nested options and
+/// tuples), as their runtime values have lost the type
+let rec private erasedToString (com: ICompiler) (ctx: Context) r (typ: Type) (expr: Expr) : Expr =
+    let needsFormat =
+        function
+        | Option _
+        | Tuple _ -> true
+        | _ -> false
+
+    let formatter (t: Type) =
+        let x = makeUniqueIdent com ctx t "x"
+        Delegate([ x ], erasedToString com ctx None t (IdentExpr x), None, Tags.empty)
+
+    match typ with
+    | Option(inner, isStruct) ->
+        let args =
+            [
+                expr
+                makeBoolConst isStruct
+                if needsFormat inner then
+                    formatter inner
+            ]
+
+        Helper.LibCall(com, "Option", "optionToString", String, args, ?loc = r)
+    | Tuple(items, _) when List.exists needsFormat items ->
+        let formats =
+            items
+            |> List.map (fun t ->
+                if needsFormat t then
+                    formatter t
+                else
+                    Value(Null Any, None)
+            )
+
+        Helper.LibCall(com, "Types", "tupleToString", String, [ expr; makeArray Any formats ], ?loc = r)
+    | Tuple _ -> Helper.LibCall(com, "Types", "tupleToString", String, [ expr ], ?loc = r)
+    | _ -> Helper.LibCall(com, "Types", "toString", String, [ expr ], ?loc = r)
+
 let toString com (ctx: Context) r (args: Expr list) =
     match args with
     | [] ->
@@ -432,6 +470,13 @@ let toString com (ctx: Context) r (args: Expr list) =
         | Number _ -> Helper.InstanceCall(head, "toString", String, tail)
         | Array _
         | List _ -> Helper.LibCall(com, "Types", "seqToString", String, [ head ], ?loc = r)
+        // Options, tuples and unit are erased or plain arrays at runtime: format them as .NET does from the static type
+        | Option _
+        | Tuple _ -> erasedToString com ctx r head.Type head
+        | Unit ->
+            match head with
+            | Value _ -> makeStrConst ""
+            | _ -> Sequential [ head; makeStrConst "" ]
         // | DeclaredType(ent, _) when ent.IsFSharpUnion || ent.IsFSharpRecord || ent.IsValueType ->
         //     Helper.InstanceCall(head, "toString", String, [], ?loc=r)
         // | DeclaredType(ent, _) ->

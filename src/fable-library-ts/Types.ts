@@ -45,6 +45,15 @@ export function toString(x: any, callStack = 0): string {
   return String(x);
 }
 
+// `string` of a tuple as .NET prints it: (1, a), with nulls as nothing. `formats` print the items whose static
+// types need it (nested options and tuples).
+export function tupleToString(xs: any[], formats?: (((x: any) => string) | null | undefined)[]): string {
+  return "(" + xs.map((x, i) => {
+    const format = formats?.[i];
+    return format != null ? format(x) : x == null ? "" : toString(x);
+  }).join(", ") + ")";
+}
+
 export function unionToString(name: string, fields: any[]) {
   if (fields.length === 0) {
     return name;

@@ -35,6 +35,27 @@ let makeSome (x: 'a): 'a option =
 
 let tests =
   testList "Option" [
+    testCase "string of options, tuples and unit prints like .NET" <| fun () -> // #63
+        let mutable called = 0
+        let effect () = called <- called + 1
+        string (Some 1) |> equal "Some(1)"
+        string (Some "a") |> equal "Some(a)"
+        string (None: int option) |> equal ""
+        string (Some(None: int option)) |> equal "Some(null)"
+        string (Some(Some 1)) |> equal "Some(Some(1))"
+        (Some 3).ToString() |> equal "Some(3)"
+        string (ValueSome 1) |> equal "1"
+        string (ValueNone: int voption) |> equal "ValueNone"
+        string () |> equal ""
+        string (effect ()) |> equal ""
+        called |> equal 1
+        string (1, "a", 2.5) |> equal "(1, a, 2.5)"
+        string (1, (2, "b")) |> equal "(1, (2, b))"
+        string (1, (null: string)) |> equal "(1, )"
+        string (struct (1, "x")) |> equal "(1, x)"
+        string (1, Some 2) |> equal "(1, Some(2))"
+        string (Some(1, 2)) |> equal "Some((1, 2))"
+
 
     testCase "defaultArg works" <| fun () ->
         let f o = defaultArg o 5
