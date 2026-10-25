@@ -8,5 +8,6 @@ let main _ =
     Boxing.run ()
     Odd.run ()
     Weird2.run ()
+    Batch3.run ()
     Deep.run ()
     0
