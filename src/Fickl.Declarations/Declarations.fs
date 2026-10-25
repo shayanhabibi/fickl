@@ -345,10 +345,12 @@ let private declarationClassMembers
     (members: ClassMember array)
     =
     let inJs memb =
-        match jsMembers, classMemberKey memb with
-        | Some jsMembers, Some key -> jsMembers.Contains(key)
-        | None, Some _ -> true
-        | _, None -> true
+        match memb, jsMembers, classMemberKey memb with
+        // An abstract member has no JavaScript, but subclasses and callers still have it
+        | ClassMethod(isAbstract = true), _, _ -> true
+        | _, Some jsMembers, Some key -> jsMembers.Contains(key)
+        | _, None, Some _ -> true
+        | _, _, None -> true
 
     members
     |> Array.collect (fun memb ->
