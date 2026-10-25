@@ -130,22 +130,7 @@ jobs:
       - name: Fable Tests
         run: dotnet run --project src/Fickl.Build -- test integration
 
-  # Separate build job for Standalone
-  build-standalone:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v7.0.1
-
-      - name: Setup .NET
-        uses: ./.github/actions/setup-dotnet
-
-      - name: Setup Node.js environment
-        uses: ./.github/actions/setup-node
-
-      - name: Fable Tests
-        run: dotnet run --project src/Fickl.Build -- test standalone
+  # fickl: no standalone job; the browser compiler is not shipped by this fork
 
   # Separate build job for Python since we use a test matrix (will run in parallell)
   build-python:
