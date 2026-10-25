@@ -74,6 +74,16 @@ let knownCliArgs () =
         [ "--timings" ], [ "Print a per-phase timing and allocation report after each compilation" ]
         [ "--silent" ], [ "Don't print any log during compilation" ]
         [ "--typedArrays" ], [ "Compile numeric arrays as JS typed arrays (default is true)" ]
+        [ "--clampByteArrays" ],
+        [
+            "Compile byte arrays as Uint8ClampedArray, as canvas pixel data is (JavaScript and TypeScript)."
+            "Out-of-range values clamp to 0 or 255 instead of wrapping as on .NET"
+        ]
+        [ "--temporal" ],
+        [
+            "Represent DateTime, DateTimeOffset, DateOnly, TimeOnly and TimeSpan with the JS Temporal API"
+            "(experimental; needs a runtime with Temporal; JavaScript and TypeScript)"
+        ]
         [ "--watch" ], [ "Alias of watch command" ]
         [ "--watchDelay" ], [ "Delay in ms before recompiling after a file changes (default 50)" ]
         [], []
@@ -342,7 +352,8 @@ type Runner =
                 | Some c when String.IsNullOrWhiteSpace c -> defaultConfiguration
                 | Some configurationArg -> configurationArg
 
-            let jsTemporal = args.FlagEnabled "--test:js-temporal"
+            // fickl: --temporal is the documented name of Fable's --test:js-temporal
+            let jsTemporal = args.FlagEnabled("--temporal", "--test:js-temporal")
 
             let define =
                 args.Values "--define"
@@ -389,7 +400,9 @@ type Runner =
                     optimizeFSharpAst = args.FlagEnabled "--optimize",
                     noReflection = args.FlagEnabled "--noReflection",
                     verbosity = verbosity,
-                    jsTemporal = jsTemporal
+                    jsTemporal = jsTemporal,
+                    // fickl: ClampByteArrays had no flag
+                    clampByteArrays = args.FlagEnabled "--clampByteArrays"
                 )
 
             let cliArgs =
