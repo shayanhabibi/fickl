@@ -630,11 +630,92 @@ module private Transforms =
             | e -> e)
             body
 
-    let curryArgIdentsAndReplaceInBody (args: Ident list) body =
+    // fickl: flags, one per flattened parameter, for parameters marked [<Curried>] on the member
+    // or on the abstract slot it implements
+    let curriedParams (com: Compiler) (memb: MemberFunctionOrValue) =
+        let flags (m: MemberFunctionOrValue) =
+            m.CurriedParameterGroups
+            |> List.concat
+            |> List.map (fun p -> p.Attributes |> Seq.exists (fun att -> att.Entity.FullName = Atts.ficklCurried))
+
+        let paramTypes (m: MemberFunctionOrValue) =
+            m.CurriedParameterGroups |> List.concat |> List.map _.Type
+
+        let ownTypes = paramTypes memb
+
+        // Only parameters that can receive a function are uncurried, so skip the slot lookup for the rest
+        let mayTakeFunction =
+            ownTypes
+            |> List.exists (
+                function
+                | Any -> true
+                | Arity arity -> arity > 1
+            )
+
+        let implemented =
+            if not mayTakeFunction || not memb.IsOverrideOrExplicitInterfaceImplementation then
+                Seq.empty
+            else
+                // FCS cannot report the slots of IL methods
+                try
+                    Seq.toList memb.ImplementedAbstractSignatures :> _ seq
+                with :? System.NotSupportedException ->
+                    Seq.empty
+
+        let slots =
+            implemented
+            |> Seq.choose (fun s ->
+                match s.DeclaringType with
+                | DeclaredType(entRef, _) ->
+                    com.TryGetEntity(entRef)
+                    |> Option.bind (fun ent ->
+                        ent.MembersFunctionsAndValues
+                        |> Seq.tryFind (fun m ->
+                            m.IsDispatchSlot
+                            && (m.CompiledName = s.Name || m.DisplayName = s.Name)
+                            // Overloads of a slot can share a name and arity, so their parameter types must match too
+                            && (let slotTypes = paramTypes m
+
+                                List.sameLength slotTypes ownTypes
+                                && List.forall2 (typeEquals false) slotTypes ownTypes)
+                        )
+                    )
+                | _ -> None
+            )
+            |> Seq.map flags
+            |> Seq.toList
+
+        (flags memb, slots) ||> List.fold (List.map2 (||))
+
+    let tryCurriedParams (com: Compiler) (memberRef: MemberRef option) =
+        match memberRef |> Option.bind com.TryGetMember with
+        | Some memb ->
+            let flags = curriedParams com memb
+
+            if List.contains true flags then
+                Some flags
+            else
+                None
+        | None -> None
+
+    // fickl: args marked [<Curried>] stay curried in the body, so they are applied one argument at a time
+    let curryArgIdentsAndReplaceInBodyExcept (curried: bool list option) (args: Ident list) body =
+        let keep =
+            match curried with
+            | Some flags ->
+                let args = args |> List.filter (fun a -> not a.IsThisArgument)
+
+                if List.sameLength args flags then
+                    List.zip args flags |> List.filter snd |> List.map (fst >> _.Name) |> Set.ofList
+                else
+                    Set.empty
+            | None -> Set.empty
+
         let replacements, args =
             ((Map.empty, []), args)
             ||> List.fold (fun (replacements, uncurriedArgs) arg ->
                 match uncurryType' arg.Type with
+                | _ when keep.Contains arg.Name -> replacements, arg :: uncurriedArgs
                 | arity, uncurriedType when arity > 1 ->
                     Map.add arg.Name arity replacements, { arg with Type = uncurriedType } :: uncurriedArgs
                 | _ -> replacements, arg :: uncurriedArgs
@@ -644,6 +725,9 @@ module private Transforms =
             List.rev args, body
         else
             List.rev args, curryIdentsInBody replacements body
+
+    let curryArgIdentsAndReplaceInBody (args: Ident list) body =
+        curryArgIdentsAndReplaceInBodyExcept None args body
 
     let uncurryExpr com arity expr =
         let matches arity arity2 =
@@ -710,23 +794,29 @@ module private Transforms =
         | _ -> expr
 
     and uncurryArgs com autoUncurrying argTypes args =
+        uncurryArgsExcept com autoUncurrying (fun _ -> false) argTypes args
+
+    // fickl: arguments at the indices where `keepCurried` holds are passed as they are
+    and uncurryArgsExcept com autoUncurrying (keepCurried: int -> bool) argTypes args =
         let mapArgs f argTypes args =
-            let rec mapArgsInner f acc argTypes args =
+            let rec mapArgsInner f i acc argTypes args =
                 match argTypes, args with
                 | head1 :: tail1, head2 :: tail2 ->
-                    let x = f head1 head2
-                    mapArgsInner f (x :: acc) tail1 tail2
+                    let x = f i head1 head2
+                    mapArgsInner f (i + 1) (x :: acc) tail1 tail2
                 | [], head2 :: tail2 when autoUncurrying ->
-                    let x = f Any head2
-                    mapArgsInner f (x :: acc) [] tail2
+                    let x = f i Any head2
+                    mapArgsInner f (i + 1) (x :: acc) [] tail2
                 | [], args2 -> (List.rev acc) @ args2
                 | _, [] -> List.rev acc
 
-            mapArgsInner f [] argTypes args
+            mapArgsInner f 0 [] argTypes args
 
         (argTypes, args)
-        ||> mapArgs (fun expectedType arg ->
+        ||> mapArgs (fun i expectedType arg ->
             match expectedType with
+            | _ when keepCurried i -> arg
+
             | Any when autoUncurrying -> uncurryExpr com None arg
 
             | AnonymousRecordType(expectedFieldNames, expectedGenArgs, isStruct) ->
@@ -780,8 +870,9 @@ module private Transforms =
                 Let({ ident with Type = uncurryType ident.Type }, value, curryIdentsInBody replacements body)
         | e -> e
 
-    let uncurryMemberArgs (m: MemberDecl) =
-        let args, body = curryArgIdentsAndReplaceInBody m.Args m.Body
+    let uncurryMemberArgs (com: Compiler) (m: MemberDecl) =
+        let args, body =
+            curryArgIdentsAndReplaceInBodyExcept (tryCurriedParams com (Some m.MemberRef)) m.Args m.Body
 
         { m with
             Args = args
@@ -846,7 +937,8 @@ module private Transforms =
             let members =
                 members
                 |> List.map (fun m ->
-                    let args, body = curryArgIdentsAndReplaceInBody m.Args m.Body
+                    let args, body =
+                        curryArgIdentsAndReplaceInBodyExcept (tryCurriedParams com (Some m.MemberRef)) m.Args m.Body
 
                     { m with
                         Args = args
@@ -858,6 +950,23 @@ module private Transforms =
 
         | e -> e
 
+    // fickl: whether the argument at an index goes to a parameter marked [<Curried>]
+    let keepCurriedArg (com: Compiler) autoUncurrying (info: CallInfo) =
+        let hasLambdaArg =
+            autoUncurrying
+            || info.SignatureArgTypes
+               |> List.exists (
+                   function
+                   | Arity arity -> arity > 1
+               )
+
+        if hasLambdaArg then
+            match tryCurriedParams com info.MemberRef with
+            | Some flags -> fun i -> List.tryItem i flags |> Option.defaultValue false
+            | None -> fun _ -> false
+        else
+            fun _ -> false
+
     let uncurrySendingArgs (com: Compiler) e =
         let uncurryConsArgs args (fields: Field seq) =
             let argTypes = fields |> Seq.map (fun fi -> fi.FieldType) |> Seq.toList
@@ -866,11 +975,14 @@ module private Transforms =
 
         match e with
         | Call(callee, info, t, r) ->
-            let args = uncurryArgs com false info.SignatureArgTypes info.Args
+            let args =
+                uncurryArgsExcept com false (keepCurriedArg com false info) info.SignatureArgTypes info.Args
+
             let info = { info with Args = args }
             Call(callee, info, t, r)
         | Emit({ CallInfo = callInfo } as emitInfo, t, r) ->
-            let args = uncurryArgs com true callInfo.SignatureArgTypes callInfo.Args
+            let args =
+                uncurryArgsExcept com true (keepCurriedArg com true callInfo) callInfo.SignatureArgTypes callInfo.Args
 
             Emit({ emitInfo with CallInfo = { callInfo with Args = args } }, t, r)
         // Uncurry also values in setters or new record/union/tuple
@@ -988,7 +1100,7 @@ let rec transformDeclaration transformations (com: Compiler) file decl =
 
     | MemberDeclaration m ->
         m
-        |> uncurryMemberArgs
+        |> uncurryMemberArgs com
         |> transformMemberBody com
         |> fun m -> com.ApplyMemberDeclarationPlugin(file, m)
         |> MemberDeclaration
@@ -1021,7 +1133,7 @@ let rec transformDeclaration transformations (com: Compiler) file decl =
                 let m =
                     match uncurriedMember with
                     | Some m -> m
-                    | None -> uncurryMemberArgs m
+                    | None -> uncurryMemberArgs com m
 
                 transformMemberBody com m
             )
@@ -1029,7 +1141,7 @@ let rec transformDeclaration transformations (com: Compiler) file decl =
         let cons, baseCall =
             match decl.Constructor, decl.BaseCall with
             | None, _ -> None, None
-            | Some cons, None -> uncurryMemberArgs cons |> transformMemberBody com |> Some, None
+            | Some cons, None -> uncurryMemberArgs com cons |> transformMemberBody com |> Some, None
             | Some cons, Some baseCall ->
                 // In order to uncurry correctly the baseCall arguments,
                 // we need to include it in the constructor body

@@ -63,6 +63,7 @@
     <Compile Include="InlineIfLambdaTests.fs" />
     <Compile Include="JsInteropTests.fs" />
     <Compile Include="CallableInterfaceTests.fs" />
+    <Compile Include="CurryingTests.fs" />
     <Compile Include="FcsEdgeCasesHelper.fs" />
     <Compile Include="FcsEdgeCaseTests.fs" />
     <Compile Include="ListCollectorTests.fs" />
