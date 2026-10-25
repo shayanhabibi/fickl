@@ -856,6 +856,67 @@ let tests =
         Math.Round(-1.426, 2) |> equal -1.43
         Math.Round(-1.426, 1) |> equal -1.4
 
+    testCase "Math.Round with a MidpointRounding works" <| fun () -> // #55
+        Math.Round(2.5, MidpointRounding.AwayFromZero) |> equal 3.
+        Math.Round(-2.5, MidpointRounding.AwayFromZero) |> equal -3.
+        Math.Round(2.5, MidpointRounding.ToEven) |> equal 2.
+        Math.Round(-2.7, MidpointRounding.ToZero) |> equal -2.
+        Math.Round(-2.1, MidpointRounding.ToNegativeInfinity) |> equal -3.
+        Math.Round(2.1, MidpointRounding.ToPositiveInfinity) |> equal 3.
+        Math.Round(2.345, 2, MidpointRounding.AwayFromZero) |> equal 2.35
+        Math.Round(1.005, 2, MidpointRounding.AwayFromZero) |> equal 1.
+        Math.Round(2.678, 2, MidpointRounding.ToZero) |> equal 2.67
+        Math.Round(2.45, 1, MidpointRounding.ToEven) |> equal 2.4
+
+    testCase "Decimal Math.Round with a MidpointRounding works" <| fun () -> // #55
+        Math.Round(2.5M, MidpointRounding.AwayFromZero) |> equal 3M
+        Math.Round(-2.345M, 2, MidpointRounding.AwayFromZero) |> equal -2.35M
+        Math.Round(-2.7M, MidpointRounding.ToZero) |> equal -2M
+        Math.Round(-2.1M, MidpointRounding.ToNegativeInfinity) |> equal -3M
+        Math.Round(2.1M, MidpointRounding.ToPositiveInfinity) |> equal 3M
+        Math.Round(2.5M, MidpointRounding.ToEven) |> equal 2M
+
+    testCase "Double.Equals treats NaN as equal to itself" <| fun () -> // #56
+        let mutable n = nan
+        n.Equals(n) |> equal true
+        n.Equals(box n) |> equal true
+        nanf.Equals(nanf) |> equal true
+        (1.5).Equals(1.5) |> equal true
+        (1.5).Equals(2.) |> equal false
+        (0.).Equals(-0.) |> equal true
+        n = n |> equal false
+
+    testCase "Bitwise not keeps byte and uint16 in range" <| fun () -> // #47
+        let mutable b = 0uy
+        let mutable u = 0us
+        let mutable s = 0y
+        ~~~b |> equal 255uy
+        ~~~u |> equal 65535us
+        ~~~s |> equal -1y
+        ~~~255uy |> equal 0uy
+        string (~~~0uy) |> equal "255"
+        (~~~1us).ToString() |> equal "65534"
+        (~~~5).ToString() |> equal "-6"
+        string (~~~0u) |> equal "4294967295"
+
+    testCase "A unary expression as the object of a member access keeps its operand" <| fun () -> // #47
+        let mutable b = true
+        let mutable f = 2.5
+        (-f).ToString().Length |> equal 4
+        string (~~~0y) |> equal "-1"
+        (not b).ToString().Length |> equal 5
+
+    testCase "Int64 shift counts are masked to 6 bits" <| fun () -> // #54
+        let mutable k = 65
+        1L <<< 65 |> equal 2L
+        1L <<< 64 |> equal 1L
+        1L <<< -1 |> equal Int64.MinValue
+        -8L >>> 65 |> equal -4L
+        1UL <<< 70 |> equal 64UL
+        1L <<< k |> equal 2L
+        Int64.MaxValue >>> k |> equal 4611686018427387903L
+        1I <<< 65 |> equal 36893488147419103232I
+
     testCase "Math.Truncate works" <| fun () ->
         Math.Truncate -12.5 |> equal -12.
         Math.Truncate 1.425 |> equal 1.

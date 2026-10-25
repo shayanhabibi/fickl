@@ -683,6 +683,23 @@ export function round(value: number, digits: number = 0) {
   return digits ? r / m : r;
 }
 
+// Math.Round with a MidpointRounding: ToEven 0, AwayFromZero 1, ToZero 2, ToNegativeInfinity 3, ToPositiveInfinity 4
+export function roundWith(value: number, digits: number, mode: number) {
+  if (mode === 0) { return round(value, digits); }
+  // As .NET: scale, round the exact product, scale back
+  const m = Math.pow(10, digits);
+  const n = value * m;
+  let r: number;
+  if (mode === 1) {
+    const a = Math.abs(n);
+    const i = Math.floor(a);
+    r = Math.sign(n) * (a - i >= 0.5 ? i + 1 : i);
+  } else {
+    r = mode === 2 ? Math.trunc(n) : mode === 3 ? Math.floor(n) : Math.ceil(n);
+  }
+  return r / m;
+}
+
 export function sign(x: number): number {
   return x > 0 ? 1 : x < 0 ? -1 : 0;
 }

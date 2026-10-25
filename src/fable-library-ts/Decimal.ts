@@ -71,6 +71,17 @@ export function round(x: Decimal, digits: number = 0) {
   return x.round(digits, 2 /* ROUND_HALF_EVEN */);
 }
 
+// Math.Round with a MidpointRounding: ToEven 0, AwayFromZero 1, ToZero 2, ToNegativeInfinity 3, ToPositiveInfinity 4
+export function roundWith(x: Decimal, digits: number, mode: number) {
+  const positive = x.cmp(0) >= 0;
+  const bigMode = mode === 1 ? 1 /* ROUND_HALF_UP */
+    : mode === 2 ? 0 /* ROUND_DOWN */
+    : mode === 3 ? (positive ? 0 : 3 /* ROUND_UP */)
+    : mode === 4 ? (positive ? 3 : 0)
+    : 2 /* ROUND_HALF_EVEN */;
+  return x.round(digits, bigMode);
+}
+
 export function truncate(x: Decimal) {
   return x.round(0, 0 /* ROUND_DOWN */);
 }
