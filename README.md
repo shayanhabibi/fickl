@@ -59,9 +59,11 @@ The capacity to explicitly control transformation via attributes does not have t
 
 | Toggle | What it changes |
 | --- | --- |
-| `[<Fickl.Core.Curried>]` on a parameter | Keeps a function parameter curried, for JavaScript that calls it one argument at a time. |
+| `[<Fickl.Core.Curried>]` on a parameter or record field | Keeps a function parameter, or a function stored in a record field, curried, for JavaScript that calls it one argument at a time. |
 | `--strictOptions` | An `option` of a type that can be null (string, array, class, record, function, `Nullable`) keeps `Some null` apart from `None`, as on .NET: it is built with `some` and read with `value`. Without it, such an option is erased, which is faster and reads as `T \| undefined` in TypeScript, but `Some null` is `None`. A `voption` stays erased either way, so it is the type to use for interop. |
 | `[<Fickl.Core.NoOverloadSuffix>]` on a member or type | Drops the overload hash from a method's compiled name, `Counter__Add` instead of `Counter__Add_Z524259A4`, so JavaScript can call it by name. On a type it applies to every member that is not overloaded; on an overloaded member it is an error. |
+| `--clampByteArrays` | Compiles byte arrays as `Uint8ClampedArray`, the type canvas pixel data uses. Out-of-range values clamp instead of wrapping as on .NET. |
+| `--temporal` | Represents `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly` and `TimeSpan` with the JavaScript Temporal API (experimental). |
 
 ## Transparency
 

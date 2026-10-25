@@ -895,6 +895,25 @@ module private Transforms =
             | _ -> ValueNone
         | _ -> ValueNone
 
+    // fickl: the record, class or union field a get reads
+    let tryGetReadField (com: Compiler) e =
+        match e with
+        | Get(callee, FieldGet info, _, _) ->
+            match callee.Type with
+            | DeclaredType(entRef, _) ->
+                com.TryGetEntity(entRef)
+                |> Option.bind (fun ent -> ent.FSharpFields |> List.tryFind (fun f -> f.Name = info.Name))
+            | _ -> None
+        | Get(_, UnionField info, _, _) ->
+            com.TryGetEntity(info.Entity)
+            |> Option.bind (fun ent -> List.tryItem info.CaseIndex ent.UnionCases)
+            |> Option.bind (fun case -> List.tryItem info.FieldIndex case.UnionCaseFields)
+        | _ -> None
+
+    // fickl: a field marked [<Curried>] holds its function curried, so reading it needs no currying back
+    let isCurriedFieldGet (com: Compiler) e =
+        tryGetReadField com e |> Option.exists FSharp2Fable.FsField.IsCurriedField
+
     let isGetterOrValueWithoutGenerics (memb: MemberFunctionOrValue) =
         memb.IsGetter || (memb.IsValue && List.isEmpty memb.GenericParameters)
 
@@ -917,7 +936,8 @@ module private Transforms =
             | _ -> e
 
         // Uncurry also values received from getters
-        | GetField com (_callee, Arity arity, r) when arity > 1 -> Extended(Curry(e, arity), r)
+        | GetField com (_callee, Arity arity, r) when arity > 1 && not (isCurriedFieldGet com e) ->
+            Extended(Curry(e, arity), r)
 
         // Uncurry public mutable module values (compiled as atoms in JS/TS/Python).
         // These are accessed as a no-arg getter call tagged "value". The stored value
@@ -969,9 +989,12 @@ module private Transforms =
 
     let uncurrySendingArgs (com: Compiler) e =
         let uncurryConsArgs args (fields: Field seq) =
-            let argTypes = fields |> Seq.map (fun fi -> fi.FieldType) |> Seq.toList
+            let fields = Seq.toList fields
+            let argTypes = fields |> List.map (fun fi -> fi.FieldType)
+            // fickl: fields marked [<Curried>] keep their function curried
+            let curried = fields |> List.map FSharp2Fable.FsField.IsCurriedField
 
-            uncurryArgs com false argTypes args
+            uncurryArgsExcept com false (fun i -> List.tryItem i curried |> Option.defaultValue false) argTypes args
 
         match e with
         | Call(callee, info, t, r) ->
@@ -1001,7 +1024,16 @@ module private Transforms =
             let args = uncurryConsArgs args uci.UnionCaseFields
             Value(NewUnion(args, tag, ent, genArgs), r)
         | Set(e, FieldSet(fieldName), t, value, r) ->
-            let value = uncurryArgs com false [ t ] [ value ]
+            // fickl: a field marked [<Curried>] is set to its function as it is
+            let isCurried =
+                match e.Type with
+                | DeclaredType(entRef, _) ->
+                    com.TryGetEntity(entRef)
+                    |> Option.bind (fun ent -> ent.FSharpFields |> List.tryFind (fun f -> f.Name = fieldName))
+                    |> Option.exists FSharp2Fable.FsField.IsCurriedField
+                | _ -> false
+
+            let value = uncurryArgsExcept com false (fun _ -> isCurried) [ t ] [ value ]
             Set(e, FieldSet(fieldName), t, List.head value, r)
         | ObjectExpr(members, t, baseCall) ->
             let members =

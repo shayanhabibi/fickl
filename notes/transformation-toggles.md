@@ -15,7 +15,7 @@ test. Paths are under `src/Fable.Transforms/` unless they start with `src/`.
 
 | Rewrite | Why it exists | How it misfires | Escape hatch today |
 | --- | --- | --- | --- |
-| Uncurrying / arity (FableTransforms.fs uncurry passes) | Match the JS calling convention | JS that calls a callback one argument at a time, or passes a curried function in (#24). Pure F# round trips agree with .NET, including effects between partial applications (tests/Js/Main/CurryingTests.fs) | `[<Fickl.Core.Curried>]` on parameters, honoured on the slot a member implements; not yet on record or union fields |
+| Uncurrying / arity (FableTransforms.fs uncurry passes) | Match the JS calling convention | JS that calls a callback one argument at a time, or passes a curried function in (#24). Pure F# round trips agree with .NET, including effects between partial applications (tests/Js/Main/CurryingTests.fs) | `[<Fickl.Core.Curried>]` on parameters, honoured on the slot a member implements, and on record fields (#41); F# allows no attributes on union case fields |
 | Option erasure and `Some` wrapping (Transforms.Util.fs `mustWrapOption`, Fable2Babel.fs) | Keep `Some None` and `Some null` apart from `None` | `Some null` of a string, array, class, record or function is `None` at a concrete site but `Some` at a generic one (#32) | `--strictOptions` makes `option` correct; `voption` stays erased |
 | Instance-member overload mangling (FSharp2Fable.Util.fs, OverloadSuffix.fs) | JS has no overloading | Names are unpredictable for interop; the hash is added even without an overload | `[<Fickl.Core.NoOverloadSuffix>]` on a member or type (#35); `[<Mangle(false)>]` covers statics only; `[<AttachMembers>]` |
 | `System.*` interface member mangling (FSharp2Fable.Util.fs) | Avoid name collisions | Interfaces outside a whitelist are mangled, breaking JS that implements them by name | `[<Mangle>]` and friends on user interfaces only |
@@ -42,8 +42,8 @@ test. Paths are under `src/Fable.Transforms/` unless they start with `src/`.
 
 ## Order of work
 
-1. Uncurrying / arity: `[<Curried>]` on parameters is done; record and union fields remain, which needs field
-   attributes that the Fable AST does not carry.
+1. Uncurrying / arity: done, `[<Curried>]` on parameters and record fields (#41). The field attribute is read through
+   `FsField`, since the Fable AST's `Field` carries none.
 2. Option wrapping: done, `--strictOptions` (#32).
 3. Instance-member overload mangling opt-out: done, `[<NoOverloadSuffix>]` (#35).
 4. Tail-call rewrite opt-out: the closure-capture misfire did not reproduce in 13 shapes, so no opt-out yet.

@@ -71,8 +71,15 @@ type InlineInterfaceAttribute() =
 /// </code>
 /// The parameter is curried both where the member is called and inside its body. On an abstract member,
 /// the attribute also applies to every implementation of it.
+/// On a record field or a union case field, the field holds its function curried, for a JS object that stores
+/// or reads a curried function:
+/// <code>
+/// type Handlers = { [&lt;Curried>] onKey: string -> int -> unit }
+/// </code>
 /// </remarks>
-[<AttributeUsage(AttributeTargets.Parameter)>]
+[<AttributeUsage(AttributeTargets.Parameter
+                 ||| AttributeTargets.Property
+                 ||| AttributeTargets.Field)>]
 type CurriedAttribute() =
     inherit Attribute()
 

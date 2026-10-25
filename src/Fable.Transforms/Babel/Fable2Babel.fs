@@ -673,6 +673,13 @@ module Annotation =
     let makeFieldAnnotation (com: IBabelCompiler) ctx (fieldType: Fable.Type) =
         FableTransforms.uncurryType fieldType |> makeTypeAnnotation com ctx
 
+    /// fickl: a field marked [<Curried>] holds its function curried, so its annotation is not uncurried
+    let makeFieldAnnotationOf (com: IBabelCompiler) ctx (field: Fable.Field) =
+        if FSharp2Fable.FsField.IsCurriedField field then
+            makeTypeAnnotation com ctx field.FieldType
+        else
+            makeFieldAnnotation com ctx field.FieldType
+
     let makeFieldAnnotationIfTypeScript (com: IBabelCompiler) ctx (fieldType: Fable.Type) =
         if com.IsTypeScript then
             makeFieldAnnotation com ctx fieldType |> Some
@@ -3779,7 +3786,7 @@ but thanks to the optimisation done below we get
                 ent.FSharpFields
                 |> List.mapToArray (fun field ->
                     let prop, isComputed = memberFromName field.Name
-                    let ta = makeFieldAnnotation com ctx field.FieldType
+                    let ta = makeFieldAnnotationOf com ctx field
                     // Static fields need to be initialized by static constructor
                     let am =
                         if field.IsMutable || field.IsStatic then
@@ -4514,11 +4521,25 @@ but thanks to the optimisation done below we get
                 |]
             )
 
+        let fields =
+            ent.FSharpFields
+            |> List.filter (fun field -> not field.IsStatic)
+            |> List.toArray
+
         let args =
-            fieldIds
-            |> Array.map (fun fi ->
-                Parameter.parameter (fi.Name, ?typeAnnotation = makeFieldAnnotationIfTypeScript com ctx fi.Type)
-            )
+            Array.map2
+                (fun (fi: Fable.Ident) field ->
+                    Parameter.parameter (
+                        fi.Name,
+                        ?typeAnnotation =
+                            (if com.IsTypeScript then
+                                 Some(makeFieldAnnotationOf com ctx field)
+                             else
+                                 None)
+                    )
+                )
+                fieldIds
+                fields
 
         declareType com ctx ent decl.Name decl.XmlDoc args body baseExpr classMembers
 
