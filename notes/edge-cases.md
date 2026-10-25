@@ -5,7 +5,8 @@
 with Fickl 0.6.7, compared with upstream Fable 5.24.0 (the latest release) on the same sources: all of them also happen in Fable except
 the `%o` format, which Fickl already fixes.
 
-Status: **bug** (Fickl's output is wrong and can be fixed), **limit** (JavaScript has no cheap equivalent; documented),
+Status: **bug** (Fickl's output is wrong and can be fixed), **warned** (wrong, but the compiler says so),
+**limit** (JavaScript has no cheap equivalent; documented),
 **gap** (a BCL member the runtime library lacks).
 
 ## Compiles to invalid or unloadable JavaScript
@@ -30,10 +31,10 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **limit** (JavaScrip
 
 | Case | .NET | JS | Status |
 | --- | --- | --- | --- |
-| A class or object expression implementing two interfaces that both declare `Value()` | each interface its own implementation | both call the last one: the class gets two methods with the same name | bug (#50) |
+| A class or object expression implementing two interfaces that both declare `Value()` | each interface its own implementation | both call the last one: the class gets two methods with the same name | warned: "Member Value is duplicated, use Mangle attribute"; `[<Mangle>]` on the interfaces fixes it (#50) |
 | Record field named `__proto__` | a field | `this.__proto__ = …` sets the prototype; the field reads `{ }` and copy-and-update loses it | bug (#51) |
 | Top-level code of a later file | runs on first access to the file's values | runs when the module is imported | limit |
-| `(box x).GetType().Name` for a record or `int` | `Rec`, `Int32` | `Object` | gap |
+| `(box x).GetType().Name` for a record or `int` | `Rec`, `Int32` | `Object` | warned (FABLE0111) |
 | `typeof<Rec>.FullName` for a type in a module | `Odd+Rec` | `Odd.Rec` | bug (#67) |
 | `string DayOfWeek.Monday`, flags enums | `Monday`, `ReadOnly, Hidden` | `1`, `3` | limit (enum names are not emitted) |
 
@@ -56,6 +57,7 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **limit** (JavaScrip
 | `nan.Equals(nan)` | `true` | `false` | bug (#56) |
 | `float32 0.1 = 0.1f`; `0.1f + 0.2f`; `string 0.1f` | `true`; `0.3`; `0.1` | `false`; `0.30000000447034836`; `0.10000000149011612` | bug (#57) |
 | `Double.TryParse "0x10"` | `false` | `true, 16` | bug (#58) |
+| `Double.TryParse "NaN"`; `Double.TryParse "1_000"` | `true, NaN`; `false` | `false`; `true, 1000` | bug |
 | `sprintf "%e" 1234.5` | `1.234500e+003` | `1.2345e+3` | bug (#59) |
 | `(0.1234).ToString("P1")` | `12.3%` (en-US) | `12.3 %` (the invariant culture's pattern) | limit |
 | `byte`, `sbyte`, `int16`, `uint16` arithmetic (`255uy + 1uy`) | wraps | `256` | limit (`--clampByteArrays` covers arrays) |
@@ -70,7 +72,7 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **limit** (JavaScrip
 
 | Case | .NET | JS | Status |
 | --- | --- | --- | --- |
-| `"a" + (null: string) + "b"` | `ab` | `anullb` | bug (#60) |
+| `"a" + (null: string) + "b"` | `ab` | `anullb` | limit: `+` stays JS `+`; `string s` and `sprintf "%s"` handle null (#60) |
 | `string (null: string)`, `sprintf "%s" null` | `""` | `null` | bug (#60) |
 | `String.Format("{{{0}}}", 5)` | `{5}` | `{{5}}` | bug (#61) |
 | `Char.ToUpper 'ß'` | `ß` (a char) | `SS` (two characters in a char) | bug (#62) |
@@ -89,7 +91,7 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **limit** (JavaScrip
 
 | Case | .NET | JS | Status |
 | --- | --- | --- | --- |
-| `:? I` on a class implementing interface `I` | matches | does not match | limit |
+| `:? I` on a class implementing interface `I`; `:? TimeSpan`, `:? Guid`, `:? int option`, `:? 'T` | matches | does not match | warned (FABLE0112: the test evaluates to false) |
 | `box "a"` tested against `:? char` first | `string` | `char` | limit |
 | `box 1.0` / `box 1uy` / `box TimeSpan.Zero` against `:? int` | no match | matches | limit |
 | `box [ "a" ]` against `:? int list`; `box (1, 2)` against `:? int[]` | no match | matches | limit (erased generics; tuples are arrays) |
