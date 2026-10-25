@@ -10,6 +10,7 @@
     <Compile Include="Fickl.fs" />
     <Compile Include="Release.fs" />
     <Compile Include="Benchmark.fs" />
+    <Compile Include="Differences.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

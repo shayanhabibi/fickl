@@ -1,0 +1,63 @@
+# fickl: checks the cases in tests/Differences, which Fickl must get right, against the latest Fable.
+# On main it rewrites the README table of what Fable gets wrong and commits it when it changes.
+name: Fickl differences
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  differences:
+    name: Fickl against the latest Fable
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write # the README commit
+    env:
+      UPDATE_README: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Setup .NET
+        uses: ./.github/actions/setup-dotnet
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      - name: Build fable-library
+        run: dotnet run --project src/Fickl.Build -- fable-library javascript
+
+      - name: Check the cases
+        run: |
+          args=(differences)
+          [ "$UPDATE_README" = true ] && args+=(--update-readme)
+          dotnet run --project src/Fickl.Build -- "${args[@]}"
+
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: differences
+          path: |
+            temp/differences/differences.md
+            temp/differences/*/*/*.log
+
+      - name: Commit the table
+        if: env.UPDATE_README == 'true'
+        run: |
+          git diff --quiet README.md && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: update the table of differences from Fable"
+          git pull --rebase
+          git push

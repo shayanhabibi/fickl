@@ -21,5 +21,6 @@ let main argv =
                 Fickl.fcsFork
                 Release.publish
                 Benchmark.benchmark
+                Differences.differences
             ]
     }

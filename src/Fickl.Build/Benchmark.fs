@@ -100,21 +100,18 @@ let private fantomasGlobalJson =
 
 type private Config =
     | Fable
-    | FableNoTelemetry
     | FicklNoPackageCache
     | FicklCacheHit
 
     member this.Key =
         match this with
         | Fable -> "fable"
-        | FableNoTelemetry -> "fableq"
         | FicklNoPackageCache -> "nopkg"
         | FicklCacheHit -> "hit"
 
-let private configs =
-    [ Fable; FableNoTelemetry; FicklNoPackageCache; FicklCacheHit ]
+let private configs = [ Fable; FicklNoPackageCache; FicklCacheHit ]
 
-let private benchDir = Path.Combine(Paths.root, "temp", "benchmark")
+let internal benchDir = Path.Combine(Paths.root, "temp", "benchmark")
 
 let private exec (workingDirectory: string) (fileName: string) (arguments: string) =
     let info =
@@ -127,7 +124,7 @@ let private exec (workingDirectory: string) (fileName: string) (arguments: strin
         failwith $"{fileName} {arguments} failed with exit code {child.ExitCode} in {workingDirectory}"
 
 /// On Windows a tool's shim is an .exe, or a .cmd for tool packages with per-runtime payloads such as Fickl's.
-let private executable (toolPath: string) (command: string) =
+let internal executable (toolPath: string) (command: string) =
     if RuntimeInformation.IsOSPlatform OSPlatform.Windows then
         [ ".exe"; ".cmd" ]
         |> List.map (fun extension -> Path.Combine(toolPath, command + extension))
@@ -137,7 +134,7 @@ let private executable (toolPath: string) (command: string) =
         Path.Combine(toolPath, command)
 
 /// Installs a .NET tool into its own folder, leaving any global install alone.
-let private installTool (package: string) (version: string) (command: string) (source: string option) =
+let internal installTool (package: string) (version: string) (command: string) (source: string option) =
     let toolPath = Path.Combine(benchDir, "tools", $"{package}-{version}")
 
     if not (File.Exists(executable toolPath command)) then
@@ -192,8 +189,7 @@ let private compile (fable: string) (fickl: string) (workload: Workload) (direct
 
     let tool =
         match config with
-        | Fable
-        | FableNoTelemetry -> fable
+        | Fable -> fable
         | FicklNoPackageCache
         | FicklCacheHit -> fickl
 
@@ -216,12 +212,9 @@ let private compile (fable: string) (fickl: string) (workload: Workload) (direct
 
     info.RedirectStandardOutput <- true
     info.RedirectStandardError <- true
-    // CI runners opt out of telemetry; Fable's two rows measure with and without it
+    // CI runners opt out of telemetry; measure Fable as a user runs it, with the default
     info.Environment.Remove "DOTNET_CLI_TELEMETRY_OPTOUT" |> ignore
     info.Environment.Remove "FICKL_NUGET_KEY" |> ignore
-
-    if config = FableNoTelemetry then
-        info.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] <- "1"
 
     info.Environment["FICKL_PACKAGE_CACHE"] <- Path.Combine(benchDir, "package-cache")
 
@@ -333,14 +326,14 @@ let private chart
     line
         """<style>
   svg { --surface: #fcfcfb; --ink: #0b0b0b; --muted: #52514e; --grid: #e4e3df;
-        --fable: #2a78d6; --fableq: #eb6834; --nopkg: #1baf7a; --hit: #eda100; }
+        --fable: #2a78d6; --nopkg: #1baf7a; --hit: #eda100; }
   @media (prefers-color-scheme: dark) {
     svg { --surface: #1a1a19; --ink: #f0efec; --muted: #c3c2b7; --grid: #383835;
-          --fable: #3987e5; --fableq: #d95926; --nopkg: #199e70; --hit: #c98500; }
+          --fable: #3987e5; --nopkg: #199e70; --hit: #c98500; }
   }
   .surface { fill: var(--surface); } .ink { fill: var(--ink); } .muted { fill: var(--muted); }
   .grid { stroke: var(--grid); stroke-width: 1; }
-  .fable { fill: var(--fable); } .fableq { fill: var(--fableq); } .nopkg { fill: var(--nopkg); } .hit { fill: var(--hit); }
+  .fable { fill: var(--fable); } .nopkg { fill: var(--nopkg); } .hit { fill: var(--hit); }
 </style>"""
 
     line $"""<rect class="surface" width="{f width}" height="{f height}"/>"""
@@ -461,6 +454,7 @@ let private watch (tool: string) (key: string) (workload: Workload) (directory: 
 
     info.RedirectStandardOutput <- true
     info.RedirectStandardError <- true
+    info.Environment.Remove "DOTNET_CLI_TELEMETRY_OPTOUT" |> ignore
     info.Environment["FICKL_PACKAGE_CACHE"] <- Path.Combine(benchDir, "package-cache")
     use lines = new Collections.Concurrent.BlockingCollection<string>()
     let log = StringBuilder()
@@ -545,7 +539,7 @@ let private watch (tool: string) (key: string) (workload: Workload) (directory: 
         File.WriteAllText(Path.Combine(benchDir, "logs", $"{workload.Name}-watch-{key}.log"), log.ToString())
 
 /// The newest stable version of a package on nuget.org.
-let private latestStable (package: string) =
+let internal latestStable (package: string) =
     use client = new Net.Http.HttpClient()
 
     let index =
@@ -567,6 +561,44 @@ let private whole = invariant "0"
 /// The README block between these markers is rewritten by `benchmark --update-readme`.
 let private readmeStart = "<!-- fickl-benchmarks:start -->"
 let private readmeEnd = "<!-- fickl-benchmarks:end -->"
+
+/// Reads the results of `benchmark --only` runs, such as one CI job per workload, back into rows.
+let private readShards (folder: string) =
+    let lines name =
+        Directory.GetFiles(folder, name, SearchOption.AllDirectories)
+        |> Seq.collect (File.ReadAllLines >> Seq.skip 1)
+        |> Seq.filter (fun line -> line <> "")
+        |> Seq.map _.Split('\t')
+        |> List.ofSeq
+
+    let rows =
+        lines "results.tsv"
+        |> List.map (fun f ->
+            {
+                Workload = f[0]
+                Config = f[1]
+                Run = int f[2]
+                WallMs = int64 f[3]
+                ParsedMs = f[4]
+                CompileMs = f[5]
+                ExitCode = int f[6]
+            }
+        )
+
+    let watchRows =
+        lines "watch.tsv"
+        |> List.map (fun f ->
+            {
+                WatchRow.Workload = f[0]
+                Compiler = f[1]
+                Edit = f[2]
+                Run = int f[3]
+                Ms = int64 f[4]
+            }
+        )
+
+    let measured = rows |> List.map _.Workload |> Set.ofList
+    workloads |> List.filter (fun w -> measured.Contains w.Name), rows, watchRows
 
 let benchmark =
     let fickl =
@@ -601,6 +633,11 @@ let benchmark =
         Input.option<bool> "--skip-watch"
         |> Input.description "Measure only fresh compilations, not --watch response times"
 
+    let report =
+        Input.optionMaybe<string> "--report"
+        |> Input.description
+            "Draw the charts from the results.tsv and watch.tsv files under this folder, such as CI shards, instead of measuring"
+
     let updateReadme =
         Input.option<bool> "--update-readme"
         |> Input.description "Write the charts and timings to notes/benchmarks and point the README at them"
@@ -615,6 +652,7 @@ let benchmark =
             and! runs = runs
             and! only = only
             and! skipWatch = skipWatch
+            and! report = report
             and! updateReadme = updateReadme
 
             return
@@ -628,55 +666,68 @@ let benchmark =
                             else
                                 fableVersion
 
-                        let selected =
-                            match only with
-                            | None -> workloads
-                            | Some names ->
-                                let names = names.Split ',' |> Array.map _.Trim() |> Set.ofArray
-                                workloads |> List.filter (fun w -> names.Contains w.Name)
+                        let measureAll () =
+                            let selected =
+                                match only with
+                                | None -> workloads
+                                | Some names ->
+                                    let names = names.Split ',' |> Array.map _.Trim() |> Set.ofArray
+                                    workloads |> List.filter (fun w -> names.Contains w.Name)
+
+                            Directory.CreateDirectory benchDir |> ignore
+                            printfn $"Fickl {version} against Fable {fableVersion}"
+                            let fable = installTool "fable" fableVersion "fable" None
+
+                            let fickl =
+                                fickl
+                                |> Option.defaultWith (fun () ->
+                                    // A release job benchmarks the packages it just built, before nuget.org indexes them
+                                    let packed = Path.Combine(Paths.root, "temp", "release-" + version)
+
+                                    installTool
+                                        "Fickl"
+                                        version
+                                        "fickl"
+                                        (Some packed |> Option.filter Directory.Exists)
+                                )
+
+                            let rows = ResizeArray()
+                            let watchRows = ResizeArray()
+
+                            for workload in selected do
+                                let directory = checkout workload
+
+                                let measure config run =
+                                    rows.Add(compile fable fickl workload directory config run)
+                                // The warm-up run fills the package cache the cache-hit rows read
+                                for config in configs do
+                                    measure config 0
+
+                                for run in 1..runs do
+                                    // Alternate the order so drift on the machine does not favour one compiler
+                                    let order =
+                                        if run % 2 = 1 then
+                                            configs
+                                        else
+                                            List.rev configs
+
+                                    for config in order do
+                                        measure config run
+
+                                if not skipWatch then
+                                    for target in watchTargets |> List.filter (fun t -> t.Workload = workload.Name) do
+                                        watchRows.AddRange(watch fable "fable" workload directory target runs)
+                                        watchRows.AddRange(watch fickl "fickl" workload directory target runs)
+
+                            selected, List.ofSeq rows, List.ofSeq watchRows
+
+                        let selected, rows, watchRows =
+                            match report with
+                            | None -> measureAll ()
+                            | Some folder -> readShards folder
 
                         if updateReadme && selected.Length <> workloads.Length then
                             failwith "--update-readme needs every workload; drop --only"
-
-                        Directory.CreateDirectory benchDir |> ignore
-                        printfn $"Fickl {version} against Fable {fableVersion}"
-                        let fable = installTool "fable" fableVersion "fable" None
-
-                        let fickl =
-                            fickl
-                            |> Option.defaultWith (fun () ->
-                                // A release job benchmarks the packages it just built, before nuget.org indexes them
-                                let packed = Path.Combine(Paths.root, "temp", "release-" + version)
-                                installTool "Fickl" version "fickl" (Some packed |> Option.filter Directory.Exists)
-                            )
-
-                        let rows = ResizeArray()
-                        let watchRows = ResizeArray()
-
-                        for workload in selected do
-                            let directory = checkout workload
-
-                            let measure config run =
-                                rows.Add(compile fable fickl workload directory config run)
-                            // The warm-up run fills the package cache the cache-hit rows read
-                            for config in configs do
-                                measure config 0
-
-                            for run in 1..runs do
-                                // Alternate the order so drift on the machine does not favour one compiler
-                                let order =
-                                    if run % 2 = 1 then
-                                        configs
-                                    else
-                                        List.rev configs
-
-                                for config in order do
-                                    measure config run
-
-                            if not skipWatch then
-                                for target in watchTargets |> List.filter (fun t -> t.Workload = workload.Name) do
-                                    watchRows.AddRange(watch fable "fable" workload directory target runs)
-                                    watchRows.AddRange(watch fickl "fickl" workload directory target runs)
 
                         let tsv =
                             [
@@ -727,7 +778,7 @@ let benchmark =
                                 {
                                     Label = w.Label
                                     Bars = configs |> List.map (fun c -> c.Key, seconds[w.Name, c.Key])
-                                    Ratio = seconds[w.Name, "fableq"] / seconds[w.Name, "hit"]
+                                    Ratio = seconds[w.Name, "fable"] / seconds[w.Name, "hit"]
                                 }
                             )
 
@@ -739,14 +790,13 @@ let benchmark =
                                 "End-to-end compilation time · fresh process · median of interleaved runs · lower is better"
                                 [
                                     "fable", fableName
-                                    "fableq", $"{fableName} · telemetry opted out"
                                     "nopkg", $"{ficklName} · package cache off"
                                     "hit", $"{ficklName} · package cache hit"
                                 ]
                                 compilePanels
                                 (fun s -> $"{oneDecimal s} s")
                                 [
-                                    $"*Cache-hit speedup versus {fableName} with DOTNET_CLI_TELEMETRY_OPTOUT=1. All runs use --noCache; restores are included."
+                                    $"*Cache-hit speedup versus {fableName} with default settings. All runs use --noCache; restores are included."
                                     $"Median of {runs} runs after a warm-up that fills the package cache. JS suite uses --exclude Fable.Core."
                                     footer
                                 ]
