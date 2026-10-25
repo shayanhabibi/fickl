@@ -73,11 +73,22 @@ let publish =
         Input.option<bool> "--pack-only"
         |> Input.description "Build and validate packages without publishing"
 
+    let packed =
+        Input.option<bool> "--packed"
+        |> Input.description
+            "Validate and publish the packages a previous --pack-only run left in temp/release-<version>"
+
+    let githubRelease =
+        Input.option<bool> "--github-release"
+        |> Input.description "After publishing, create the GitHub release v<version> with generated notes (needs gh)"
+
     command "publish" {
         description "Pack and publish all Fickl NuGet packages; reads FICKL_NUGET_KEY from the environment"
 
         input {
             let! packOnly = packOnly
+            and! packed = packed
+            and! githubRelease = githubRelease
 
             return
                 stage "Fickl release" {
@@ -90,26 +101,34 @@ let publish =
                         let releaseVersion = version ()
                         let output = Path.Combine(Paths.root, "temp", "release-" + releaseVersion)
 
-                        // CLI payloads are generated files under temp; never rely on leftover build outputs.
-                        BuildFableLibraryJavaScript().Run(true)
-                        BuildFableLibraryTypeScript().Run(true)
-                        emitLibraryDeclarations ()
-                        BuildFableLibraryRust().Run(true)
-                        BuildFableLibraryDart().Run(true)
-                        BuildFableLibraryBeam().Run(true)
+                        // A tag push publishes the version the tag names, so the two must agree
+                        if Environment.GetEnvironmentVariable "GITHUB_REF_TYPE" = "tag" then
+                            let tag = Environment.GetEnvironmentVariable "GITHUB_REF_NAME"
 
-                        for project in projects do
-                            printfn $"Packing {project} {releaseVersion}"
+                            if tag <> "v" + releaseVersion then
+                                failwith $"Tag {tag} does not match FicklVersion {releaseVersion}"
 
-                            runDotnet
-                                [
-                                    "pack"
-                                    Path.Combine(Paths.root, "src", project)
-                                    "-c"
-                                    "Release"
-                                    "-o"
-                                    output
-                                ]
+                        if not packed then
+                            // CLI payloads are generated files under temp; never rely on leftover build outputs.
+                            BuildFableLibraryJavaScript().Run(true)
+                            BuildFableLibraryTypeScript().Run(true)
+                            emitLibraryDeclarations ()
+                            BuildFableLibraryRust().Run(true)
+                            BuildFableLibraryDart().Run(true)
+                            BuildFableLibraryBeam().Run(true)
+
+                            for project in projects do
+                                printfn $"Packing {project} {releaseVersion}"
+
+                                runDotnet
+                                    [
+                                        "pack"
+                                        Path.Combine(Paths.root, "src", project)
+                                        "-c"
+                                        "Release"
+                                        "-o"
+                                        output
+                                    ]
                         // Validate the entire set before the first upload. Never publish upstream package IDs.
                         let packages =
                             packageIds
@@ -195,6 +214,13 @@ let publish =
                                         then
                                             "--no-symbols"
                                     ]
+
+                        if not packOnly && githubRelease then
+                            SimpleExec.Command.Run(
+                                "gh",
+                                $"release create v{releaseVersion} --title \"Fickl {releaseVersion}\" --generate-notes",
+                                workingDirectory = Paths.root
+                            )
 
                         printfn $"Validated {packages.Length} packages in {output}"
                         0
