@@ -1,0 +1,142 @@
+# fickl: releases Fickl to NuGet and GitHub, then benchmarks it against the latest Fable and updates the README.
+#
+# Release: bump <FicklVersion> in src/Fickl.Branding.targets on main, then push the tag v<version>.
+# The release logic lives in src/Fickl.Build (Partas.Build); this file only provides the machine.
+#
+# NuGet uses trusted publishing, so no API key is stored here. One-off setup on nuget.org:
+# Account > Trusted Publishing > add a policy for repository shayanhabibi/fickl, workflow fickl-release.yml.
+# Then set the repository variable NUGET_USER to the nuget.org account name that owns the policy.
+name: Fickl release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to NuGet and create the GitHub release
+        type: boolean
+        default: false
+      benchmark:
+        description: Benchmark against the latest Fable
+        type: boolean
+        default: true
+      update_readme:
+        description: Commit the benchmark charts and README to main
+        type: boolean
+        default: false
+
+concurrency:
+  group: fickl-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Pack and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write # the GitHub release
+      id-token: write # NuGet trusted publishing
+    env:
+      PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Setup .NET
+        uses: ./.github/actions/setup-dotnet
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      # Pack first: the NuGet key from trusted publishing lasts an hour, the runtime library builds take a while
+      - name: Build and validate packages
+        run: dotnet run --project src/Fickl.Build -- publish --pack-only
+
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: packages
+          path: temp/release-*/*.nupkg
+          if-no-files-found: error
+
+      - name: Log in to NuGet
+        if: env.PUBLISH == 'true'
+        id: nuget
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish to NuGet and create the GitHub release
+        if: env.PUBLISH == 'true'
+        run: dotnet run --project src/Fickl.Build -- publish --packed --github-release
+        env:
+          FICKL_NUGET_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+
+  benchmark:
+    name: Benchmark against the latest Fable
+    needs: release
+    if: github.event_name == 'push' || inputs.benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: write # the README commit
+    env:
+      UPDATE_README: ${{ github.event_name == 'push' || inputs.update_readme }}
+    steps:
+      # The charts are committed to the default branch, so benchmark from it rather than from the tag
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event_name == 'push' && github.event.repository.default_branch || github.ref }}
+
+      - name: Setup .NET
+        uses: ./.github/actions/setup-dotnet
+
+      # The Fantomas online tools workload targets .NET 11
+      - name: Setup .NET 11
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 11.0.x
+          dotnet-quality: preview
+
+      # Benchmark the packages the release job built, which nuget.org may not have indexed yet
+      - uses: actions/download-artifact@v8
+        with:
+          name: packages
+          path: temp
+
+      - name: Benchmark
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [ "$GITHUB_EVENT_NAME" = push ] || version=$(ls temp | sed -n 's/^release-//p' | head -1)
+          args=(benchmark --version "$version")
+          [ "$UPDATE_README" = true ] && args+=(--update-readme)
+          dotnet run --project src/Fickl.Build -- "${args[@]}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: benchmark
+          path: |
+            temp/benchmark/*.svg
+            temp/benchmark/*.tsv
+            temp/benchmark/logs
+
+      - name: Commit the charts
+        if: env.UPDATE_README == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md notes/benchmarks
+          git commit -m "docs: update benchmark charts for Fickl $VERSION"
+          git pull --rebase
+          git push

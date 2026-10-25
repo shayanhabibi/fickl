@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="5.2.0" />
+    <PackageReference Include="Thoth.Json.Core" Version="0.9.1" />
+    <PackageReference Include="Hedgehog" Version="2.0.4" />
+    <PackageReference Include="Fable.Python" Version="5.5.0" />
+  </ItemGroup>
+</Project>
