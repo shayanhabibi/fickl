@@ -154,10 +154,11 @@ module Lib =
         )
 
     let sanitizeMemberName memberName =
-        if memberName = "constructor" then
-            memberName + "$"
-        else
-            memberName
+        match memberName with
+        // Assigning `__proto__` (also as an object literal key) replaces the object's prototype
+        | "constructor"
+        | "__proto__" -> memberName + "$"
+        | _ -> memberName
 
 module Reflection =
     open Lib
@@ -182,7 +183,8 @@ module Reflection =
                 if fi.IsStatic then
                     None
                 else
-                    let fieldName = sanitizeMemberName fi.Name |> Expression.stringLiteral
+                    // The F# name: the runtime maps it to the escaped property (see fieldKey in Util.ts)
+                    let fieldName = fi.Name |> Expression.stringLiteral
 
                     let typeInfo = transformTypeInfoFor Reflection com ctx r genMap fi.FieldType
 
