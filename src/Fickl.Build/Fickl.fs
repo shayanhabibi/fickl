@@ -70,9 +70,10 @@ let fcsFork =
                         workingDir repo
                         // BUILDING_USING_DOTNET: outside the FCS solution the build otherwise expects the bootstrap compiler.
                         // FSHARPCORE_USE_PACKAGE=false: build FSharp.Core from the fork's source, as upstream's lib/fcs does.
+                        // FSharpNetCoreProductTargetFramework: upstream FCS defaults to the newest .NET; Fable runs on the framework given here.
                         run (
                             cmd
-                                $"dotnet build -c Release src/Compiler -p:BUILDING_USING_DOTNET=true -p:FSHARPCORE_USE_PACKAGE=false"
+                                $"dotnet build -c Release src/Compiler -p:BUILDING_USING_DOTNET=true -p:FSHARPCORE_USE_PACKAGE=false -p:FSharpNetCoreProductTargetFramework={framework}"
                         )
                     }
 

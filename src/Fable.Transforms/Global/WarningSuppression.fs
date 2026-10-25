@@ -276,7 +276,7 @@ let private transition (state: BlockState) (d: Directive) =
 
 let private computeDirectives (defines: string list) (source: string) =
     let lines = source.Replace("\r\n", "\n").Split('\n')
-    let sourceTok = FSharpSourceTokenizer(defines, None, None, None)
+    let sourceTok = FSharpSourceTokenizer(defines, None, None)
     let directives = ResizeArray<Directive>()
     let parseDiagnostics = ResizeArray<DirectiveDiagnostic>()
     let mutable state = FSharpTokenizerLexState.Initial

@@ -6,48 +6,48 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "FSharp.Compiler.Service/43.11.200": {
+      "FSharp.Compiler.Service/43.14.200": {
         "dependencies": {
-          "FSharp.Core": "10.0.200",
-          "FSharp.DependencyManager.Nuget": "10.0.200"
+          "FSharp.Core": "11.0.200",
+          "FSharp.DependencyManager.Nuget": "11.0.200"
         },
         "runtime": {
           "FSharp.Compiler.Service.dll": {}
         }
       },
-      "FSharp.Core/10.0.200": {
+      "FSharp.Core/11.0.200": {
         "runtime": {
           "FSharp.Core.dll": {
-            "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.0.0"
+            "assemblyVersion": "11.0.0.0",
+            "fileVersion": "11.0.0.0"
           }
         }
       },
-      "FSharp.DependencyManager.Nuget/10.0.200": {
+      "FSharp.DependencyManager.Nuget/11.0.200": {
         "dependencies": {
-          "FSharp.Core": "10.0.200"
+          "FSharp.Core": "11.0.200"
         },
         "runtime": {
           "FSharp.DependencyManager.Nuget.dll": {
-            "assemblyVersion": "10.0.200.0",
-            "fileVersion": "10.0.200.0"
+            "assemblyVersion": "11.0.200.0",
+            "fileVersion": "11.0.200.0"
           }
         }
       }
     }
   },
   "libraries": {
-    "FSharp.Compiler.Service/43.11.200": {
+    "FSharp.Compiler.Service/43.14.200": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "FSharp.Core/10.0.200": {
+    "FSharp.Core/11.0.200": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "FSharp.DependencyManager.Nuget/10.0.200": {
+    "FSharp.DependencyManager.Nuget/11.0.200": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
