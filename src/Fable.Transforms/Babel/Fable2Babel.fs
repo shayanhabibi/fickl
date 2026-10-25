@@ -1713,6 +1713,38 @@ module Util =
                 else
                     callConstructor (List.tryItem tag ent.UnionCases)
 
+    /// fickl: under --strictOptions an option, not a value option, of a type that can be null is built with
+    /// `some` and read with `value`, so `Some null` stays apart from `None` as on .NET. Value options stay erased.
+    let isStrictOption (com: IBabelCompiler) isStruct (t: Fable.Type) =
+        let canBeNull =
+            match t with
+            | Fable.String
+            | Fable.Array _
+            | Fable.List _
+            | Fable.LambdaType _
+            | Fable.DelegateType _
+            | Fable.Regex
+            | Fable.MetaType
+            | Fable.Nullable _ -> true
+            | Fable.Tuple(_, isStruct)
+            | Fable.AnonymousRecordType(_, _, isStruct) -> not isStruct
+            | Fable.DeclaredType(entRef, _) -> not (com.GetEntity(entRef).IsValueType)
+            | _ -> false
+
+        not isStruct
+        && canBeNull
+        && List.contains Fickl.Options.strictOptionsDefine com.Options.Define
+
+    /// fickl: values that are never null, so an option of them needs no wrapping even under --strictOptions
+    let isNeverNull (expr: Fable.Expr) =
+        match expr with
+        | Fable.Value((Fable.StringConstant _ | Fable.StringTemplate _ | Fable.RegexConstant _ | Fable.TypeInfo _ | Fable.NewArray _ | Fable.NewList _ | Fable.NewTuple _ | Fable.NewRecord _ | Fable.NewAnonymousRecord _ | Fable.NewUnion _),
+                      _)
+        | Fable.Lambda _
+        | Fable.Delegate _
+        | Fable.ObjectExpr _ -> true
+        | _ -> false
+
     let transformValue (com: IBabelCompiler) (ctx: Context) r value : Expression =
         match value with
         | Fable.BaseValue(None, _) -> Super(None)
@@ -1797,10 +1829,12 @@ module Util =
             | exprs, Some(TransformExpr com ctx tail) ->
                 [ makeArray com ctx exprs; tail ]
                 |> libCall com ctx r "List" "ofArrayWithTail" []
-        | Fable.NewOption(value, t, _) ->
+        | Fable.NewOption(value, t, isStruct) ->
             match value with
-            | Some(TransformExpr com ctx e) ->
-                if mustWrapOption t then
+            | Some value ->
+                let e = com.TransformAsExpr(ctx, value)
+
+                if mustWrapOption t || (isStrictOption com isStruct t && not (isNeverNull value)) then
                     libCall com ctx r "Option" "some" [] [ e ]
                 else
                     e
@@ -2712,7 +2746,12 @@ but thanks to the optimisation done below we get
         | Fable.OptionValue ->
             let expr = com.TransformAsExpr(ctx, fableExpr)
 
-            if mustWrapOption typ || com.IsTypeScript then
+            let isStruct =
+                match fableExpr.Type with
+                | Fable.Option(_, isStruct) -> isStruct
+                | _ -> false
+
+            if mustWrapOption typ || com.IsTypeScript || isStrictOption com isStruct typ then
                 libCall com ctx None "Option" "value" [] [ expr ]
             else
                 expr

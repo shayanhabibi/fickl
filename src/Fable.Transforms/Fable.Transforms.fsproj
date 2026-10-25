@@ -5,6 +5,7 @@
     <Compile Include="Global/Metadata.fs" />
     <Compile Include="Global/Prelude.fs" />
     <Compile Include="Global/Compiler.fs" />
+    <Compile Include="Global/Fickl.Options.fs" />
     <Compile Include="Global/WarningCodes.fs" />
     <Compile Include="Global/WarningSuppression.fs" />
     <Compile Include="Global/Naming.fs" />
