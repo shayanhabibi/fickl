@@ -1588,16 +1588,26 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     // Strings
     | ("PrintFormatToString" | "PrintFormatToStringThen" | "PrintFormat" | "PrintFormatLine" | "PrintFormatToError" | "PrintFormatLineToError" | "PrintFormatThen" | "PrintFormatToStringThenFail" | "PrintFormatToStringBuilder" | "PrintFormatToStringBuilderThen"), // Printf.kbprintf
       _ -> fsFormat com ctx r t i thisArg args
+    // Failure matches System.Exception itself, not the exceptions derived from it
+    | "FailurePattern", [ exn ] -> Helper.LibCall(com, "Util", "failurePattern", t, [ exn ], ?loc = r) |> Some
     | ("Failure" | "FailurePattern" | "LazyPattern" | "Lock" | "NullArg" | "Using"), _ ->
         fsharpModule com ctx r t i thisArg args
     | ("IsNull" | "IsNotNull" | "IsNullV" | "NonNull" | "NonNullV" | "NullMatchPattern" | "NullValueMatchPattern" | "NonNullQuickPattern" | "NonNullQuickValuePattern" | "WithNull" | "WithNullV" | "NullV" | "NullArgCheck"),
       _ -> fsharpModule com ctx r t i thisArg args
     // Exceptions
-    | "FailWith", [ msg ]
-    | "InvalidOp", [ msg ] -> makeThrow r t (error com msg) |> Some
+    | "FailWith", [ msg ] -> makeThrow r t (error com msg) |> Some
+    // The exceptions .NET raises, so `:? InvalidOperationException` and `:? ArgumentException` handlers catch them
+    | "InvalidOp", [ msg ] ->
+        Helper.LibCall(com, "System", "InvalidOperationException", Any, [ msg ], isConstructor = true)
+        |> makeThrow r t
+        |> Some
     | "InvalidArg", [ argName; msg ] ->
-        let msg = add msg (add (add (str " (Parameter '") argName) (str "')"))
-        makeThrow r t (error com msg) |> Some
+        // ArgumentException appends " (Parameter '<name>')" to the message itself; no inner exception
+        let noInner = Helper.LibCall(com, "Util", "defaultOf", Any, [])
+
+        Helper.LibCall(com, "System", "ArgumentException", Any, [ msg; argName; noInner ], isConstructor = true)
+        |> makeThrow r t
+        |> Some
     | "Raise", [ arg ] -> makeThrow r t arg |> Some
     | "Reraise", _ ->
         match ctx.CaughtException with
