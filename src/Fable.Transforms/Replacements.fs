@@ -497,7 +497,12 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
         | Operators.exclusiveOr, [ left; right ] -> binOp BinaryXorBitwise left right |> truncateUnsigned
         | Operators.booleanAnd, [ left; right ] -> logicOp LogicalAnd left right
         | Operators.booleanOr, [ left; right ] -> logicOp LogicalOr left right
-        | Operators.logicalNot, [ operand ] -> unOp UnaryNotBitwise operand |> truncateUnsigned
+        | Operators.logicalNot, [ operand ] ->
+            match t with
+            // ~ works on 32 bits: keep the complement of a byte or uint16 in its range
+            | Number(UInt8, _) -> binOp BinaryAndBitwise (unOp UnaryNotBitwise operand) (makeIntConst 0xFF)
+            | Number(UInt16, _) -> binOp BinaryAndBitwise (unOp UnaryNotBitwise operand) (makeIntConst 0xFFFF)
+            | _ -> unOp UnaryNotBitwise operand |> truncateUnsigned
         | Operators.unaryNegation, [ operand ] ->
             match argTypes with
             | Number(Int8, _) :: _ -> Helper.LibCall(com, "Int32", "op_UnaryNegation_Int8", t, args, ?loc = r)
@@ -521,6 +526,23 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
 
         Helper.LibCall(com, "Decimal", opName, t, args, argTypes, ?loc = r)
     | Number(BigIntegers kind, _) :: _ ->
+        let args =
+            match kind, args with
+            // .NET masks the shift count by the operand's width, as JS does for 32 bits; BigInteger does not
+            | BigInt, _ -> args
+            | _, [ value; count ] when opName = Operators.leftShift || opName = Operators.rightShift ->
+                let mask =
+                    match kind with
+                    | Int128
+                    | UInt128 -> 127
+                    | _ -> 63
+
+                [
+                    value
+                    Operation(Binary(BinaryAndBitwise, count, makeIntConst mask), Tags.empty, count.Type, None)
+                ]
+            | _ -> args
+
         let op = Helper.LibCall(com, "BigInt", opName, t, args, argTypes, ?loc = r)
 
         if kind = BigInt then
@@ -1631,7 +1653,25 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
         | ExprType(Number(_, _)) :: _ -> math r t args i.SignatureArgTypes i.CompiledName |> Some
         | _ -> applyOp com ctx r t i.CompiledName args |> Some
     | "Round", _ ->
+        let isMidpointRounding =
+            function
+            | Number(_, NumberInfo.IsEnum ent) -> ent.FullName = "System.MidpointRounding"
+            | _ -> false
+
+        // The overloads taking a MidpointRounding: without digits the mode would be read as digits
+        let args, roundName =
+            match args, i.SignatureArgTypes with
+            | [ value; mode ], [ _; modeType ] when isMidpointRounding modeType ->
+                [ value; makeIntConst 0; mode ], "roundWith"
+            | [ _; _; _ ], [ _; _; modeType ] when isMidpointRounding modeType -> args, "roundWith"
+            | _ -> args, "round"
+
+        let argTypes = args |> List.map (fun a -> a.Type)
+
         match args with
+        | ExprType(Number(Decimal, _)) :: _ when roundName = "roundWith" ->
+            Helper.LibCall(com, "Decimal", roundName, t, args, argTypes, ?loc = r) |> Some
+        | _ when roundName = "roundWith" -> Helper.LibCall(com, "Util", roundName, t, args, argTypes, ?loc = r) |> Some
         | ExprType(Number(Decimal, _)) :: _ ->
             Helper.LibCall(com, "Decimal", "round", t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
             |> Some
@@ -1733,6 +1773,8 @@ let objects (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
         match arg1.Type, arg2.Type with
         | Array _, _
         | _, Array _ -> makeEqOp r arg1 arg2 BinaryEqual |> Some
+        // Double.Equals(obj): NaN equals itself
+        | Number(Floats _, _), _ -> Helper.LibCall(com, "Double", "equals", t, [ arg1; arg2 ], ?loc = r) |> Some
         | _ -> equals com ctx r true arg1 arg2 |> Some
     | "GetHashCode", Some arg, _ -> identityHash com r arg |> Some
     | "GetType", Some arg, _ ->
@@ -1746,6 +1788,10 @@ let valueTypes (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
     match i.CompiledName, thisArg, args with
     | ".ctor", _, _ -> typedObjExpr t [] |> Some
     | "ToString", Some arg, _ -> toString com ctx r [ arg ] |> Some
+    // Double.Equals(Double) and Single.Equals(Single), unlike =, treat NaN as equal to itself
+    | "Equals", Some(ExprType(Number(Floats _, _)) as arg1), [ arg2 ]
+    | "Equals", None, [ ExprType(Number(Floats _, _)) as arg1; arg2 ] ->
+        Helper.LibCall(com, "Double", "equals", t, [ arg1; arg2 ], ?loc = r) |> Some
     | "Equals", Some arg1, [ arg2 ]
     | "Equals", None, [ arg1; arg2 ] -> equals com ctx r true arg1 arg2 |> Some
     | "GetHashCode", Some arg, _ -> structuralHash com r arg |> Some

@@ -55,6 +55,18 @@ let tests =
         tryParse Double.TryParse 0.0 "9SayWhat12Huh" |> equal (false, 0.0)
         tryParse Double.TryParse 0.0 "-1.5" |> equal (true, -1.5)
 
+    testCase "System.Double.TryParse rejects radix prefixes" <| fun () -> // #58
+        tryParse Double.TryParse 0.0 "0x10" |> equal (false, 0.0)
+        tryParse Double.TryParse 0.0 " 0X1F" |> equal (false, 0.0)
+        tryParse Double.TryParse 0.0 "0b11" |> equal (false, 0.0)
+        tryParse Double.TryParse 0.0 "0o7" |> equal (false, 0.0)
+        tryParse Double.TryParse 0.0 "-0x10" |> equal (false, 0.0)
+        tryParse Double.TryParse 0.0 "0.5" |> equal (true, 0.5)
+        tryParse Double.TryParse 0.0 "0" |> equal (true, 0.0)
+        tryParse Double.TryParse 0.0 "007" |> equal (true, 7.0)
+        tryParse Single.TryParse 0.0f "0x10" |> equal (false, 0.0f)
+        (try Double.Parse "0x10" |> ignore; false with _ -> true) |> equal true
+
     testCase "System.Decimal.Parse works" <| fun () ->
         parse Decimal.Parse "1.5" |> equal 1.5M
 

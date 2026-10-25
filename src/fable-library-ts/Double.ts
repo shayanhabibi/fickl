@@ -1,9 +1,14 @@
 import { FSharpRef } from "./Types.ts";
 import { Exception } from "./Util.ts";
 
+// JS's unary + also reads 0x, 0b and 0o literals, which .NET does not parse as a Double
+function hasRadixPrefix(str: string) {
+  return /^\s*[+-]?0[xXbBoO]/.test(str);
+}
+
 export function tryParse(str: string, defValue: FSharpRef<number>): boolean {
   // TODO: test if value is valid and in range
-  if (str != null && /\S/.test(str)) {
+  if (str != null && /\S/.test(str) && !hasRadixPrefix(str)) {
     const v = +str.replace("_", "");
     if (!Number.isNaN(v)) {
       defValue.contents = v;
@@ -14,13 +19,18 @@ export function tryParse(str: string, defValue: FSharpRef<number>): boolean {
 }
 
 export function parse(str: string): number {
-  if (str != null && /\S/.test(str)) {
+  if (str != null && /\S/.test(str) && !hasRadixPrefix(str)) {
     const v = +str.replace("_", "");
     if (!Number.isNaN(v)) {
       return v;
     }
   }
   throw new Exception(`The input string ${str} was not in a correct format.`);
+}
+
+// Double.Equals and Single.Equals: unlike ==, NaN equals itself
+export function equals(x: number, y: number): boolean {
+  return x === y || (x !== x && y !== y);
 }
 
 // JS Number.isFinite function evals false for NaN
