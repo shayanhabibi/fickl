@@ -49,6 +49,13 @@ There should be a distinct combination of target related and target agnostic att
 
 The capacity to explicitly control transformation via attributes does not have to be as ergonomic as normal usage. We expect explicit control to be used in exception; however, we acknowledge that some libraries/authors/tools will use them in excess, so we will not attempt to deter users; instead, we will attempt to adjust the balance between implicit and explicit.
 
+### Escape hatches
+
+| Toggle | What it changes |
+| --- | --- |
+| `[<Fickl.Core.Curried>]` on a parameter | Keeps a function parameter curried, for JavaScript that calls it one argument at a time. |
+| `--strictOptions` | An `option` of a type that can be null (string, array, class, record, function, `Nullable`) keeps `Some null` apart from `None`, as on .NET: it is built with `some` and read with `value`. Without it, such an option is erased, which is faster and reads as `T \| undefined` in TypeScript, but `Some null` is `None`. A `voption` stays erased either way, so it is the type to use for interop. |
+
 ## Transparency
 
 Development loops are increasingly becoming agentic, and workflows are increasingly being inhibited/obstructed by the lack of machine readable diagnostics/logs/information.

@@ -99,6 +99,11 @@ let knownCliArgs () =
             "Also write a TypeScript declaration file (.d.ts) next to each JavaScript file,"
             "describing what that JavaScript exports (JavaScript only)"
         ]
+        [ "--strictOptions" ],
+        [
+            "Keep `Some null` apart from `None` for options of types that can be null, as .NET does,"
+            "by wrapping and unwrapping them at runtime (JavaScript and TypeScript; value options stay erased)"
+        ]
         [ "--server" ],
         [
             "Compile through a background compile server that keeps check results between compilations,"
@@ -347,6 +352,9 @@ type Runner =
                         "FABLE_COMPILER_5"
                         if jsTemporal then
                             "FABLE_COMPILER_JAVASCRIPT_TEMPORAL"
+                        // fickl: Fickl's options travel as defines, see Fickl.Options
+                        if args.FlagEnabled "--strictOptions" then
+                            Fickl.Options.strictOptionsDefine
                         match language with
                         | Php -> "FABLE_COMPILER_PHP"
                         | Rust -> "FABLE_COMPILER_RUST"
