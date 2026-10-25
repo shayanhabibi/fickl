@@ -25,6 +25,10 @@ on:
         description: Commit the benchmark charts and README to main
         type: boolean
         default: false
+      published_version:
+        description: Skip packing and benchmark this version from nuget.org instead (e.g. 0.6.5)
+        type: string
+        default: ""
 
 concurrency:
   group: fickl-release
@@ -36,6 +40,7 @@ permissions:
 jobs:
   release:
     name: Pack and publish
+    if: github.event_name == 'push' || inputs.published_version == ''
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -61,7 +66,9 @@ jobs:
       - name: Build and validate packages
         run: dotnet run --project src/Fickl.Build -- publish --pack-only
 
+      # Also on failure, so a package that fails validation can be inspected
       - uses: actions/upload-artifact@v7.0.2
+        if: ${{ !cancelled() }}
         with:
           name: packages
           path: temp/release-*/*.nupkg
@@ -84,13 +91,18 @@ jobs:
   benchmark:
     name: Benchmark against the latest Fable
     needs: release
-    if: github.event_name == 'push' || inputs.benchmark
+    # Runs after a successful pack, or on its own for a published version
+    if: >-
+      !cancelled()
+      && (needs.release.result == 'success' || inputs.published_version != '')
+      && (github.event_name == 'push' || inputs.benchmark)
     runs-on: ubuntu-latest
     timeout-minutes: 240
     permissions:
       contents: write # the README commit
     env:
       UPDATE_README: ${{ github.event_name == 'push' || inputs.update_readme }}
+      PUBLISHED_VERSION: ${{ inputs.published_version }}
     steps:
       # The charts are committed to the default branch, so benchmark from it rather than from the tag
       - uses: actions/checkout@v7.0.1
@@ -109,6 +121,7 @@ jobs:
 
       # Benchmark the packages the release job built, which nuget.org may not have indexed yet
       - uses: actions/download-artifact@v8
+        if: inputs.published_version == ''
         with:
           name: packages
           path: temp
@@ -116,7 +129,11 @@ jobs:
       - name: Benchmark
         run: |
           version="${GITHUB_REF_NAME#v}"
-          [ "$GITHUB_EVENT_NAME" = push ] || version=$(ls temp | sed -n 's/^release-//p' | head -1)
+          if [ -n "$PUBLISHED_VERSION" ]; then
+            version="$PUBLISHED_VERSION"
+          elif [ "$GITHUB_EVENT_NAME" != push ]; then
+            version=$(ls temp | sed -n 's/^release-//p' | head -1)
+          fi
           args=(benchmark --version "$version")
           [ "$UPDATE_README" = true ] && args+=(--update-readme)
           dotnet run --project src/Fickl.Build -- "${args[@]}"

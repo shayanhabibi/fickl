@@ -19,13 +19,13 @@
     <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation.CallCountingDelayMs" Value="0" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\..\temp\fable-library-js\**\*.*" PackagePath="fable-library-js\" />
-    <Content Include="..\..\temp\fable-library-ts\**\*.*" PackagePath="fable-library-ts\" />
+    <Content Include="..\..\temp\fable-library-js\**\*.*" PackagePath="fable-library-js" />
+    <Content Include="..\..\temp\fable-library-ts\**\*.*" PackagePath="fable-library-ts" />
     <!-- Python library is distributed via PyPI (pip install fable-library) -->
-    <Content Include="..\..\temp\fable-library-rust\**\*.*" PackagePath="fable-library-rust\" />
-    <Content Include="..\..\temp\fable-library-dart\**\*.*" PackagePath="fable-library-dart\" />
-    <Content Include="..\..\temp\fable-library-beam\**\*.*" PackagePath="fable-library-beam\" />
-    <Content Include="..\fable-library-php\**\*.*" PackagePath="fable-library-php\" />
+    <Content Include="..\..\temp\fable-library-rust\**\*.*" PackagePath="fable-library-rust" />
+    <Content Include="..\..\temp\fable-library-dart\**\*.*" PackagePath="fable-library-dart" />
+    <Content Include="..\..\temp\fable-library-beam\**\*.*" PackagePath="fable-library-beam" />
+    <Content Include="..\fable-library-php\**\*.*" PackagePath="fable-library-php" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Contributors.fs" />

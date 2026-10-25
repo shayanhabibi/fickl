@@ -64,7 +64,8 @@ let private workloads =
         {
             Name = "jssuite"
             Label = "Fable JS test suite"
-            Source = None
+            // Upstream's suite at 5.24.0: Fickl's own suite uses features upstream Fable rejects
+            Source = Some("https://github.com/fable-compiler/Fable.git", "be20361ffaf44ccc91a430501caec6e65db31db2")
             Directory = "tests/Js/Main"
             Project = "Fable.Tests.fsproj"
             Language = "javascript"
@@ -403,7 +404,8 @@ let private chart
     line "</svg>"
     svg.ToString()
 
-/// Each watch session saves an edit to a leaf file, then to an early file most of the project depends on.
+/// Each watch session saves a comment to a leaf file, then a comment to an early file most of the project depends on,
+/// then a new public value to that early file. Only the last changes what the dependents compile to.
 type private WatchTarget =
     {
         Workload: string
@@ -465,11 +467,17 @@ let private watch (tool: string) (key: string) (workload: Workload) (directory: 
 
     let files =
         [
-            "leaf", Path.Combine(directory, target.Leaf)
-            "root", Path.Combine(directory, target.Root)
+            "leaf", Path.Combine(directory, target.Leaf), (fun run -> $"\n// fickl watch probe {run}\n")
+            "root", Path.Combine(directory, target.Root), (fun run -> $"\n// fickl watch probe {run}\n")
+            "api", Path.Combine(directory, target.Root), (fun run -> $"\nlet ficklWatchProbe{run} = {run}\n")
         ]
 
-    let originals = files |> List.map (fun (_, path) -> path, File.ReadAllText path)
+    let originals =
+        files
+        |> List.map (fun (_, path, _) -> path)
+        |> List.distinct
+        |> List.map (fun path -> path, File.ReadAllText path)
+
     use child = new Process(StartInfo = info)
 
     let receive (args: DataReceivedEventArgs) =
@@ -502,7 +510,7 @@ let private watch (tool: string) (key: string) (workload: Workload) (directory: 
         [
             // Run 0 warms the JIT on the edit path, and is kept out of the medians
             for run in 0..runs do
-                for edit, path in files do
+                for edit, path, text in files do
                     // Past any debounce and settling left by the previous edit
                     Threading.Thread.Sleep 1500
                     let mutable stale = null
@@ -511,7 +519,7 @@ let private watch (tool: string) (key: string) (workload: Workload) (directory: 
                         ()
 
                     let elapsed = Stopwatch.StartNew()
-                    File.AppendAllText(path, $"\n// fickl watch probe {run}\n")
+                    File.AppendAllText(path, text run)
                     waitForWatching (TimeSpan.FromMinutes 5.0)
                     elapsed.Stop()
                     printfn $"{workload.Name} watch {key} {edit} run {run}: {elapsed.ElapsedMilliseconds} ms"
@@ -747,7 +755,11 @@ let benchmark =
                             [
                                 for target in watchTargets do
                                     for edit, description in
-                                        [ "leaf", "edit to a leaf file"; "root", "edit to an early file" ] do
+                                        [
+                                            "leaf", "comment in a leaf file"
+                                            "root", "comment in an early file"
+                                            "api", "new value in an early file"
+                                        ] do
                                         match
                                             watchMs.TryFind(target.Workload, edit, "fable"),
                                             watchMs.TryFind(target.Workload, edit, "fickl")
