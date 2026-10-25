@@ -125,6 +125,42 @@ type Element =
             action()
             for child in children do child.Activate()
 
+// fickl: values captured while a self-tail-recursive function runs as a loop keep the value of their iteration
+type ITailCapture =
+    abstract Get: unit -> int
+
+type TailCaptureRecord = { f: unit -> int }
+
+let rec tailCaptureObj i (acc: ITailCapture list) =
+    if i = 3 then acc
+    else tailCaptureObj (i + 1) ({ new ITailCapture with member _.Get() = i } :: acc)
+
+let rec tailCaptureRecord i acc =
+    if i = 3 then acc
+    else tailCaptureRecord (i + 1) ({ f = fun () -> i } :: acc)
+
+let rec tailCaptureInner i acc =
+    if i = 3 then acc
+    else
+        let get () = i + 100
+        tailCaptureInner (i + 1) (get :: acc)
+
+let rec tailCaptureTupled (i, acc) =
+    if i = 3 then acc
+    else tailCaptureTupled (i + 1, (fun () -> i) :: acc)
+
+let rec tailCaptureSwap a b acc =
+    if a > 2 then acc
+    else tailCaptureSwap b (a + 1) ((fun () -> a * 10 + b) :: acc)
+
+let rec tailCaptureChain i (k: unit -> int) acc =
+    if i = 3 then acc
+    else tailCaptureChain (i + 1) (fun () -> k () + i) (k :: acc)
+
+type TailCaptureClass() =
+    member this.Loop(i: int, acc: (unit -> int) list) : (unit -> int) list =
+        if i = 3 then acc else this.Loop(i + 1, (fun () -> i) :: acc)
+
 let tests =
   testList "TailCalls" [
 
@@ -281,4 +317,13 @@ let tests =
 
         main init view update
         accValue |> equal 10
+
+    testCase "Closures, objects and records captured in a tail-call loop keep their iteration's values" <| fun () ->
+        tailCaptureObj 0 [] |> List.map (fun o -> o.Get()) |> equal [ 2; 1; 0 ]
+        tailCaptureRecord 0 [] |> List.map (fun r -> r.f ()) |> equal [ 2; 1; 0 ]
+        tailCaptureInner 0 [] |> List.map (fun f -> f ()) |> equal [ 102; 101; 100 ]
+        tailCaptureTupled (0, []) |> List.map (fun f -> f ()) |> equal [ 2; 1; 0 ]
+        tailCaptureSwap 0 0 [] |> List.map (fun f -> f ()) |> equal [ 23; 22; 12; 11; 1; 0 ]
+        tailCaptureChain 0 (fun () -> 0) [] |> List.map (fun f -> f ()) |> equal [ 1; 0; 0 ]
+        TailCaptureClass().Loop(0, []) |> List.map (fun f -> f ()) |> equal [ 2; 1; 0 ]
   ]

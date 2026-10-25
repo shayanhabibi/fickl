@@ -19,7 +19,7 @@ test. Paths are under `src/Fable.Transforms/` unless they start with `src/`.
 | Option erasure and `Some` wrapping (Transforms.Util.fs `mustWrapOption`, Fable2Babel.fs) | Keep `Some None` and `Some null` apart from `None` | Wrapping depends on whether the construction site is generic, so one value can be built two ways | none |
 | Instance-member overload mangling (FSharp2Fable.Util.fs, OverloadSuffix.fs) | JS has no overloading | Names are unpredictable for interop; the hash is added even without an overload | `[<Mangle(false)>]` covers statics only; `[<AttachMembers>]` |
 | `System.*` interface member mangling (FSharp2Fable.Util.fs) | Avoid name collisions | Interfaces outside a whitelist are mangled, breaking JS that implements them by name | `[<Mangle>]` and friends on user interfaces only |
-| Tail call → loop (Babel/Fable2Babel.fs) | Avoid stack overflow | Closures captured in the loop body can share variables; applied to every self-tail-recursive function | none |
+| Tail call → loop (Babel/Fable2Babel.fs) | Avoid stack overflow | Suspected: closures captured in the loop body share variables. Not reproduced: parameters, lets, mutables, tuples, guards, methods, object expressions, records, lazies and chained closures all keep their iteration's values (TailCallTests.fs) | none needed so far |
 | Auto-uncurrying of `Emit` arguments typed `obj` (FableTransforms.fs) | Make an F# lambda callable from emitted JS | Also uncurries when the JS side expects a curried function | `[<Fickl.Core.Curried>]` on the parameter |
 | `ParamArray` spread (FSharp2Fable.Util.fs) | Match JS variadic calls | Wrong when the JS API takes an actual array | `[<ParamList>]` for seq only |
 | Typed arrays and byte clamping (Replacements.fs) | Match .NET numeric wraparound | Chosen by the static element type, so `'T[]` built generically differs from `int[]` | `--typedArrays`; `ClampByteArrays` has no CLI flag |
@@ -47,6 +47,6 @@ test. Paths are under `src/Fable.Transforms/` unless they start with `src/`.
    attributes that the Fable AST does not carry.
 2. Option wrapping: pin the representation regardless of genericity.
 3. Instance-member overload mangling opt-out.
-4. Tail-call rewrite opt-out, after confirming the closure-capture misfire with a test.
+4. Tail-call rewrite opt-out: the closure-capture misfire did not reproduce in 13 shapes, so no opt-out yet.
 5. `ParamArray` opt-out.
 6. Surface `ClampByteArrays` and Temporal as documented flags.
