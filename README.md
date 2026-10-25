@@ -21,6 +21,23 @@ Fickl has already made significant strides in improving performance. The difficu
 Wall clock of a fresh process with `--noCache`, median of 5 interleaved runs on Windows. Raw timings are in [notes/benchmarks/fickl-0.6.3.tsv](notes/benchmarks/fickl-0.6.3.tsv).
 <!-- fickl-benchmarks:end -->
 
+## Differences from Fable
+
+<!-- fickl-differences:start -->
+What Fickl gets right that Fable 5.24.0 does not, checked by compiling each case in [tests/Differences](tests/Differences) with both and running it with node. A case leaves this table once Fable passes it too.
+
+| Change | Fickl | Fable 5.24.0 | Issues |
+| --- | --- | --- | --- |
+| `[<CallableInterface>]` | An object expression implementing a callable interface compiles to a plain JavaScript function, and keeps a generic `Invoke` generic. | doesn't type-check: The namespace or module 'Fickl' is not defined. | [#8](https://github.com/shayanhabibi/fickl/issues/8), [#10](https://github.com/shayanhabibi/fickl/issues/10), [#11](https://github.com/shayanhabibi/fickl/issues/11) |
+| `[<Curried>]` on a parameter | Keeps a function parameter curried, for JavaScript that calls it one argument at a time. | doesn't type-check: The namespace or module 'Fickl' is not defined. | [#24](https://github.com/shayanhabibi/fickl/issues/24) |
+| `DateTimeOffset.ToString` with a format | Formats the date in the value's own offset, not in the machine's timezone. | compiles, but fails at runtime: expected Monday, 01 September 2014, got Tuesday, 02 September 2014 | — |
+| `--declaration` | Writes a TypeScript declaration file next to each JavaScript file, so TypeScript can call the compiled F#. | doesn't compile: Unknown argument: --declaration | [#20](https://github.com/shayanhabibi/fickl/issues/20), [#21](https://github.com/shayanhabibi/fickl/issues/21) |
+| `[<CaseTest>]` on erased union cases | A JavaScript predicate tells apart erased cases with the same payload type, here two strings. | doesn't type-check: The namespace or module 'Fickl' is not defined. | [#7](https://github.com/shayanhabibi/fickl/issues/7) |
+| `[<InlineInterface>]` | A `TypeScriptTaggedUnion` case holding one interface compiles as that interface with the tag added, `{ type: "take", fromIndex, toIndex }`. | doesn't type-check: The namespace or module 'Fickl' is not defined. | — |
+| reading another file's `mutable` value | The read stays before later side effects; it is not inlined past a call that changes the value. | compiles, but fails at runtime: expected 1, got 0 | [#15](https://github.com/shayanhabibi/fickl/issues/15) |
+| `%o` in printf formats | Formats in octal, as .NET does; the value is not printed in decimal. | compiles, but fails at runtime: expected 10\|37777777777\|  100, got 8\|-1\|   64 | [#16](https://github.com/shayanhabibi/fickl/issues/16) |
+<!-- fickl-differences:end -->
+
 ## Explicit control of expression
 
 When targeting another language, a sensible collection of ergonomic changes are made to faithfully represent F# semantics in the target language. Beyond this, are a collection of attributes and other compiler recognised constructs that inform our transformation pipeline.
