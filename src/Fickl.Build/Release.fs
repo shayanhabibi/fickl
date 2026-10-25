@@ -151,7 +151,10 @@ let publish =
                                     failwith $"Unexpected package identity: {path}"
 
                                 // A PackagePath ending in `\` gains a second separator when packed on Linux
-                                match archive.Entries |> Seq.tryFind (fun e -> e.FullName.Contains "//") with
+                                match
+                                    archive.Entries
+                                    |> Seq.tryFind (fun e -> e.FullName.Contains "//" || e.FullName.StartsWith "/")
+                                with
                                 | Some entry -> failwith $"Malformed entry {entry.FullName} in {path}"
                                 | None -> ()
 
