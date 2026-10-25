@@ -16,6 +16,8 @@
     <Compile Include="Deep.fs" />
     <Compile Include="Weird1.fs" />
     <Compile Include="Weird2.fs" />
+    <Compile Include="Batch3.fs" />
+    <Compile Include="Batch4.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 </Project>
