@@ -67,6 +67,7 @@ let private AllocatedAtStart = 5
 
 let private counters: int64[] = Array.zeroCreate 6
 let mutable private gcAtStart = [| 0; 0; 0 |]
+let mutable private gcPauseAtStart = TimeSpan.Zero
 
 let private gcCounts () =
     [| GC.CollectionCount 0; GC.CollectionCount 1; GC.CollectionCount 2 |]
@@ -78,6 +79,7 @@ let reset () =
 
     counters[AllocatedAtStart] <- GC.GetTotalAllocatedBytes false
     gcAtStart <- gcCounts ()
+    gcPauseAtStart <- GC.GetTotalPauseDuration()
 
 let recordCrack (ms: int64) =
     if enabled then
@@ -139,6 +141,7 @@ let report (totalMs: int64) =
                 filesMs / float fileCount
 
         let maxMs = ticksToMs counters[MaxFileTicks]
+        let gcPauseMs = (GC.GetTotalPauseDuration() - gcPauseAtStart).TotalMilliseconds
         let nl = Environment.NewLine
 
         match fcsActivitiesFile with
@@ -154,7 +157,7 @@ let report (totalMs: int64) =
             + $"  Fable per-file work (summed)     %8.0f{filesMs} ms over %d{fileCount} files (avg %.1f{avgMs} ms, max %.1f{maxMs} ms){nl}"
             + $"  Compilation total (wall)         %8d{totalMs} ms{nl}"
             + $"  Allocated                        %8.0f{allocatedMb} MB{nl}"
-            + $"  GC collections gen0/gen1/gen2    %d{gcs[0]}/%d{gcs[1]}/%d{gcs[2]}{nl}"
+            + $"  GC collections gen0/gen1/gen2    %d{gcs[0]}/%d{gcs[1]}/%d{gcs[2]}, paused %.0f{gcPauseMs} ms{nl}"
             // Process totals, cracking included: JIT cost and CPU time stay comparable on a busy machine
             + $"  JIT (process)                    %8.0f{Runtime.JitInfo.GetCompilationTime(false).TotalMilliseconds} ms over %d{Runtime.JitInfo.GetCompiledMethodCount false} methods{nl}"
             + $"  CPU time (process)               %8.0f{Process.GetCurrentProcess().TotalProcessorTime.TotalMilliseconds} ms{nl}"
