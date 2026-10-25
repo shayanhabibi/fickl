@@ -15187,6 +15187,16 @@
  (Originally from Interactive\FSIstrings.txt:44)
 </summary>
 </member>
+<member name="P:UtilsStrings.SR.SwallowResourceText(System.Boolean)">
+<summary>
+ If set to true, then all error messages will just return the filled &apos;holes&apos; delimited by &apos;,,,&apos;s - this is for language-neutral testing (e.g. localization-invariant baselines).
+</summary>
+</member>
+<member name="P:UtilsStrings.SR.SwallowResourceText">
+<summary>
+ If set to true, then all error messages will just return the filled &apos;holes&apos; delimited by &apos;,,,&apos;s - this is for language-neutral testing (e.g. localization-invariant baselines).
+</summary>
+</member>
 <member name="M:UtilsStrings.SR.fSharpBannerVersion(System.String,System.String)">
 <summary>
  %s for F# %s
@@ -20580,6 +20590,12 @@
  A name generator used by IlxGen for static fields, some generated arguments and other things.
 </summary>
 </member>
+<member name="M:FSharp.Compiler.CompilerGlobalState.CompilerGlobalState.ResetCompilerGeneratedNamesOfFile(System.Int32)">
+<summary>
+ Reset the type-checking name counters of one file, before checking it again in the same process, so it
+ gets the names a first check gives. The IlxGen counters are left alone: they belong to code generation.
+</summary>
+</member>
 <member name="M:FSharp.Compiler.CompilerGlobalState.CompilerGlobalState.ResetCompilerGeneratedNameState">
 <summary>
  Reset all compiler-generated-name occurrence counters on this state, so successive in-process
@@ -20609,6 +20625,12 @@
  non-determinism fixed by https://github.com/dotnet/fsharp/issues/19732.
 </summary>
 </member>
+<member name="M:FSharp.Compiler.CompilerGlobalState.StableNiceNameGenerator.ResetCompilerGeneratedNamesOfFile(System.Int32)">
+<summary>
+ Reset the occurrence counters of one file. The names already given to values stay cached, so a value
+ checked earlier keeps its name. See NiceNameGenerator.ResetCompilerGeneratedNamesOfFile.
+</summary>
+</member>
 <member name="M:FSharp.Compiler.CompilerGlobalState.StableNiceNameGenerator.ResetCompilerGeneratedNameState">
 <summary>
  Reset the stable-name cache and inner occurrence counters, so both the cached stable names and
@@ -20623,6 +20645,12 @@
 
  This type may be accessed concurrently, though in practice it is only used from the compilation thread.
  It is made concurrency-safe since a global instance of the type is allocated in tast.fs.
+</summary>
+</member>
+<member name="M:FSharp.Compiler.CompilerGlobalState.NiceNameGenerator.ResetCompilerGeneratedNamesOfFile(System.Int32)">
+<summary>
+ Reset the occurrence counters of one file, so checking it again assigns the names its first check did.
+ Callers must ensure nothing generates names in that file meanwhile; other files are untouched.
 </summary>
 </member>
 <member name="M:FSharp.Compiler.CompilerGlobalState.NiceNameGenerator.ResetCompilerGeneratedNameState">
@@ -46310,6 +46338,12 @@ Get the signature for the value&apos;s XML documentation
 <member name="P:FSharp.Compiler.SourceCodeServices.ParseAndCheck.lastGraphCheckGeneration">
 <summary>
  The last generation given to a graph check finisher; 0 is never given.
+</summary>
+</member>
+<member name="M:FSharp.Compiler.SourceCodeServices.ParseAndCheck.ResetGeneratedNames(FSharp.Compiler.Syntax.ParsedInput,FSharp.Compiler.SourceCodeServices.CompilerState)">
+<summary>
+ Counts the compiler-generated names of a file from zero again, before checking it, so a file checked again in
+ this process, as in watch mode, gets the names a fresh compilation gives instead of continuing from its last check.
 </summary>
 </member>
 <member name="T:FSharp.Compiler.SourceCodeServices.SignatureFingerprint">

@@ -492,10 +492,12 @@ let excludeProjRef (opts: CrackerOptions) (dllRefs: IDictionary<string, string>)
     let projName = Path.GetFileNameWithoutExtension(projRef)
 
     let isExcluded =
-        opts.Exclude
-        |> List.exists (fun e ->
-            String.Equals(e, Path.GetFileNameWithoutExtension(projRef), StringComparison.OrdinalIgnoreCase)
-        )
+        // fickl: Fickl.Core stays a reference, see Metadata.isSystemPackage
+        String.Equals(projName, "Fickl.Core", StringComparison.OrdinalIgnoreCase)
+        || opts.Exclude
+           |> List.exists (fun e ->
+               String.Equals(e, Path.GetFileNameWithoutExtension(projRef), StringComparison.OrdinalIgnoreCase)
+           )
 
     if isExcluded then
         try

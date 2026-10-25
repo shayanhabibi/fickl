@@ -12,10 +12,6 @@
     <Compile Include="Fickl.Core.Types.fs" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Fable compiles packaged F# sources found under the fable/ folder of a NuGet package -->
-    <Content Include="*.fsproj; **\*.fs" PackagePath="fable" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="../Fable.Core/Fable.Core.fsproj" />
   </ItemGroup>
   <ItemGroup>

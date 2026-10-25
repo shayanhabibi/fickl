@@ -18,6 +18,7 @@ let values () =
         Sig.greet "x"
         Mid.describe { X = 1; Y = 2 }
         string (Other.unrelated ())
+        string (first + second)
     |]
 
 let area shape =
@@ -43,3 +44,8 @@ let bumped () =
     let n = c.Count
     c.Reset()
     n
+
+let recurse () =
+    recursive1 ()
+    Other.otherRecursive ()
+    recursed
