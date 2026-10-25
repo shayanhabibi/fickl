@@ -266,18 +266,25 @@ let needToCast fromKind toKind =
 
 /// Conversions to floating point
 let toFloat com (ctx: Context) r targetType (args: Expr list) : Expr =
-    match args.Head.Type with
-    | Char -> Helper.InstanceCall(args.Head, "charCodeAt", Int32.Number, [ makeIntConst 0 ])
-    | String -> Helper.LibCall(com, "Double", "parse", targetType, args)
-    | Number(kind, _) ->
-        match kind with
-        | Decimal -> Helper.LibCall(com, "Decimal", "toFloat64", targetType, args)
-        | BigIntegers _ -> Helper.LibCall(com, "BigInt", "toFloat64", targetType, args)
-        | _ -> TypeCast(args.Head, targetType)
-    | _ ->
-        addWarning com ctx.InlinePath r "Cannot make conversion because source type is unknown"
+    let converted =
+        match args.Head.Type with
+        | Char -> Helper.InstanceCall(args.Head, "charCodeAt", Int32.Number, [ makeIntConst 0 ])
+        | String -> Helper.LibCall(com, "Double", "parse", targetType, args)
+        | Number(kind, _) ->
+            match kind with
+            | Decimal -> Helper.LibCall(com, "Decimal", "toFloat64", targetType, args)
+            | BigIntegers _ -> Helper.LibCall(com, "BigInt", "toFloat64", targetType, args)
+            | _ -> TypeCast(args.Head, targetType)
+        | _ ->
+            addWarning com ctx.InlinePath r "Cannot make conversion because source type is unknown"
 
-        TypeCast(args.Head, targetType)
+            TypeCast(args.Head, targetType)
+
+    // A Single holds fewer digits: round to the nearest one, as the conversion does in .NET
+    match targetType, args.Head.Type with
+    | Number(Float32, _), Number(Float32, _) -> converted
+    | Number(Float32, _), _ -> Helper.GlobalCall("Math", targetType, [ converted ], memb = "fround")
+    | _ -> converted
 
 let toDecimal com (ctx: Context) r targetType (args: Expr list) : Expr =
     match args.Head.Type with
@@ -467,6 +474,9 @@ let toString com (ctx: Context) r (args: Expr list) =
         | Number(NativeInt, _) -> Helper.LibCall(com, "Util", "int64ToString", String, args)
         | Number(BigInt, _) -> Helper.LibCall(com, "BigInt", "toString", String, args)
         | Number(Decimal, _) -> Helper.LibCall(com, "Decimal", "toString", String, args)
+        // Double.ToString() and Single.ToString() write exponents and -0 as .NET does
+        | Number(Float64, _) when tail.IsEmpty -> Helper.LibCall(com, "Util", "doubleToString", String, [ head ])
+        | Number(Float32, _) when tail.IsEmpty -> Helper.LibCall(com, "Util", "singleToString", String, [ head ])
         | Number _ -> Helper.InstanceCall(head, "toString", String, tail)
         | Array _
         | List _ -> Helper.LibCall(com, "Types", "seqToString", String, [ head ], ?loc = r)
@@ -503,7 +513,12 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
         Operation(Unary(operator, operand), Tags.empty, t, r)
 
     let binOp op left right =
-        Operation(Binary(op, left, right), Tags.empty, t, r)
+        let operation = Operation(Binary(op, left, right), Tags.empty, t, r)
+
+        match t with
+        // Single arithmetic rounds every result to single precision
+        | Number(Float32, _) -> Helper.GlobalCall("Math", t, [ operation ], memb = "fround")
+        | _ -> operation
 
     let binOpChar op left right =
         let toUInt16 e = toInt com ctx None UInt16.Number [ e ]

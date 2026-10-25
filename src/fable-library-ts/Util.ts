@@ -701,6 +701,9 @@ export function roundWith(value: number, digits: number, mode: number) {
 }
 
 export function sign(x: number): number {
+  if (Number.isNaN(x)) {
+    throw new Exception("Function does not accept floating point Not-a-Number values.");
+  }
   return x > 0 ? 1 : x < 0 ? -1 : 0;
 }
 
@@ -1027,6 +1030,48 @@ export function fieldKey(name: string): string {
 // The F# name of a stored field, for printing and serialisation
 export function fieldName(key: string): string {
   return key === "constructor$" || key === "__proto__$" ? key.slice(0, -1) : key;
+}
+
+// Double.ToString() and Single.ToString(): the shortest digits that round-trip, as JS gives them, written as .NET
+// writes them: fixed for decimal exponents from -4 to 16 (8 for Single), otherwise like 1.5E+20 and 1E-05; -0 is
+// kept. `exponential` is the value's digits as from toExponential().
+function formatShortest(x: number, exponential: string, maxExponent: number): string {
+  const e = exponential.indexOf("e");
+  const exponent = parseInt(exponential.slice(e + 1), 10);
+  const sign = x < 0 ? "-" : "";
+  const mantissa = exponential.slice(x < 0 ? 1 : 0, e);
+  if (exponent > -5 && exponent < maxExponent) {
+    const digits = mantissa.replace(".", "");
+    if (exponent >= 0) {
+      const integral = digits.slice(0, exponent + 1).padEnd(exponent + 1, "0");
+      const fraction = digits.slice(exponent + 1);
+      return sign + integral + (fraction.length > 0 ? "." + fraction : "");
+    }
+    return sign + "0." + "0".repeat(-exponent - 1) + digits;
+  }
+  return sign + mantissa + "E" + (exponent < 0 ? "-" : "+") + String(Math.abs(exponent)).padStart(2, "0");
+}
+
+export function doubleToString(x: number): string {
+  if (x === 0) { return Object.is(x, -0) ? "-0" : "0"; }
+  if (!isFinite(x)) { return x.toString(); }
+  return formatShortest(x, x.toExponential(), 17);
+}
+
+export function singleToString(x: number): string {
+  x = Math.fround(x);
+  if (x === 0) { return Object.is(x, -0) ? "-0" : "0"; }
+  if (!isFinite(x)) { return x.toString(); }
+  // The fewest digits that read back as the same Single
+  let exponential = x.toExponential(8);
+  for (let digits = 0; digits < 8; digits++) {
+    const candidate = x.toExponential(digits);
+    if (Math.fround(parseFloat(candidate)) === x) {
+      exponential = candidate;
+      break;
+    }
+  }
+  return formatShortest(x, exponential.replace(/\.?0+e/, "e"), 9);
 }
 
 export function copyToArray<T>(source: MutableArray<T>, sourceIndex: number, target: MutableArray<T>, targetIndex: number, count: number): void {
