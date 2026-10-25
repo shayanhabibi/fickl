@@ -1,5 +1,7 @@
 module Lib
 
+#nowarn "40" // the recursive values below
+
 open System.Runtime.InteropServices
 open Fable.Core
 
@@ -43,3 +45,14 @@ type Counter() =
     member val Count = 0 with get, set
     member inline this.Bump() = this.Count <- this.Count + 1
     member this.Reset() = this.Count <- 0
+
+let delay (f: unit -> unit) = f
+let mutable recursed = 0
+
+let rec recursive1 = delay (fun () -> recursive2 ())
+
+and recursive2 =
+    recursed <- 5
+    fun () -> recursed <- recursed * 2
+
+let first, second = 1, 2
