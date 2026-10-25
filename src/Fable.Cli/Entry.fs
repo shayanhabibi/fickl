@@ -660,6 +660,13 @@ let private execute (argv: string array) (inServer: bool) =
             Log.error msg
             1
 
+/// fickl: runs a request as the compile server does, in this process and logging to `logger`, so tests can drive
+/// one session through edits
+let serverRequest (logger: ILogger) argv =
+    Log.setLogger Verbosity.Normal logger
+    CompileServer.setRequestLogger logger
+    execute argv true
+
 [<EntryPoint>]
 let main argv =
     // fickl: the compile server started by a client (see CompileServer.fs)

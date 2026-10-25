@@ -286,6 +286,9 @@ let mutable private requestLogger: ILogger = Abstractions.NullLogger.Instance
 /// Sets the verbosity of a request's log, which goes to the client that sent it.
 let setRequestVerbosity verbosity = Log.setLogger verbosity requestLogger
 
+/// Sends the log of requests handled in this process to `logger` (tests run requests without a client).
+let setRequestLogger logger = requestLogger <- logger
+
 /// Runs the server until it has been idle for the idle timeout. `handle` compiles a request, logging through
 /// Log (see setRequestVerbosity), and returns the exit code.
 let serve (name: string) (handle: Request -> int) =

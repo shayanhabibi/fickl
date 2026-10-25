@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Lib.fs" />
+    <Compile Include="Mid.fs" />
+    <Compile Include="Sig.fsi" />
+    <Compile Include="Sig.fs" />
+    <Compile Include="Other.fs" />
+    <Compile Include="Use.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Core" Version="4.5.0" />
+  </ItemGroup>
+
+</Project>
