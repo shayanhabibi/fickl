@@ -90,6 +90,21 @@ type IFoldCurried =
 type TupledCurried() =
     member _.M(x: int, [<Curried>] f: int -> int -> int) = f x x
 
+type CurriedFields =
+    {
+        [<Curried>]
+        add: int -> int -> int
+        plain: int -> int -> int
+    }
+
+type MutableCurriedField =
+    {
+        [<Curried>]
+        mutable g: int -> int -> int
+    }
+
+let private readCurriedField (r: CurriedFields) = r.add
+
 #if FABLE_COMPILER
 [<Emit("(($0)(1))(2)")>]
 let private emitCallsCurried ([<Curried>] f: int -> int -> int) : int = jsNative
@@ -236,5 +251,36 @@ let tests =
 
             let folder = { new IFoldCurried with member _.Fold f x = f x x }
             emitJsExpr folder "$0.Fold(a => b => a + b, 4)" |> equal 8
+
+        testCase "Record fields marked Curried hold their function curried" <| fun () ->
+            let r = { add = (fun a b -> a + b); plain = (fun a b -> a * b) }
+            emitJsExpr r "$0.add(3)(4)" |> equal 7
+            emitJsExpr r "$0.plain(3, 4)" |> equal 12
+            let copy = { r with plain = fun a b -> a - b }
+            emitJsExpr copy "$0.add(4)(5)" |> equal 9
+            let m = { g = fun a b -> a + b }
+            m.g <- fun a b -> a * b
+            emitJsExpr m "$0.g(4)(5)" |> equal 20
+
+        testCase "Record fields marked Curried read curried functions from JS" <| fun () ->
+            let r: CurriedFields = emitJsExpr () "({ add: a => b => a - b, plain: (a, b) => a + b })"
+            r.add 10 4 |> equal 6
+            r.plain 10 4 |> equal 14
+            let partial = r.add 20
+            partial 5 |> equal 15
+            readCurriedField r 7 2 |> equal 5
 #endif
+
+        testCase "Record fields marked Curried work from F#" <| fun () ->
+            let r = { add = (fun a b -> a + b); plain = (fun a b -> a * b) }
+            r.add 1 2 |> equal 3
+            r.plain 2 3 |> equal 6
+            let partial = r.add 5
+            partial 3 |> equal 8
+            readCurriedField r 5 6 |> equal 11
+            let { add = f } = r
+            f 2 2 |> equal 4
+            let m = { g = fun a b -> a + b }
+            m.g <- fun a b -> a * b
+            m.g 4 5 |> equal 20
     ]

@@ -79,6 +79,18 @@ type FsField(fi: FSharpField) =
         member _.HasDefaultValueAttribute =
             fi.FieldAttributes |> Helpers.hasAttrib Atts.defaultValue
 
+    /// fickl: the field is marked [<Fickl.Core.Curried>]. Fable.AST's Field carries no attributes, so this is read
+    /// through the FCS field; a field made by a plugin is never curried.
+    member _.IsCurried =
+        fi.PropertyAttributes |> Helpers.hasAttrib Atts.ficklCurried
+        || fi.FieldAttributes |> Helpers.hasAttrib Atts.ficklCurried
+
+    /// fickl: whether a field keeps its function value curried, see FsField.IsCurried
+    static member IsCurriedField(field: Fable.Field) =
+        match field with
+        | :? FsField as field -> field.IsCurried
+        | _ -> false
+
     static member FSharpFieldName(fi: FSharpField) =
         let rec countConflictingCases acc (ent: FSharpEntity) (name: string) =
             match TypeHelpers.tryGetBaseEntity ent with
