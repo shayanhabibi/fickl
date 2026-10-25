@@ -3870,6 +3870,63 @@ but thanks to the optimisation done below we get
         classMembers
         : ModuleDeclaration list
         =
+        // fickl: Record and Union compare fields, so a record or union that .NET compares by reference,
+        // [<ReferenceEquality>] or [<NoEquality>], overrides their Equals and GetHashCode
+        let classMembers =
+            if
+                (ent.IsFSharpRecord || ent.IsFSharpUnion)
+                && not ent.IsValueType
+                && not (FSharp2Fable.Util.hasStructuralEquality ent)
+            then
+                let other = "other"
+
+                [|
+                    ClassMember.classMethod (
+                        ClassFunction(Expression.identifier "Equals", false),
+                        [|
+                            Parameter.parameter (
+                                other,
+                                ?typeAnnotation =
+                                    (if com.IsTypeScript then
+                                         Some AnyTypeAnnotation
+                                     else
+                                         None)
+                            )
+                        |],
+                        Some(
+                            BlockStatement
+                                [|
+                                    Expression.binaryExpression (BinaryEqual, thisExpr, Expression.identifier other)
+                                    |> Statement.returnStatement
+                                |]
+                        ),
+                        ?returnType =
+                            (if com.IsTypeScript then
+                                 Some BooleanTypeAnnotation
+                             else
+                                 None)
+                    )
+                    ClassMember.classMethod (
+                        ClassFunction(Expression.identifier "GetHashCode", false),
+                        [||],
+                        Some(
+                            BlockStatement
+                                [|
+                                    libCall com ctx None "Util" "physicalHash" [] [ thisExpr ]
+                                    |> Statement.returnStatement
+                                |]
+                        ),
+                        ?returnType =
+                            (if com.IsTypeScript then
+                                 Some NumberTypeAnnotation
+                             else
+                                 None)
+                    )
+                |]
+                |> Array.append classMembers
+            else
+                classMembers
+
         let typeDeclaration =
             declareClass com ctx ent entName doc consArgs consBody baseExpr classMembers
 
