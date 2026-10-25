@@ -330,7 +330,10 @@ type ImplFile =
             Entities = entities
             RootModule = rootModule
             RootComment = rootComment
-            InlineExprs = FSharp2Fable.Compiler.getInlineExprs file.FileName declarations
+            // fickl: FCS names a file with a signature after its .fsi, but changes and watch dependencies name the .fs,
+            // so files that inline from it were not recompiled when it changed
+            InlineExprs =
+                FSharp2Fable.Compiler.getInlineExprs (Path.normalizePathAndEnsureFsExtension file.FileName) declarations
             Signature = signature declarations
         }
 

@@ -412,6 +412,14 @@ module private Transforms =
         let canInlineBinding =
             match value with
             | Import(i, _, _) -> i.IsCompilerGenerated
+            // fickl: reading a mutable value of another file is a call of an import, which tells nothing about the
+            // value changing, so it must not be moved past side effects
+            | Call(Import _, info, _, _) when
+                List.isEmpty info.Args
+                && List.contains "value" info.Tags
+                && info.MemberRef |> Option.bind com.TryGetMember |> Option.exists _.IsMutable
+                ->
+                canInlineArg com ident.Name value letBody
             | Call(callee, info, _, _) when List.isEmpty info.Args && List.contains "value" info.Tags ->
                 canInlineArg com ident.Name callee letBody
             // Replace non-recursive lambda bindings

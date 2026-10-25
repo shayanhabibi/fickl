@@ -1,5 +1,5 @@
 import { toString as dateToString } from "./Date.ts";
-import { compare as numericCompare, divide, isNumeric, isIntegral, multiply, Numeric, toExponential, toFixed, toHex, toPrecision } from "./Numeric.ts";
+import { compare as numericCompare, divide, isNumeric, isIntegral, multiply, Numeric, toExponential, toFixed, toHex, toOctal, toPrecision } from "./Numeric.ts";
 import { escape } from "./RegExp.ts";
 import { toString } from "./Types.ts";
 import { Exception } from "./Util.ts";
@@ -231,7 +231,7 @@ function formatReplacement(rep: any, flags: any, padLength: any, precision: any,
   flags = flags || "";
   format = format || "";
   if (isNumeric(rep)) {
-    if (format.toLowerCase() !== "x") {
+    if (format.toLowerCase() !== "x" && format !== "o") {
       if (isLessThan(rep, 0)) {
         rep = multiply(rep, -1);
         sign = "-";
@@ -260,6 +260,9 @@ function formatReplacement(rep: any, flags: any, padLength: any, precision: any,
         break;
       case "X":
         rep = toHex(rep).toUpperCase();
+        break;
+      case "o":
+        rep = toOctal(rep);
         break;
       default: // AOid
         rep = String(rep);
