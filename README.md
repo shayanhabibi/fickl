@@ -16,9 +16,13 @@ This also benefits the ecosystem of plugins, as they also benefit from modern pe
 Fickl has already made significant strides in improving performance. The difficulty ceiling for completing these tasks is remarkably low in the advent of AI. The importance is in ensuring there is a solid foundation of *behavioural* tests that cover edge cases. There is more yield from prompting AI to try its best to find code utilising/stressing a feature and won't compile, or will compile and provide the wrong runtime behaviour.
 
 <!-- fickl-benchmarks:start -->
-![Fickl 0.6.3 against Fable 5.22: up to 7.1× faster end to end](notes/benchmarks/fickl-0.6.3.png)
+![Fickl 0.6.5 against Fable 5.24.0: up to 7.5× faster end to end](notes/benchmarks/fickl-0.6.5.svg)
 
-Wall clock of a fresh process with `--noCache`, median of 5 interleaved runs on Windows. Raw timings are in [notes/benchmarks/fickl-0.6.3.tsv](notes/benchmarks/fickl-0.6.3.tsv).
+Wall clock of a fresh process with `--noCache`, median of 5 interleaved runs on Ubuntu 24.04.5 LTS, measured by the release workflow. Raw timings are in [notes/benchmarks/fickl-0.6.5.tsv](notes/benchmarks/fickl-0.6.5.tsv).
+
+![Fickl 0.6.5 against Fable 5.24.0 in watch mode: up to 90.0× faster to respond](notes/benchmarks/fickl-0.6.5-watch.svg)
+
+Time from saving a file to `Watching` in one `--watch` session per compiler. Raw timings are in [notes/benchmarks/fickl-0.6.5-watch.tsv](notes/benchmarks/fickl-0.6.5-watch.tsv).
 <!-- fickl-benchmarks:end -->
 
 ## Explicit control of expression
