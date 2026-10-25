@@ -34,6 +34,25 @@ type MyNumberWrapper =
 
 let tests =
   testList "Seqs" [
+    testCase "Deep yield! recursion and chained Seq.append keep a flat stack" <| fun () -> // #68
+        let rec gen n = seq { if n > 0 then yield n; yield! gen (n - 1) }
+        Seq.length (gen 100_000) |> equal 100_000
+        gen 5 |> Seq.toList |> equal [ 5; 4; 3; 2; 1 ]
+        Seq.fold (fun acc i -> Seq.append acc [ i ]) Seq.empty [ 1..10_000 ] |> Seq.length |> equal 10_000
+        List.foldBack (fun i acc -> Seq.append [ i ] acc) [ 1..10_000 ] Seq.empty |> Seq.length |> equal 10_000
+        Seq.concat [ seq { 1; 2 }; Seq.append [ 3 ] [ 4 ]; Seq.empty; seq { 5 } ] |> Seq.toList |> equal [ 1; 2; 3; 4; 5 ]
+
+    testCase "Flattened appends keep laziness and disposal order" <| fun () -> // #68
+        let mutable n = 0
+        let s = Seq.append (seq { n <- n + 1; yield 1 }) (seq { n <- n + 10; yield 2 })
+        Seq.head s |> equal 1
+        n |> equal 1
+        let log = ResizeArray()
+        let a = seq { try yield 1; yield 2 finally log.Add "a" }
+        let b = seq { try yield 3 finally log.Add "b" }
+        Seq.append a (Seq.append b a) |> Seq.take 3 |> Seq.toList |> equal [ 1; 2; 3 ]
+        List.ofSeq log |> equal [ "a"; "b" ]
+
     testCase "Can test untyped enumerables" <| fun () ->
         let sumEnumerable (enumerable: obj) =
             let mutable sum = 0
