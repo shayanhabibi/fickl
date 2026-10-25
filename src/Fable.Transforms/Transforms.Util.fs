@@ -116,6 +116,9 @@ module Atts =
     let callableInterface = "Fickl.Core.CallableInterfaceAttribute"
 
     [<Literal>]
+    let ficklCurried = "Fickl.Core.CurriedAttribute" // typeof<Fickl.Core.CurriedAttribute>.FullName
+
+    [<Literal>]
     let stringEnum = "Fable.Core.StringEnumAttribute" // typeof<Fable.Core.StringEnumAttribute>.FullName
 
     [<Literal>]

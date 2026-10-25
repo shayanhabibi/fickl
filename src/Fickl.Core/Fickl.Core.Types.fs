@@ -57,3 +57,21 @@ type CaseTestAttribute(test: string) =
 /// </remarks>
 type InlineInterfaceAttribute() =
     inherit Attribute()
+
+/// <summary>
+/// Keeps a function parameter curried in JavaScript, so it is passed and called one argument at a time.
+/// </summary>
+/// <remarks>
+/// Fickl passes a function of several arguments as one JS function taking all of them, <c>(a, b) => ...</c>.
+/// A JS API that calls its callback as <c>f(a)(b)</c>, or JS code that passes a curried function to
+/// F#, needs the curried shape instead:
+/// <code>
+/// [&lt;Import("subscribe", "./events.js")>]
+/// let subscribe ([&lt;Curried>] handler: string -> int -> unit) : unit = jsNative
+/// </code>
+/// The parameter is curried both where the member is called and inside its body. On an abstract member,
+/// the attribute also applies to every implementation of it.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Parameter)>]
+type CurriedAttribute() =
+    inherit Attribute()
