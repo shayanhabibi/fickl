@@ -1,4 +1,5 @@
 import { Exception, Nullable, structuralHash, equals, compare } from "./Util.ts";
+import { toString } from "./Types.ts";
 
 // Options are erased in runtime by Fable, but we have
 // the `Some` type below to wrap values that would evaluate
@@ -70,6 +71,17 @@ export function value<T>(x: Option<T>) {
 
 export function unwrap<T>(opt: Option<T>): T | undefined {
   return opt instanceof Some ? opt.value : opt;
+}
+
+// `string` of an option as .NET prints it: Some(x), and None (null) as nothing; a value option prints its value,
+// and ValueNone as "ValueNone". `format` prints the value when its static type needs it (a nested option or tuple).
+export function optionToString<T>(x: Option<T>, isValueOption: boolean, format?: (v: T) => string): string {
+  if (x == null) {
+    return isValueOption ? "ValueNone" : "";
+  }
+  const v = unwrap(x);
+  const inner = v == null ? "null" : format != null ? format(v as T) : toString(v);
+  return isValueOption ? inner : "Some(" + inner + ")";
 }
 
 export function some<T>(x: T): Option<T> {

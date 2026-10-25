@@ -266,18 +266,25 @@ let needToCast fromKind toKind =
 
 /// Conversions to floating point
 let toFloat com (ctx: Context) r targetType (args: Expr list) : Expr =
-    match args.Head.Type with
-    | Char -> Helper.InstanceCall(args.Head, "charCodeAt", Int32.Number, [ makeIntConst 0 ])
-    | String -> Helper.LibCall(com, "Double", "parse", targetType, args)
-    | Number(kind, _) ->
-        match kind with
-        | Decimal -> Helper.LibCall(com, "Decimal", "toFloat64", targetType, args)
-        | BigIntegers _ -> Helper.LibCall(com, "BigInt", "toFloat64", targetType, args)
-        | _ -> TypeCast(args.Head, targetType)
-    | _ ->
-        addWarning com ctx.InlinePath r "Cannot make conversion because source type is unknown"
+    let converted =
+        match args.Head.Type with
+        | Char -> Helper.InstanceCall(args.Head, "charCodeAt", Int32.Number, [ makeIntConst 0 ])
+        | String -> Helper.LibCall(com, "Double", "parse", targetType, args)
+        | Number(kind, _) ->
+            match kind with
+            | Decimal -> Helper.LibCall(com, "Decimal", "toFloat64", targetType, args)
+            | BigIntegers _ -> Helper.LibCall(com, "BigInt", "toFloat64", targetType, args)
+            | _ -> TypeCast(args.Head, targetType)
+        | _ ->
+            addWarning com ctx.InlinePath r "Cannot make conversion because source type is unknown"
 
-        TypeCast(args.Head, targetType)
+            TypeCast(args.Head, targetType)
+
+    // A Single holds fewer digits: round to the nearest one, as the conversion does in .NET
+    match targetType, args.Head.Type with
+    | Number(Float32, _), Number(Float32, _) -> converted
+    | Number(Float32, _), _ -> Helper.GlobalCall("Math", targetType, [ converted ], memb = "fround")
+    | _ -> converted
 
 let toDecimal com (ctx: Context) r targetType (args: Expr list) : Expr =
     match args.Head.Type with
@@ -399,6 +406,44 @@ let toChar com (ctx: Context) r (arg: Expr) =
         let code = toInt com ctx r UInt16.Number [ arg ]
         Helper.GlobalCall("String", Char, [ code ], memb = "fromCharCode")
 
+/// `string` of an option or tuple, with formatters for the items whose static types need one (nested options and
+/// tuples), as their runtime values have lost the type
+let rec private erasedToString (com: ICompiler) (ctx: Context) r (typ: Type) (expr: Expr) : Expr =
+    let needsFormat =
+        function
+        | Option _
+        | Tuple _ -> true
+        | _ -> false
+
+    let formatter (t: Type) =
+        let x = makeUniqueIdent com ctx t "x"
+        Delegate([ x ], erasedToString com ctx None t (IdentExpr x), None, Tags.empty)
+
+    match typ with
+    | Option(inner, isStruct) ->
+        let args =
+            [
+                expr
+                makeBoolConst isStruct
+                if needsFormat inner then
+                    formatter inner
+            ]
+
+        Helper.LibCall(com, "Option", "optionToString", String, args, ?loc = r)
+    | Tuple(items, _) when List.exists needsFormat items ->
+        let formats =
+            items
+            |> List.map (fun t ->
+                if needsFormat t then
+                    formatter t
+                else
+                    Value(Null Any, None)
+            )
+
+        Helper.LibCall(com, "Types", "tupleToString", String, [ expr; makeArray Any formats ], ?loc = r)
+    | Tuple _ -> Helper.LibCall(com, "Types", "tupleToString", String, [ expr ], ?loc = r)
+    | _ -> Helper.LibCall(com, "Types", "toString", String, [ expr ], ?loc = r)
+
 let toString com (ctx: Context) r (args: Expr list) =
     match args with
     | [] ->
@@ -429,9 +474,19 @@ let toString com (ctx: Context) r (args: Expr list) =
         | Number(NativeInt, _) -> Helper.LibCall(com, "Util", "int64ToString", String, args)
         | Number(BigInt, _) -> Helper.LibCall(com, "BigInt", "toString", String, args)
         | Number(Decimal, _) -> Helper.LibCall(com, "Decimal", "toString", String, args)
+        // Double.ToString() and Single.ToString() write exponents and -0 as .NET does
+        | Number(Float64, _) when tail.IsEmpty -> Helper.LibCall(com, "Util", "doubleToString", String, [ head ])
+        | Number(Float32, _) when tail.IsEmpty -> Helper.LibCall(com, "Util", "singleToString", String, [ head ])
         | Number _ -> Helper.InstanceCall(head, "toString", String, tail)
         | Array _
         | List _ -> Helper.LibCall(com, "Types", "seqToString", String, [ head ], ?loc = r)
+        // Options, tuples and unit are erased or plain arrays at runtime: format them as .NET does from the static type
+        | Option _
+        | Tuple _ -> erasedToString com ctx r head.Type head
+        | Unit ->
+            match head with
+            | Value _ -> makeStrConst ""
+            | _ -> Sequential [ head; makeStrConst "" ]
         // | DeclaredType(ent, _) when ent.IsFSharpUnion || ent.IsFSharpRecord || ent.IsValueType ->
         //     Helper.InstanceCall(head, "toString", String, [], ?loc=r)
         // | DeclaredType(ent, _) ->
@@ -458,7 +513,12 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
         Operation(Unary(operator, operand), Tags.empty, t, r)
 
     let binOp op left right =
-        Operation(Binary(op, left, right), Tags.empty, t, r)
+        let operation = Operation(Binary(op, left, right), Tags.empty, t, r)
+
+        match t with
+        // Single arithmetic rounds every result to single precision
+        | Number(Float32, _) -> Helper.GlobalCall("Math", t, [ operation ], memb = "fround")
+        | _ -> operation
 
     let binOpChar op left right =
         let toUInt16 e = toInt com ctx None UInt16.Number [ e ]
@@ -1433,6 +1493,54 @@ let getMangledNames (i: CallInfo) (thisArg: Expr option) =
 
     moduleName, mangledName
 
+#if !FABLE_COMPILER
+/// The names a runtime library module exports, read once per library directory; None if the file is not found.
+let private libraryModuleExports =
+    Collections.Concurrent.ConcurrentDictionary<string, Set<string> option>()
+
+let private exportRegex =
+    System.Text.RegularExpressions.Regex(
+        @"^export\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:function\*?|class|const|let|var)\s+([A-Za-z0-9_$]+)",
+        System.Text.RegularExpressions.RegexOptions.Multiline
+        ||| System.Text.RegularExpressions.RegexOptions.Compiled
+    )
+
+/// Members of BCL types and FSharp.Core modules implemented in F# in the runtime library are called by their mangled
+/// names. A member the library does not implement would compile to an import the module does not export, which fails
+/// when the module loads; report it as unsupported instead.
+let private isMissingLibraryMember (com: ICompiler) (moduleName: string) (mangledName: string) =
+    // LibraryDir is relative to the file being compiled
+    let libraryDir =
+        try
+            IO.Path.GetFullPath(IO.Path.Combine(IO.Path.GetDirectoryName(com.CurrentFile), com.LibraryDir))
+        with _ ->
+            com.LibraryDir
+
+    let exports =
+        libraryModuleExports.GetOrAdd(
+            libraryDir + "|" + moduleName,
+            fun _ ->
+                [ ".js"; ".ts" ]
+                |> List.tryPick (fun ext ->
+                    let path = IO.Path.Combine(libraryDir, moduleName + ext)
+
+                    if IO.File.Exists path then
+                        exportRegex.Matches(IO.File.ReadAllText path)
+                        |> Seq.map (fun m -> m.Groups[1].Value)
+                        |> Set.ofSeq
+                        |> Some
+                    else
+                        None
+                )
+        )
+
+    match exports with
+    | Some exports -> not (exports.Contains mangledName)
+    | None -> false
+#else
+let private isMissingLibraryMember (_com: ICompiler) (_moduleName: string) (_mangledName: string) = false
+#endif
+
 let bclType (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
     | "ToString", Some callee, [] -> Helper.InstanceCall(callee, "toString", t, args, ?loc = r) |> Some
@@ -1446,14 +1554,29 @@ let bclType (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
             | Some callee -> callee :: args
             | _ -> args
 
-        Helper.LibCall(com, moduleName, mangledName, t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
-        |> Some
+        if isMissingLibraryMember com moduleName mangledName then
+            None
+        else
+            Helper.LibCall(
+                com,
+                moduleName,
+                mangledName,
+                t,
+                args,
+                i.SignatureArgTypes,
+                genArgs = i.GenericArgs,
+                ?loc = r
+            )
+            |> Some
 
 let fsharpModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     let moduleName, mangledName = getMangledNames i thisArg
 
-    Helper.LibCall(com, moduleName, mangledName, t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
-    |> Some
+    if isMissingLibraryMember com moduleName mangledName then
+        None
+    else
+        Helper.LibCall(com, moduleName, mangledName, t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
+        |> Some
 
 /// Matches printf("constant") where constant has no format specifiers.
 /// These can be passed directly to console.log/error instead of going through toConsole.
@@ -1588,16 +1711,26 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     // Strings
     | ("PrintFormatToString" | "PrintFormatToStringThen" | "PrintFormat" | "PrintFormatLine" | "PrintFormatToError" | "PrintFormatLineToError" | "PrintFormatThen" | "PrintFormatToStringThenFail" | "PrintFormatToStringBuilder" | "PrintFormatToStringBuilderThen"), // Printf.kbprintf
       _ -> fsFormat com ctx r t i thisArg args
+    // Failure matches System.Exception itself, not the exceptions derived from it
+    | "FailurePattern", [ exn ] -> Helper.LibCall(com, "Util", "failurePattern", t, [ exn ], ?loc = r) |> Some
     | ("Failure" | "FailurePattern" | "LazyPattern" | "Lock" | "NullArg" | "Using"), _ ->
         fsharpModule com ctx r t i thisArg args
     | ("IsNull" | "IsNotNull" | "IsNullV" | "NonNull" | "NonNullV" | "NullMatchPattern" | "NullValueMatchPattern" | "NonNullQuickPattern" | "NonNullQuickValuePattern" | "WithNull" | "WithNullV" | "NullV" | "NullArgCheck"),
       _ -> fsharpModule com ctx r t i thisArg args
     // Exceptions
-    | "FailWith", [ msg ]
-    | "InvalidOp", [ msg ] -> makeThrow r t (error com msg) |> Some
+    | "FailWith", [ msg ] -> makeThrow r t (error com msg) |> Some
+    // The exceptions .NET raises, so `:? InvalidOperationException` and `:? ArgumentException` handlers catch them
+    | "InvalidOp", [ msg ] ->
+        Helper.LibCall(com, "System", "InvalidOperationException", Any, [ msg ], isConstructor = true)
+        |> makeThrow r t
+        |> Some
     | "InvalidArg", [ argName; msg ] ->
-        let msg = add msg (add (add (str " (Parameter '") argName) (str "')"))
-        makeThrow r t (error com msg) |> Some
+        // ArgumentException appends " (Parameter '<name>')" to the message itself; no inner exception
+        let noInner = Helper.LibCall(com, "Util", "defaultOf", Any, [])
+
+        Helper.LibCall(com, "System", "ArgumentException", Any, [ msg; argName; noInner ], isConstructor = true)
+        |> makeThrow r t
+        |> Some
     | "Raise", [ arg ] -> makeThrow r t arg |> Some
     | "Reraise", _ ->
         match ctx.CaughtException with

@@ -279,6 +279,13 @@ let tests = testList "Strings" [
         let x = 3.14159
         $"{{0}} {x:F2} {{y}}" |> equal "{0} 3.14 {y}"
 
+    testCase "sprintf \"%e\" writes six decimals and a three-digit exponent" <| fun () -> // #59
+        sprintf "%e" 1234.5 |> equal "1.234500e+003"
+        sprintf "%E" 1234.5 |> equal "1.234500E+003"
+        sprintf "%.2e" 0.000123 |> equal "1.23e-004"
+        sprintf "%e" 0.0 |> equal "0.000000e+000"
+        sprintf "%e" -1e-300 |> equal "-1.000000e-300"
+
     testCase "String.Join and String.Concat read null as empty" <| fun () -> // #80
         String.Join(null, [| "a"; "b" |]) |> equal "ab"
         String.Join(null, [ "a"; "b" ]) |> equal "ab"
