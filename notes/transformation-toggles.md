@@ -32,7 +32,7 @@ test. Paths are under `src/Fable.Transforms/` unless they start with `src/`.
 | --- | --- | --- |
 | Union representation | Erase, StringEnum, TypeScriptTaggedUnion, CaseTest, CompiledValue, InlineInterface, CompiledName | Erased/StringEnum unions can't implement abstract members |
 | Records as `Types.Record` | `JS.Pojo` (classes only) | No POJO switch for records |
-| int64/decimal/char/DateTime | `--temporal` (#39) | — |
+| int64/decimal/char/DateTime | `--temporal` (#39) | â€” |
 | Members as module functions vs attached | `[<AttachMembers>]` | All or nothing per type |
 
 ## Bugs, not toggles
