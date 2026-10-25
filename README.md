@@ -15,6 +15,10 @@ This also benefits the ecosystem of plugins, as they also benefit from modern pe
 
 Fickl has already made significant strides in improving performance. The difficulty ceiling for completing these tasks is remarkably low in the advent of AI. The importance is in ensuring there is a solid foundation of *behavioural* tests that cover edge cases. There is more yield from prompting AI to try its best to find code utilising/stressing a feature and won't compile, or will compile and provide the wrong runtime behaviour.
 
+![Fickl 0.6.2 against Fable 5.22: up to 5.2× faster end to end](notes/benchmarks/fickl-0.6.2.png)
+
+Wall clock of a fresh process with `--noCache`, median of 5 interleaved runs on Windows. Raw timings are in [notes/benchmarks/fickl-0.6.2.tsv](notes/benchmarks/fickl-0.6.2.tsv).
+
 ## Explicit control of expression
 
 When targeting another language, a sensible collection of ergonomic changes are made to faithfully represent F# semantics in the target language. Beyond this, are a collection of attributes and other compiler recognised constructs that inform our transformation pipeline.
@@ -41,4 +45,3 @@ As much as possible, the development and learnings that are made in this endeavo
 The principle behind having this *Lab* is the ability to make changes and publish with speed, and without encumbrance.
 
 Contribution should be made to Fable instead of Fickl. However, if you insist on embarking on this experiment, then you are free to do so. Agentic contributions should endeavour to have full provenance, experimental data, tests, mutations and considered cost/benefit ratios accompanying them.
-
