@@ -406,7 +406,11 @@ let toString com (ctx: Context) r (args: Expr list) =
         |> addErrorAndReturnNull com ctx.InlinePath r
     | head :: tail ->
         match head.Type with
-        | String -> head
+        | String ->
+            match head with
+            | Value(StringConstant _, _) -> head
+            // `string` of a null string is empty
+            | _ -> emitExpr r String [ head ] "($0 ?? \"\")"
         | Char -> TypeCast(head, String)
         | Builtin BclGuid when tail.IsEmpty -> head
         | Builtin BclDateOnly -> Helper.LibCall(com, dateOnlyModule com, "toString", String, args)
@@ -497,7 +501,12 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
         | Operators.exclusiveOr, [ left; right ] -> binOp BinaryXorBitwise left right |> truncateUnsigned
         | Operators.booleanAnd, [ left; right ] -> logicOp LogicalAnd left right
         | Operators.booleanOr, [ left; right ] -> logicOp LogicalOr left right
-        | Operators.logicalNot, [ operand ] -> unOp UnaryNotBitwise operand |> truncateUnsigned
+        | Operators.logicalNot, [ operand ] ->
+            match t with
+            // ~ works on 32 bits: keep the complement of a byte or uint16 in its range
+            | Number(UInt8, _) -> binOp BinaryAndBitwise (unOp UnaryNotBitwise operand) (makeIntConst 0xFF)
+            | Number(UInt16, _) -> binOp BinaryAndBitwise (unOp UnaryNotBitwise operand) (makeIntConst 0xFFFF)
+            | _ -> unOp UnaryNotBitwise operand |> truncateUnsigned
         | Operators.unaryNegation, [ operand ] ->
             match argTypes with
             | Number(Int8, _) :: _ -> Helper.LibCall(com, "Int32", "op_UnaryNegation_Int8", t, args, ?loc = r)
@@ -521,6 +530,23 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
 
         Helper.LibCall(com, "Decimal", opName, t, args, argTypes, ?loc = r)
     | Number(BigIntegers kind, _) :: _ ->
+        let args =
+            match kind, args with
+            // .NET masks the shift count by the operand's width, as JS does for 32 bits; BigInteger does not
+            | BigInt, _ -> args
+            | _, [ value; count ] when opName = Operators.leftShift || opName = Operators.rightShift ->
+                let mask =
+                    match kind with
+                    | Int128
+                    | UInt128 -> 127
+                    | _ -> 63
+
+                [
+                    value
+                    Operation(Binary(BinaryAndBitwise, count, makeIntConst mask), Tags.empty, count.Type, None)
+                ]
+            | _ -> args
+
         let op = Helper.LibCall(com, "BigInt", opName, t, args, argTypes, ?loc = r)
 
         if kind = BigInt then
@@ -1641,7 +1667,25 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
         | ExprType(Number(_, _)) :: _ -> math r t args i.SignatureArgTypes i.CompiledName |> Some
         | _ -> applyOp com ctx r t i.CompiledName args |> Some
     | "Round", _ ->
+        let isMidpointRounding =
+            function
+            | Number(_, NumberInfo.IsEnum ent) -> ent.FullName = "System.MidpointRounding"
+            | _ -> false
+
+        // The overloads taking a MidpointRounding: without digits the mode would be read as digits
+        let args, roundName =
+            match args, i.SignatureArgTypes with
+            | [ value; mode ], [ _; modeType ] when isMidpointRounding modeType ->
+                [ value; makeIntConst 0; mode ], "roundWith"
+            | [ _; _; _ ], [ _; _; modeType ] when isMidpointRounding modeType -> args, "roundWith"
+            | _ -> args, "round"
+
+        let argTypes = args |> List.map (fun a -> a.Type)
+
         match args with
+        | ExprType(Number(Decimal, _)) :: _ when roundName = "roundWith" ->
+            Helper.LibCall(com, "Decimal", roundName, t, args, argTypes, ?loc = r) |> Some
+        | _ when roundName = "roundWith" -> Helper.LibCall(com, "Util", roundName, t, args, argTypes, ?loc = r) |> Some
         | ExprType(Number(Decimal, _)) :: _ ->
             Helper.LibCall(com, "Decimal", "round", t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
             |> Some
@@ -1743,6 +1787,8 @@ let objects (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
         match arg1.Type, arg2.Type with
         | Array _, _
         | _, Array _ -> makeEqOp r arg1 arg2 BinaryEqual |> Some
+        // Double.Equals(obj): NaN equals itself
+        | Number(Floats _, _), _ -> Helper.LibCall(com, "Double", "equals", t, [ arg1; arg2 ], ?loc = r) |> Some
         | _ -> equals com ctx r true arg1 arg2 |> Some
     | "GetHashCode", Some arg, _ -> identityHash com r arg |> Some
     | "GetType", Some arg, _ ->
@@ -1756,6 +1802,10 @@ let valueTypes (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
     match i.CompiledName, thisArg, args with
     | ".ctor", _, _ -> typedObjExpr t [] |> Some
     | "ToString", Some arg, _ -> toString com ctx r [ arg ] |> Some
+    // Double.Equals(Double) and Single.Equals(Single), unlike =, treat NaN as equal to itself
+    | "Equals", Some(ExprType(Number(Floats _, _)) as arg1), [ arg2 ]
+    | "Equals", None, [ ExprType(Number(Floats _, _)) as arg1; arg2 ] ->
+        Helper.LibCall(com, "Double", "equals", t, [ arg1; arg2 ], ?loc = r) |> Some
     | "Equals", Some arg1, [ arg2 ]
     | "Equals", None, [ arg1; arg2 ] -> equals com ctx r true arg1 arg2 |> Some
     | "GetHashCode", Some arg, _ -> structuralHash com r arg |> Some
@@ -1763,18 +1813,14 @@ let valueTypes (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
     | _ -> None
 
 let chars (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
-    let icall r t args argTypes memb =
-        match args, argTypes with
-        | thisArg :: args, _ :: argTypes ->
-            let info = makeCallInfo None args argTypes
-            getField thisArg memb |> makeCall r t info |> Some
-        | _ -> None
-
     match i.CompiledName with
-    | "ToUpper" -> icall r t args i.SignatureArgTypes "toLocaleUpperCase"
-    | "ToUpperInvariant" -> icall r t args i.SignatureArgTypes "toUpperCase"
-    | "ToLower" -> icall r t args i.SignatureArgTypes "toLocaleLowerCase"
-    | "ToLowerInvariant" -> icall r t args i.SignatureArgTypes "toLowerCase"
+    | "ToUpper"
+    | "ToUpperInvariant"
+    | "ToLower"
+    | "ToLowerInvariant" ->
+        // A char's case mapping keeps it one character, unlike String's
+        Helper.LibCall(com, "Char", Naming.lowerFirst i.CompiledName, t, List.truncate 1 args, ?loc = r)
+        |> Some
     | "ToString" -> toString com ctx r args |> Some
     | "GetUnicodeCategory"
     | "IsControl"
@@ -2997,12 +3043,21 @@ let intrinsicFunctions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisAr
     | "GetArray", _, [ ar; idx ] -> arrayGetItem com r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
     | "SetArray", _, [ ar; idx; value ] -> setExpr r ar idx value |> Some
     | ("GetArraySlice" | "GetStringSlice"), None, [ ar; lower; upper ] ->
+        // .NET clamps a negative bound to 0, where JS's slice counts it from the end
+        let nonNegative =
+            function
+            | Value(NumberConstant(NumberValue.Int32 v, _), _) as e when v >= 0 -> e
+            | Value(NewOption(None, _, _), _) as e -> e
+            | e -> Helper.GlobalCall("Math", Int32.Number, [ makeIntConst 0; e ], memb = "max")
+
         let upper =
             match upper with
             | Value(NewOption(None, _, _), _) -> getExpr None (Int32.Number) ar (makeStrConst "length")
-            | _ -> add upper (makeIntConst 1)
+            | Value(NumberConstant(NumberValue.Int32 v, _), _) -> makeIntConst (max 0 (v + 1))
+            | _ -> add upper (makeIntConst 1) |> nonNegative
 
-        Helper.InstanceCall(ar, "slice", t, [ lower; upper ], ?loc = r) |> Some
+        Helper.InstanceCall(ar, "slice", t, [ nonNegative lower; upper ], ?loc = r)
+        |> Some
     | "SetArraySlice", None, args ->
         Helper.LibCall(com, "Array", "setSlice", t, args, i.SignatureArgTypes, ?loc = r)
         |> Some

@@ -358,16 +358,50 @@ let private transformTraitCall
         |> addErrorAndReturnNull com ctx.InlinePath r
     )
 
+/// F# accesses fields and calls members through a byref implicitly: go through the reference cell to the value.
+/// Only for parameters, which always get a cell; a byref local bound to `&x` of an immutable x holds the value.
+let private derefByRefReceiver
+    (com: IFableCompiler)
+    (ctx: Context)
+    (callee: FSharpExpr option)
+    (transformed: Fable.Expr)
+    =
+    let isParameter (var: FSharpMemberOrFunctionOrValue) =
+        ctx.EnclosingMember
+        |> Option.exists (fun memb ->
+            memb.CurriedParameterGroups
+            |> Seq.concat
+            |> Seq.exists (fun p -> p.DeclarationLocation = var.DeclarationLocation)
+        )
+
+    match callee with
+    | Some(FSharpExprPatterns.Value var as expr) when
+        isByRefValue var
+        && not var.IsConstructorThisValue
+        && isByRefType expr.Type
+        && isParameter var
+        // Python passes an inref to a struct as the struct itself
+        && (
+            match com.Options.Language with
+            | JavaScript
+            | TypeScript -> true
+            | _ -> false
+        )
+        ->
+        let valueType = makeType ctx.GenericArgs expr.Type.GenericArguments.[0]
+        Replacements.Api.getRefCell com transformed.Range valueType transformed
+    | _ -> transformed
+
 let private transformCallee com ctx callee (calleeType: FSharpType) =
     trampoline {
-        let! callee = transformExprOpt com ctx callee
+        let! transformed = transformExprOpt com ctx callee
 
-        let callee =
-            match callee with
-            | Some callee -> callee
+        let transformed =
+            match transformed with
+            | Some transformed -> transformed
             | None -> FsEnt.Ref calleeType.TypeDefinition |> entityIdent com
 
-        return callee
+        return derefByRefReceiver com ctx callee transformed
     }
 
 let private resolveImportMemberBinding (ident: Fable.Ident) (info: Fable.ImportInfo) =
@@ -1214,10 +1248,43 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                     let callInfo = makeCallInfo None argExprs argTypes
                     return makeCall r typ callInfo w.Expr
 
-        | FSharpExprPatterns.CallWithWitnesses(callee, memb, ownerGenArgs, membGenArgs, witnesses, args) ->
+        | FSharpExprPatterns.CallWithWitnesses(callee, memb, ownerGenArgs, membGenArgs, witnesses, fsArgs) ->
             let typ = makeType ctx.GenericArgs fsExpr.Type
             let callGenArgs = ownerGenArgs @ membGenArgs |> List.map (makeType ctx.GenericArgs)
-            let! args = transformExprList com ctx args
+            let! args = transformExprList com ctx fsArgs
+
+            // `&x` of an immutable value is passed as the value itself (struct receivers, BCL `in` parameters),
+            // but F# code reads a byref parameter through its reference cell: give it one
+            let args =
+                let paramTypes =
+                    memb.CurriedParameterGroups
+                    |> Seq.concat
+                    |> Seq.map (fun p -> p.Type)
+                    |> Seq.toList
+
+                let isFSharpCode =
+                    match memb.DeclaringEntity with
+                    | Some ent -> not (isReplacementCandidateFrom ent)
+                    | None -> true
+
+                let isAddressOfImmutable =
+                    function
+                    | FSharpExprPatterns.AddressOf(FSharpExprPatterns.Value v)
+                    | FSharpExprPatterns.AddressOf(FSharpExprPatterns.Call(None, v, _, _, [])) ->
+                        v.IsValue && not v.IsMutable && not (isByRefValue v)
+                    | _ -> false
+
+                match com.Options.Language with
+                | JavaScript
+                | TypeScript when isFSharpCode && List.sameLength fsArgs paramTypes && List.sameLength args fsArgs ->
+                    List.zip3 args fsArgs paramTypes
+                    |> List.map (fun (arg, fsArg, paramType) ->
+                        if isByRefType paramType && isAddressOfImmutable fsArg then
+                            Replacements.Api.makeRefCellFromValue com arg.Range arg
+                        else
+                            arg
+                    )
+                | _ -> args
 
             // Sometimes args may include local generics (e.g. an identifier referencing a local generic function)
             // so we try to match extract them by comparing the arg types with the expected types (from the member signature)
@@ -1253,9 +1320,10 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             | Some unionExpr, UnionCaseTesterFor unionCase ->
                 return! transformUnionCaseTest com ctx (makeRangeFrom fsExpr) unionExpr unionExpr.Type unionCase
 
-            | callee, _ ->
+            | fsCallee, _ ->
                 let r = makeRangeFrom fsExpr
-                let! callee = transformExprOpt com ctx callee
+                let! callee = transformExprOpt com ctx fsCallee
+                let callee = callee |> Option.map (derefByRefReceiver com ctx fsCallee)
 
                 let! ctx =
                     trampoline {
@@ -1811,8 +1879,41 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                     "Mutating this argument passed by reference is not supported"
                     |> addErrorAndReturnNull com ctx.InlinePath r
 
+        // `&arr.[i]`: a reference to the element, with the array and index evaluated once
+        | FSharpExprPatterns.ILAsm(code, _, [ arrExpr; idxExpr ]) when
+            code.Contains("ldelema")
+            && (
+                match com.Options.Language with
+                | JavaScript
+                | TypeScript -> true
+                | _ -> false
+            )
+            ->
+            let r = makeRangeFrom fsExpr
+            let elemType = makeType ctx.GenericArgs fsExpr.Type.GenericArguments.[0]
+            let! arr = transformExpr com ctx [] arrExpr
+            let! idx = transformExpr com ctx [] idxExpr
+
+            let bindIfComplex name (e: Fable.Expr) =
+                match e with
+                | Fable.IdentExpr _
+                | Fable.Value _ -> [], e
+                | _ ->
+                    let ident = getIdentUniqueName com ctx name |> makeTypedIdent e.Type
+                    [ ident, e ], Fable.IdentExpr ident
+
+            let arrBinding, arr = bindIfComplex "array" arr
+            let idxBinding, idx = bindIfComplex "index" idx
+            let element = Fable.Get(arr, Fable.ExprGet idx, elemType, r)
+            let reference = Replacements.Api.makeRefFromMutableValue com ctx r elemType element
+
+            return
+                List.foldBack
+                    (fun (ident, value) body -> Fable.Let(ident, value, body))
+                    (arrBinding @ idxBinding)
+                    reference
+
         // | FSharpExprPatterns.ILFieldSet _
-        // | FSharpExprPatterns.ILAsm _
         | expr ->
             return
                 $"Cannot compile expression %A{expr}"

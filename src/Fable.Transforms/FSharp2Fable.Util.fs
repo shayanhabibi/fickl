@@ -2187,7 +2187,11 @@ module Util =
     /// FCS issue: https://github.com/dotnet/fsharp/issues/20040
     /// Fable PR: https://github.com/fable-compiler/Fable/pull/4719
     let fixEnumerateTryWithHandler (memb: FSharpMemberOrFunctionOrValue) (args: Fable.Expr list) =
-        if memb.FullName = "Microsoft.FSharp.Core.CompilerServices.RuntimeHelpers.EnumerateTryWith" then
+        // FullName builds the whole path, and this runs for every call: test the name first
+        if
+            memb.LogicalName = "EnumerateTryWith"
+            && memb.FullName = "Microsoft.FSharp.Core.CompilerServices.RuntimeHelpers.EnumerateTryWith"
+        then
             match args with
             | [ source; filterLambda; Fable.Lambda(exIdent, handlerBody, name) ] ->
                 let expectedType = handlerBody.Type

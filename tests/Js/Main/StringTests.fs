@@ -263,6 +263,22 @@ let tests = testList "Strings" [
 
         equal "/hello/%s" (pathScan "/hello/%s")
 
+    testCase "Null strings print as empty" <| fun () -> // #60
+        let mutable s: string = null
+        "[" + string s + "]" |> equal "[]"
+        sprintf "[%s]" s |> equal "[]"
+        sprintf "[%3s]" s |> equal "[   ]"
+        sprintf "[%O]" (box s) |> equal "[<null>]"
+        sprintf "[%A]" s |> equal "[<null>]"
+        string "lit" |> equal "lit"
+
+    testCase "String.Format unescapes doubled braces" <| fun () -> // #61
+        String.Format("{{{0}}}", 5) |> equal "{5}"
+        String.Format("{{0}} {0} }}{{", 7) |> equal "{0} 7 }{"
+        String.Format("[{0,4}][{1:000}]{{x}}", 1, 2) |> equal "[   1][002]{x}"
+        let x = 3.14159
+        $"{{0}} {x:F2} {{y}}" |> equal "{0} 3.14 {y}"
+
     testCase "sprintf with escaped percent symbols works" <| fun () -> // See #195
         let r, r1, r2 = "Ratio", 0.213849, 0.799898
         sprintf "%s1: %.2f%% %s2: %.2f%%" r (r1*100.) r (r2*100.)

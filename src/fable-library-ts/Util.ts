@@ -683,6 +683,23 @@ export function round(value: number, digits: number = 0) {
   return digits ? r / m : r;
 }
 
+// Math.Round with a MidpointRounding: ToEven 0, AwayFromZero 1, ToZero 2, ToNegativeInfinity 3, ToPositiveInfinity 4
+export function roundWith(value: number, digits: number, mode: number) {
+  if (mode === 0) { return round(value, digits); }
+  // As .NET: scale, round the exact product, scale back
+  const m = Math.pow(10, digits);
+  const n = value * m;
+  let r: number;
+  if (mode === 1) {
+    const a = Math.abs(n);
+    const i = Math.floor(a);
+    r = Math.sign(n) * (a - i >= 0.5 ? i + 1 : i);
+  } else {
+    r = mode === 2 ? Math.trunc(n) : mode === 3 ? Math.floor(n) : Math.ceil(n);
+  }
+  return r / m;
+}
+
 export function sign(x: number): number {
   return x > 0 ? 1 : x < 0 ? -1 : 0;
 }
@@ -1002,9 +1019,24 @@ export function failurePattern(e: any): string | undefined {
   return e instanceof Exception && e.constructor !== Exception ? undefined : e?.message;
 }
 
+// Fields named `constructor` or `__proto__` are stored with a trailing `$` (see sanitizeMemberName in Fable2Babel)
+export function fieldKey(name: string): string {
+  return name === "constructor" || name === "__proto__" ? name + "$" : name;
+}
+
+// The F# name of a stored field, for printing and serialisation
+export function fieldName(key: string): string {
+  return key === "constructor$" || key === "__proto__$" ? key.slice(0, -1) : key;
+}
+
 export function copyToArray<T>(source: MutableArray<T>, sourceIndex: number, target: MutableArray<T>, targetIndex: number, count: number): void {
   if (ArrayBuffer.isView(source) && ArrayBuffer.isView(target)) {
     (target as any).set((source as any).subarray(sourceIndex, sourceIndex + count), targetIndex);
+  } else if (source === target && targetIndex > sourceIndex) {
+    // Overlapping ranges of one array: copy from the end, as Array.Copy preserves the source
+    for (let i = count - 1; i >= 0; --i) {
+      target[targetIndex + i] = source[sourceIndex + i];
+    }
   } else {
     for (let i = 0; i < count; ++i) {
       target[targetIndex + i] = source[sourceIndex + i];

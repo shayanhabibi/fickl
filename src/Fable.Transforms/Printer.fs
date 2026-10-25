@@ -6,14 +6,18 @@ open System.Text.RegularExpressions
 open Fable
 open Fable.AST
 
+// Built once: a compiled Regex emits and JITs a dynamic method per instance, and Parse runs for every documented
+// declaration
+let private summaryRegex =
+    Regex(@"<summary>([\s\S]*?)</summary>", RegexOptions.Compiled)
+
 type ParsedXmlDoc =
     {
         Summary: string option
     }
     // TODO: Parse the whole XML
     static member Parse(xml: string) =
-        let regex = Regex(@"<summary>([\s\S]*?)</summary>", RegexOptions.Compiled)
-        let m = regex.Match(xml)
+        let m = summaryRegex.Match(xml)
 
         {
             Summary =
