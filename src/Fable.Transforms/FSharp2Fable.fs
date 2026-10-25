@@ -2459,13 +2459,15 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
             checkInlinedTaggedUnionCases com ctx fsEnt
             warnDuplicateCompiledNames com ctx fsEnt
 
+            // An abbreviation reports its target's interfaces but implements none of them.
             let inheritsCallable =
-                fsEnt.AllInterfaces
-                |> Seq.exists (fun typ ->
-                    match tryDefinition typ with
-                    | Some(entity, _) -> isCallableInterface entity
-                    | _ -> false
-                )
+                not fsEnt.IsFSharpAbbreviation
+                && fsEnt.AllInterfaces
+                   |> Seq.exists (fun typ ->
+                       match tryDefinition typ with
+                       | Some(entity, _) -> isCallableInterface entity
+                       | _ -> false
+                   )
 
             if isCallableInterface fsEnt then
                 match validateCallableInterface com fsEnt with
