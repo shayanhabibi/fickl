@@ -279,6 +279,13 @@ let tests = testList "Strings" [
         let x = 3.14159
         $"{{0}} {x:F2} {{y}}" |> equal "{0} 3.14 {y}"
 
+    testCase "sprintf \"%e\" writes six decimals and a three-digit exponent" <| fun () -> // #59
+        sprintf "%e" 1234.5 |> equal "1.234500e+003"
+        sprintf "%E" 1234.5 |> equal "1.234500E+003"
+        sprintf "%.2e" 0.000123 |> equal "1.23e-004"
+        sprintf "%e" 0.0 |> equal "0.000000e+000"
+        sprintf "%e" -1e-300 |> equal "-1.000000e-300"
+
     testCase "sprintf with escaped percent symbols works" <| fun () -> // See #195
         let r, r1, r2 = "Ratio", 0.213849, 0.799898
         sprintf "%s1: %.2f%% %s2: %.2f%%" r (r1*100.) r (r2*100.)

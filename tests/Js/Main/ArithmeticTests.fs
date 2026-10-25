@@ -917,6 +917,51 @@ let tests =
         Int64.MaxValue >>> k |> equal 4611686018427387903L
         1I <<< 65 |> equal 36893488147419103232I
 
+    testCase "Double.ToString writes exponents and -0 as .NET does" <| fun () -> // #59
+        string 1e21 |> equal "1E+21"
+        string 1.2345e20 |> equal "1.2345E+20"
+        string 1e17 |> equal "1E+17"
+        string 1e16 |> equal "10000000000000000"
+        string 1e-5 |> equal "1E-05"
+        string 9.99e-5 |> equal "9.99E-05"
+        string 1e-4 |> equal "0.0001"
+        string 1.5e-300 |> equal "1.5E-300"
+        string -1.5e-5 |> equal "-1.5E-05"
+        string -0.0 |> equal "-0"
+        string 0.0 |> equal "0"
+        string (0.1 + 0.2) |> equal "0.30000000000000004"
+        string 123.456 |> equal "123.456"
+        string 1.7976931348623157e308 |> equal "1.7976931348623157E+308"
+        (1e21).ToString() |> equal "1E+21"
+        $"{1e21}|{1e-5}" |> equal "1E+21|1E-05"
+        string nan |> equal "NaN"
+        string -infinity |> equal "-Infinity"
+
+    testCase "Single values are rounded and printed at single precision" <| fun () -> // #57
+        string 0.1f |> equal "0.1"
+        string (1.0f / 3.0f) |> equal "0.33333334"
+        string 16777217.0f |> equal "16777216"
+        string 1e20f |> equal "1E+20"
+        string 3.4028235e38f |> equal "3.4028235E+38"
+        string 123456789f |> equal "123456790"
+        string 1e8f |> equal "100000000"
+        string 1e9f |> equal "1E+09"
+        float32 0.1 = 0.1f |> equal true
+        float32 16777217 |> equal 16777216.0f
+        float32 0.1M |> equal 0.1f
+        let mutable sum = 0.0f
+        for _ in 1..10 do
+            sum <- sum + 0.1f
+        string sum |> equal "1.0000001"
+        string (0.1f + 0.2f) |> equal "0.3"
+        float 0.1f |> equal 0.10000000149011612
+        $"{0.1f}" |> equal "0.1"
+
+    testCase "sign throws for NaN" <| fun () -> // #59
+        sign -2.0 |> equal -1
+        sign 0.0 |> equal 0
+        (try sign nan |> ignore; false with _ -> true) |> equal true
+
     testCase "Math.Truncate works" <| fun () ->
         Math.Truncate -12.5 |> equal -12.
         Math.Truncate 1.425 |> equal 1.

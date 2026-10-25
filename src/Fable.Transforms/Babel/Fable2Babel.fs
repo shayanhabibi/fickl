@@ -1773,6 +1773,32 @@ module Util =
         | Fable.CharConstant x -> Expression.stringLiteral (string<char> x, ?loc = r)
         | Fable.StringConstant x -> Expression.stringLiteral (x, ?loc = r)
         | Fable.StringTemplate(tag, parts, values) ->
+            let values =
+                match tag with
+                | Some _ -> values
+                // An interpolated float is written as Double.ToString() and Single.ToString() write it
+                | None ->
+                    values
+                    |> List.map (fun value ->
+                        match value with
+                        // The compiler runs on .NET: format a constant here
+                        | MaybeCasted(Fable.Value(Fable.NumberConstant(Fable.NumberValue.Float64 v, _), r)) ->
+                            Fable.Value(
+                                Fable.StringConstant(v.ToString(Globalization.CultureInfo.InvariantCulture)),
+                                r
+                            )
+                        | MaybeCasted(Fable.Value(Fable.NumberConstant(Fable.NumberValue.Float32 v, _), r)) ->
+                            Fable.Value(
+                                Fable.StringConstant(v.ToString(Globalization.CultureInfo.InvariantCulture)),
+                                r
+                            )
+                        | MaybeCasted(ExprType(Fable.Number(Float64, _)) as number) ->
+                            Replacements.Util.Helper.LibCall(com, "Util", "doubleToString", Fable.String, [ number ])
+                        | MaybeCasted(ExprType(Fable.Number(Float32, _)) as number) ->
+                            Replacements.Util.Helper.LibCall(com, "Util", "singleToString", Fable.String, [ number ])
+                        | _ -> value
+                    )
+
             let tag = tag |> Option.map (fun e -> com.TransformAsExpr(ctx, e))
 
             let values = values |> List.mapToArray (fun e -> com.TransformAsExpr(ctx, e))

@@ -254,7 +254,10 @@ function formatReplacement(rep: any, flags: any, padLength: any, precision: any,
         rep = precision != null ? toPrecision(rep, precision) : toPrecision(rep);
         break;
       case "e": case "E":
-        rep = precision != null ? toExponential(rep, precision) : toExponential(rep);
+        // As F#: 6 decimals by default and a three-digit exponent, 1.234500e+003
+        rep = toExponential(rep, precision != null ? precision : 6)
+          .replace(/e([+-])(\d+)$/, (_: string, sign: string, digits: string) => "e" + sign + digits.padStart(3, "0"));
+        if (format === "E") { rep = rep.toUpperCase(); }
         break;
       case "x":
         rep = toHex(rep);

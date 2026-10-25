@@ -15,6 +15,20 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "A member the runtime library does not implement is reported as unsupported" <| fun _ -> // #48
+      compile """
+let f () = System.Text.StringBuilder("b").Insert(0, "a").ToString()
+"""
+      |> Assert.Exists.errorWith "System.Text.StringBuilder.Insert is not supported by Fable"
+      |> ignore
+
+    testCase "Members the runtime library implements are not reported" <| fun _ -> // #48
+      compile """
+let f () = System.Text.StringBuilder("b").Append("c").AppendLine("d").ToString() + string (List.sum [ 1 ])
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
     testCase "A static abstract member called from non-inline generic code is reported" <| fun _ -> // #78
       compile """
 type IAdd<'T when 'T :> IAdd<'T>> =
