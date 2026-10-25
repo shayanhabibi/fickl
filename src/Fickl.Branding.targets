@@ -62,6 +62,15 @@
         <PublishReadyToRun>true</PublishReadyToRun>
     </PropertyGroup>
 
+    <!--
+        The per-runtime publishes reuse the outer restore, which has no RuntimeIdentifier. Restore has to see
+        PublishReadyToRun too, or it never downloads the runtime and crossgen packs (NETSDK1094 on a clean machine).
+    -->
+    <PropertyGroup
+        Condition="'$(MSBuildProjectName)' == 'Fable.Cli' AND '$(_IsPacking)' == 'true' AND '$(MSBuildIsRestoring)' == 'true'">
+        <PublishReadyToRun>true</PublishReadyToRun>
+    </PropertyGroup>
+
     <!-- The pointer package holds no assemblies, so it has no symbols package either -->
     <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Fable.Cli' AND '$(_IsPacking)' == 'true' AND '$(RuntimeIdentifier)' == ''">
         <IncludeSymbols>false</IncludeSymbols>
