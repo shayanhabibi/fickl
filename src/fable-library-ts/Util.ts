@@ -1013,6 +1013,16 @@ export function curry20<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, 
 }
 
 // More performant method to copy arrays, see #2352
+// Fields named `constructor` or `__proto__` are stored with a trailing `$` (see sanitizeMemberName in Fable2Babel)
+export function fieldKey(name: string): string {
+  return name === "constructor" || name === "__proto__" ? name + "$" : name;
+}
+
+// The F# name of a stored field, for printing and serialisation
+export function fieldName(key: string): string {
+  return key === "constructor$" || key === "__proto__$" ? key.slice(0, -1) : key;
+}
+
 export function copyToArray<T>(source: MutableArray<T>, sourceIndex: number, target: MutableArray<T>, targetIndex: number, count: number): void {
   if (ArrayBuffer.isView(source) && ArrayBuffer.isView(target)) {
     (target as any).set((source as any).subarray(sourceIndex, sourceIndex + count), targetIndex);
