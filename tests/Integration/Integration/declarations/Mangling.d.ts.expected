@@ -1,0 +1,42 @@
+import { int32 } from "./fable_modules/fable-library-js.5.24.0/Int32.js";
+import { TypeInfo } from "./fable_modules/fable-library-js.5.24.0/Reflection.js";
+export interface IMangled {
+    "Mangling.IMangled.FooZ524259A4"(arg0: int32): int32,
+    "Mangling.IMangled.FooZ721C83C5"(arg0: string): string,
+    "Mangling.IMangled.get_Bar"(): string
+}
+export interface INotMangled {
+    Foo(arg0: int32): int32,
+    get Bar(): string
+}
+export interface IGeneric$1<T> {
+    "Mangling.IGeneric`1.Get2B595"(arg0: T): T,
+    "Mangling.IGeneric`1.get_Value"(): T
+}
+export interface IPlain {
+    Foo(arg0: int32): int32,
+    get Baz(): int32,
+    set Baz(arg0: int32)
+}
+export interface Inner_INested {
+    "Mangling.Inner.INested.Run"(): int32
+}
+export declare abstract class Base {
+    constructor();
+    abstract "Mangling.Base.MZ524259A4"(arg0: int32): int32;
+    abstract "Mangling.Base.get_P"(): int32;
+    "Mangling.Base.DZ524259A4"(x: int32): int32;
+}
+export declare function Base_$reflection(): TypeInfo;
+export declare abstract class GenericBase$1<T> {
+    constructor();
+    abstract "Mangling.GenericBase`1.M2B595"(arg0: T): T;
+}
+export declare function GenericBase$1_$reflection(gen0: TypeInfo): TypeInfo;
+export declare abstract class Attached {
+    constructor();
+    abstract M(arg0: int32): int32;
+    abstract get P(): int32;
+}
+export declare function Attached_$reflection(): TypeInfo;
+export declare function useAll(a: IMangled, b: INotMangled, c: IGeneric$1<int32>, d: IPlain, e: Inner_INested, f: Base, g: GenericBase$1<int32>, h: Attached): [int32, string, string, int32, string, int32, int32, int32, int32, int32, int32, int32, int32, int32, int32, int32];
