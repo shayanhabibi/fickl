@@ -88,8 +88,9 @@ jobs:
           FICKL_NUGET_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
           GH_TOKEN: ${{ github.token }}
 
+  # One job per workload, so the slowest workload sets the wall clock instead of their sum
   benchmark:
-    name: Benchmark against the latest Fable
+    name: Benchmark ${{ matrix.workload }}
     needs: release
     # Runs after a successful pack, or on its own for a published version
     if: >-
@@ -97,11 +98,12 @@ jobs:
       && (needs.release.result == 'success' || inputs.published_version != '')
       && (github.event_name == 'push' || inputs.benchmark)
     runs-on: ubuntu-latest
-    timeout-minutes: 240
-    permissions:
-      contents: write # the README commit
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        workload: [sutil, fantomas, ionide, jssuite, py, beam]
     env:
-      UPDATE_README: ${{ github.event_name == 'push' || inputs.update_readme }}
       PUBLISHED_VERSION: ${{ inputs.published_version }}
     steps:
       # The charts are committed to the default branch, so benchmark from it rather than from the tag
@@ -114,6 +116,7 @@ jobs:
 
       # The Fantomas online tools workload targets .NET 11
       - name: Setup .NET 11
+        if: matrix.workload == 'fantomas'
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 11.0.x
@@ -134,7 +137,55 @@ jobs:
           elif [ "$GITHUB_EVENT_NAME" != push ]; then
             version=$(ls temp | sed -n 's/^release-//p' | head -1)
           fi
-          args=(benchmark --version "$version")
+          dotnet run --project src/Fickl.Build -- benchmark --version "$version" --only ${{ matrix.workload }}
+
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: benchmark-${{ matrix.workload }}
+          path: |
+            temp/benchmark/*.tsv
+            temp/benchmark/logs
+
+  benchmark-report:
+    name: Draw the benchmark charts
+    needs: benchmark
+    if: ${{ !cancelled() && needs.benchmark.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # the README commit
+    env:
+      UPDATE_README: ${{ github.event_name == 'push' || inputs.update_readme }}
+      PUBLISHED_VERSION: ${{ inputs.published_version }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event_name == 'push' && github.event.repository.default_branch || github.ref }}
+
+      - name: Setup .NET
+        uses: ./.github/actions/setup-dotnet
+
+      - uses: actions/download-artifact@v8
+        if: inputs.published_version == ''
+        with:
+          name: packages
+          path: temp
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: benchmark-*
+          path: temp/benchmark-shards
+
+      - name: Draw the charts
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [ -n "$PUBLISHED_VERSION" ]; then
+            version="$PUBLISHED_VERSION"
+          elif [ "$GITHUB_EVENT_NAME" != push ]; then
+            version=$(ls temp | sed -n 's/^release-//p' | head -1)
+          fi
+          args=(benchmark --version "$version" --report temp/benchmark-shards)
           [ "$UPDATE_README" = true ] && args+=(--update-readme)
           dotnet run --project src/Fickl.Build -- "${args[@]}"
           echo "VERSION=$version" >> "$GITHUB_ENV"
@@ -146,7 +197,6 @@ jobs:
           path: |
             temp/benchmark/*.svg
             temp/benchmark/*.tsv
-            temp/benchmark/logs
 
       - name: Commit the charts
         if: env.UPDATE_README == 'true'
