@@ -23,6 +23,15 @@ let tests =
         testCase "Char.ToLowerInvariant works" <| fun () ->
             Char.ToLowerInvariant('B') |> equal 'b'
 
+        testCase "Char case mapping keeps one character" <| fun () -> // #62
+            Char.ToUpper('ß') |> equal 'ß'
+            Char.ToUpperInvariant('ß') |> equal 'ß'
+            Char.ToUpperInvariant('ﬁ') |> equal 'ﬁ'
+            Char.ToLowerInvariant('İ') |> equal 'İ'
+            Char.ToUpperInvariant('é') |> equal 'É'
+            Char.ToLowerInvariant('Σ') |> equal 'σ'
+            (string (Char.ToUpper 'ß')).Length |> equal 1
+
         testCase "Char.ToString works" <| fun () ->
             Char.ToString('b') |> equal "b"
 

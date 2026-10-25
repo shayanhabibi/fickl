@@ -1016,6 +1016,11 @@ export function curry20<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, 
 export function copyToArray<T>(source: MutableArray<T>, sourceIndex: number, target: MutableArray<T>, targetIndex: number, count: number): void {
   if (ArrayBuffer.isView(source) && ArrayBuffer.isView(target)) {
     (target as any).set((source as any).subarray(sourceIndex, sourceIndex + count), targetIndex);
+  } else if (source === target && targetIndex > sourceIndex) {
+    // Overlapping ranges of one array: copy from the end, as Array.Copy preserves the source
+    for (let i = count - 1; i >= 0; --i) {
+      target[targetIndex + i] = source[sourceIndex + i];
+    }
   } else {
     for (let i = 0; i < count; ++i) {
       target[targetIndex + i] = source[sourceIndex + i];
