@@ -1354,6 +1354,13 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             // Sometimes args may include local generics (e.g. an identifier referencing a local generic function)
             // so we try to match extract them by comparing the arg types with the expected types (from the member signature)
             let args =
+                // Native async replacements turn Promise-returning continuations into their raw bodies.
+                // Matching those bodies against the builder signature would infer T as Promise<T>.
+                let isNativeAsyncBuilder =
+                    match com.Options.Language, memb.DeclaringEntity with
+                    | (JavaScript | TypeScript), Some ent -> FsEnt.FullName ent = "Fickl.Core.JsAsyncBuilder"
+                    | _ -> false
+
                 let expectedArgTypes =
                     let ctx = addGenArgsToContext ctx memb callGenArgs
 
@@ -1361,7 +1368,7 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                     |> Seq.map (fun x -> makeType ctx.GenericArgs x.Type)
                     |> Seq.toList
 
-                if List.sameLength args expectedArgTypes then
+                if not isNativeAsyncBuilder && List.sameLength args expectedArgTypes then
                     List.zip args expectedArgTypes
                     |> List.map (fun (argExpr, expectedArgType) ->
                         extractGenericArgs argExpr expectedArgType |> replaceGenericArgs argExpr
