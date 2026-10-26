@@ -22,9 +22,65 @@ let private useAsyncResource<'T when 'T :> IAsyncDisposable> (resource: 'T) = ta
     return 42
 }
 
+#if FABLE_COMPILER
+let private getterResource (key: string) (throwsOnRepeat: bool) : obj =
+    emitJsExpr (key, throwsOnRepeat) "(() => { const disposalKey = $0 === 'Symbol.dispose' ? Symbol.dispose : $0 === 'Symbol.asyncDispose' ? Symbol.asyncDispose : $0; const disposalResource = { reads: 0, called: 0 }; return Object.defineProperty(disposalResource, disposalKey, { get() { const read = ++disposalResource.reads; if ($1 && read > 1) throw new Error('Repeated disposal getter'); return { called: 0, dispose() { this.called = read; return Promise.resolve(); } }.dispose; } }); })()"
+
+let private assertGetterResource (resource: obj) =
+    emitJsExpr resource "Object($0).reads" |> equal 1
+    emitJsExpr resource "Object($0).called" |> equal 1
+
+let private overrideDisposalCall (resource: obj) (key: string) : unit =
+    emitJsStatement (resource, key) "{ const disposalKey = $1 === 'Symbol.dispose' ? Symbol.dispose : $1 === 'Symbol.asyncDispose' ? Symbol.asyncDispose : $1; const method = { called: 0, dispose() { this.called = 1; } }.dispose; Object.defineProperty(method, 'call', { value: null }); Object.defineProperty($0, disposalKey, { value: method }); }"
+#endif
+
 let tests =
     testList "NativeDisposal" [
 #if FABLE_COMPILER
+        testCase "synchronous cleanup ignores the method's own call property" <| fun () ->
+            for key in [ "Dispose"; "Symbol.dispose" ] do
+                let resource: obj = emitJsExpr () "Object({ called: 0 })"
+                overrideDisposalCall resource key
+                (unbox<IDisposable> resource).Dispose()
+                emitJsExpr resource "Object($0).called" |> equal 1
+
+        testCaseAsync "asynchronous cleanup ignores the method's own call property" <| fun () -> async {
+            for key in [ "DisposeAsync"; "Symbol.asyncDispose" ] do
+                let resource: obj = emitJsExpr () "Object({ called: 0 })"
+                overrideDisposalCall resource key
+                do! Async.AwaitTask((unbox<IAsyncDisposable> resource).DisposeAsync().AsTask())
+                emitJsExpr resource "Object($0).called" |> equal 1
+        }
+
+        testCase "Dispose getters are read once and invoke the first method with its receiver" <| fun () ->
+            for throwsOnRepeat in [ false; true ] do
+                let resource = getterResource "Dispose" throwsOnRepeat
+                (unbox<IDisposable> resource).Dispose()
+                assertGetterResource resource
+
+        testCase "native disposal getters are read once and invoke the first method with its receiver" <| fun () ->
+            for throwsOnRepeat in [ false; true ] do
+                let resource = getterResource "Symbol.dispose" throwsOnRepeat
+                let run () =
+                    use _resource = unbox<IDisposable> resource
+                    ()
+                run()
+                assertGetterResource resource
+
+        testCaseAsync "DisposeAsync getters are read once and invoke the first method with its receiver" <| fun () -> async {
+            for throwsOnRepeat in [ false; true ] do
+                let resource = getterResource "DisposeAsync" throwsOnRepeat
+                do! Async.AwaitTask((unbox<IAsyncDisposable> resource).DisposeAsync().AsTask())
+                assertGetterResource resource
+        }
+
+        testCaseAsync "native asynchronous disposal getters are read once and invoke the first method with its receiver" <| fun () -> async {
+            for throwsOnRepeat in [ false; true ] do
+                let resource = getterResource "Symbol.asyncDispose" throwsOnRepeat
+                let! _ = Async.AwaitTask(useAsyncResource (unbox<IAsyncDisposable> resource))
+                assertGetterResource resource
+        }
+
         testCase "FSharp use consumes a native disposable once with its receiver" <| fun () ->
             let resource: IDisposable = emitJsExpr () "Object({ count: 0, [Symbol.dispose]() { this.count++; } })"
             let run () =

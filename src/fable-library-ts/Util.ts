@@ -161,10 +161,17 @@ export function isDisposable<T>(x: T | IDisposable): x is IDisposable {
 }
 
 export function disposeSafe(x: any) {
-  if (isDisposable(x)) {
-    x.Dispose();
-  } else if (x != null && typeof x[disposeSymbol] === "function") {
-    x[disposeSymbol]();
+  if (x == null) {
+    return;
+  }
+  const dispose = x.Dispose;
+  if (typeof dispose === "function") {
+    Reflect.apply(dispose, x, []);
+  } else {
+    const nativeDispose = x[disposeSymbol];
+    if (typeof nativeDispose === "function") {
+      Reflect.apply(nativeDispose, x, []);
+    }
   }
 }
 
@@ -172,12 +179,16 @@ export async function disposeAsyncSafe(x: any): Promise<void> {
   if (x == null) {
     return;
   }
-  if (typeof x.DisposeAsync === "function") {
-    await x.DisposeAsync();
-  } else if (typeof x[asyncDisposeSymbol] === "function") {
-    await x[asyncDisposeSymbol]();
+  const disposeAsync = x.DisposeAsync;
+  if (typeof disposeAsync === "function") {
+    await Reflect.apply(disposeAsync, x, []);
   } else {
-    disposeSafe(x);
+    const nativeDisposeAsync = x[asyncDisposeSymbol];
+    if (typeof nativeDisposeAsync === "function") {
+      await Reflect.apply(nativeDisposeAsync, x, []);
+    } else {
+      disposeSafe(x);
+    }
   }
 }
 
