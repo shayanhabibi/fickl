@@ -84,3 +84,26 @@ export function setterFactory(label) {
     return descriptor;
   };
 }
+/** @param {any} value @returns {any} */
+export function subclassDecorator(value) {
+  return class extends value {};
+}
+
+export const setterEvents = [];
+export const setterRegistry = {
+  events: setterEvents,
+  get key() { setterEvents.push('key'); return Symbol.for('fickl.setter.order'); }
+};
+
+/** @param {any} value @param {any} context @param {any} [descriptor] @returns {any} */
+export function opaqueMethodDecorator(value, context, descriptor) {
+  const original = isStandard(context) ? value : descriptor.value;
+  /** @this {any} @param {any[]} args */
+  function replacement(...args) { return Reflect.apply(original, this, args); }
+  for (const key of ['name', 'length']) {
+    Object.defineProperty(replacement, key, { get() { throw new Error('Unexpected method metadata read'); } });
+  }
+  if (isStandard(context)) return replacement;
+  descriptor.value = replacement;
+  return descriptor;
+}

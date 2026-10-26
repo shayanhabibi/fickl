@@ -3318,6 +3318,131 @@ but thanks to the optimisation done below we get
                 |> Some
         | _ -> None
 
+    let private transformNativeDeclarationCall (com: IBabelCompiler) ctx range callee (callInfo: Fable.CallInfo) =
+        let info = callInfo.MemberRef |> Option.bind com.TryGetMember |> Option.get
+        let owner = com.TransformAsExpr(ctx, callee)
+
+        let receiver =
+            match callInfo.ThisArg |> Option.get with
+            | MaybeCasted(Fable.Value(Fable.BaseValue(None, _), _)) -> Expression.thisExpression ()
+            | value -> com.TransformAsExpr(ctx, value)
+
+        let receiverName = getUniqueNameInDeclarationScope ctx "nativeReceiver"
+        let receiverIdent = Expression.identifier receiverName
+
+        let parameter name =
+            Parameter.parameter (
+                name,
+                ?typeAnnotation =
+                    (if com.IsTypeScript then
+                         Some AnyTypeAnnotation
+                     else
+                         None)
+            )
+
+        let key =
+            SymbolKeys.tryMember com ctx info
+            |> Option.defaultWith (fun () ->
+                Expression.stringLiteral (
+                    if info.IsGetter || info.IsSetter then
+                        info.DisplayName
+                    else
+                        info.CompiledName
+                )
+            )
+
+        let body =
+            if info.IsGetter then
+                emitExpression range "Reflect.get($0.prototype, $1, $2)" [ owner; key; receiverIdent ]
+            elif info.IsSetter then
+                let valueName = getUniqueNameInDeclarationScope ctx "nativeValue"
+                let value = Expression.identifier valueName
+                let targetName = getUniqueNameInDeclarationScope ctx "nativeTarget"
+                let keyName = getUniqueNameInDeclarationScope ctx "nativeKey"
+
+                let body =
+                    emitExpression
+                        range
+                        "($3 == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set($0, $1, $2, $3) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })())"
+                        [
+                            Expression.identifier targetName
+                            Expression.identifier keyName
+                            value
+                            receiverIdent
+                        ]
+
+                let assign = Expression.arrowFunctionExpression ([| parameter valueName |], body)
+
+                Expression.callExpression (
+                    Expression.arrowFunctionExpression ([| parameter targetName; parameter keyName |], assign),
+                    [| emitExpression range "$0.prototype" [ owner ]; key |]
+                )
+            else
+                let methodName = getUniqueNameInDeclarationScope ctx "nativeMethod"
+                let argsName = getUniqueNameInDeclarationScope ctx "nativeArgs"
+
+                let argsParameter =
+                    Parameter
+                        .parameter(
+                            argsName,
+                            ?typeAnnotation =
+                                (if com.IsTypeScript then
+                                     Some(ArrayTypeAnnotation AnyTypeAnnotation)
+                                 else
+                                     None)
+                        )
+                        .WithFlags(ParameterFlags(isSpread = true))
+
+                let invoke =
+                    emitExpression
+                        range
+                        "Reflect.apply($0, $1, $2)"
+                        [
+                            Expression.identifier methodName
+                            receiverIdent
+                            Expression.identifier argsName
+                        ]
+
+                let invoke =
+                    Expression.arrowFunctionExpression (
+                        [| argsParameter |],
+                        invoke,
+                        ?returnType =
+                            (if com.IsTypeScript then
+                                 Some AnyTypeAnnotation
+                             else
+                                 None)
+                    )
+
+                let selectedMethod =
+                    emitExpression range "Reflect.get($0.prototype, $1, $2)" [ owner; key; receiverIdent ]
+
+                Expression.callExpression (
+                    Expression.arrowFunctionExpression ([| parameter methodName |], invoke),
+                    [| selectedMethod |]
+                )
+
+        let body =
+            if info.IsSetter then
+                body
+            else
+                emitExpression
+                    range
+                    "($0 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : $1)"
+                    [ receiverIdent; body ]
+
+        let selected =
+            Expression.callExpression (
+                Expression.arrowFunctionExpression ([| parameter receiverName |], body),
+                [| receiver |]
+            )
+
+        if info.IsGetter then
+            selected
+        else
+            let args = transformCallArgs com ctx callInfo |> List.toArray
+            Expression.callExpression (selected, args, ?loc = range)
+
     let transformCall (com: IBabelCompiler) ctx range typ callee (callInfo: Fable.CallInfo) =
         validateAsyncGeneratorPayload com range typ
 
@@ -3336,7 +3461,12 @@ but thanks to the optimisation done below we get
                 validateNativeAsyncPayload com range typ
 
         // Try to optimize some patterns after FableTransforms
-        match optimizeCall com ctx range typ callee callInfo with
+        match
+            if List.contains "native-declaration" callInfo.Tags then
+                Some(transformNativeDeclarationCall com ctx range callee callInfo)
+            else
+                optimizeCall com ctx range typ callee callInfo
+        with
         | Some e -> e
         | None ->
             match callInfo.MemberRef |> Option.bind com.TryGetMember with

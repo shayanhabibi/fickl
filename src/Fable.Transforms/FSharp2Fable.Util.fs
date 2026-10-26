@@ -3080,6 +3080,7 @@ module Util =
             )
         )
 
+    /// <summary>Lowers attached member calls while preserving declaration-bound dispatch for native nonvirtual members.</summary>
     let callAttachedMember
         (com: Compiler)
         (ctx: Context)
@@ -3164,24 +3165,71 @@ module Util =
                 |> failwith
 
         | Some callee ->
-            let callee =
+            let preserveDeclaration, isNativeField =
                 if
+                    (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+                    && memb.IsInstanceMember
+                    && not entity.IsInterface
+                    && not memb.IsDispatchSlot
+                    && not memb.IsOverrideOrExplicitInterfaceImplementation
+                    && not (isGlobalOrImportedFSharpEntity entity)
+                then
+                    let nativeAttributes, _, _, _ = FsMemberFunctionOrValue.JsDecoratorAttributes memb
+
+                    let isNativeField =
+                        nativeAttributes
+                        |> List.exists (fun att ->
+                            att.ConstructorArguments
+                            |> Seq.exists (fun (_, value) -> value :? bool && unbox<bool> value)
+                        )
+
+                    (not isNativeField
+                     && ((FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
+                         || not nativeAttributes.IsEmpty)),
+                    isNativeField
+                else
+                    false, false
+
+            let callee =
+                match callee with
+                | Fable.Value(Fable.BaseValue(Some boundIdent, _), _) when preserveDeclaration || isNativeField ->
+                    Fable.IdentExpr boundIdent
+                | Fable.Value(Fable.BaseValue(None, typ), range) when preserveDeclaration || isNativeField ->
+                    Fable.Value(Fable.ThisValue typ, range)
+                | _ when
                     not memb.IsInstanceMember
                     && (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
-                then
+                    ->
                     let typ = Fable.DeclaredType(FsEnt.Ref entity, [])
 
                     match callee with
                     | Fable.IdentExpr ident -> Fable.IdentExpr { ident with Type = typ }
                     | Fable.Import(info, _, range) -> Fable.Import(info, typ, range)
                     | _ -> callee
-                else
-                    callee
+                | _ -> callee
 
-            let callInfo = { callInfo with ThisArg = None }
+            let callInfo =
+                if preserveDeclaration then
+                    { callInfo with
+                        ThisArg = Some callee
+                        Tags = "native-declaration" :: callInfo.Tags
+                    }
+                else
+                    { callInfo with ThisArg = None }
+
             let info = getAbstractMemberInfo com entity memb
 
-            if not info.isMangled && info.isGetter && not (com.Options.Language = Rust) then
+            if preserveDeclaration then
+                let entityGenParamsCount = entity.GenericParameters.Count
+
+                let callInfo =
+                    if callInfo.GenericArgs.Length < entityGenParamsCount then
+                        callInfo
+                    else
+                        { callInfo with GenericArgs = List.skip entityGenParamsCount callInfo.GenericArgs }
+
+                makeCall r typ callInfo (entityIdent com (FsEnt.Ref entity))
+            elif not info.isMangled && info.isGetter && not (com.Options.Language = Rust) then
                 // Set the field as maybe calculated so it's not displaced by beta reduction
                 let kind =
                     Fable.FieldInfo.Create(
