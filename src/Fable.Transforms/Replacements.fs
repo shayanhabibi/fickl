@@ -891,6 +891,22 @@ let makeDictionary (com: ICompiler) ctx r t sourceSeq =
         makeEqualityComparer com ctx key |> makeDictionaryWithComparer com r t sourceSeq
     | _ -> Helper.GlobalCall("Map", t, [ sourceSeq ], isConstructor = true, ?loc = r)
 
+/// The equality a BCL collection created without a comparer uses for its keys (EqualityComparer<T>.Default): an
+/// array is compared by reference, unlike F#'s structural `=`; other keys compare as makeDictionary/makeHashSet do
+let private tryBclDefaultEqualityComparer (com: ICompiler) ctx (key: Type) =
+    match key with
+    | Array _ ->
+        let x = makeUniqueIdent com ctx key "x"
+        let y = makeUniqueIdent com ctx key "y"
+
+        objExpr
+            [
+                "Equals", Delegate([ x; y ], makeEqOp None (IdentExpr x) (IdentExpr y) BinaryEqual, None, Tags.empty)
+                "GetHashCode", Delegate([ x ], identityHash com None (IdentExpr x), None, Tags.empty)
+            ]
+        |> Some
+    | _ -> None
+
 let makeHashSetWithComparer com r t sourceSeq comparer =
     Helper.LibCall(com, "MutableSet", "HashSet", t, [ sourceSeq; comparer ], isConstructor = true, ?loc = r)
 
@@ -900,6 +916,23 @@ let makeHashSet (com: ICompiler) ctx r t sourceSeq =
         // makeComparer com ctx key
         makeEqualityComparer com ctx key |> makeHashSetWithComparer com r t sourceSeq
     | _ -> Helper.GlobalCall("Set", t, [ sourceSeq ], isConstructor = true, ?loc = r)
+
+/// new Dictionary<_, _>() and new HashSet<_>() without a comparer, as .NET compares their keys
+let private makeBclDictionary (com: ICompiler) ctx r t sourceSeq =
+    match t with
+    | DeclaredType(_, [ key; _ ]) ->
+        match tryBclDefaultEqualityComparer com ctx key with
+        | Some comparer -> makeDictionaryWithComparer com r t sourceSeq comparer
+        | None -> makeDictionary com ctx r t sourceSeq
+    | _ -> makeDictionary com ctx r t sourceSeq
+
+let private makeBclHashSet (com: ICompiler) ctx r t sourceSeq =
+    match t with
+    | DeclaredType(_, [ key ]) ->
+        match tryBclDefaultEqualityComparer com ctx key with
+        | Some comparer -> makeHashSetWithComparer com r t sourceSeq comparer
+        | None -> makeHashSet com ctx r t sourceSeq
+    | _ -> makeHashSet com ctx r t sourceSeq
 
 let tryEntityIdent (com: Compiler) entFullName =
     match entFullName with
@@ -3259,13 +3292,13 @@ let dictionaries (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
     match i.CompiledName, thisArg with
     | ".ctor", _ ->
         match i.SignatureArgTypes, args with
-        | ([] | [ Number _ ]), _ -> makeDictionary com ctx r t (makeArray Any []) |> Some
-        | [ IDictionary ], [ arg ] -> makeDictionary com ctx r t arg |> Some
+        | ([] | [ Number _ ]), _ -> makeBclDictionary com ctx r t (makeArray Any []) |> Some
+        | [ IDictionary ], [ arg ] -> makeBclDictionary com ctx r t arg |> Some
         | [ IDictionary; IEqualityComparer ], [ arg; eqComp ] ->
             makeComparerFromEqualityComparer eqComp
             |> makeDictionaryWithComparer com r t arg
             |> Some
-        | [ IEnumerable ], [ arg ] -> makeDictionary com ctx r t arg |> Some
+        | [ IEnumerable ], [ arg ] -> makeBclDictionary com ctx r t arg |> Some
         | [ IEnumerable; IEqualityComparer ], [ arg; eqComp ] ->
             makeComparerFromEqualityComparer eqComp
             |> makeDictionaryWithComparer com r t arg
@@ -3367,8 +3400,8 @@ let hashSets (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
     match i.CompiledName, thisArg, args with
     | ".ctor", _, _ ->
         match i.SignatureArgTypes, args with
-        | ([] | [ Number _ ]), _ -> makeHashSet com ctx r t (makeArray Any []) |> Some
-        | [ IEnumerable ], [ arg ] -> makeHashSet com ctx r t arg |> Some
+        | ([] | [ Number _ ]), _ -> makeBclHashSet com ctx r t (makeArray Any []) |> Some
+        | [ IEnumerable ], [ arg ] -> makeBclHashSet com ctx r t arg |> Some
         | [ IEnumerable; IEqualityComparer ], [ arg; eqComp ] ->
             makeComparerFromEqualityComparer eqComp
             |> makeHashSetWithComparer com r t arg

@@ -26,6 +26,29 @@ type Table<'K, 'V when 'K: equality and 'K: not null> () =
 
 let tests =
   testList "Dictionaries" [
+    testCase "Dictionary and HashSet without a comparer compare array keys by reference" <| fun () -> // #81
+        let key = [| 1 |]
+        let d = Dictionary<int[], int>()
+        d.[key] <- 1
+        d.ContainsKey [| 1 |] |> equal false
+        d.ContainsKey key |> equal true
+        d.[[| 1 |]] <- 2
+        d.Count |> equal 2
+        let h = HashSet<int[]>()
+        h.Add key |> equal true
+        h.Add [| 1 |] |> equal true
+        h.Contains key |> equal true
+        h.Count |> equal 2
+        let structural = Dictionary<int[], int>(HashIdentity.Structural)
+        structural.[[| 1 |]] <- 1
+        structural.ContainsKey [| 1 |] |> equal true
+        let fsDict = dict [ [| 1 |], 1 ]
+        fsDict.ContainsKey [| 1 |] |> equal true
+        set [ [| 1 |] ] |> Set.contains [| 1 |] |> equal true
+        let strings = Dictionary<string, int>()
+        strings.["a"] <- 1
+        strings.ContainsKey "a" |> equal true
+
     testCase "Dictionary KeyValuePattern works" <| fun () -> // See #509
         let dic = Dictionary<_,_>()
         for i in 1. .. 10. do dic.Add(i, i*i)
