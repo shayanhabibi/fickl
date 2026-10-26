@@ -17,7 +17,7 @@ let main args =
     // fickl: `--declaration` and the compile server session are process-wide, so their tests must not run
     // alongside other compilations
     | 0 ->
-        testList "Sequential" [ CompilationTests.declarationTests; IncrementalTests.tests ]
+        testList "Sequential" [ CompilationTests.declarationTests; CompilationTests.strictOptionsTests; IncrementalTests.tests ]
         |> testSequenced
         |> runTestsWithCLIArgs [] args
     | exitCode -> exitCode
