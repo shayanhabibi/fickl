@@ -5,7 +5,7 @@
 with Fickl 0.6.7, compared with upstream Fable 5.24.0 (the latest release) on the same sources: all of them also happen in Fable except
 the `%o` format, which Fickl already fixes.
 
-Status: **bug** (Fickl's output is wrong and can be fixed), **warned** (wrong, but the compiler says so),
+Status: **bug** (Fickl's output is wrong and can be fixed), **fixed** (in Fickl after 0.6.7), **warned** (wrong, but the compiler says so),
 **limit** (JavaScript has no cheap equivalent; documented),
 **gap** (a BCL member the runtime library lacks).
 
@@ -13,14 +13,14 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **warned** (wrong, b
 
 | Case | Result | Status |
 | --- | --- | --- |
-| `string (~~~0uy)` | `~0.toString()`: a JS syntax error, so the whole module fails to load. Also through a `let` bound constant | bug (#47) |
+| `string (~~~0uy)` | `~0.toString()`: a JS syntax error, so the whole module fails to load. Also through a `let` bound constant | fixed (#47) |
 | `StringBuilder.Insert` (any member the library type lacks) | Imports `StringBuilder__Insert_…`, which `fable-library` does not export: the module fails at load, with no compile error | bug (#48) |
 
 ## Rejected by Fickl
 
 | Case | Result | Status |
 | --- | --- | --- |
-| `inc &arr.[i]` (byref to an array element, also of a struct array) | "Cannot compile expression ILAsm" | bug (#49) |
+| `inc &arr.[i]` (byref to an array element, also of a struct array) | "Cannot compile expression ILAsm" | fixed (#49) |
 | `typeof<'T>` in a static member of a generic type | "Cannot get type info of generic parameter T" | limit (generics are erased) |
 | `System.Linq.Enumerable` | Type check error: not defined | gap |
 | `Double.ToString("R")`, `Convert.ToBoolean`, `Convert.ChangeType`, `BitOperations.PopCount`, `ArgumentException.ParamName`, `StringComparer.OrdinalIgnoreCase`, `Array2D`, `List.BinarySearch`, `Array.BinarySearch`, `SortedDictionary`, `Environment.GetCommandLineArgs`, `Async.RunSynchronously` | "… is not supported by Fable" | gap |
@@ -32,7 +32,7 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **warned** (wrong, b
 | Case | .NET | JS | Status |
 | --- | --- | --- | --- |
 | A class or object expression implementing two interfaces that both declare `Value()` | each interface its own implementation | both call the last one: the class gets two methods with the same name | warned: "Member Value is duplicated, use Mangle attribute"; `[<Mangle>]` on the interfaces fixes it (#50) |
-| Record field named `__proto__` | a field | `this.__proto__ = …` sets the prototype; the field reads `{ }` and copy-and-update loses it | bug (#51) |
+| Record field named `__proto__` | a field | `this.__proto__ = …` sets the prototype; the field reads `{ }` and copy-and-update loses it | fixed (#51) |
 | Top-level code of a later file | runs on first access to the file's values | runs when the module is imported | limit |
 | `(box x).GetType().Name` for a record or `int` | `Rec`, `Int32` | `Object` | warned (FABLE0111) |
 | `typeof<Rec>.FullName` for a type in a module | `Odd+Rec` | `Odd.Rec` | bug (#67) |
@@ -42,8 +42,8 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **warned** (wrong, b
 
 | Case | .NET | JS | Status |
 | --- | --- | --- | --- |
-| `f &x` where `f` takes `inref<int>` and `x` is an immutable `let` | `x + 1` | `0`: the bare value is passed, the callee reads `.contents` | bug (#52) |
-| `bump &p` where `bump (p: byref<MP>) = p.X <- …` and `MP` is a struct record | `p.X` changed | unchanged: the write goes to the reference cell, not to `p` | bug (#53) |
+| `f &x` where `f` takes `inref<int>` and `x` is an immutable `let` | `x + 1` | `0`: the bare value is passed, the callee reads `.contents` | fixed (#52) |
+| `bump &p` where `bump (p: byref<MP>) = p.X <- …` and `MP` is a struct record | `p.X` changed | unchanged: the write goes to the reference cell, not to `p` | fixed (#53) |
 | Struct records and `[<Struct>] val mutable` copied by `let b = a`, passed as arguments, stored in lists, captured, boxed, read from properties or dictionaries | independent copies | one shared object: mutating one changes all | limit |
 | `static let mutable` or `static member val` in a generic type | one per instantiation | one shared by all instantiations | limit |
 
@@ -51,12 +51,12 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **warned** (wrong, b
 
 | Case | .NET | JS | Status |
 | --- | --- | --- | --- |
-| `~~~z` for `byte` / `uint16` | `255` / `65535` | `-1` | bug (#47) |
-| `1L <<< 65` | `2` (count masked to 6 bits) | `0` | bug (#54) |
-| `Math.Round(2.5, MidpointRounding.AwayFromZero)` | `3` | `2.5` (not rounded) | bug (#55) |
-| `nan.Equals(nan)` | `true` | `false` | bug (#56) |
+| `~~~z` for `byte` / `uint16` | `255` / `65535` | `-1` | fixed (#47) |
+| `1L <<< 65` | `2` (count masked to 6 bits) | `0` | fixed (#54) |
+| `Math.Round(2.5, MidpointRounding.AwayFromZero)` | `3` | `2.5` (not rounded) | fixed (#55) |
+| `nan.Equals(nan)` | `true` | `false` | fixed (#56) |
 | `float32 0.1 = 0.1f`; `0.1f + 0.2f`; `string 0.1f` | `true`; `0.3`; `0.1` | `false`; `0.30000000447034836`; `0.10000000149011612` | bug (#57) |
-| `Double.TryParse "0x10"` | `false` | `true, 16` | bug (#58) |
+| `Double.TryParse "0x10"` | `false` | `true, 16` | fixed (#58) |
 | `Double.TryParse "NaN"`; `Double.TryParse "1_000"` | `true, NaN`; `false` | `false`; `true, 1000` | bug |
 | `sprintf "%e" 1234.5` | `1.234500e+003` | `1.2345e+3` | bug (#59) |
 | `(0.1234).ToString("P1")` | `12.3%` (en-US) | `12.3 %` (the invariant culture's pattern) | limit |
@@ -73,9 +73,9 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **warned** (wrong, b
 | Case | .NET | JS | Status |
 | --- | --- | --- | --- |
 | `"a" + (null: string) + "b"` | `ab` | `anullb` | limit: `+` stays JS `+`; `string s` and `sprintf "%s"` handle null (#60) |
-| `string (null: string)`, `sprintf "%s" null` | `""` | `null` | bug (#60) |
-| `String.Format("{{{0}}}", 5)` | `{5}` | `{{5}}` | bug (#61) |
-| `Char.ToUpper 'ß'` | `ß` (a char) | `SS` (two characters in a char) | bug (#62) |
+| `string (null: string)`, `sprintf "%s" null` | `""` | `null` | fixed (#60) |
+| `String.Format("{{{0}}}", 5)` | `{5}` | `{{5}}` | fixed (#61) |
+| `Char.ToUpper 'ß'` | `ß` (a char) | `SS` (two characters in a char) | fixed (#62) |
 | `"straße".ToUpperInvariant()` | `STRAßE` | `STRASSE` | limit |
 | `string (Some 1)`, `string None`, `string ()`, `string (1, "a")` | `Some(1)`, `""`, `""`, `(1, a)` | `1`, `undefined`, `undefined`, `1,a` | bug (#63) |
 | `compare "a" "B"` | `31` | `1` | limit (only the sign is specified) |
@@ -84,8 +84,8 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **warned** (wrong, b
 
 | Case | .NET | JS | Status |
 | --- | --- | --- | --- |
-| `Array.blit a 0 a 1 4` (overlapping, same array) | `11234` | `11111` | bug (#64) |
-| `arr.[-1..1]` | first two elements | empty | bug (#65) |
+| `Array.blit a 0 a 1 4` (overlapping, same array) | `11234` | `11111` | fixed (#64) |
+| `arr.[-1..1]` | first two elements | empty | fixed (#65) |
 
 ### Type tests and boxing
 
@@ -116,6 +116,49 @@ Status: **bug** (Fickl's output is wrong and can be fixed), **warned** (wrong, b
 | `[ yield n; yield! build (n - 1) ]`, 10⁴ deep | completes | stack overflow | bug (#68) |
 | `=`, `compare`, `hash` on a union tree 10⁴ deep | completes | stack overflow | limit |
 | `Async.StartImmediate` of 10⁵ nested binds | completes synchronously | still pending | limit (the trampoline yields) |
+
+## Second round: generics, constructors, collections (2026-10-26)
+
+`tests/Probe/Batch3.fs`; the same results with Fable 5.24.0.
+
+| Case | .NET | JS | Status |
+| --- | --- | --- | --- |
+| `'T.Add(a, b)` on a static abstract interface member, from a generic function (also `inline`, inside a lambda) | runs | the compiler stops with "error EXCEPTION: Unexpected static interface/override call" | bug (#78) |
+| `new() as x = { Value = 1 } then x.Value <- …` | constructs | "Cannot compile expression ILAsm (I_ldarg 0)", and the constructor throws | bug (#79) |
+| `String.Join(null, …)`, `String.Concat("a", null, "b")` | `ab` | `anullb` | bug (#80) |
+| `Dictionary<int[], _>` / `HashSet<int[]>` looking up an equal but different array | not found (reference equality) | found | bug (#81) |
+| `Unchecked.defaultof<'T>` and `Array.zeroCreate<'T>` in a non-inline generic function | `0`, `false`, a zero struct | `null` (a `bool` prints `null`, a struct field read throws; `int` and `float` only look right through `null + 1`) | limit (erased generics) |
+| A base constructor of a class declared `as this` calling an abstract member overridden in a derived class | `InvalidOperationException` (initialisation check) | runs, with the derived fields unset | limit |
+| `Int64.MinValue / -1L` | `OverflowException` | `-9223372036854775808` | limit |
+| `string [ Some 1; None ]` | `[Some(1); null]` | `[1; undefined]` | limit (#63 covers options and tuples, not their lists) |
+
+Worked: generic `List.sum` / `List.average` over a struct or union with `(+)`, `Zero` and `DivideByInt`, polymorphic
+recursion, struct and custom-equality keys in `Dictionary`, records and unions implementing interfaces (and overriding
+`ToString`), struct-returning active patterns, curried and partially applied members, method groups (also
+overloaded ones), 8- and 9-element tuples, `use` of a null disposable, `lock`, extreme numeric, char and string
+literals, `$$"""…{{x}}…"""` interpolation, event `RemoveHandler`, closures over `for` in sequence expressions, nested
+`try`/`finally` order, and the laziness of `Seq.groupBy` / `Seq.sortBy`.
+
+## Third round: `%A` formatting (2026-10-26)
+
+`tests/Probe/Batch4.fs`. `%A` prints from the runtime value, which has lost the static type, so most of F#'s structured
+format is not reproduced. #18 tracks it.
+
+| Case | .NET | JS | Status |
+| --- | --- | --- | --- |
+| `sprintf "%A" ()` (also `%O`, inside a format, before another argument) | `()`, `<null>` | the source of a function | bug (#91) |
+| Numeric suffixes: `2.0`, `1.5f`, `1.50M`, `5L`, `7uy`, `nan` (also inside unions: `Circle 2.0`) | as written | `2`, `1.5`, `1.50`, `5`, `7`, `NaN` | limit (#18) |
+| `'c'` | `'c'` | `"c"` | limit (#18) |
+| Tuples, struct tuples, options, value options, `Some None` | `(1, "a")`, `struct (1, "a")`, `Some 1`, `None` | `1,a`, `1`, `undefined` | limit (#18) |
+| Arrays `[\| 1; 2 \|]`, `[\|\|]`, jagged | `[\|1; 2\|]`, `[\|\|]` | `1,2`, empty | limit (#18) |
+| Lists longer than 100, lines longer than 80 | truncated with `...`, wrapped | all items, one line | limit (#18) |
+| Nested records | indented under their field, `Some { … }` | flush, without `Some` | limit (#18) |
+| `Map` with string values; `Dictionary`, `ResizeArray` | `map [(1, "a")]`, `seq [[1, a]]`, `seq [1; 2]` | `map [(1, a)]`, `[1,a]`, `1,2` | limit (#18) |
+| Functions; `TimeSpan`; `Guid`; enums; `DateTime` | `<fun:…>`; `01:30:00`; unquoted; `Monday`; culture date | JS source; `5400000`; quoted; `1`; `01/02/2024 03:04:05` | limit (#18) |
+| `sprintf "[%10A]" 42` | `[42]` (width ignored) | padded | limit (#18) |
+
+Worked: `%A` of integers, strings (quoted and escaped), booleans, lists, sequences up to their first items, unions
+with and without fields, flat records, anonymous records, sets, and `%O` / `string` of records and unions.
 
 ## What worked
 
