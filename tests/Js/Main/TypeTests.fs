@@ -773,6 +773,29 @@ type ExplicitLogger =
             this.Add "ready"
     member this.Add s = this.Log <- this.Log @ [ s ]
 
+type ExplicitBase<'T> =
+    val Name: string
+    val Value: 'T
+    new(name, value) = { Name = name; Value = value }
+    new(value) = { Name = "default"; Value = value }
+    abstract Describe: unit -> string
+    default this.Describe() = "base " + this.Name
+
+type ExplicitDerived =
+    inherit ExplicitBase<int>
+    val Extra: int
+    new() = { inherit ExplicitBase<int>("derived", 1); Extra = 5 }
+    new(extra) = { inherit ExplicitBase<int>(extra * 2); Extra = extra }
+    override this.Describe() = "derived " + this.Name
+
+type ExplicitDerivedThen =
+    inherit ExplicitDerived
+    val mutable Log: string list
+    new() as x =
+        let extra = 3
+        { inherit ExplicitDerived(extra); Log = [] }
+        then x.Log <- [ x.Name; string x.Value; string x.Extra ]
+
 #nowarn "3535" // static abstract interface members
 
 type IAddable<'T when 'T :> IAddable<'T>> =
@@ -966,6 +989,21 @@ let tests =
         let logger = ExplicitLogger("a")
         logger.Log |> equal [ "created a"; "ready" ]
         logger.Name |> equal "a"
+
+    testCase "Explicit classes inheriting explicit classes keep the base" <| fun () -> // #87
+        let d = ExplicitDerived()
+        d.Name |> equal "derived"
+        d.Value |> equal 1
+        d.Extra |> equal 5
+        box d :? ExplicitBase<int> |> equal true
+        d.Describe() |> equal "derived derived"
+        (d :> ExplicitBase<int>).Describe() |> equal "derived derived"
+        let d2 = ExplicitDerived(4)
+        (d2.Name, d2.Value, d2.Extra) |> equal ("default", 8, 4)
+        let t = ExplicitDerivedThen()
+        t.Log |> equal [ "default"; "6"; "3" ]
+        box t :? ExplicitDerived |> equal true
+        box t :? ExplicitBase<int> |> equal true
 
     testCase "Static abstract interface members can be called from inline functions" <| fun () -> // #78
         (addTwoStatic { M = 1 } { M = 2 }).M |> equal 3

@@ -2471,6 +2471,33 @@ module Util =
         let isFromDll () = Option.isSome ent.Assembly.FileName
         isReplacementCandidatePrivate isFromDll (FsEnt.FullName ent)
 
+    /// A class declared with `val` fields and explicit constructors only, which is compiled with a constructor
+    /// that takes its fields
+    let private isExplicitClass (ent: FSharpEntity) =
+        ent.IsClass
+        && not (
+            ent.IsFSharpRecord
+            || ent.IsFSharpUnion
+            || ent.IsFSharpExceptionDeclaration
+            || ent.IsValueType
+            || ent.IsInterface
+        )
+        && ent.TryFullName <> Some Types.object
+        && not (isReplacementCandidateFrom ent)
+        && not (isGlobalOrImportedFSharpEntity ent)
+        && not (isPojoDefinedByConsArgsFSharpEntity ent)
+        && not (ent.MembersFunctionsAndValues |> Seq.exists _.IsImplicitConstructor)
+
+    /// The base type of an explicit class that inherits another explicit class (#87). The class extends it, and its
+    /// constructor also takes the base's fields, which an explicit constructor reads from the base object it builds
+    let tryExplicitBaseType (ent: Fable.Entity) : Fable.DeclaredType option =
+        match ent with
+        | :? FsEnt as fsEnt when isExplicitClass fsEnt.FSharpEntity ->
+            match tryGetBaseEntity fsEnt.FSharpEntity, ent.BaseType with
+            | Some(baseEnt, _), Some baseType when isExplicitClass baseEnt -> Some baseType
+            | _ -> None
+        | _ -> None
+
     let getEntityGenParams (ent: Fable.Entity) : (string * Fable.Type) list =
         ent.GenericParameters
         |> List.filter (fun p -> not (p.IsMeasure))

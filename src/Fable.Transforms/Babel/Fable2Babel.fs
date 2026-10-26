@@ -3752,6 +3752,94 @@ but thanks to the optimisation done below we get
                 Some { makeTypedIdent typ name with IsMutable = field.IsMutable }
         )
 
+    /// The fields of the explicit base classes of an explicit class, which its constructor takes before its own,
+    /// with their types in terms of the class's generic parameters (#87)
+    let rec getExplicitBaseFields (com: IBabelCompiler) (ent: Fable.Entity) : (Fable.Field * Fable.Type) list =
+        match FSharp2Fable.Util.tryExplicitBaseType ent with
+        | Some baseType ->
+            let baseEnt = com.GetEntity(baseType.Entity)
+
+            let genArgs =
+                let names = baseEnt.GenericParameters |> List.map _.Name
+
+                if List.sameLength names baseType.GenericArgs then
+                    List.zip names baseType.GenericArgs |> Map
+                else
+                    Map.empty
+
+            let ownFields =
+                baseEnt.FSharpFields
+                |> List.filter (fun field -> not field.IsStatic)
+                |> List.map (fun field -> field, field.FieldType)
+
+            getExplicitBaseFields com baseEnt @ ownFields
+            |> List.map (fun (field, typ) -> field, resolveInlineType genArgs typ)
+        | None -> []
+
+    /// An explicit constructor of a class that inherits an explicit class, `{ inherit Base(...); Field = ... }`,
+    /// calls the base constructor and then builds the object. The class's constructor also takes the base's fields,
+    /// so bind the base object and pass its fields on (#87)
+    let passExplicitBaseFields (com: IBabelCompiler) ctx (ent: Fable.Entity) (body: Fable.Expr) =
+        match FSharp2Fable.Util.tryExplicitBaseType ent with
+        | None -> body
+        | Some baseType ->
+            let baseFields = getExplicitBaseFields com ent
+
+            let isBaseConsCall expr =
+                match expr with
+                | Fable.Call(_, { MemberRef = Some memberRef }, _, _) ->
+                    match com.TryGetMember(memberRef) with
+                    | Some memb ->
+                        memb.IsConstructor
+                        && memb.DeclaringEntity
+                           |> Option.exists (fun e -> e.FullName = baseType.Entity.FullName)
+                    | None -> false
+                | _ -> false
+
+            let passFields (baseIdent: Fable.Ident) expr =
+                expr
+                |> visitFromOutsideIn (
+                    function
+                    | Fable.Value(Fable.NewRecord(args, entRef, genArgs), r) when entRef.FullName = ent.FullName ->
+                        let baseArgs =
+                            baseFields
+                            |> List.map (fun (field, typ) ->
+                                let kind = Fable.FieldInfo.Create(field.Name, typ, field.IsMutable)
+                                Fable.Get(Fable.IdentExpr baseIdent, kind, typ, None)
+                            )
+
+                        Fable.Value(Fable.NewRecord(baseArgs @ args, entRef, genArgs), r) |> Some
+                    | _ -> None
+                )
+
+            let rec rewrite expr =
+                match expr with
+                | Fable.Let(ident, value, body) -> Fable.Let(ident, value, rewrite body)
+                | Fable.Sequential exprs ->
+                    match List.tryFindIndex isBaseConsCall exprs with
+                    | Some i ->
+                        let baseCall = exprs[i]
+
+                        let baseIdent =
+                            getUniqueNameInDeclarationScope ctx "base" |> makeTypedIdent baseCall.Type
+
+                        let rest =
+                            match List.skip (i + 1) exprs with
+                            | [ e ] -> e
+                            | rest -> Fable.Sequential rest
+
+                        Fable.Sequential(
+                            List.take i exprs
+                            @ [ Fable.Let(baseIdent, baseCall, passFields baseIdent rest) ]
+                        )
+                    | None ->
+                        match List.rev exprs with
+                        | last :: init -> Fable.Sequential(List.rev init @ [ rewrite last ])
+                        | [] -> expr
+                | expr -> expr
+
+            rewrite body
+
     let declareClassWithParams
         (com: IBabelCompiler)
         ctx
@@ -4514,19 +4602,48 @@ but thanks to the optimisation done below we get
         let fieldIds = getEntityFieldsAsIdents ent |> List.toArray
         let args = fieldIds |> Array.map identAsExpr
 
+        let baseFields = getExplicitBaseFields com ent
+
+        let baseFieldIds =
+            let ownNames = fieldIds |> Array.map _.Name |> set
+
+            baseFields
+            |> List.mapToArray (fun (field, typ) ->
+                let name = sanitizeName field.Name
+
+                let name =
+                    if ownNames.Contains name then
+                        name + "$base"
+                    else
+                        name
+
+                makeTypedIdent typ name
+            )
+
         let baseExpr =
             if ent.IsFSharpExceptionDeclaration then
                 libValue com ctx "Types" "FSharpException" |> SuperExpression |> Some
             elif ent.IsFSharpRecord || ent.IsValueType then
                 libValue com ctx "Types" "Record" |> SuperExpression |> Some
             else
-                None
+                match FSharp2Fable.Util.tryExplicitBaseType ent with
+                | Some baseType when com.IsTypeScript ->
+                    Fable.DeclaredType(baseType.Entity, baseType.GenericArgs)
+                    |> makeTypeAnnotation com ctx
+                    |> SuperType
+                    |> Some
+                | Some baseType ->
+                    com.GetEntity(baseType.Entity)
+                    |> jsConstructor com ctx
+                    |> SuperExpression
+                    |> Some
+                | None -> None
 
         let body =
             BlockStatement(
                 [|
                     if Option.isSome baseExpr then
-                        yield callSuperAsStatement []
+                        yield baseFieldIds |> Array.map identAsExpr |> Array.toList |> callSuperAsStatement
                     yield!
                         ent.FSharpFields
                         |> List.filter (fun field -> not field.IsStatic)
@@ -4560,6 +4677,25 @@ but thanks to the optimisation done below we get
                 )
                 fieldIds
                 fields
+
+        let baseArgs =
+            Array.map2
+                (fun (fi: Fable.Ident) (field: Fable.Field, typ) ->
+                    Parameter.parameter (
+                        fi.Name,
+                        ?typeAnnotation =
+                            (if not com.IsTypeScript then
+                                 None
+                             elif FSharp2Fable.FsField.IsCurriedField field then
+                                 Some(makeTypeAnnotation com ctx typ)
+                             else
+                                 Some(makeFieldAnnotation com ctx typ))
+                    )
+                )
+                baseFieldIds
+                (List.toArray baseFields)
+
+        let args = Array.append baseArgs args
 
         declareType com ctx ent decl.Name decl.XmlDoc args body baseExpr classMembers
 
@@ -4977,6 +5113,12 @@ but thanks to the optimisation done below we get
             withCurrentScope ctx decl.UsedNames
             <| fun ctx ->
                 let memb = com.GetMember(decl.MemberRef)
+
+                let decl =
+                    match memb.DeclaringEntity with
+                    | Some entRef when memb.IsConstructor ->
+                        { decl with Body = passExplicitBaseFields com ctx (com.GetEntity entRef) decl.Body }
+                    | _ -> decl
 
                 let valueExpr =
                     match decl.Body with
