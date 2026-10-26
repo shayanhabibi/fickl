@@ -1,0 +1,5 @@
+export const value: { a?: string | undefined, b: string, c: void } = {
+    a: undefined,
+    b: "present",
+    c: undefined,
+};
