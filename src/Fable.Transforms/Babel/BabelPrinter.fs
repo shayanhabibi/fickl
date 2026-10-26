@@ -1090,11 +1090,8 @@ module PrinterExtensions =
         member printer.Print(node: ObjectMember) =
             match node with
             | ObjectProperty(key, value, isComputed, doc) ->
-                match value with
-                | UndefinedOrVoid -> ()
-                | value ->
-                    printer.PrintJsDoc(doc)
-                    printer.PrintObjectProperty(key, value, isComputed)
+                printer.PrintJsDoc(doc)
+                printer.PrintObjectProperty(key, value, isComputed)
 
             | ObjectMethod(kind, key, parameters, body, isComputed, returnType, typeParameters, loc, doc) ->
                 printer.PrintJsDoc(doc)
@@ -1251,16 +1248,10 @@ module PrinterExtensions =
 
             printer.AddLocation(loc)
 
-            properties
-            |> Array.filter (
-                function
-                | ObjectProperty(_, UndefinedOrVoid, _, _) -> false
-                | _ -> true
-            )
-            |> function
-                | [||] -> printer.Print("{}")
-                | properties ->
-                    printer.PrintBlock(properties, (fun p x -> p.Print(x)), printSeparator, skipNewLineAtEnd = true)
+            match properties with
+            | [||] -> printer.Print("{}")
+            | properties ->
+                printer.PrintBlock(properties, (fun p x -> p.Print(x)), printSeparator, skipNewLineAtEnd = true)
 
         member printer.PrintConditionalExpression(test, consequent, alternate, loc) =
             printer.AddLocation(loc)

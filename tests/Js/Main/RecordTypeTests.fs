@@ -8,6 +8,15 @@ open Fable.Core
 type RecursiveRecord =
     { things : RecursiveRecord list }
 
+type IObjectShape =
+    abstract name: string option
+    abstract size: float option
+    abstract label: string
+    abstract empty: unit
+
+type IOmittedOptions =
+    abstract missing: int option with get, set
+
 type Person =
     { name: string; mutable luckyNumber: int }
     member x.LuckyDay = x.luckyNumber % 30
@@ -75,6 +84,35 @@ let holdStructRecord (data: StructRecord) (path: int list) =
 
 let tests =
   testList "RecordTypes" [
+
+#if FABLE_COMPILER
+    testCase "Declared object shapes retain undefined properties" <| fun () -> // fickl#110
+        let shape =
+            { new IObjectShape with
+                member _.name = None
+                member _.size = None
+                member _.label = "present"
+                member _.empty = () }
+        Fable.Core.JsInterop.emitJsExpr shape "Object.keys($0).sort()"
+        |> equal [| "empty"; "label"; "name"; "size" |]
+        Fable.Core.JsInterop.emitJsExpr shape "Object.prototype.hasOwnProperty.call($0, 'name')" |> equal true
+        shape.name |> equal None
+        let anonymous = {| a = (None: int option); b = 1; c = () |}
+        Fable.Core.JsInterop.emitJsExpr anonymous "Object.keys($0).sort()"
+        |> equal [| "a"; "b"; "c" |]
+        Fable.Core.JsInterop.emitJsExpr anonymous "Object.keys({...$0}).sort()"
+        |> equal [| "a"; "b"; "c" |]
+
+    testCase "Option bags still omit constant undefined properties" <| fun () ->
+        let options = Fable.Core.JsInterop.jsOptions<IOmittedOptions>(fun o ->
+            o.missing <- None)
+        Fable.Core.JsInterop.emitJsExpr options "Object.keys($0)" |> equal [||]
+        let created = Fable.Core.JsInterop.createObj [
+            "missing", box (None: int option)
+            "empty", box ()
+            "kept", box 1 ]
+        Fable.Core.JsInterop.emitJsExpr created "Object.keys($0)" |> equal [| "kept" |]
+#endif
 
     testCase "Anonymous records work" <| fun () ->
         let r = makeAnonRec()

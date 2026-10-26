@@ -1020,7 +1020,15 @@ module Annotation =
                     true, genArg
             | typ -> false, typ
 
-        isOptional, makeFieldAnnotation com ctx typ
+        let annotation = makeFieldAnnotation com ctx typ
+
+        let annotation =
+            if isOptional then
+                UnionTypeAnnotation [| annotation; UndefinedTypeAnnotation |]
+            else
+                annotation
+
+        isOptional, annotation
 
     let makeAnonymousRecordTypeAnnotation com ctx fieldNames fieldTypes : TypeAnnotation =
         Seq.zip fieldNames fieldTypes
@@ -1316,6 +1324,14 @@ module Util =
         )
         |> Seq.toArray
         |> Expression.objectExpression
+
+    /// <summary>Identifies constant undefined option-bag values whose evaluation has no effects.</summary>
+    let rec isUndefinedPropertyValue com body value =
+        match value with
+        | Undefined _ -> true
+        | AsExpression(value, _) -> isUndefinedPropertyValue com body value
+        | UnaryExpression(_, "void", false, _) -> not (canHaveSideEffects com body)
+        | _ -> false
 
     let assign range left right =
         Expression.assignmentExpression (AssignEqual, left, right, ?loc = range)
@@ -2007,6 +2023,7 @@ module Util =
         =
 
         let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
+        let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
 
         // Optimization: Object literals with getters and setters are very slow in V8
         // so use a class expression instead. See https://github.com/fable-compiler/Fable/pull/2165#issuecomment-695835444
@@ -2065,10 +2082,12 @@ module Util =
                 // and can be compiled as object fields (see condition above)
                 if not memb.IsMangled && (info.IsValue || (not compileAsClass && info.IsGetter)) then
                     let _, body = unwrapOptionalReturn com memb.Body
+                    let value = com.TransformAsExpr(ctx, body)
 
-                    [
-                        ObjectMember.objectProperty (prop, com.TransformAsExpr(ctx, body), isComputed = isComputed)
-                    ]
+                    if info.IsValue && isUndefinedPropertyValue com body value then
+                        []
+                    else
+                        [ ObjectMember.objectProperty (prop, value, isComputed = isComputed) ]
 
                 elif not memb.IsMangled && info.IsGetter then
                     [ makeMethod ObjectGetter ]
@@ -2096,8 +2115,8 @@ module Util =
 
             match typ with
             | Fable.DeclaredType(entRef, _) when com.IsTypeScript ->
-                if entRef.FullName = Types.ienumerableGeneric then
-                    // cast object expression as IEnumerable<T>
+                if entRef.FullName = Types.ienumerableGeneric || isOptionBag then
+                    // Interop option bags can intentionally contain only part of the declared interface.
                     let ta = makeTypeAnnotation com ctx typ
                     AsExpression(expr, ta)
                 else
@@ -2221,7 +2240,14 @@ module Util =
                             | Some k, v -> Some(k, v)
                             | None, _ -> None
                         )
-                        |> List.map (fun (k, v) -> k, com.TransformAsExpr(ctx, v))
+                        |> List.choose (fun (k, v) ->
+                            let value = com.TransformAsExpr(ctx, v)
+
+                            if isUndefinedPropertyValue com v value then
+                                None
+                            else
+                                Some(k, value)
+                        )
                         |> makeJsObject
 
                     args, Some objArg
