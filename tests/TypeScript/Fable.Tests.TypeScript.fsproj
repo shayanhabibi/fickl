@@ -57,6 +57,7 @@
     <Compile Include="../Js/Main/InlineInterfaceTests.fs" />
     <Compile Include="../Js/Main/NativeFunctionTests.fs" />
     <Compile Include="../Js/Main/NativeDisposalTests.fs" />
+    <Compile Include="../Js/Main/NativeAsyncTests.fs" />
     <!-- <Compile Include="../Js/Main/ListCollectorTests.fs" /> -->
     <Compile Include="../Js/Main/ListTests.fs" />
     <Compile Include="../Js/Main/MapTests.fs" />

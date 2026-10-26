@@ -5200,6 +5200,81 @@ let private replacedModules =
             "System.Reflection.TypeInfo", types
         ]
 
+let private nativeAsync (com: ICompiler) (ctx: Context) r t (info: CallInfo) args =
+    let code =
+        function
+        | MaybeCasted(Delegate([], body, _, tags)) when List.contains "fickl-async-code" tags -> body
+        | body -> body
+
+    let (|Body|_|) =
+        function
+        | MaybeCasted(Lambda(arg, body, _)) -> Some(arg, code body)
+        | MaybeCasted(Delegate([ arg ], body, _, _)) -> Some(arg, code body)
+        | _ -> None
+
+    let awaitPromise typ promise =
+        match emitExpr r typ [ promise ] "await $0" with
+        | Emit(info, typ, range) ->
+            Emit(
+                { info with CallInfo = { info.CallInfo with Tags = "fickl-native-await" :: info.CallInfo.Tags } },
+                typ,
+                range
+            )
+        | expression -> expression
+
+    let unitValue = Value(UnitConstant, r)
+
+    match info.CompiledName, args with
+    | ("jsAsync" | "get_jsAsync" | ".ctor"), [] -> Value(Null t, r) |> Some
+    | "Return", [ value ] -> Some value
+    | "ReturnFrom", [ promise ] -> awaitPromise (genArg com ctx r 0 info.GenericArgs) promise |> Some
+    | "Bind", [ promise; Body(arg, body) ] -> Let(arg, awaitPromise arg.Type promise, body) |> Some
+    | "Zero", ([] | [ Value(UnitConstant, _) ]) -> Some unitValue
+    | "Delay", [ Body(_, body) ] -> Delegate([], body, None, [ "fickl-async-code" ]) |> Some
+    | "Run", [ body ] ->
+        let callback =
+            Delegate([], code body, None, [ "not-arrow"; "fickl-async-function" ])
+
+        Call(callback, makeCallInfo None [] [], t, r) |> Some
+    | "Combine", [ first; second ] -> Sequential [ code first; code second ] |> Some
+    | "While", [ Body(_, guard); body ] -> WhileLoop(guard, code body, r) |> Some
+    | "TryWith", [ body; Body(error, handler) ] -> TryCatch(code body, Some(error, handler), None, r) |> Some
+    | "TryFinally", [ body; Body(_, compensation) ] -> TryCatch(code body, None, Some compensation, r) |> Some
+    | "Using", [ resource; Body(arg, body) ] ->
+        let dispose =
+            Helper.LibCall(com, "Util", "disposeSafe", Unit, [ IdentExpr arg ], ?loc = r)
+
+        Let(arg, resource, TryCatch(body, None, Some dispose, r)) |> Some
+    | "For", [ values; Body(arg, body) ] ->
+        let iterator = makeTypedIdent Any $"iterator{com.IncrementCounter()}"
+        let iteratorExpr = IdentExpr iterator
+
+        let value =
+            Helper.InstanceCall(
+                iteratorExpr,
+                "System.Collections.Generic.IEnumerator`1.get_Current",
+                arg.Type,
+                [],
+                ?loc = r
+            )
+
+        let guard =
+            Helper.InstanceCall(iteratorExpr, "System.Collections.IEnumerator.MoveNext", Boolean, [], ?loc = r)
+
+        let loop = WhileLoop(guard, Let(arg, value, body), r)
+
+        let dispose =
+            Helper.LibCall(com, "Util", "disposeSafe", Unit, [ iteratorExpr ], ?loc = r)
+
+        let enumerator =
+            Helper.LibCall(com, "Util", "getEnumerator", Any, [ values ], ?loc = r)
+
+        Let(iterator, enumerator, TryCatch(loop, None, Some dispose, r)) |> Some
+    | _ ->
+        $"jsAsync.{info.CompiledName} requires a computation expression with literal continuations"
+        |> addErrorAndReturnNull com ctx.InlinePath r
+        |> Some
+
 let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
     let expose arity callback =
         let callback = TypeCast(callback, t)
@@ -5248,6 +5323,8 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | Naming.StartsWith Types.printfFormat _ -> fsFormat com ctx r t info thisArg args
     | Naming.StartsWith "Fable.Core." _ -> fableCoreLib com ctx r t info thisArg args
     | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
+    | "Fickl.Core.JsAsyncBuilder"
+    | "Fickl.Core.NativeAsync" -> nativeAsync com ctx r t info args
     | Naming.EndsWith "Exception" _ -> exceptions com ctx r t info thisArg args
     | "System.Timers.ElapsedEventArgs" -> thisArg // only signalTime is available here
     | Naming.StartsWith "System.Tuple" _

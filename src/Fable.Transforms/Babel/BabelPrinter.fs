@@ -285,7 +285,8 @@ module PrinterExtensions =
                 returnType: TypeAnnotation option,
                 loc,
                 ?isDeclaration,
-                ?isArrow
+                ?isArrow,
+                ?isAsync
             )
             =
 
@@ -310,12 +311,16 @@ module PrinterExtensions =
 
             let isDeclaration = defaultArg isDeclaration false
             let isArrow = defaultArg isArrow false
+            let isAsync = defaultArg isAsync false
             printer.AddLocation(loc)
 
             match body.Body with
             // Check if we can remove the function
-            | [| ReturnStatement(ImmediatelyApplied e, _) |] when isArrow && not isDeclaration -> printer.Print(e)
+            | [| ReturnStatement(ImmediatelyApplied e, _) |] when isArrow && not isDeclaration && not isAsync ->
+                printer.Print(e)
             | _ when isArrow ->
+                if isAsync then
+                    printer.Print("async ")
                 // Remove parens if we only have one argument? (and no annotation)
                 printer.Print(typeParameters)
                 printer.Print("(")
@@ -336,6 +341,9 @@ module PrinterExtensions =
                     | _ -> printer.ComplexExpressionWithParens(argument)
                 | _ -> printer.PrintBlock(body.Body, skipNewLineAtEnd = true)
             | _ ->
+                if isAsync then
+                    printer.Print("async ")
+
                 printer.Print("function ")
                 printer.PrintOptional(id)
                 printer.Print(typeParameters)
@@ -366,7 +374,8 @@ module PrinterExtensions =
             | CommentedExpression(_, e) -> printer.NeedsParensAsExpressionStatement(e)
             | ObjectExpression _
             | ClassExpression _
-            | FunctionExpression _ -> true
+            | FunctionExpression _
+            | AsyncFunctionExpression _ -> true
             | AsExpression(e, _) -> printer.NeedsParensAsExpressionStatement(e)
             | BinaryExpression(left, _, _, _)
             | LogicalExpression(left, _, _, _)
@@ -592,6 +601,17 @@ module PrinterExtensions =
                 printer.PrintConditionalExpression(test, consequent, alternate, loc)
             | FunctionExpression(id, parameters, body, typeParameters, returnType, loc) ->
                 printer.PrintFunction(id, parameters, body, returnType, typeParameters, loc)
+            | AsyncFunctionExpression(id, parameters, body, returnType, typeParameters, loc, isArrow) ->
+                printer.PrintFunction(
+                    id,
+                    parameters,
+                    body,
+                    typeParameters,
+                    returnType,
+                    loc,
+                    isAsync = true,
+                    isArrow = isArrow
+                )
             | ArrowFunctionExpression(parameters, body, returnType, typeParameters, loc) ->
                 printer.PrintArrowFunctionExpression(parameters, body, returnType, typeParameters, loc)
             | AsExpression(expression, typeAnnotation) ->

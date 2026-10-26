@@ -2,6 +2,12 @@ namespace Fickl.Core
 
 open System
 
+/// <summary>Emits a module function returning a <c>jsAsync</c> computation as a native JavaScript async function.</summary>
+/// <remarks>The function returns a JavaScript Promise. Applies to JavaScript and TypeScript module functions.</remarks>
+[<AttributeUsage(AttributeTargets.Method)>]
+type AsyncFunctionAttribute() =
+    inherit Attribute()
+
 /// <summary>Compiles literal callbacks passed to this parameter as ordinary JavaScript functions.</summary>
 /// <remarks>The callback has its own <c>this</c>, <c>arguments</c>, and prototype.
 /// Applies to JavaScript and TypeScript calls; use <c>Fickl.Core.JsInterop.withThis</c> for a typed receiver.</remarks>
