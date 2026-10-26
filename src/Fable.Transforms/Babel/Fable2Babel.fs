@@ -823,6 +823,9 @@ module Annotation =
     let tryNativeOrFableLibraryInterface com ctx genArgs (ent: Fable.Entity) =
         match ent.FullName with
         | Types.fsharpAsyncGeneric -> makeFableLibImportTypeAnnotation com ctx genArgs "AsyncBuilder" "Async" |> Some
+        | Types.task
+        | "System.Threading.Tasks.ValueTask" -> makeNativeTypeAnnotation com ctx [ Fable.Unit ] "Promise" |> Some
+        | Types.taskGeneric -> makeNativeTypeAnnotation com ctx genArgs "Promise" |> Some
         | _ when not ent.IsInterface -> None
         // everything below is an interface
         | Types.icollection ->
@@ -834,6 +837,9 @@ module Annotation =
         // | Types.idictionary
         // | Types.ireadonlydictionary
         | Types.idisposable -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IDisposable" |> Some
+        | Types.iasyncdisposable ->
+            makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IAsyncDisposable"
+            |> Some
         | Types.ienumerable ->
             // makeFableLibImportTypeAnnotation com ctx [Fable.Any] "Util" "IEnumerable" |> Some
             makeNativeTypeAnnotation com ctx [ Fable.Any ] "Iterable" |> Some
@@ -1981,6 +1987,28 @@ module Util =
             |]
         )
 
+    /// <summary>Creates a native disposal method that forwards to the F# disposal member.</summary>
+    let nativeDisposalBridge com ctx isAsync =
+        let symbol, invocation, returnType =
+            if isAsync then
+                "asyncDisposeSymbol",
+                "Promise.resolve(this.DisposeAsync()).then(() => {})",
+                makeNativeTypeAnnotation com ctx [ Fable.Unit ] "Promise"
+            else
+                "disposeSymbol", "this.Dispose()", VoidTypeAnnotation
+
+        let key = libValue com ctx "Util" symbol
+
+        let body =
+            BlockStatement [| emitExpression None invocation [] |> Statement.returnStatement |]
+
+        key,
+        body,
+        (if com.IsTypeScript then
+             Some returnType
+         else
+             None)
+
     let extractSuperClassFromBaseCall (com: IBabelCompiler) (ctx: Context) (baseType: Fable.Type option) baseCall =
         match baseCall, baseType with
         | Some(Fable.Call(baseRef, info, _, _)), _ ->
@@ -2024,6 +2052,9 @@ module Util =
 
         let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
         let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
+
+        let hasExplicitDisposal name =
+            members |> List.exists (fun (memb, _) -> memb.Name = name)
 
         // Optimization: Object literals with getters and setters are very slow in V8
         // so use a class expression instead. See https://github.com/fable-compiler/Fable/pull/2165#issuecomment-695835444
@@ -2094,6 +2125,27 @@ module Util =
 
                 elif not memb.IsMangled && info.IsSetter then
                     [ makeMethod ObjectSetter ]
+
+                elif
+                    (info.FullName = "System.IDisposable.Dispose"
+                     && not (hasExplicitDisposal "Symbol.dispose"))
+                    || (info.FullName = "System.IAsyncDisposable.DisposeAsync"
+                        && not (hasExplicitDisposal "Symbol.asyncDispose"))
+                then
+                    let key, body, returnType =
+                        nativeDisposalBridge com ctx (info.FullName = "System.IAsyncDisposable.DisposeAsync")
+
+                    [
+                        makeMethod ObjectMeth
+                        ObjectMember.objectMethod (
+                            ObjectMeth,
+                            key,
+                            [||],
+                            body,
+                            isComputed = true,
+                            ?returnType = returnType
+                        )
+                    ]
 
                 elif info.FullName = "System.Collections.Generic.IEnumerable.GetEnumerator" then
                     let method = makeMethod ObjectMeth
@@ -4101,6 +4153,14 @@ but thanks to the optimisation done below we get
                         |> Some
                 )
                 |> Seq.toArray
+                |> fun interfaces ->
+                    [|
+                        yield! interfaces
+                        if FSharp2Fable.Util.hasInterface Types.idisposable ent then
+                            yield makeNativeTypeAnnotation com ctx [] "Disposable"
+                        if FSharp2Fable.Util.hasInterface Types.iasyncdisposable ent then
+                            yield makeNativeTypeAnnotation com ctx [] "AsyncDisposable"
+                    |]
                 |> Some
             else
                 None
@@ -4138,7 +4198,38 @@ but thanks to the optimisation done below we get
             else
                 None
 
-        let members = [| yield! classFields; classCons; yield! classMembers |]
+        let hasExplicitDisposal name =
+            ent.MembersFunctionsAndValues
+            |> Seq.exists (fun memb ->
+                memb.CompiledName = name
+                && (hasAttribute Atts.attachMembers ent.Attributes
+                    || memb.IsOverrideOrExplicitInterfaceImplementation)
+            )
+
+        let members =
+            [|
+                yield! classFields
+                yield classCons
+                yield! classMembers
+                for interfaceName, symbolName, isAsync in
+                    [
+                        Types.idisposable, "Symbol.dispose", false
+                        Types.iasyncdisposable, "Symbol.asyncDispose", true
+                    ] do
+                    if
+                        FSharp2Fable.Util.hasInterface interfaceName ent
+                        && not (hasExplicitDisposal symbolName)
+                    then
+                        let key, body, returnType = nativeDisposalBridge com ctx isAsync
+
+                        yield
+                            ClassMember.classMethod (
+                                ClassFunction(key, true),
+                                [||],
+                                Some body,
+                                ?returnType = returnType
+                            )
+            |]
 
         let classExpr =
             Expression.classExpression (

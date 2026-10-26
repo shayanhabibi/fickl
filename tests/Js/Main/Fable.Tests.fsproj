@@ -65,6 +65,7 @@
     <Compile Include="CallableInterfaceTests.fs" />
     <Compile Include="InlineInterfaceTests.fs" />
     <Compile Include="NativeFunctionTests.fs" />
+    <Compile Include="NativeDisposalTests.fs" />
     <Compile Include="CurryingTests.fs" />
     <Compile Include="FcsEdgeCasesHelper.fs" />
     <Compile Include="FcsEdgeCaseTests.fs" />

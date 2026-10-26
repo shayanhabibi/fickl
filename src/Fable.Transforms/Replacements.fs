@@ -2716,6 +2716,7 @@ let disposables (com: ICompiler) (_: Context) r (t: Type) (i: CallInfo) (thisArg
     match i.CompiledName, thisArg with
     // `use` will call Dispose without a null check so use a safe version just in case, see #2719
     | "Dispose", Some c -> Helper.LibCall(com, "Util", "disposeSafe", t, [ c ], ?loc = r) |> Some
+    | "DisposeAsync", Some c -> Helper.LibCall(com, "Util", "disposeAsyncSafe", t, [ c ], ?loc = r) |> Some
     | _ -> None
 
 let results (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Expr option) (args: Expr list) =
@@ -4529,32 +4530,44 @@ let asyncs com (ctx: Context) r t (i: CallInfo) (_: Expr option) (args: Expr lis
         |> Some
 
 let taskBuilder (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    // FCS resumable-state-machine type parameters do not belong to the runtime builder's API.
     match thisArg, i.CompiledName, args with
     | _, "Singleton", _ -> makeImportLib com t "singleton" "TaskBuilder" |> Some
     | Some x, "Using", [ arg; f ]
     | Some x, "TaskBuilderBase.Using", [ arg; f ] ->
-        Helper.InstanceCall(x, "Using", t, [ arg; f ], i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
+        let rec isAsyncType typ =
+            match typ with
+            | DeclaredType(entRef, _) ->
+                entRef.FullName = Types.iasyncdisposable
+                || FSharp2Fable.Util.hasInterface Types.iasyncdisposable (com.GetEntity(entRef))
+            | GenericParam(_, _, constraints) ->
+                constraints
+                |> List.exists (
+                    function
+                    | Constraint.CoercesTo typ -> isAsyncType typ
+                    | _ -> false
+                )
+            | _ -> false
+
+        let methodName =
+            if isAsyncType arg.Type then
+                "UsingAsync"
+            else
+                "Using"
+
+        Helper.InstanceCall(x, methodName, t, [ arg; f ], i.SignatureArgTypes, genArgs = [], ?loc = r)
         |> Some
     | Some x, "TaskBuilderBase.Bind", [ arg; f ] ->
-        Helper.InstanceCall(x, "Bind", t, [ arg; f ], i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
+        Helper.InstanceCall(x, "Bind", t, [ arg; f ], i.SignatureArgTypes, genArgs = [], ?loc = r)
         |> Some
     | Some x, "TaskBuilderBase.ReturnFrom", [ arg ] ->
-        Helper.InstanceCall(x, "ReturnFrom", t, [ arg ], i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
+        Helper.InstanceCall(x, "ReturnFrom", t, [ arg ], i.SignatureArgTypes, genArgs = [], ?loc = r)
         |> Some
     | Some x, meth, _ ->
-        Helper.InstanceCall(x, meth, t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
+        Helper.InstanceCall(x, meth, t, args, i.SignatureArgTypes, genArgs = [], ?loc = r)
         |> Some
     | None, meth, _ ->
-        Helper.LibCall(
-            com,
-            "TaskBuilder",
-            Naming.lowerFirst meth,
-            t,
-            args,
-            i.SignatureArgTypes,
-            genArgs = i.GenericArgs,
-            ?loc = r
-        )
+        Helper.LibCall(com, "TaskBuilder", Naming.lowerFirst meth, t, args, i.SignatureArgTypes, genArgs = [], ?loc = r)
         |> Some
 
 // .NET implements these overloads with Async.StartImmediateAsTask
@@ -4565,6 +4578,13 @@ let taskBuilderAsync (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg:
     match i.CompiledName, args with
     | "TaskBuilderBase.Bind", [ computation; f ] -> taskBuilder com ctx r t i thisArg [ startAsPromise computation; f ]
     | "TaskBuilderBase.ReturnFrom", [ computation ] -> taskBuilder com ctx r t i thisArg [ startAsPromise computation ]
+    | _ -> None
+
+let valueTasks (com: ICompiler) (_: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    match i.CompiledName, thisArg, args with
+    | ("AsTask" | "GetAwaiter"), Some value, [] -> Some value
+    | (".ctor" | "FromResult" | "get_CompletedTask"), None, ([] | [ _ ]) ->
+        Helper.GlobalCall("Promise", t, args, memb = "resolve", ?loc = r) |> Some
     | _ -> None
 
 let tasks (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
@@ -5085,6 +5105,7 @@ let private replacedModules =
             Types.queue, bclType
             Types.iset, hashSets
             Types.idisposable, disposables
+            Types.iasyncdisposable, disposables
             Types.option, options false
             Types.valueOption, options true
             Types.nullable, nullables
@@ -5155,6 +5176,7 @@ let private replacedModules =
             "Microsoft.FSharp.Control.FSharpAsync", asyncs
             "Microsoft.FSharp.Control.AsyncPrimitives", asyncs
             Types.task, tasks
+            "System.Threading.Tasks.ValueTask", valueTasks
             Types.taskGeneric, tasks
             "System.Threading.Tasks.TaskCompletionSource`1", tasks
             "System.Runtime.CompilerServices.TaskAwaiter`1", tasks

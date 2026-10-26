@@ -1,4 +1,4 @@
-import { Exception, ensureErrorOrException, IDisposable } from "./Util.ts";
+import { Exception, ensureErrorOrException, IDisposable, disposeSafe, disposeSymbol, createDisposable } from "./Util.ts";
 
 export interface AsyncReplyChannel<Reply> {
   reply(value: Reply): void
@@ -22,7 +22,7 @@ export class CancellationCallbackError extends Exception {
   }
 }
 
-export class CancellationToken implements IDisposable {
+export class CancellationToken implements IDisposable, Disposable {
   private _id: number;
   private _cancelled: boolean;
   private _listeners: Map<number, () => void>;
@@ -62,12 +62,15 @@ export class CancellationToken implements IDisposable {
   public register(f: (state?: any) => void, state?: any) {
     const $ = this;
     const id = this.addListener(state == null ? f : () => f(state));
-    return { Dispose() { $.removeListener(id); } };
+    return createDisposable(() => { $.removeListener(id); });
   }
   public Dispose() {
     // Implement IDisposable for compatibility but do nothing
     // According to docs, calling Dispose does not trigger cancellation
     // https://docs.microsoft.com/en-us/dotnet/api/system.threading.cancellationtokensource.dispose?view=net-6.0
+  }
+  public [disposeSymbol]() {
+    this.Dispose();
   }
 }
 
@@ -259,7 +262,7 @@ export class AsyncBuilder {
 
   public Using<T extends IDisposable, U>(resource: T, binder: (x: T) => Async<U>) {
     // Without Delay the binder runs before TryFinally installs Dispose
-    return this.TryFinally(this.Delay(() => binder(resource)), () => resource.Dispose());
+    return this.TryFinally(this.Delay(() => binder(resource)), () => disposeSafe(resource));
   }
 
   public While(guard: () => boolean, computation: Async<void>): Async<void> {

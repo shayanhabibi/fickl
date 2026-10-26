@@ -1,7 +1,7 @@
 import { Event } from "./Event.ts";
-import { IDisposable } from "./Util.ts";
+import { IDisposable, disposeSymbol } from "./Util.ts";
 
-export class Timer implements IDisposable {
+export class Timer implements IDisposable, Disposable {
   public Interval: number;
   public AutoReset: boolean;
 
@@ -65,6 +65,9 @@ export class Timer implements IDisposable {
   }
 
   public Close() {
+    this.Dispose();
+  }
+  public [disposeSymbol]() {
     this.Dispose();
   }
 

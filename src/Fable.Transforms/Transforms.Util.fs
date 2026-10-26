@@ -495,6 +495,9 @@ module Types =
     let idisposable = "System.IDisposable"
 
     [<Literal>]
+    let iasyncdisposable = "System.IAsyncDisposable"
+
+    [<Literal>]
     let iformattable = "System.IFormattable"
 
     [<Literal>]

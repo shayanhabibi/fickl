@@ -10,6 +10,7 @@ let allTests =
     CallableInterfaces.tests
     InlineInterfaces.tests
     NativeFunctions.tests
+    NativeDisposal.tests
     Arithmetic.tests
     Arrays.tests
     Async.tests

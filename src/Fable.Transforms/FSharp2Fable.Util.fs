@@ -2792,6 +2792,7 @@ module Util =
             match fullName with
             | Types.object
             | Types.idisposable
+            | Types.iasyncdisposable
             | Types.iobservableGeneric
             | Types.iobserverGeneric
             | Types.ienumerableGeneric
@@ -2823,6 +2824,7 @@ module Util =
             match fullName with
             | Types.object
             | Types.idisposable
+            | Types.iasyncdisposable
             | Types.iobservableGeneric
             | Types.iobserverGeneric
             | Types.ienumerableGeneric
