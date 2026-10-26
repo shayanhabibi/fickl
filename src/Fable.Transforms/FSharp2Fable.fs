@@ -1358,7 +1358,7 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                 // Matching those bodies against the builder signature would infer T as Promise<T>.
                 let isNativeAsyncBuilder =
                     match com.Options.Language, memb.DeclaringEntity with
-                    | (JavaScript | TypeScript), Some ent -> ent.FullName = "Fickl.Core.JsAsyncBuilder"
+                    | (JavaScript | TypeScript), Some ent -> FsEnt.FullName ent = "Fickl.Core.JsAsyncBuilder"
                     | _ -> false
 
                 let expectedArgTypes =
