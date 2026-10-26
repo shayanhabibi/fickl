@@ -55,7 +55,7 @@ jobs:
           PYRIGHT_OUTPUT=$(uv run pyright temp/tests/Python/ temp/fable-library-py/ 2>&1 || true)
 
           # Parse errors per file
-          ERROR_COUNTS=$(echo "$PYRIGHT_OUTPUT" | grep " - error:" | sed 's/:.*//g' | sed 's|.*/Fable/||' | sort | uniq -c | sort -rn)
+          ERROR_COUNTS=$(echo "$PYRIGHT_OUTPUT" | grep " - error:" | sed 's/:.*//g' | sed "s|^[[:space:]]*${GITHUB_WORKSPACE}/||" | sort | uniq -c | sort -rn)
 
           # Calculate total errors
           TOTAL_ERRORS=$(echo "$ERROR_COUNTS" | awk '{sum += $1} END {print sum+0}')
