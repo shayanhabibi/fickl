@@ -1,0 +1,187 @@
+
+import { int32 } from "./fable_modules/fable-library-ts.5.24.0/Int32.ts";
+import { identityDecorator, setterFactory, classFactory as classFactory_1, getterFactory, methodFactory, fieldFactory, accessorFactory } from "./decorators.js";
+import { class_type, TypeInfo } from "./fable_modules/fable-library-ts.5.24.0/Reflection.ts";
+import { value as value_1, Option } from "./fable_modules/fable-library-ts.5.24.0/Option.ts";
+
+export const classFactory = "import alias collision";
+
+@(classFactory_1('class'))
+export class Counter {
+    readonly "ReadOnly@": string;
+    constructor() {
+        this["ReadOnly@"] = "readonly";
+    }
+    @(methodFactory('outer'))
+    @(methodFactory('inner'))
+    Message(value: string): string {
+        return value;
+    }
+    @(accessorFactory('count'))
+    accessor Count: int32 = 0;
+    @(getterFactory('label'))
+    get Label(): string {
+        return "label";
+    }
+    @(fieldFactory('field'))
+    Field: int32 = 1;
+    @(getterFactory('readonly'))
+    get ReadOnly(): string {
+        const __: Counter = this;
+        return __["ReadOnly@"];
+    }
+    @(methodFactory('static'))
+    static StaticMessage(value: string): string {
+        return value;
+    }
+    @(methodFactory('symbol'))
+    [Symbol.toPrimitive](_hint: string): string {
+        return "primitive";
+    }
+    @(methodFactory('$0'))
+    DollarLiteral(value: string): string {
+        return value;
+    }
+}
+
+export function Counter_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.Counter", undefined, Counter);
+}
+
+export function Counter_$ctor(): Counter {
+    return new Counter();
+}
+
+@(Reflect.get(Object, 'freeze'))
+export class Frozen {
+    constructor() {
+    }
+}
+
+export function Frozen_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.Frozen", undefined, Frozen);
+}
+
+export function Frozen_$ctor(): Frozen {
+    return new Frozen();
+}
+
+@(Reflect.get(globalThis, '$0'))
+export class DollarGlobal {
+    constructor() {
+    }
+}
+
+export function DollarGlobal_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.DollarGlobal", undefined, DollarGlobal);
+}
+
+export function DollarGlobal_$ctor(): DollarGlobal {
+    return new DollarGlobal();
+}
+
+export class ManualAccessors {
+    value: string;
+    constructor() {
+        this.value = "";
+    }
+    @(getterFactory('manual'))
+    get Value(): string {
+        const _: ManualAccessors = this;
+        return _.value;
+    }
+    set Value(next: string) {
+        const _: ManualAccessors = this;
+        _.value = next;
+    }
+    @(setterFactory('sink'))
+    set Sink(next: string) {
+        const _: ManualAccessors = this;
+        _.value = next;
+    }
+}
+
+export function ManualAccessors_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.ManualAccessors", undefined, ManualAccessors);
+}
+
+export function ManualAccessors_$ctor(): ManualAccessors {
+    return new ManualAccessors();
+}
+
+export abstract class Base {
+    constructor() {
+    }
+    "NativeDecorators.Base.MessageZ721C83C5"(value: string): string {
+        return "base" + value;
+    }
+}
+
+export function Base_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.Base", undefined, undefined);
+}
+
+export class Derived extends Base {
+    constructor() {
+        super();
+    }
+    @(methodFactory('override'))
+    "NativeDecorators.Base.MessageZ721C83C5"(value: string): string {
+        return value;
+    }
+}
+
+export function Derived_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.Derived", undefined, Derived, Base_$reflection());
+}
+
+export function Derived_$ctor(): Derived {
+    return new Derived();
+}
+
+export class Optional$1<T> {
+    constructor() {
+    }
+    @(identityDecorator)
+    accessor Value: Option<T> = undefined;
+}
+
+export function Optional$1_$reflection(gen0: TypeInfo): TypeInfo {
+    return class_type("NativeDecorators.Optional`1", [gen0], Optional$1);
+}
+
+export function Optional$1_$ctor<T>(): Optional$1<T> {
+    return new Optional$1();
+}
+
+export function create(): Counter {
+    return Counter_$ctor();
+}
+
+export function read(value: Counter): [string, string, int32, int32] {
+    return [value.Message("hello"), value.Label, value.Count, value.Field] as [string, string, int32, int32];
+}
+
+export function staticRead(): string {
+    return Counter.StaticMessage("hello");
+}
+
+export function manualRead(value: string): [string, string] {
+    const accessors: ManualAccessors = ManualAccessors_$ctor();
+    accessors.Value = value;
+    const first: string = accessors.Value;
+    accessors.Sink = "sink";
+    return [first, accessors.Value] as [string, string];
+}
+
+export function overrideRead(): [string, string] {
+    const value: Derived = Derived_$ctor();
+    return [value["NativeDecorators.Base.MessageZ721C83C5"]("hello"), value["NativeDecorators.Base.MessageZ721C83C5"]("hello")] as [string, string];
+}
+
+export function optionalRead(): [boolean, string] {
+    const value: Optional$1<string> = Optional$1_$ctor<string>();
+    const wasNone: boolean = value.Value == null;
+    value.Value = "optional";
+    return [wasNone, value_1(value.Value)] as [boolean, string];
+}

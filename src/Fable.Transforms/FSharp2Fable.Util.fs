@@ -319,6 +319,77 @@ type FsMemberFunctionOrValue(m: FSharpMemberOrFunctionOrValue) =
                 None
         )
 
+    /// <summary>Reads native decorators, property/getter presence and conflicting explicit accessor placement.</summary>
+    static member JsDecoratorAttributes(m: FSharpMemberOrFunctionOrValue) =
+        let decorators (attributes: FSharpAttribute seq) =
+            attributes
+            |> Seq.filter (fun att -> att.AttributeType.TryFullName = Some Atts.ficklJsDecorator)
+            |> Seq.toList
+
+        let property =
+            if m.IsPropertyGetterMethod || m.IsPropertySetterMethod then
+                m.DeclaringEntity
+                |> Option.bind (fun ent ->
+                    ent.MembersFunctionsAndValues
+                    |> Seq.tryFind (fun prop -> prop.IsProperty && prop.DisplayName = m.DisplayName)
+                )
+            else
+                None
+
+        let propertyAttributes =
+            property
+            |> Option.map (fun prop -> decorators prop.Attributes)
+            |> Option.defaultValue []
+
+        // FCS also exposes property attributes on its generated accessors.
+        let ownAttributes =
+            decorators m.Attributes
+            |> List.filter (fun att ->
+                propertyAttributes
+                |> List.exists (fun propAtt -> propAtt.Range = att.Range)
+                |> not
+            )
+
+        let attributes =
+            if ownAttributes.IsEmpty then
+                propertyAttributes
+            else
+                ownAttributes
+
+        attributes,
+        (not propertyAttributes.IsEmpty),
+        (property |> Option.exists (fun prop -> prop.HasGetterMethod)),
+        (not propertyAttributes.IsEmpty && not ownAttributes.IsEmpty)
+
+    /// <summary>Whether a member or its property requests a native JavaScript decorator.</summary>
+    static member HasJsDecorator(m: FSharpMemberOrFunctionOrValue) =
+        let attributes, _, _, _ = FsMemberFunctionOrValue.JsDecoratorAttributes m
+        not attributes.IsEmpty
+
+    /// <summary>Finds compiler-generated mutable auto-property storage decorated at the property level.</summary>
+    static member JsDecoratedAutoProperty(info: Fable.MemberFunctionOrValue) =
+        match info with
+        | :? FsMemberFunctionOrValue as info ->
+            let m = info.FSharpMemberOrFunctionOrValue
+            let _, isProperty, _, _ = FsMemberFunctionOrValue.JsDecoratorAttributes m
+
+            if isProperty && (m.IsPropertyGetterMethod || m.IsPropertySetterMethod) then
+                m.DeclaringEntity
+                |> Option.bind (fun ent ->
+                    ent.MembersFunctionsAndValues
+                    |> Seq.tryFind (fun prop ->
+                        prop.IsProperty && prop.DisplayName = m.DisplayName && prop.HasSetterMethod
+                    )
+                    |> Option.bind (fun prop ->
+                        ent.FSharpFields
+                        |> Seq.tryFind (fun field -> field.IsCompilerGenerated && field.Name = prop.DisplayName + "@")
+                        |> Option.map (fun field -> FsField.FSharpFieldName field, prop.DisplayName)
+                    )
+                )
+            else
+                None
+        | _ -> None
+
     member _.FSharpMemberOrFunctionOrValue = m
 
     interface Fable.MemberFunctionOrValue with
@@ -2905,7 +2976,8 @@ module Util =
 
         let isSymbol =
             (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
-            && (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
+            && ((FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
+                || FsMemberFunctionOrValue.HasJsDecorator memb)
 
         let isMangled = not isSymbol && isMangledAbstractEntity com ent
         let isGetter = FsMemberFunctionOrValue.IsGetter(memb)
@@ -3254,7 +3326,8 @@ module Util =
                     && (isAttachMembersEntity com e
                         || isPojoDefinedByConsArgsFSharpEntity e
                         || ((com.Options.Language = JavaScript || com.Options.Language = TypeScript)
-                            && (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome))
+                            && ((FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
+                                || FsMemberFunctionOrValue.HasJsDecorator memb)))
                     ->
                     let classExpr = FsEnt.Ref e |> entityIdent com
 

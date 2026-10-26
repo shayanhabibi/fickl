@@ -132,8 +132,15 @@ let private declarationNames (decl: Declaration) =
         |> List.ofArray
     | ClassDeclaration(id = None) -> []
 
-let private classMemberKey (memb: ClassMember) =
+let rec private undecoratedModule =
+    function
+    | DecoratedModuleDeclaration(_, declaration) -> undecoratedModule declaration
+    | declaration -> declaration
+
+let rec private classMemberKey (memb: ClassMember) =
     match memb with
+    | DecoratedClassMember(_, memberDeclaration) -> classMemberKey memberDeclaration
+    | ClassAutoAccessor(key, _, _, isStatic, _, _) -> Some(isStatic, keyName key)
     | ClassMethod(kind, _, _, isStatic, _, _, _, _, _) ->
         match kind with
         | ClassPrimaryConstructor _ -> None
@@ -160,7 +167,7 @@ let private jsSurface (Program body) =
         | _ -> ()
 
     for md in body do
-        match md with
+        match undecoratedModule md with
         | ExportNamedDeclaration decl ->
             exports.UnionWith(declarationNames decl)
             addClass decl
@@ -245,6 +252,16 @@ and private addAbstractMemberNames names (memb: AbstractMember) =
         addTypeNames names returnType
         addTypeParameterNames names typeParameters
 
+let rec private addClassMemberNames names memberDeclaration =
+    match memberDeclaration with
+    | DecoratedClassMember(_, memberDeclaration) -> addClassMemberNames names memberDeclaration
+    | ClassMethod(_, parameters, _, _, _, returnType, typeParameters, _, _) ->
+        addParameterNames names parameters
+        returnType |> Option.iter (addTypeNames names)
+        addTypeParameterNames names typeParameters
+    | ClassProperty(typeAnnotation = annotation)
+    | ClassAutoAccessor(typeAnnotation = annotation) -> annotation |> Option.iter (addTypeNames names)
+
 let private addDeclarationNames names (decl: Declaration) =
     match decl with
     | ClassDeclaration(members, _, _, superClass, implements, typeParameters, _, _) ->
@@ -256,13 +273,7 @@ let private addDeclarationNames names (decl: Declaration) =
         implements |> Array.iter (addTypeNames names)
         addTypeParameterNames names typeParameters
 
-        for memb in members do
-            match memb with
-            | ClassMethod(_, parameters, _, _, _, returnType, typeParameters, _, _) ->
-                addParameterNames names parameters
-                returnType |> Option.iter (addTypeNames names)
-                addTypeParameterNames names typeParameters
-            | ClassProperty(typeAnnotation = typeAnnotation) -> typeAnnotation |> Option.iter (addTypeNames names)
+        members |> Array.iter (addClassMemberNames names)
     | FunctionDeclaration(parameters, _, _, returnType, typeParameters, _, _) ->
         addParameterNames names parameters
         returnType |> Option.iter (addTypeNames names)
@@ -340,7 +351,7 @@ let private valueType (annotation: TypeAnnotation option) (init: Expression opti
     | None -> initializerType init |> Option.orElse annotation |> orAny
     | Some annotation -> annotation
 
-let private declarationClassMembers
+let rec private declarationClassMembers
     (isUnion: bool)
     (jsMembers: HashSet<bool * string> option)
     (members: ClassMember array)
@@ -356,6 +367,15 @@ let private declarationClassMembers
     members
     |> Array.collect (fun memb ->
         match memb with
+        | DecoratedClassMember(_, memberDeclaration) ->
+            declarationClassMembers isUnion jsMembers [| memberDeclaration |]
+        | ClassAutoAccessor(key, value, computed, isStatic, annotation, loc) ->
+            declarationClassMembers
+                isUnion
+                jsMembers
+                [|
+                    ClassProperty(key, value, computed, isStatic, false, annotation, None, loc, None)
+                |]
         // Parameter properties are not allowed in a declaration: declare the properties instead
         | ClassMethod(ClassPrimaryConstructor accessModifiers,
                       parameters,
@@ -560,7 +580,7 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
     let reexported = HashSet<string>()
 
     for md in body do
-        match md with
+        match undecoratedModule md with
         | ExportNamedReferences(specifiers, None) ->
             for ExportSpecifier(Identifier(local, _), _) in specifiers do
                 reexported.Add(local) |> ignore
@@ -574,7 +594,7 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
     let declarations =
         body
         |> Array.choose (fun md ->
-            match md with
+            match undecoratedModule md with
             | ExportNamedDeclaration decl -> declarationOf js isExportedValue decl |> Option.map ExportNamedDeclaration
             | ExportDefaultDeclaration(Choice1Of2 decl) when js.Exports.Contains("default") ->
                 declarationOf js (fun _ -> true) decl
@@ -590,7 +610,7 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
     let used = HashSet<string>(reexported)
 
     for md in declarations do
-        match md with
+        match undecoratedModule md with
         | ExportNamedDeclaration decl
         | ExportDefaultDeclaration(Choice1Of2 decl)
         | PrivateModuleDeclaration(Statement.Declaration decl) -> addDeclarationNames used decl
@@ -684,7 +704,7 @@ let print (writer: Writer) (Program body) : Async<unit> =
                 p.PrintNewLine()
 
         for md in body do
-            match md with
+            match undecoratedModule md with
             | ImportDeclaration _
             | ExportNamedReferences _
             | ExportAllDeclaration _ -> p.Print(md)

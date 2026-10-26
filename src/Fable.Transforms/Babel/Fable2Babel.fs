@@ -53,6 +53,8 @@ type Context =
         NativeGeneratorType: Fable.Type option
         /// <summary>Caches resolved symbol access keys within one emitted module.</summary>
         SymbolAccessCache: Dictionary<string, Expression option>
+        /// <summary>Native fields replacing decorated auto-property backing storage in the current class.</summary>
+        NativeAutoProperties: Map<string, ClassMember>
     }
 
 type ModuleDecl(name, ?isPublic, ?isMutable, ?typ, ?doc) =
@@ -167,6 +169,225 @@ module Lib =
         | "constructor"
         | "__proto__" -> memberName + "$"
         | _ -> memberName
+
+module private NativeDecorators =
+    let attributes (attributes: Fable.Attribute seq) =
+        attributes
+        |> Seq.filter (fun att -> att.Entity.FullName = Atts.ficklJsDecorator)
+        |> Seq.toList
+
+    let private parse (att: Fable.Attribute) =
+        match att.ConstructorArgs with
+        | (:? string as expression) :: rest ->
+            let path =
+                match rest with
+                | (:? string as path) :: _ -> path
+                | _ -> ""
+
+            let isField =
+                att.ConstructorArgs
+                |> List.tryPick (
+                    function
+                    | :? bool as flag -> Some flag
+                    | _ -> None
+                )
+                |> Option.defaultValue false
+
+            expression, path, isField
+        | _ -> "", "", false
+
+    let private expression (com: IBabelCompiler) ctx sourceFile att =
+        let text, path, _ = parse att
+
+        if String.IsNullOrWhiteSpace text then
+            addError com [] None "JsDecorator requires a non-empty decorator expression"
+            Expression.nullLiteral ()
+        elif String.IsNullOrEmpty path then
+            RawExpression(text, None)
+        else
+            let root =
+                Regex.Match(text, @"^\s*([A-Za-z_$][\w$]*)(.*)$", RegexOptions.Singleline)
+
+            if not root.Success then
+                addError com [] None "An imported JsDecorator expression must begin with an exported identifier"
+                Expression.nullLiteral ()
+            else
+                let path =
+                    match sourceFile with
+                    | Some file when path.StartsWith(".", StringComparison.Ordinal) ->
+                        FSharp2Fable.Util.fixImportedRelativePath com path file
+                    | _ -> path
+
+                match com.TransformImport(ctx, root.Groups[1].Value, path) with
+                | Expression.Identifier(Identifier(name, _)) -> RawExpression(name + root.Groups[2].Value, None)
+                | _ ->
+                    addError com [] None "Cannot resolve an imported decorator identifier"
+                    Expression.nullLiteral ()
+
+    let memberAttributes (info: Fable.MemberFunctionOrValue) =
+        match info with
+        | :? FSharp2Fable.FsMemberFunctionOrValue as info ->
+            let attributes, isProperty, hasGetter, _ =
+                FSharp2Fable.FsMemberFunctionOrValue.JsDecoratorAttributes info.FSharpMemberOrFunctionOrValue
+
+            if
+                isProperty
+                && hasGetter
+                && info.FSharpMemberOrFunctionOrValue.IsPropertySetterMethod
+            then
+                []
+            else
+                attributes |> List.map (fun att -> FSharp2Fable.FsAtt(att) :> Fable.Attribute)
+        | _ -> attributes info.Attributes
+
+    let memberExpressions (com: IBabelCompiler) ctx (info: Fable.MemberFunctionOrValue) =
+        if
+            (memberAttributes info |> List.exists (parse >> fun (_, _, isField) -> isField))
+            && (FSharp2Fable.FsMemberFunctionOrValue.JsDecoratedAutoProperty info).IsNone
+        then
+            addError com [] None "JsDecorator field mode requires a mutable auto-property"
+
+        memberAttributes info
+        |> List.map (expression com ctx (info.DeclaringEntity |> Option.bind _.SourcePath))
+        |> List.toArray
+
+    let decorateMember com ctx info memberDeclaration =
+        match memberExpressions com ctx info with
+        | [||] -> memberDeclaration
+        | decorators -> DecoratedClassMember(decorators, memberDeclaration)
+
+    let decorateClass (com: IBabelCompiler) ctx (ent: Fable.Entity) declaration =
+        if
+            (attributes ent.Attributes
+             |> List.exists (parse >> fun (_, _, isField) -> isField))
+        then
+            addError com [] None "JsDecorator field mode requires a mutable auto-property"
+
+        let decorators =
+            attributes ent.Attributes
+            |> List.map (expression com ctx ent.Ref.SourcePath)
+            |> List.toArray
+
+        if decorators.Length = 0 then
+            declaration
+        else
+            DecoratedModuleDeclaration(decorators, declaration)
+
+    let prepareClass (com: IBabelCompiler) ctx (decl: Fable.ClassDecl) =
+        let properties =
+            decl.AttachedMembers
+            |> List.choose (fun memberDecl ->
+                let info = com.GetMember memberDecl.MemberRef
+
+                if info.IsGetter then
+                    FSharp2Fable.FsMemberFunctionOrValue.JsDecoratedAutoProperty info
+                    |> Option.map (fun (backingName, propertyName) -> backingName, (propertyName, info, memberDecl))
+                else
+                    None
+            )
+            |> Map.ofList
+
+        if properties.IsEmpty then
+            decl, Map.empty
+        else
+            let initializers = Dictionary<string, Fable.Expr>()
+
+            let rec isLiteral =
+                function
+                | Fable.Value((Fable.UnitConstant | Fable.BoolConstant _ | Fable.CharConstant _ | Fable.StringConstant _ | Fable.NumberConstant _ | Fable.Null _),
+                              _) -> true
+                | Fable.TypeCast(value, _) -> isLiteral value
+                | Fable.Value(Fable.NewOption(None, _, _), _) -> true
+                | _ -> false
+
+            let rec constructorHasEffects =
+                function
+                | Fable.Sequential expressions -> List.exists constructorHasEffects expressions
+                | Fable.Let(_, value, body) -> constructorHasEffects value || constructorHasEffects body
+                | Fable.TypeCast(value, _) -> constructorHasEffects value
+                | Fable.ObjectExpr([], _, None) -> false
+                | expression -> canHaveSideEffects com expression
+
+            let rec rewrite hadEffects body =
+                match body with
+                | Fable.Sequential expressions ->
+                    let mutable hadEffects = hadEffects
+
+                    expressions
+                    |> List.map (fun original ->
+                        let rewritten = rewrite hadEffects original
+                        hadEffects <- hadEffects || constructorHasEffects rewritten
+                        rewritten
+                    )
+                    |> Fable.Sequential
+                | Fable.Let(ident, value, body) ->
+                    Fable.Let(ident, value, rewrite (hadEffects || constructorHasEffects value) body)
+                | Fable.Set(_, Fable.FieldSet name, _, value, range) when
+                    properties.ContainsKey name && not (initializers.ContainsKey name)
+                    ->
+                    if hadEffects || not (isLiteral value) then
+                        addError
+                            com
+                            []
+                            range
+                            "Decorated auto-properties require literal initializers before constructor side effects"
+
+                    initializers.Add(name, value)
+                    Fable.Value(Fable.UnitConstant, range)
+                | body -> body
+
+            let constructor =
+                decl.Constructor
+                |> Option.map (fun constructor -> { constructor with Body = rewrite false constructor.Body })
+
+            let members =
+                properties
+                |> Map.map (fun backingName (_, info, memberDecl) ->
+                    if not info.IsInstance then
+                        addError com [] memberDecl.Body.Range "Decorated auto-properties must be instance properties"
+
+                    let value =
+                        match initializers.TryGetValue backingName with
+                        | true, value -> com.TransformAsExpr(ctx, value) |> Some
+                        | _ ->
+                            addError com [] memberDecl.Body.Range "Cannot locate a decorated auto-property initializer"
+                            None
+
+                    let modes =
+                        memberAttributes info
+                        |> List.map (parse >> fun (_, _, mode) -> mode)
+                        |> List.distinct
+
+                    if modes.Length > 1 then
+                        addError
+                            com
+                            []
+                            memberDecl.Body.Range
+                            "Decorators on one auto-property must agree on field mode"
+
+                    let key, computed = SymbolKeys.attachedKey com ctx info memberDecl
+
+                    let annotation =
+                        if com.IsTypeScript then
+                            Some(Annotation.makeFieldAnnotation com ctx info.ReturnParameter.Type)
+                        else
+                            None
+
+                    let memberDeclaration =
+                        if modes = [ true ] then
+                            ClassMember.classProperty (
+                                key,
+                                ?value = value,
+                                isComputed = computed,
+                                ?typeAnnotation = annotation
+                            )
+                        else
+                            ClassAutoAccessor(key, value, computed, false, annotation, memberDecl.Body.Range)
+
+                    decorateMember com ctx info memberDeclaration
+                )
+
+            { decl with Constructor = constructor }, members
 
 module private SymbolKeys =
     let isWellKnownMember name (memberInfo: Fable.MemberFunctionOrValue) =
@@ -4651,6 +4872,7 @@ but thanks to the optimisation done below we get
         let classFields =
             if com.IsTypeScript && not ent.IsFSharpUnion then
                 ent.FSharpFields
+                |> List.filter (fun field -> not (ctx.NativeAutoProperties.ContainsKey field.Name))
                 |> List.mapToArray (fun field ->
                     let prop, isComputed = SymbolKeys.fieldKey com ctx field
                     let ta = makeFieldAnnotationOf com ctx field
@@ -4749,6 +4971,7 @@ but thanks to the optimisation done below we get
 
         ModuleDecl(entName, isPublic = ent.IsPublic, ?doc = doc)
         |> declareModuleMember com ctx classExpr
+        |> NativeDecorators.decorateClass com ctx ent
 
     let declareClass
         (com: IBabelCompiler)
@@ -5104,7 +5327,7 @@ but thanks to the optimisation done below we get
         else
             statements |> Array.mapToList (fun x -> PrivateModuleDeclaration(x))
 
-    let transformAttachedProperty
+    let private transformOrdinaryAttachedProperty
         (com: IBabelCompiler)
         ctx
         (ent: Fable.Entity)
@@ -5148,7 +5371,25 @@ but thanks to the optimisation done below we get
             ?returnType = returnType,
             ?doc = memb.XmlDoc
         ) //, ?typeParameters=typeParamDecl)
+        |> NativeDecorators.decorateMember com ctx (com.GetMember memb.MemberRef)
         |> Array.singleton
+
+    let transformAttachedProperty
+        (com: IBabelCompiler)
+        (ctx: Context)
+        ent
+        (info: Fable.MemberFunctionOrValue)
+        (memb: Fable.MemberDecl)
+        =
+        let declaredInfo = com.GetMember memb.MemberRef
+
+        match FSharp2Fable.FsMemberFunctionOrValue.JsDecoratedAutoProperty declaredInfo with
+        | Some(backingName, _) when ctx.NativeAutoProperties.ContainsKey backingName ->
+            if info.IsGetter then
+                [| ctx.NativeAutoProperties[backingName] |]
+            else
+                [||]
+        | _ -> transformOrdinaryAttachedProperty com ctx ent info memb
 
     let transformAttachedMethod
         (com: IBabelCompiler)
@@ -5175,6 +5416,11 @@ but thanks to the optimisation done below we get
                 ?typeParameters = typeParamDecl,
                 ?doc = memb.XmlDoc
             )
+            |> fun declaration ->
+                if name = memb.Name then
+                    NativeDecorators.decorateMember com ctx (com.GetMember memb.MemberRef) declaration
+                else
+                    declaration
 
         let args, body, returnType, typeParamDecl =
             getMemberArgsAndBody com ctx (Attached isStatic) (Some ent) info memb.Args memb.Body
@@ -6173,6 +6419,8 @@ but thanks to the optimisation done below we get
                     else
                         []
                 else
+                    let decl, nativeProperties = NativeDecorators.prepareClass com ctx decl
+                    let ctx = { ctx with NativeAutoProperties = nativeProperties }
 
                     let classMembers =
                         decl.AttachedMembers
@@ -6491,6 +6739,7 @@ module Compiler =
                 IsNativeAsync = false
                 NativeGeneratorType = None
                 SymbolAccessCache = Dictionary()
+                NativeAutoProperties = Map.empty
             }
 
         let registerSymbolKey (att: Fable.Attribute) =
