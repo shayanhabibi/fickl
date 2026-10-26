@@ -986,6 +986,18 @@ module Annotation =
         | Fable.Option(t, _) when not (mustWrapOption t) -> t
         | _ -> t
 
+    /// Getters returning an erased option are typed `T | undefined` in TypeScript. Unlike `unwrapOptionalArg`,
+    /// the unwrapped body keeps the option type so the return is not coerced like a plain `T` (e.g. `| 0` turning
+    /// `undefined` into `0` for `int option`). Returns the unwrapped type to use for the return annotation.
+    let unwrapOptionalReturn com (body: Fable.Expr) =
+        match body.Type with
+        | Fable.Option(t, _) when not (mustWrapOption t) ->
+            match body with
+            | Fable.Value(Fable.NewOption(Some arg, _, _), _) -> Some t, arg
+            | Fable.Value(Fable.NewOption(None, _, _), _) -> Some t, body
+            | _ -> Some t, Replacements.Util.Helper.LibCall(com, "Option", "unwrap", body.Type, [ body ])
+        | _ -> None, body
+
     let unwrapOptionalArg com (arg: Fable.Expr) =
         match arg.Type with
         | Fable.Option(t, _) when not (mustWrapOption t) ->
@@ -1020,12 +1032,15 @@ module Annotation =
         )
         |> ObjectTypeAnnotation
 
-    let transformFunctionWithAnnotations
+    /// Like `transformFunctionWithAnnotations` but the return type annotation
+    /// is made from `returnType` instead of the type of `body`
+    let transformFunctionWithReturnType
         (com: IBabelCompiler)
         ctx
         name
         typeParams
         (args: Fable.Ident list)
+        (returnType: Fable.Type)
         (body: Fable.Expr)
         =
         if com.IsTypeScript then
@@ -1034,16 +1049,26 @@ module Annotation =
             let scopedTypeParams, genParams =
                 match typeParams with
                 | Some typeParams -> ctx.ScopedTypeParams, typeParams
-                | None -> Util.getTypeParameters ctx (argTypes @ [ body.Type ])
+                | None -> Util.getTypeParameters ctx (argTypes @ [ returnType ])
 
             let ctx = { ctx with ScopedTypeParams = scopedTypeParams }
             let args', body' = com.TransformFunction(ctx, name, args, body)
-            let returnType = makeTypeAnnotation com ctx body.Type
+            let returnType = makeTypeAnnotation com ctx returnType
             let typeParamDecl = makeTypeParamDecl com ctx genParams
             args', body', Some returnType, Some typeParamDecl
         else
             let args', body' = com.TransformFunction(ctx, name, args, body)
             args', body', None, None
+
+    let transformFunctionWithAnnotations
+        (com: IBabelCompiler)
+        ctx
+        name
+        typeParams
+        (args: Fable.Ident list)
+        (body: Fable.Expr)
+        =
+        transformFunctionWithReturnType com ctx name typeParams args body.Type body
 
 module Util =
     open Lib
@@ -1388,13 +1413,14 @@ module Util =
         | NonAttached of funcName: string
         | Attached of isStatic: bool
 
-    let getMemberArgsAndBody
+    let getMemberArgsAndBodyWithReturnType
         (com: IBabelCompiler)
         ctx
         kind
         (entOpt: Fable.Entity option)
         (info: Fable.MemberFunctionOrValue)
         (args: Fable.Ident list)
+        (returnType: Fable.Type)
         (body: Fable.Expr)
         =
         let funcName, args, body =
@@ -1523,7 +1549,7 @@ module Util =
             | _ -> args |> List.map (fun a -> a, ParameterFlags())
 
         let args, body, returnType, typeParamDecl =
-            transformFunctionWithAnnotations com ctx funcName typeParams (List.map fst argsWithFlags) body
+            transformFunctionWithReturnType com ctx funcName typeParams (List.map fst argsWithFlags) returnType body
 
         let args =
             if Array.isEmpty args then
@@ -1533,6 +1559,17 @@ module Util =
                 |> Seq.mapToArray (fun (a, (_, flags)) -> a.WithFlags(flags))
 
         args, body, returnType, typeParamDecl
+
+    let getMemberArgsAndBody
+        (com: IBabelCompiler)
+        ctx
+        kind
+        (entOpt: Fable.Entity option)
+        (info: Fable.MemberFunctionOrValue)
+        (args: Fable.Ident list)
+        (body: Fable.Expr)
+        =
+        getMemberArgsAndBodyWithReturnType com ctx kind entOpt info args body.Type body
 
     let getUnionCaseName (uci: Fable.UnionCase) =
         match uci.CompiledName with
@@ -1962,16 +1999,24 @@ module Util =
                 let makeMethod kind =
                     let args = memb.Args
 
-                    let isOptional, body =
+                    let unwrappedType, body =
                         match kind with
-                        | ObjectGetter -> unwrapOptionalArg com memb.Body
-                        | _ -> false, memb.Body
+                        | ObjectGetter -> unwrapOptionalReturn com memb.Body
+                        | _ -> None, memb.Body
 
                     let args, body, returnType, typeParams =
-                        getMemberArgsAndBody com ctx (Attached(isStatic = false)) entOpt info args body
+                        getMemberArgsAndBodyWithReturnType
+                            com
+                            ctx
+                            (Attached(isStatic = false))
+                            entOpt
+                            info
+                            args
+                            (defaultArg unwrappedType body.Type)
+                            body
 
                     let returnType =
-                        if isOptional then
+                        if Option.isSome unwrappedType then
                             returnType
                             |> Option.map (fun t -> UnionTypeAnnotation [| t; UndefinedTypeAnnotation |])
                         else
@@ -4287,17 +4332,25 @@ but thanks to the optimisation done below we get
 
         let args = memb.Args
 
-        let kind, (isOptional, body) =
+        let kind, (unwrappedType, body) =
             if info.IsGetter then
-                ClassGetter(key, isComputed), unwrapOptionalArg com memb.Body
+                ClassGetter(key, isComputed), unwrapOptionalReturn com memb.Body
             else
-                ClassSetter(key, isComputed), (false, memb.Body)
+                ClassSetter(key, isComputed), (None, memb.Body)
 
         let args, body, returnType, _typeParamDecl =
-            getMemberArgsAndBody com ctx (Attached isStatic) (Some ent) info args body
+            getMemberArgsAndBodyWithReturnType
+                com
+                ctx
+                (Attached isStatic)
+                (Some ent)
+                info
+                args
+                (defaultArg unwrappedType body.Type)
+                body
 
         let returnType =
-            if isOptional then
+            if Option.isSome unwrappedType then
                 returnType
                 |> Option.map (fun t -> UnionTypeAnnotation [| t; UndefinedTypeAnnotation |])
             else

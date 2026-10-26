@@ -33,8 +33,44 @@ type OptTest = OptTest of int option
 let makeSome (x: 'a): 'a option =
     Some x
 
+type IOptionalGetter =
+    abstract Number: int option
+    abstract ValueNumber: int voption
+    abstract Small: byte option
+
+type OptionalGetter(value: int option) =
+    interface IOptionalGetter with
+        member _.Number = value
+        member _.ValueNumber = Option.toValueOption value
+        member _.Small = Option.map byte value
+
+[<Fable.Core.AttachMembers>]
+type AttachedOptionalGetter(value: int option) =
+    member _.Number = value
+    member _.Empty: int option = None
+    member _.Present: int option = Some 2
+
 let tests =
   testList "Option" [
+    testCase "optional integer getters preserve None and Some" <| fun () -> // fickl#106
+        let check expected (value: IOptionalGetter) =
+            value.Number |> equal expected
+            value.ValueNumber |> equal (Option.toValueOption expected)
+            value.Small |> equal (Option.map byte expected)
+            value.Number |> Option.defaultValue 42 |> equal (Option.defaultValue 42 expected)
+
+        for expected in [None; Some 0; Some 7] do
+            OptionalGetter(expected) |> check expected
+            { new IOptionalGetter with
+                member _.Number = expected
+                member _.ValueNumber = Option.toValueOption expected
+                member _.Small = Option.map byte expected }
+            |> check expected
+            let attached = AttachedOptionalGetter(expected)
+            attached.Number |> equal expected
+            attached.Empty |> equal None
+            attached.Present |> equal (Some 2)
+
     testCase "string of options, tuples and unit prints like .NET" <| fun () -> // #63
         let mutable called = 0
         let effect () = called <- called + 1
