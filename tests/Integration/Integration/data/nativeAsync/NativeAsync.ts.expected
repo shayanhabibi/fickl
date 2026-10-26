@@ -1,0 +1,12 @@
+"use server";
+
+
+
+export const load = async function (this: any, promise: Promise<string>): Promise<string> {
+    return await promise;
+};
+
+export const identity = async function <T>(this: any, value: T): Promise<T> {
+    return value;
+};
+

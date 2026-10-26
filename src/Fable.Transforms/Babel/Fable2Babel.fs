@@ -49,6 +49,7 @@ type Context =
         ScopedTypeParams: Set<string>
         BoundTypes: Map<string, Fable.Type>
         ForcedIdents: Set<string>
+        IsNativeAsync: bool
     }
 
 type ModuleDecl(name, ?isPublic, ?isMutable, ?typ, ?doc) =
@@ -659,6 +660,7 @@ module Annotation =
             | _, Some(Literal(NumericLiteral _))
             | _, Some(Literal(RegExp _))
             | _, Some(FunctionExpression _)
+            | _, Some(AsyncFunctionExpression _)
             | _, Some(ArrowFunctionExpression _) -> None
             | _, Some(AsExpression _) -> None
             | _ -> makeTypeAnnotation com ctx typ |> Some
@@ -1082,7 +1084,7 @@ module Annotation =
         (args: Fable.Ident list)
         (body: Fable.Expr)
         =
-        transformFunctionWithReturnType com ctx name typeParams args body.Type body
+        transformFunctionWithReturnType com { ctx with IsNativeAsync = false } name typeParams args body.Type body
 
 module Util =
     open Lib
@@ -1344,9 +1346,34 @@ module Util =
 
     /// Immediately Invoked Function Expression
     let iife (com: IBabelCompiler) ctx (expr: Fable.Expr) =
-        let _, body = com.TransformFunction(ctx, None, [], expr)
-        // Use an arrow function in case we need to capture `this`
-        Expression.callExpression (Expression.arrowFunctionExpression ([||], body), [||])
+        let rec containsAwait =
+            function
+            | Fable.Emit(info, _, _) when List.contains "fickl-native-await" info.CallInfo.Tags -> true
+            | Fable.Lambda _
+            | Fable.Delegate _
+            | Fable.ObjectExpr _ -> false
+            | expression -> getSubExpressions expression |> List.exists containsAwait
+
+        let isAsync = ctx.IsNativeAsync && containsAwait expr
+
+        let _, body =
+            com.TransformFunction({ ctx with IsNativeAsync = isAsync }, None, [], expr)
+
+        if isAsync then
+            let returnType =
+                if com.IsTypeScript then
+                    Some(makeNativeTypeAnnotation com ctx [ expr.Type ] "Promise")
+                else
+                    None
+
+            let callback =
+                Expression.asyncFunctionExpression ([||], body, ?returnType = returnType, isArrow = true)
+
+            let call = Expression.callExpression (callback, [||])
+
+            emitExpression None "(await $0)" [ call ]
+        else
+            Expression.callExpression (Expression.arrowFunctionExpression ([||], body), [||])
 
     let multiVarDeclaration (com: IBabelCompiler) ctx kind (variables: (Fable.Ident * Expression option) seq) =
         let varDeclarators =
@@ -1445,6 +1472,20 @@ module Util =
         (returnType: Fable.Type)
         (body: Fable.Expr)
         =
+        let isNativeAsync = hasAttribute Atts.ficklAsyncFunction info.Attributes
+
+        if
+            isNativeAsync
+            && not (
+                info.DeclaringEntity
+                |> Option.bind com.TryGetEntity
+                |> Option.exists _.IsFSharpModule
+            )
+        then
+            addError com [] body.Range "AsyncFunction is only supported on module functions"
+
+        let ctx = { ctx with IsNativeAsync = isNativeAsync }
+
         let funcName, args, body =
             match kind, args with
             | Attached(isStatic = false), (thisArg :: args) ->
@@ -2381,6 +2422,8 @@ module Util =
 
     let transformEmit (com: IBabelCompiler) ctx range (info: Fable.EmitInfo) =
         match info.CallInfo.Tags with
+        | Fable.Tags.Contains "fickl-native-await" when not ctx.IsNativeAsync ->
+            addErrorAndReturnNull com range "Native promise bindings must be inside a jsAsync computation"
         | Fable.Tags.Contains "topDirectiveProloge" ->
             com.SaveTopDirectivePrologue(info.Macro)
             // Return empty sequence expression so it can be erased at print time
@@ -3477,7 +3520,26 @@ but thanks to the optimisation done below we get
             |> makeArrowFunctionExpression name
 
         | Fable.Delegate(args, body, name, tags) ->
-            if List.contains "not-arrow" tags then
+            if List.contains "fickl-async-function" tags then
+                let parameters, block, _, typeParameters =
+                    transformFunctionWithReturnType com { ctx with IsNativeAsync = true } name None args body.Type body
+
+                let returnType =
+                    if com.IsTypeScript then
+                        Some(makeNativeTypeAnnotation com ctx [ body.Type ] "Promise")
+                    else
+                        None
+
+                Expression.asyncFunctionExpression (
+                    parameters,
+                    block,
+                    ?returnType = returnType,
+                    ?typeParameters = typeParameters,
+                    isArrow = true
+                )
+            elif List.contains "fickl-async-code" tags then
+                addErrorAndReturnNull com body.Range "Deferred jsAsync code must be consumed by jsAsync.Run"
+            elif List.contains "not-arrow" tags then
                 let id = name |> Option.map Identifier.identifier
 
                 let args, body, returnType, typeParamDecl =
@@ -4427,6 +4489,28 @@ but thanks to the optimisation done below we get
     let tryFindAnyEntAttribute fullNames (ent: Fable.Entity) : (string * obj list) option =
         tryFindAnyAttribute fullNames ent.Attributes
 
+    let rec private tryNativeAsyncBody =
+        function
+        | Fable.Call(Fable.Delegate([], body, _, tags), info, _, _) when
+            List.contains "fickl-async-function" tags && info.Args.IsEmpty
+            ->
+            Some body
+        | Fable.TypeCast(body, _) -> tryNativeAsyncBody body
+        | Fable.Let(ident, value, body) ->
+            tryNativeAsyncBody body
+            |> Option.map (fun body -> Fable.Let(ident, value, body))
+        | Fable.Sequential expressions ->
+            match List.rev expressions with
+            | last :: rest ->
+                tryNativeAsyncBody last
+                |> Option.map (fun body -> Fable.Sequential(List.rev rest @ [ body ]))
+            | [] -> None
+        | Fable.IfThenElse(guard, thenBody, elseBody, range) ->
+            match tryNativeAsyncBody thenBody, tryNativeAsyncBody elseBody with
+            | Some thenBody, Some elseBody -> Some(Fable.IfThenElse(guard, thenBody, elseBody, range))
+            | _ -> None
+        | _ -> None
+
     let transformModuleFunction com ctx (info: Fable.MemberFunctionOrValue) membName (args: Fable.Ident list) body =
         let args, body =
             if info.Attributes |> hasAttribute Atts.jsxComponent then
@@ -4444,10 +4528,38 @@ but thanks to the optimisation done below we get
             else
                 args, body
 
-        let args, body, returnType, typeParamDecl =
-            getMemberArgsAndBody com ctx (NonAttached membName) None info args body
+        if hasAttribute Atts.ficklAsyncFunction info.Attributes then
+            match tryNativeAsyncBody body with
+            | Some body ->
+                let args, body, returnType, typeParameters =
+                    getMemberArgsAndBodyWithReturnType
+                        com
+                        ctx
+                        (NonAttached membName)
+                        None
+                        info
+                        args
+                        info.ReturnParameter.Type
+                        body
 
-        Expression.functionExpression (args, body, ?returnType = returnType, ?typeParameters = typeParamDecl)
+                let args =
+                    if com.IsTypeScript then
+                        Array.append [| Parameter.parameter ("this", typeAnnotation = AnyTypeAnnotation) |] args
+                    else
+                        args
+
+                Expression.asyncFunctionExpression (
+                    args,
+                    body,
+                    ?returnType = returnType,
+                    ?typeParameters = typeParameters
+                )
+            | None -> addErrorAndReturnNull com body.Range "AsyncFunction requires a jsAsync computation"
+        else
+            let args, body, returnType, typeParamDecl =
+                getMemberArgsAndBody com ctx (NonAttached membName) None info args body
+
+            Expression.functionExpression (args, body, ?returnType = returnType, ?typeParameters = typeParamDecl)
 
     let transformAction (com: IBabelCompiler) ctx expr =
         let statements = transformAsStatements com ctx None expr
@@ -5797,6 +5909,7 @@ module Compiler =
                 ScopedTypeParams = Set.empty
                 BoundTypes = Map.empty
                 ForcedIdents = Set.empty
+                IsNativeAsync = false
             }
 
         let rootDecls = List.collect (transformDeclaration com ctx) file.Declarations

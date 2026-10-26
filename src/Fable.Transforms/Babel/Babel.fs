@@ -74,6 +74,15 @@ type Expression =
         returnType: TypeAnnotation option *
         typeParameters: TypeParameter array *
         loc: SourceLocation option
+    /// <summary>A native async function or arrow with optional TypeScript annotations.</summary>
+    | AsyncFunctionExpression of
+        id: Identifier option *
+        parameters: Parameter array *
+        body: BlockStatement *
+        returnType: TypeAnnotation option *
+        typeParameters: TypeParameter array *
+        loc: SourceLocation option *
+        isArrow: bool
     | ArrowFunctionExpression of
         parameters: Parameter array *
         body: BlockStatement *
@@ -103,6 +112,7 @@ type Expression =
         | MemberExpression(loc = loc) -> loc
         | NewExpression(loc = loc) -> loc
         | FunctionExpression(loc = loc) -> loc
+        | AsyncFunctionExpression(loc = loc) -> loc
         | ArrowFunctionExpression(loc = loc) -> loc
         | _ -> None
 
@@ -644,6 +654,18 @@ module Helpers =
 
         static member functionExpression(parameters, body, ?id, ?returnType, ?typeParameters, ?loc) = //?generator_, ?async_
             FunctionExpression(id, parameters, body, returnType, defaultArg typeParameters [||], loc)
+
+        /// <summary>Creates a native async function, or an async arrow when <c>isArrow</c> is true.</summary>
+        static member asyncFunctionExpression(parameters, body, ?id, ?returnType, ?typeParameters, ?loc, ?isArrow) =
+            AsyncFunctionExpression(
+                id,
+                parameters,
+                body,
+                returnType,
+                defaultArg typeParameters [||],
+                loc,
+                defaultArg isArrow false
+            )
 
         static member classExpression(members, ?id, ?isAbstract, ?superClass, ?typeParameters, ?implements, ?loc) =
             ClassExpression(

@@ -9,6 +9,7 @@ let allTests =
     InlineInterfaces.tests
     NativeFunctions.tests
     NativeDisposal.tests
+    NativeAsync.tests
     Currying.tests
     FcsEdgeCases.tests
     Arithmetic.tests

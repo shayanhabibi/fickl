@@ -2462,6 +2462,8 @@ module Util =
         // When compiling Fable itself, Fable.Core entities will be part of the code base, but still need to be replaced
         else
             entFullName = "Fickl.Core.JsInterop"
+            || entFullName = "Fickl.Core.JsAsyncBuilder"
+            || entFullName = "Fickl.Core.NativeAsync"
             || (entFullName.StartsWith("Fable.Core.", StringComparison.Ordinal)
                 && (not (entFullName.StartsWith("Fable.Core.JS.", StringComparison.Ordinal))
                     || entFullName.EndsWith("Attribute", StringComparison.Ordinal)))

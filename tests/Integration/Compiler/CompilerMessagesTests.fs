@@ -15,6 +15,48 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "Native async attributes require a native computation" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+[<AsyncFunction>]
+let invalid () = JS.Constructors.Promise.resolve(42)
+"""
+      |> Assert.Exists.errorWith "AsyncFunction requires a jsAsync computation"
+      |> ignore
+
+    testCase "Native async bindings cannot escape their computation" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+let invalid (promise: JS.Promise<int>) =
+    jsAsync.Bind(promise, fun value -> jsAsync.Return(value))
+"""
+      |> Assert.Exists.errorWith "Native promise bindings must be inside a jsAsync computation"
+      |> ignore
+
+    testCase "Native async attributes reject attached class methods" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+[<AttachMembers>]
+type Invalid() =
+    [<AsyncFunction>]
+    member _.Run() = jsAsync { return 42 }
+"""
+      |> Assert.Exists.errorWith "AsyncFunction is only supported on module functions"
+      |> ignore
+
+    testCase "Native async attributes reject standalone class method helpers" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid() =
+    [<AsyncFunction>]
+    member _.Run() = jsAsync { return 42 }
+"""
+      |> Assert.Exists.errorWith "AsyncFunction is only supported on module functions"
+      |> ignore
+
     testCase "Native function helpers reject callbacks whose bodies are unavailable" <| fun _ ->
       compile """
 open Fickl.Core.JsInterop

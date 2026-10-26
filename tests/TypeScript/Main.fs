@@ -11,6 +11,7 @@ let allTests =
     InlineInterfaces.tests
     NativeFunctions.tests
     NativeDisposal.tests
+    NativeAsync.tests
     Arithmetic.tests
     Arrays.tests
     Async.tests
