@@ -286,6 +286,15 @@ let tests = testList "Strings" [
         sprintf "%e" 0.0 |> equal "0.000000e+000"
         sprintf "%e" -1e-300 |> equal "-1.000000e-300"
 
+    testCase "String.Join and String.Concat read null as empty" <| fun () -> // #80
+        String.Join(null, [| "a"; "b" |]) |> equal "ab"
+        String.Join(null, [ "a"; "b" ]) |> equal "ab"
+        String.Join(",", [| "a"; null; "b" |]) |> equal "a,,b"
+        String.Join(null, [| "a"; "b"; "c" |], 1, 2) |> equal "bc"
+        String.Concat("a", null, "b") |> equal "ab"
+        String.Concat("a", (null: obj), box 1) |> equal "a1"
+        String.Concat([| "a"; null; "b" |]) |> equal "ab"
+
     testCase "sprintf with escaped percent symbols works" <| fun () -> // See #195
         let r, r1, r2 = "Ratio", 0.213849, 0.799898
         sprintf "%s1: %.2f%% %s2: %.2f%%" r (r1*100.) r (r2*100.)

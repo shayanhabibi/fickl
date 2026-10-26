@@ -606,11 +606,13 @@ export function isNullOrWhiteSpace(str: string | any) {
   return typeof str !== "string" || /^\s*$/.test(str);
 }
 
+// As in .NET, a null argument, separator or element is empty (JS's String(null) and join(null) write "null")
 export function concat(...xs: any[]): string {
-  return xs.map((x) => String(x)).join("");
+  return xs.map((x) => x == null ? "" : String(x)).join("");
 }
 
 export function join<T>(delimiter: string, xs: Iterable<T>): string {
+  delimiter = delimiter ?? "";
   if (Array.isArray(xs)) {
     return xs.join(delimiter);
   } else {
@@ -623,7 +625,7 @@ export function joinWithIndices(delimiter: string, xs: string[], startIndex: num
   if (endIndexPlusOne > xs.length) {
     throw new Exception("Index and count must refer to a location within the buffer.");
   }
-  return xs.slice(startIndex, endIndexPlusOne).join(delimiter);
+  return xs.slice(startIndex, endIndexPlusOne).join(delimiter ?? "");
 }
 
 function notSupported(name: string): never {
