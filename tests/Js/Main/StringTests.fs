@@ -279,6 +279,14 @@ let tests = testList "Strings" [
         let x = 3.14159
         $"{{0}} {x:F2} {{y}}" |> equal "{0} 3.14 {y}"
 
+    testCase "sprintf \"%A\" of unit prints ()" <| fun () -> // #91
+        sprintf "%A" () |> equal "()"
+        sprintf "%O" () |> equal "<null>"
+        sprintf "x%Ay" () |> equal "x()y"
+        sprintf "%A|%A" () 1 |> equal "()|1"
+        let f () = ()
+        sprintf "%A" (f ()) |> equal "()"
+
     testCase "sprintf \"%e\" writes six decimals and a three-digit exponent" <| fun () -> // #59
         sprintf "%e" 1234.5 |> equal "1.234500e+003"
         sprintf "%E" 1234.5 |> equal "1.234500E+003"
