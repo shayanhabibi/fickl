@@ -292,6 +292,8 @@ type FsMemberFunctionOrValue(m: FSharpMemberOrFunctionOrValue) =
     static member IsSetter(m: FSharpMemberOrFunctionOrValue) =
         m.IsPropertySetterMethod && Util.countNonCurriedParams m = 1
 
+    member _.FSharpMemberOrFunctionOrValue = m
+
     interface Fable.MemberFunctionOrValue with
         member _.Attributes = m.Attributes |> Seq.map (fun x -> FsAtt(x) :> Fable.Attribute)
 
@@ -2471,9 +2473,8 @@ module Util =
         let isFromDll () = Option.isSome ent.Assembly.FileName
         isReplacementCandidatePrivate isFromDll (FsEnt.FullName ent)
 
-    /// A class declared with `val` fields and explicit constructors only, which is compiled with a constructor
-    /// that takes its fields
-    let private isExplicitClass (ent: FSharpEntity) =
+    /// A class Fable compiles to a JS class of its own, which a class it inherits can extend
+    let private isCompiledClass (ent: FSharpEntity) =
         ent.IsClass
         && not (
             ent.IsFSharpRecord
@@ -2486,7 +2487,14 @@ module Util =
         && not (isReplacementCandidateFrom ent)
         && not (isGlobalOrImportedFSharpEntity ent)
         && not (isPojoDefinedByConsArgsFSharpEntity ent)
-        && not (ent.MembersFunctionsAndValues |> Seq.exists _.IsImplicitConstructor)
+
+    let private tryPrimaryConstructor (ent: FSharpEntity) =
+        ent.MembersFunctionsAndValues |> Seq.tryFind _.IsImplicitConstructor
+
+    /// A class declared with `val` fields and explicit constructors only, which is compiled with a constructor
+    /// that takes its fields
+    let private isExplicitClass (ent: FSharpEntity) =
+        isCompiledClass ent && Option.isNone (tryPrimaryConstructor ent)
 
     /// The base type of an explicit class that inherits another explicit class (#87). The class extends it, and its
     /// constructor also takes the base's fields, which an explicit constructor reads from the base object it builds
@@ -2497,6 +2505,36 @@ module Util =
             | Some(baseEnt, _), Some baseType when isExplicitClass baseEnt -> Some baseType
             | _ -> None
         | _ -> None
+
+    /// The base type of an explicit class that inherits a class with a primary constructor (#96), with the primary
+    /// constructor's parameters. The class extends it, and its constructor also takes those parameters and passes
+    /// them to `super`
+    let tryPrimaryBaseType (ent: Fable.Entity) : (Fable.DeclaredType * (string * Fable.Type) list) option =
+        match ent with
+        | :? FsEnt as fsEnt when isExplicitClass fsEnt.FSharpEntity ->
+            match tryGetBaseEntity fsEnt.FSharpEntity, ent.BaseType with
+            | Some(baseEnt, _), Some baseType when isCompiledClass baseEnt ->
+                tryPrimaryConstructor baseEnt
+                |> Option.map (fun cons ->
+                    let parameters =
+                        cons.CurriedParameterGroups
+                        |> Seq.concat
+                        |> Seq.mapi (fun i p ->
+                            let name = p.Name |> Option.defaultValue $"arg%i{i}"
+                            name, makeType Map.empty p.Type
+                        )
+                        |> Seq.toList
+
+                    baseType, parameters
+                )
+            | _ -> None
+        | _ -> None
+
+    /// Whether the member is the primary constructor of its class
+    let isPrimaryConstructor (memb: Fable.MemberFunctionOrValue) =
+        match memb with
+        | :? FsMemberFunctionOrValue as memb -> memb.FSharpMemberOrFunctionOrValue.IsImplicitConstructor
+        | _ -> false
 
     let getEntityGenParams (ent: Fable.Entity) : (string * Fable.Type) list =
         ent.GenericParameters

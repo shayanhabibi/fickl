@@ -3752,13 +3752,20 @@ but thanks to the optimisation done below we get
                 Some { makeTypedIdent typ name with IsMutable = field.IsMutable }
         )
 
-    /// The fields of the explicit base classes of an explicit class, which its constructor takes before its own,
-    /// with their types in terms of the class's generic parameters (#87)
-    let rec getExplicitBaseFields (com: IBabelCompiler) (ent: Fable.Entity) : (Fable.Field * Fable.Type) list =
-        match FSharp2Fable.Util.tryExplicitBaseType ent with
-        | Some baseType ->
-            let baseEnt = com.GetEntity(baseType.Entity)
+    /// The base type an explicit class extends: another explicit class (#87) or a class with a primary constructor (#96)
+    let tryExtendedBaseType (ent: Fable.Entity) =
+        FSharp2Fable.Util.tryExplicitBaseType ent
+        |> Option.orElseWith (fun () -> FSharp2Fable.Util.tryPrimaryBaseType ent |> Option.map fst)
 
+    /// The parameters an explicit class's constructor takes before its own fields and passes to `super`: the fields of
+    /// its explicit base classes (#87), after the parameters of a primary constructor at the root (#96). Each has its
+    /// type in terms of the class's generic parameters and, if it is a base field, the field
+    let rec getExplicitBaseParams
+        (com: IBabelCompiler)
+        (ent: Fable.Entity)
+        : (string * Fable.Type * Fable.Field option) list
+        =
+        let resolve (baseType: Fable.DeclaredType) (baseEnt: Fable.Entity) parameters =
             let genArgs =
                 let names = baseEnt.GenericParameters |> List.map _.Name
 
@@ -3767,71 +3774,180 @@ but thanks to the optimisation done below we get
                 else
                     Map.empty
 
+            parameters
+            |> List.map (fun (name, typ, field) -> name, resolveInlineType genArgs typ, field)
+
+        match FSharp2Fable.Util.tryExplicitBaseType ent with
+        | Some baseType ->
+            let baseEnt = com.GetEntity(baseType.Entity)
+
             let ownFields =
                 baseEnt.FSharpFields
                 |> List.filter (fun field -> not field.IsStatic)
-                |> List.map (fun field -> field, field.FieldType)
+                |> List.map (fun field -> field.Name, field.FieldType, Some field)
 
-            getExplicitBaseFields com baseEnt @ ownFields
-            |> List.map (fun (field, typ) -> field, resolveInlineType genArgs typ)
-        | None -> []
+            getExplicitBaseParams com baseEnt @ ownFields |> resolve baseType baseEnt
+        | None ->
+            match FSharp2Fable.Util.tryPrimaryBaseType ent with
+            | Some(baseType, parameters) ->
+                parameters
+                |> List.map (fun (name, typ) -> name, typ, None)
+                |> resolve baseType (com.GetEntity(baseType.Entity))
+            | None -> []
 
-    /// An explicit constructor of a class that inherits an explicit class, `{ inherit Base(...); Field = ... }`,
-    /// calls the base constructor and then builds the object. The class's constructor also takes the base's fields,
-    /// so bind the base object and pass its fields on (#87)
-    let passExplicitBaseFields (com: IBabelCompiler) ctx (ent: Fable.Entity) (body: Fable.Expr) =
-        match FSharp2Fable.Util.tryExplicitBaseType ent with
+    /// An explicit constructor of a class that extends its base, `{ inherit Base(...); Field = ... }`, calls the base
+    /// constructor and then builds the object, but the class's constructor also takes the parameters it passes to
+    /// `super`. When the base constructor is the primary constructor of the base, pass its arguments instead of calling
+    /// it (#96), unless computing the class's own fields could have side effects, which must follow the base
+    /// constructor's. When every parameter is a base field, bind the base object and pass its fields on (#87).
+    /// Otherwise, as when the class extends an explicit class with a primary constructor at the root, the arguments of
+    /// that constructor are not at hand, so make the base object an instance of the class and set its own fields
+    let passExplicitBaseArgs (com: IBabelCompiler) ctx (ent: Fable.Entity) (body: Fable.Expr) =
+        match tryExtendedBaseType ent with
         | None -> body
         | Some baseType ->
-            let baseFields = getExplicitBaseFields com ent
+            let baseParams = getExplicitBaseParams com ent
 
-            let isBaseConsCall expr =
+            let baseFields =
+                baseParams
+                |> List.choose (fun (_, typ, field) -> field |> Option.map (fun field -> field, typ))
+
+            let tryBaseConsCall expr =
                 match expr with
-                | Fable.Call(_, { MemberRef = Some memberRef }, _, _) ->
+                | Fable.Call(_, ({ MemberRef = Some memberRef } as info), _, _) ->
                     match com.TryGetMember(memberRef) with
-                    | Some memb ->
+                    | Some memb when
                         memb.IsConstructor
                         && memb.DeclaringEntity
                            |> Option.exists (fun e -> e.FullName = baseType.Entity.FullName)
-                    | None -> false
-                | _ -> false
+                        ->
+                        Some(memb, info)
+                    | _ -> None
+                | _ -> None
 
-            let passFields (baseIdent: Fable.Ident) expr =
+            let replaceNewObj makeExpr expr =
                 expr
                 |> visitFromOutsideIn (
                     function
                     | Fable.Value(Fable.NewRecord(args, entRef, genArgs), r) when entRef.FullName = ent.FullName ->
-                        let baseArgs =
-                            baseFields
-                            |> List.map (fun (field, typ) ->
-                                let kind = Fable.FieldInfo.Create(field.Name, typ, field.IsMutable)
-                                Fable.Get(Fable.IdentExpr baseIdent, kind, typ, None)
-                            )
-
-                        Fable.Value(Fable.NewRecord(baseArgs @ args, entRef, genArgs), r) |> Some
+                        makeExpr args entRef genArgs r |> Some
                     | _ -> None
+                )
+
+            let rec isPure expr =
+                match expr with
+                | Fable.Operation((Fable.Binary(_, left, right) | Fable.Logical(_, left, right)), _, _, _) ->
+                    isPure left && isPure right
+                | Fable.Operation(Fable.Unary(_, operand), _, _, _) -> isPure operand
+                | expr -> not (canHaveSideEffects com expr)
+
+            let hasPureOwnFields rest =
+                rest
+                |> deepExists (
+                    function
+                    | Fable.Value(Fable.NewRecord(args, entRef, _), _) when entRef.FullName = ent.FullName ->
+                        not (List.forall isPure args)
+                    | _ -> false
+                )
+                |> not
+
+            let passPrimaryArgs (info: Fable.CallInfo) rest =
+                let args =
+                    if List.isEmpty baseParams then
+                        []
+                    else
+                        info.Args
+
+                let bindings, args =
+                    args
+                    |> List.map (fun arg ->
+                        if canHaveSideEffects com arg then
+                            let ident = getUniqueNameInDeclarationScope ctx "arg" |> makeTypedIdent arg.Type
+                            Some(ident, arg), Fable.IdentExpr ident
+                        else
+                            None, arg
+                    )
+                    |> List.unzip
+
+                let rest =
+                    rest
+                    |> replaceNewObj (fun ownArgs entRef genArgs r ->
+                        Fable.Value(Fable.NewRecord(args @ ownArgs, entRef, genArgs), r)
+                    )
+
+                List.foldBack (fun (ident, value) rest -> Fable.Let(ident, value, rest)) (List.choose id bindings) rest
+
+            let passFields (baseIdent: Fable.Ident) rest =
+                rest
+                |> replaceNewObj (fun ownArgs entRef genArgs r ->
+                    let baseArgs =
+                        baseFields
+                        |> List.map (fun (field, typ) ->
+                            let kind = Fable.FieldInfo.Create(field.Name, typ, field.IsMutable)
+                            Fable.Get(Fable.IdentExpr baseIdent, kind, typ, None)
+                        )
+
+                    Fable.Value(Fable.NewRecord(baseArgs @ ownArgs, entRef, genArgs), r)
+                )
+
+            let adoptBase (baseIdent: Fable.Ident) rest =
+                rest
+                |> replaceNewObj (fun ownArgs entRef genArgs r ->
+                    let fields =
+                        ent.FSharpFields
+                        |> List.filter (fun field -> not field.IsStatic)
+                        |> List.mapi (fun i field ->
+                            let name = field.Name.Replace("\\", "\\\\").Replace("\"", "\\\"")
+                            $"\"%s{name}\": $%i{i + 2}"
+                        )
+                        |> String.concat ", "
+
+                    let classRef = FSharp2Fable.Util.entityIdent com entRef
+
+                    $"Object.assign(Object.setPrototypeOf($0, $1.prototype), {{ %s{fields} }})"
+                    |> emitExpr
+                        r
+                        (Fable.DeclaredType(entRef, genArgs))
+                        (Fable.IdentExpr baseIdent :: classRef :: ownArgs)
                 )
 
             let rec rewrite expr =
                 match expr with
                 | Fable.Let(ident, value, body) -> Fable.Let(ident, value, rewrite body)
                 | Fable.Sequential exprs ->
-                    match List.tryFindIndex isBaseConsCall exprs with
-                    | Some i ->
-                        let baseCall = exprs[i]
+                    let baseConsCall =
+                        exprs
+                        |> List.indexed
+                        |> List.tryPick (fun (i, e) -> tryBaseConsCall e |> Option.map (fun call -> i, call))
 
-                        let baseIdent =
-                            getUniqueNameInDeclarationScope ctx "base" |> makeTypedIdent baseCall.Type
+                    match baseConsCall with
+                    | Some(i, (memb, info)) ->
+                        let baseCall = exprs[i]
 
                         let rest =
                             match List.skip (i + 1) exprs with
                             | [ e ] -> e
                             | rest -> Fable.Sequential rest
 
-                        Fable.Sequential(
-                            List.take i exprs
-                            @ [ Fable.Let(baseIdent, baseCall, passFields baseIdent rest) ]
-                        )
+                        let bindBase build =
+                            let baseIdent =
+                                getUniqueNameInDeclarationScope ctx "base" |> makeTypedIdent baseCall.Type
+
+                            Fable.Let(baseIdent, baseCall, build baseIdent rest)
+
+                        let rest =
+                            if
+                                FSharp2Fable.Util.isPrimaryConstructor memb
+                                && Option.isSome (FSharp2Fable.Util.tryPrimaryBaseType ent)
+                                && hasPureOwnFields rest
+                            then
+                                passPrimaryArgs info rest
+                            elif List.sameLength baseFields baseParams then
+                                bindBase passFields
+                            else
+                                bindBase adoptBase
+
+                        Fable.Sequential(List.take i exprs @ [ rest ])
                     | None ->
                         match List.rev exprs with
                         | last :: init -> Fable.Sequential(List.rev init @ [ rewrite last ])
@@ -4602,23 +4718,33 @@ but thanks to the optimisation done below we get
         let fieldIds = getEntityFieldsAsIdents ent |> List.toArray
         let args = fieldIds |> Array.map identAsExpr
 
-        let baseFields = getExplicitBaseFields com ent
+        let baseParams = getExplicitBaseParams com ent
 
-        let baseFieldIds =
+        let baseParamIds =
             let ownNames = fieldIds |> Array.map _.Name |> set
 
-            baseFields
-            |> List.mapToArray (fun (field, typ) ->
-                let name = sanitizeName field.Name
+            (Set.empty, baseParams)
+            ||> List.mapFold (fun usedNames (name, typ, _) ->
+                let name = sanitizeName name
 
                 let name =
-                    if ownNames.Contains name then
-                        name + "$base"
+                    if ownNames.Contains name || usedNames.Contains name then
+                        Seq.initInfinite (fun i ->
+                            name
+                            + "$base"
+                            + (if i = 0 then
+                                   ""
+                               else
+                                   string<int> i)
+                        )
+                        |> Seq.find (fun name -> not (ownNames.Contains name || usedNames.Contains name))
                     else
                         name
 
-                makeTypedIdent typ name
+                makeTypedIdent typ name, usedNames.Add name
             )
+            |> fst
+            |> List.toArray
 
         let baseExpr =
             if ent.IsFSharpExceptionDeclaration then
@@ -4626,7 +4752,7 @@ but thanks to the optimisation done below we get
             elif ent.IsFSharpRecord || ent.IsValueType then
                 libValue com ctx "Types" "Record" |> SuperExpression |> Some
             else
-                match FSharp2Fable.Util.tryExplicitBaseType ent with
+                match tryExtendedBaseType ent with
                 | Some baseType when com.IsTypeScript ->
                     Fable.DeclaredType(baseType.Entity, baseType.GenericArgs)
                     |> makeTypeAnnotation com ctx
@@ -4643,7 +4769,7 @@ but thanks to the optimisation done below we get
             BlockStatement(
                 [|
                     if Option.isSome baseExpr then
-                        yield baseFieldIds |> Array.map identAsExpr |> Array.toList |> callSuperAsStatement
+                        yield baseParamIds |> Array.map identAsExpr |> Array.toList |> callSuperAsStatement
                     yield!
                         ent.FSharpFields
                         |> List.filter (fun field -> not field.IsStatic)
@@ -4680,20 +4806,21 @@ but thanks to the optimisation done below we get
 
         let baseArgs =
             Array.map2
-                (fun (fi: Fable.Ident) (field: Fable.Field, typ) ->
+                (fun (fi: Fable.Ident) (_, typ, field: Fable.Field option) ->
                     Parameter.parameter (
                         fi.Name,
                         ?typeAnnotation =
                             (if not com.IsTypeScript then
                                  None
-                             elif FSharp2Fable.FsField.IsCurriedField field then
-                                 Some(makeTypeAnnotation com ctx typ)
                              else
-                                 Some(makeFieldAnnotation com ctx typ))
+                                 match field with
+                                 | Some field when not (FSharp2Fable.FsField.IsCurriedField field) ->
+                                     Some(makeFieldAnnotation com ctx typ)
+                                 | _ -> Some(makeTypeAnnotation com ctx typ))
                     )
                 )
-                baseFieldIds
-                (List.toArray baseFields)
+                baseParamIds
+                (List.toArray baseParams)
 
         let args = Array.append baseArgs args
 
@@ -5117,7 +5244,7 @@ but thanks to the optimisation done below we get
                 let decl =
                     match memb.DeclaringEntity with
                     | Some entRef when memb.IsConstructor ->
-                        { decl with Body = passExplicitBaseFields com ctx (com.GetEntity entRef) decl.Body }
+                        { decl with Body = passExplicitBaseArgs com ctx (com.GetEntity entRef) decl.Body }
                     | _ -> decl
 
                 let valueExpr =

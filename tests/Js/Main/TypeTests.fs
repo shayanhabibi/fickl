@@ -796,6 +796,44 @@ type ExplicitDerivedThen =
         { inherit ExplicitDerived(extra); Log = [] }
         then x.Log <- [ x.Name; string x.Value; string x.Extra ]
 
+let mutable primaryBaseLog: string list = []
+
+type PrimaryBase<'T>(name: string, value: 'T) =
+    do primaryBaseLog <- primaryBaseLog @ [ "base " + name ]
+    new(value) = PrimaryBase<'T>("secondary", value)
+    member _.Name = name
+    member _.Value = value
+    member val Count = 0 with get, set
+    abstract Describe: unit -> string
+    default this.Describe() = "base " + this.Name
+
+type ExplicitOverPrimary =
+    inherit PrimaryBase<int>
+    val Extra: int
+    new() = { inherit PrimaryBase<int>("derived", 1); Extra = 5 }
+    new(extra) = { inherit PrimaryBase<int>(extra * 2); Extra = extra }
+
+    new(name: string, extra: int) =
+        {
+            inherit PrimaryBase<int>((primaryBaseLog <- primaryBaseLog @ [ "arg" ]; name), 0)
+            Extra = (primaryBaseLog <- primaryBaseLog @ [ "field" ]; extra)
+        }
+
+    override this.Describe() = "derived " + this.Name
+
+type ExplicitOverExplicitOverPrimary =
+    inherit ExplicitOverPrimary
+    val Flag: bool
+    new() = { inherit ExplicitOverPrimary("leaf", 7); Flag = true }
+
+type UnitPrimaryBase() =
+    member _.Hello = "hello"
+
+type ExplicitOverUnitPrimary =
+    inherit UnitPrimaryBase
+    val mutable Log: string list
+    new(name: string) as x = { inherit UnitPrimaryBase(); Log = [] } then x.Log <- [ name; x.Hello ]
+
 #nowarn "3535" // static abstract interface members
 
 type IAddable<'T when 'T :> IAddable<'T>> =
@@ -1004,6 +1042,29 @@ let tests =
         t.Log |> equal [ "default"; "6"; "3" ]
         box t :? ExplicitDerived |> equal true
         box t :? ExplicitBase<int> |> equal true
+
+    testCase "Explicit classes inheriting classes with a primary constructor keep the base" <| fun () -> // #96
+        let d = ExplicitOverPrimary()
+        (d.Name, d.Value, d.Extra) |> equal ("derived", 1, 5)
+        box d :? PrimaryBase<int> |> equal true
+        d.Describe() |> equal "derived derived"
+        (d :> PrimaryBase<int>).Describe() |> equal "derived derived"
+        d.Count <- 3
+        d.Count |> equal 3
+        let s = ExplicitOverPrimary(4)
+        (s.Name, s.Value, s.Extra) |> equal ("secondary", 8, 4)
+        box s :? ExplicitOverPrimary |> equal true
+        primaryBaseLog <- []
+        let o = ExplicitOverPrimary("order", 2)
+        primaryBaseLog |> equal [ "arg"; "base order"; "field" ]
+        (o.Name, o.Extra) |> equal ("order", 2)
+        let l = ExplicitOverExplicitOverPrimary()
+        (l.Name, l.Extra, l.Flag) |> equal ("leaf", 7, true)
+        box l :? ExplicitOverPrimary |> equal true
+        box l :? PrimaryBase<int> |> equal true
+        l.Describe() |> equal "derived leaf"
+        let u = ExplicitOverUnitPrimary("u")
+        (u.Hello, u.Log) |> equal ("hello", [ "u"; "hello" ])
 
     testCase "Static abstract interface members can be called from inline functions" <| fun () -> // #78
         (addTwoStatic { M = 1 } { M = 2 }).M |> equal 3
