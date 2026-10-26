@@ -5178,6 +5178,46 @@ let private replacedModules =
             "System.Reflection.TypeInfo", types
         ]
 
+let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
+    let expose arity callback =
+        let callback = TypeCast(callback, t)
+
+        if arity > 1 then
+            Extended(Curry(callback, arity), r)
+        else
+            callback
+
+    let literal =
+        match args with
+        | [ Delegate(args, body, name, _) ] -> Some(args, body, name)
+        | [ NestedLambda(args, body, name) ] -> Some(args, body, name)
+        | _ -> None
+
+    match methodName, literal with
+    | "jsFunction", Some(args, body, name) ->
+        Delegate(args, body, name, [ "not-arrow"; "fickl-js-function" ])
+        |> expose args.Length
+        |> Some
+    | "withThis", Some(receiver :: args, body, name) when not args.IsEmpty ->
+        // Keep a local capture when an inner ordinary function uses the outer receiver.
+        let capture = { receiver with IsMutable = true }
+        let body = Let(capture, Value(ThisValue receiver.Type, r), body)
+
+        let receiver =
+            { receiver with
+                Name = "this"
+                IsThisArgument = true
+            }
+
+        Delegate(receiver :: args, body, name, [ "not-arrow"; "fickl-this-function" ])
+        |> expose args.Length
+        |> Some
+    | ("jsFunction" | "withThis"), _ ->
+        $"{methodName} requires a literal lambda with its declared arguments"
+        |> addErrorAndReturnNull com ctx.InlinePath r
+        |> Some
+    | _ -> None
+
 let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match info.DeclaringEntityFullName with
     | Patterns.DicContains replacedModules replacement -> replacement com ctx r t info thisArg args
@@ -5185,6 +5225,7 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | Types.printfModule
     | Naming.StartsWith Types.printfFormat _ -> fsFormat com ctx r t info thisArg args
     | Naming.StartsWith "Fable.Core." _ -> fableCoreLib com ctx r t info thisArg args
+    | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
     | Naming.EndsWith "Exception" _ -> exceptions com ctx r t info thisArg args
     | "System.Timers.ElapsedEventArgs" -> thisArg // only signalTime is available here
     | Naming.StartsWith "System.Tuple" _

@@ -15,6 +15,32 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "Native function helpers reject callbacks whose bodies are unavailable" <| fun _ ->
+      compile """
+open Fickl.Core.JsInterop
+let convert (callback: int -> int) = jsFunction callback
+"""
+      |> Assert.Exists.errorWith "jsFunction requires a literal lambda"
+      |> ignore
+
+    testCase "Native typed function helpers reject callbacks whose bodies are unavailable" <| fun _ ->
+      compile """
+open Fickl.Core.JsInterop
+let convert (callback: obj -> int -> int) = withThis callback
+"""
+      |> Assert.Exists.errorWith "withThis requires a literal lambda"
+      |> ignore
+
+    testCase "Native callback parameters reject callbacks whose bodies are unavailable" <| fun _ ->
+      compile """
+open Fable.Core
+[<Emit("$0(1)")>]
+let invoke ([<Fickl.Core.JsFunction>] callback: int -> int) : int = nativeOnly
+let convert (callback: int -> int) = invoke callback
+"""
+      |> Assert.Exists.errorWith "JsFunction parameters require a literal lambda"
+      |> ignore
+
     testCase "A member the runtime library does not implement is reported as unsupported" <| fun _ -> // #48
       compile """
 let f () = System.Text.StringBuilder("b").Insert(0, "a").ToString()
