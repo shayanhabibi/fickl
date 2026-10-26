@@ -847,6 +847,8 @@ let benchmark =
                                     ]
                                 |> Some
 
+                        // --report measures nothing, so nothing else has created it on the CI job that draws the charts
+                        Directory.CreateDirectory benchDir |> ignore
                         File.WriteAllText(Path.Combine(benchDir, "results.tsv"), tsv)
                         File.WriteAllText(Path.Combine(benchDir, "chart.svg"), svg)
                         File.WriteAllText(Path.Combine(benchDir, "watch.tsv"), watchTsv)
