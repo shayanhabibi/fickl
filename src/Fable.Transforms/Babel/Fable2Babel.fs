@@ -4788,6 +4788,7 @@ but thanks to the optimisation done below we get
         |> Seq.filter (fun memb ->
             memb.IsDispatchSlot
             && not (memb.IsProperty)
+            && memb.IsInstance
             // TODO: Deal with other emit attributes like EmitMethod or EmitConstructor
             && not (hasAttribute Atts.emitAttr memb.Attributes)
             && not (Set.contains (getMangledMemberName ent memb) memberImplNames)
@@ -4899,6 +4900,8 @@ but thanks to the optimisation done below we get
             ent.MembersFunctionsAndValues
             |> Seq.filter (fun memb ->
                 not (memb.IsProperty)
+                // Static abstract members are not part of an instance's shape, see #78
+                && memb.IsInstance
                 // TODO: Deal with other emit attributes like EmitMethod or EmitConstructor
                 && not (hasAttribute Atts.emitAttr memb.Attributes)
             )

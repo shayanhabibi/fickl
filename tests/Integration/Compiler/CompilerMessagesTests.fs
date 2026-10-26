@@ -29,6 +29,15 @@ let f () = System.Text.StringBuilder("b").Append("c").AppendLine("d").ToString()
       |> Assert.Is.strictSuccess
       |> ignore
 
+    testCase "A static abstract member called from non-inline generic code is reported" <| fun _ -> // #78
+      compile """
+type IAdd<'T when 'T :> IAdd<'T>> =
+    static abstract Add: 'T * 'T -> 'T
+let addGeneric<'T when 'T :> IAdd<'T>> (a: 'T) (b: 'T) = 'T.Add(a, b)
+"""
+      |> Assert.Exists.errorWith "Static abstract member Add of IAdd can only be called where the type is known"
+      |> ignore
+
     testCase "CallableInterface rejects added members on a callable base" <| fun _ ->
       compile """
 open Fickl.Core
