@@ -2,6 +2,13 @@ namespace Fickl.Core
 
 open System
 
+/// <summary>Emits a module function returning jsAsyncGenerator as a native async generator function.</summary>
+/// <remarks>The return type specifies yielded, terminal, and sent values. Supports JavaScript and TypeScript.</remarks>
+[<AttributeUsage(AttributeTargets.Method)>]
+type AsyncGeneratorFunctionAttribute() =
+    inherit Attribute()
+
+
 /// <summary>Emits a module function returning <c>jsGenerator</c> as a native JavaScript generator function.</summary>
 /// <remarks>Supports JavaScript and TypeScript. The return type specifies yielded, terminal, and sent values.</remarks>
 [<AttributeUsage(AttributeTargets.Method)>]

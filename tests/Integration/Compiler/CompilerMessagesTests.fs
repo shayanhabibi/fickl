@@ -15,6 +15,63 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "Native async generators reject promise-valued yields" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+let invalid () = jsAsyncGenerator { yield JS.Constructors.Promise.resolve(42) }
+"""
+      |> Assert.Exists.errorWith "Async generator yield and terminal types must be resolved values"
+      |> ignore
+
+    testCase "Native async generators reject promise-valued terminal results" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+[<AsyncGeneratorFunction>]
+let invalid () : JsAsyncGenerator<int, JS.Promise<int>, unit> = jsAsyncGenerator { return JS.Constructors.Promise.resolve(42) }
+"""
+      |> Assert.Exists.errorWith "Async generator yield and terminal types must be resolved values"
+      |> ignore
+
+    testCase "Native async generator attributes require a native computation" <| fun _ ->
+      compile """
+open Fickl.Core
+[<AsyncGeneratorFunction>]
+let invalid () = seq { yield 1 }
+"""
+      |> Assert.Exists.errorWith "AsyncGeneratorFunction requires a jsAsyncGenerator computation"
+      |> ignore
+
+    testCase "Native async generator attributes reject class methods" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid() =
+    [<AsyncGeneratorFunction>]
+    member _.Run() : JsAsyncGenerator<int, string, unit> = jsAsyncGenerator { return "done" }
+"""
+      |> Assert.Exists.errorWith "AsyncGeneratorFunction is only supported on module functions"
+      |> ignore
+
+    testCase "Native async generators validate disposable resources" <| fun _ ->
+      compile """
+open Fickl.Core
+let invalid () = jsAsyncGenerator {
+    use resource = 42
+    yield resource
+}
+"""
+      |> Assert.Exists.errorWith "jsAsyncGenerator.use requires IDisposable, IAsyncDisposable, or JsAsyncDisposable"
+      |> ignore
+
+    testCase "Native async generator control cannot escape its computation" <| fun _ ->
+      compile """
+open Fickl.Core
+let invalid () = jsAsyncGenerator.Yield(42)
+"""
+      |> Assert.Exists.errorWith "Native yields and returns must be inside a jsGenerator computation"
+      |> ignore
+
     testCase "Native generator attributes require a native computation" <| fun _ ->
       compile """
 open Fickl.Core
