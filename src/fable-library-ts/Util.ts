@@ -119,6 +119,108 @@ export function isPromise(x: any) {
   return x instanceof Promise;
 }
 
+/** Rejects opaque thenable payloads before native async resolution can change their value or type.
+ * Payloads must keep their then property stable until native resolution, which can read an accessor again.
+ */
+export function ensureResolvedAsyncValue<T>(value: T): T {
+  if (value != null && (typeof value === "object" || typeof value === "function")
+    && typeof (value as { then?: unknown }).then === "function") {
+    throw new TypeError("Native async payloads must be resolved values; await promises before yielding or returning");
+  }
+  return value;
+}
+
+/** Checks delegated payloads before native async iteration adopts them, preserving the iterator protocol. */
+export function ensureResolvedAsyncIterable<T>(source: Iterable<T> | AsyncIterable<T>, checkReturn: boolean): AsyncIterable<T> {
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<T, unknown, unknown> {
+      const asyncMethod = (source as AsyncIterable<T>)[Symbol.asyncIterator];
+      const isAsync = asyncMethod != null;
+      const method = isAsync ? asyncMethod : (source as Iterable<T>)[Symbol.iterator];
+      const iterator = Reflect.apply(method, source, []) as Iterator<T, unknown, unknown> | AsyncIterator<T, unknown, unknown>;
+      const isObject = (value: unknown): value is object => value != null && (typeof value === "object" || typeof value === "function");
+      if (!isObject(iterator)) {
+        throw new TypeError("Iterator must be an object");
+      }
+      const next = iterator.next;
+
+      const closeAfterFailure = async (): Promise<void> => {
+        const close = iterator.return;
+        if (close != null) {
+          const raw = Reflect.apply(close, iterator, []);
+          const result = isAsync ? await raw : raw;
+          if (!isObject(result)) {
+            throw new TypeError("Iterator result must be an object");
+          }
+        }
+      };
+
+      const invoke = async (method: Function, args: unknown[], closeSyncOnFailure: boolean): Promise<IteratorResult<T, unknown>> => {
+        let done = false;
+        let validationFailed = false;
+        try {
+          const raw = Reflect.apply(method, iterator, args);
+          const result = isAsync ? await raw : raw;
+          if (!isObject(result)) {
+            throw new TypeError("Iterator result must be an object");
+          }
+          done = Boolean((result as IteratorResult<T, unknown>).done);
+          let value = (result as IteratorResult<T, unknown>).value;
+          if (!done || checkReturn) {
+            try {
+              ensureResolvedAsyncValue(value);
+            } catch (error) {
+              validationFailed = true;
+              throw error;
+            }
+          }
+          if (!isAsync) {
+            value = await value;
+          }
+          return done ? { done: true, value } : { done: false, value: value as T };
+        } catch (error) {
+          // Async-from-sync next/throw close on abrupt completion; async next failures do not.
+          // Our terminal validation runs after completion and must not close an already finished source.
+          if (validationFailed ? !done : !isAsync && closeSyncOnFailure) {
+            try {
+              await closeAfterFailure();
+            } catch {
+              // IteratorClose preserves the original abrupt completion when cleanup also fails.
+            }
+          }
+          throw error;
+        }
+      };
+
+      return {
+        next: (...args: [] | [unknown]) => invoke(next, args, true),
+        get return() {
+          const close = iterator.return;
+          return close == null ? undefined : (...args: unknown[]) => invoke(close, args, false);
+        },
+        get throw() {
+          const raise = iterator.throw;
+          if (raise != null) {
+            return (...args: unknown[]) => invoke(raise, args, true);
+          }
+          return async () => {
+            // Missing throw closes without inspecting the close result's done or value properties.
+            const close = iterator.return;
+            if (close != null) {
+              const raw = Reflect.apply(close, iterator, []);
+              const result = isAsync ? await raw : raw;
+              if (!isObject(result)) {
+                throw new TypeError("Iterator result must be an object");
+              }
+            }
+            throw new TypeError("Iterator does not provide a throw method");
+          };
+        },
+      };
+    },
+  };
+}
+
 export function ensureErrorOrException(e: any): any {
   // Exceptionally admitting promises as errors for compatibility with React.suspense (see #3298)
   return (isException(e) || isPromise(e)) ? e : new Exception(String(e));

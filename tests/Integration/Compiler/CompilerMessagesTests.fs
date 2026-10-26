@@ -15,6 +15,108 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "Native async payload validation rejects generic yielded promises" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+let factory<'T> (value: 'T) : JsAsyncGenerator<'T, unit, unit> = jsAsyncGenerator { yield value }
+let invalid () = factory (JS.Constructors.Promise.resolve(42))
+"""
+      |> Assert.Exists.errorWith "Async generator yield and terminal types must be resolved values"
+      |> ignore
+
+    testCase "Native async payload validation rejects generic terminal promises across files" <| fun _ ->
+      let library = """
+module Library
+open Fickl.Core
+let factory<'T> (value: 'T) : JsAsyncGenerator<int, 'T, unit> = jsAsyncGenerator { return value }
+"""
+      let source = """
+open Fable.Core
+let invalid () = Library.factory (JS.Constructors.Promise.resolve(42))
+"""
+      compileWithLibrary library source
+      |> Assert.Exists.errorWith "Async generator yield and terminal types must be resolved values"
+      |> ignore
+
+    testCase "Native async payload validation rejects nested promises in direct computations" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+let invalid () = jsAsync { return JS.Constructors.Promise.resolve(42) }
+"""
+      |> Assert.Exists.errorWith "Native async computations must return resolved values"
+      |> ignore
+
+    testCase "Native async payload validation rejects generic native async exports" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+[<AsyncFunction>]
+let factory<'T> (value: 'T) = jsAsync { return value }
+let invalid () = factory (JS.Constructors.Promise.resolve(42))
+"""
+      |> Assert.Exists.errorWith "Native async computations must return resolved values"
+      |> ignore
+
+    testCase "Native async payload validation rejects unannotated factories across files" <| fun _ ->
+      let library = """
+module Library
+open Fickl.Core
+let factory<'T> (value: 'T) = jsAsync { return value }
+"""
+      let source = """
+open Fable.Core
+let invalid () = Library.factory (JS.Constructors.Promise.resolve(42))
+"""
+      compileWithLibrary library source
+      |> Assert.Exists.errorWith "Native async computations must return resolved values"
+      |> ignore
+
+    testCase "Native async payload validation preserves promised sent inputs" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+let factory () : JsAsyncGenerator<int, int, JS.Promise<int>> = jsAsyncGenerator {
+    let! (response: JS.Promise<int>) = jsYield 1
+    let! value = response
+    return value
+}
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
+    testCase "Native async payload validation preserves unrelated Promise APIs" <| fun _ ->
+      compile """
+open Fable.Core
+open Fable.Core.JsInterop
+open Fickl.Core
+let unrelated (value: JS.Promise<JS.Promise<int>>) =
+    let unused () = jsAsync { return 42 }
+    emitJsExpr<JS.Promise<JS.Promise<int>>> (value, unused) "$0"
+let callUnrelated value = unrelated value
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
+    testCase "Native async payload validation rejects mixed native factory branches" <| fun _ ->
+      let library = """
+module Library
+open Fable.Core
+open Fable.Core.JsInterop
+open Fickl.Core
+let factory<'T> choose (value: 'T) : JS.Promise<'T> =
+    if choose then jsAsync { return value }
+    else emitJsExpr<JS.Promise<'T>> () "new Promise(() => {})"
+"""
+      let source = """
+open Fable.Core
+let invalid () = Library.factory true (JS.Constructors.Promise.resolve(42))
+"""
+      compileWithLibrary library source
+      |> Assert.Exists.errorWith "Native async computations must return resolved values"
+      |> ignore
+
     testCase "Native decorators reject mixed property and accessor placements" <| fun _ ->
       compile """
 open Fickl.Core

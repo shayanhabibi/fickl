@@ -52,11 +52,47 @@ let private expressionBind<'T> (promise: JS.Promise<'T>) : JS.Promise<'T> = jsAs
     return value
 }
 let private expressionReturnFrom<'T> (promise: JS.Promise<'T>) : JS.Promise<'T> = jsAsync { return! promise }
+
+let private higherOrderNativeAsync<'T> () = fun (value: 'T) -> jsAsync { return value }
+[<Emit("$0($1)")>]
+let private invokeNativeAsync (callback: 'T -> JS.Promise<'T>) (value: 'T) : JS.Promise<'T> = Fable.Core.Util.nativeOnly
 #endif
 
 let tests =
     testList "NativeAsync" [
 #if FABLE_COMPILER
+        testCaseAsync "native async never silently unwraps a Promise stored in an option" <| fun () -> async {
+            let payload = JS.Constructors.Promise.resolve(42)
+            let computation = jsAsync { return Some payload }
+            let! preservedOrRejected = async {
+                try
+                    let! result = computation |> Async.AwaitPromise
+                    match result with
+                    | Some value -> return emitJsExpr<bool> (value, payload) "$0 === $1"
+                    | None -> return false
+                with error -> return error.Message.Contains("resolved")
+            }
+            preservedOrRejected |> equal true
+            let! plain = jsAsync { return Some 42 } |> Async.AwaitPromise
+            plain |> equal (Some 42)
+            let! boxed = jsAsync { return {| Payload = payload |} } |> Async.AwaitPromise
+            emitJsExpr<bool> (boxed.Payload, payload) "$0 === $1" |> equal true
+            let! callback = jsAsync { return fun first second -> first + second } |> Async.AwaitPromise
+            callback 20 22 |> equal 42
+        }
+
+        testCaseAsync "generic native async bodies reject hidden Promise payloads" <| fun () -> async {
+            let payload = JS.Constructors.Promise.resolve(42)
+            let nested = invokeNativeAsync (higherOrderNativeAsync<obj>()) (box payload)
+            let! rejected = async {
+                try
+                    let! _ = nested |> Async.AwaitPromise
+                    return false
+                with error -> return error.Message.Contains("resolved")
+            }
+            rejected |> equal true
+        }
+
         testCaseAsync "generic native async expressions retain scalar and collection types" <| fun () -> async {
             let! scalar = expressionIdentity "value" |> Async.AwaitPromise
             scalar |> equal "value"

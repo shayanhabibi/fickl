@@ -202,3 +202,42 @@ let tests =
 
         if failures.Count > 0 then
             failtest (String.concat (System.Environment.NewLine + System.Environment.NewLine) failures)
+
+/// <summary>Rechecks payload diagnostics when a factory body changes without changing its public signature.</summary>
+let nativeAsyncPayloadTests =
+    testCase "Native async payload diagnostics follow body-only edits" <| fun () ->
+        let dir = Path.Combine(Path.GetTempPath(), "fickl-native-async-watch-" + System.Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        let coreProject = Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "../../../src/Fickl.Core/Fickl.Core.fsproj"))
+        let project = Path.Combine(dir, "watch.fsproj")
+        File.WriteAllText(project, $"""<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup><Compile Include="Library.fs"/><Compile Include="Program.fs"/></ItemGroup>
+  <ItemGroup><ProjectReference Include="{System.Security.SecurityElement.Escape coreProject}"/></ItemGroup>
+</Project>""")
+        let libraryFile = Path.Combine(dir, "Library.fs")
+        let opaqueSource =
+            String.concat "\n" [
+                "module Library"
+                "open Fable.Core"
+                "open Fable.Core.JsInterop"
+                "open Fickl.Core"
+                "let factory<'T> (value: 'T) : JS.Promise<'T> = emitJsExpr value \"Promise.resolve($0)\""
+            ]
+        let nativeSource = opaqueSource.Replace("emitJsExpr value \"Promise.resolve($0)\"", "jsAsync { return value }")
+        File.WriteAllText(libraryFile, opaqueSource)
+        File.WriteAllText(Path.Combine(dir, "Program.fs"), String.concat "\n" [
+            "module Consumer"
+            "open Fable.Core"
+            "let invalid () = Library.factory (JS.Constructors.Promise.resolve(42))"
+        ])
+        let logger = CapturingLogger()
+        let compile () =
+            Fable.Cli.Entry.serverRequest logger
+                [| project; "--outDir"; Path.Combine(dir, "out"); "--exclude"; "Fable.Core" |]
+        Expect.equal (compile ()) 0 $"Opaque API compilation failed: {logger.Take()}"
+        File.WriteAllText(libraryFile, nativeSource)
+        Expect.equal (compile ()) 1 "A native factory must reject its consumer's nested Promise payload after a body-only edit"
+        Expect.stringContains (logger.Take()) "Native async computations must return resolved values" "Expected the payload diagnostic"
+        File.WriteAllText(libraryFile, opaqueSource)
+        Expect.equal (compile ()) 0 $"The diagnostic did not recover after restoring the opaque API: {logger.Take()}"

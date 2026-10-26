@@ -25,9 +25,9 @@ type JsAsyncGenerator<'Yield, 'Return, 'Next> =
 type JsAsyncGeneratorCode<'Yield, 'Return, 'Next> = interface end
 
 /// <summary>Builds native JavaScript async generator bodies.</summary>
-/// <remarks>Use through <c>jsAsyncGenerator</c>. Execution starts on the first <c>next</c> call.
-/// A <c>let!</c> binding awaits a Promise; bind <c>jsYield value</c> to receive a value from the next call.
-/// Await promises before yielding or returning; yield and terminal types describe resolved values.</remarks>
+/// <remarks>Use <c>jsAsyncGenerator</c>. Execution starts on the first <c>next</c> call; <c>let!</c> awaits Promises.
+/// Bind <c>jsYield value</c> to receive the next sent value. Yield and return resolved values; opaque top-level thenables fail validation.
+/// Wrap Promise data in a record. Interop payloads must keep their <c>then</c> property stable through validation and native resolution.</remarks>
 type JsAsyncGeneratorBuilder<'Yield, 'Return, 'Next>() =
     /// <summary>Yields a value to the caller.</summary>
     member _.Yield(value: 'Yield) : JsAsyncGeneratorCode<'Yield, 'Return, 'Next> = nativeOnly

@@ -5259,6 +5259,30 @@ let rec private isNativeAsyncResource (com: ICompiler) typ =
         )
     | _ -> false
 
+let private isResolvedAsyncPrimitive =
+    function
+    | Unit
+    | Boolean
+    | Char
+    | String
+    | Number _ -> true
+    | _ -> false
+
+let private resolvedAsyncPayload (com: ICompiler) r (value: Expr) =
+    if isResolvedAsyncPrimitive value.Type then
+        value
+    else
+        Helper.LibCall(
+            com,
+            "Util",
+            "ensureResolvedAsyncValue",
+            value.Type,
+            [ value ],
+            [ Any ],
+            genArgs = [ value.Type ],
+            ?loc = r
+        )
+
 let private nativeGenerator isAsync (com: ICompiler) (ctx: Context) r t (info: CallInfo) args =
     let code =
         function
@@ -5285,12 +5309,48 @@ let private nativeGenerator isAsync (com: ICompiler) (ctx: Context) r t (info: C
         | expression -> expression
 
     let yieldValue typ value =
+        let value =
+            if isAsync then
+                resolvedAsyncPayload com r value
+            else
+                value
+
         marked "fickl-native-yield" typ false [ value ] "yield $0"
 
-    let yieldAll typ value =
+    let yieldAll checkReturn typ (value: Expr) =
+        let yieldType, returnType =
+            match t with
+            | DeclaredType(_, [ yieldType; returnType; _ ]) -> yieldType, returnType
+            | _ -> Any, Any
+
+        let value =
+            if
+                isAsync
+                && (not (isResolvedAsyncPrimitive yieldType)
+                    || (checkReturn && not (isResolvedAsyncPrimitive returnType)))
+            then
+                Helper.LibCall(
+                    com,
+                    "Util",
+                    "ensureResolvedAsyncIterable",
+                    value.Type,
+                    [ value; makeBoolConst checkReturn ],
+                    [ Any; Boolean ],
+                    genArgs = [ yieldType ],
+                    ?loc = r
+                )
+            else
+                value
+
         marked "fickl-native-yield" typ false [ value ] "yield* $0"
 
     let returnValue value =
+        let value =
+            if isAsync then
+                resolvedAsyncPayload com r value
+            else
+                value
+
         marked "fickl-generator-return" Unit true [ value ] "return $0"
 
     let returnType =
@@ -5303,9 +5363,11 @@ let private nativeGenerator isAsync (com: ICompiler) (ctx: Context) r t (info: C
     | ("jsGenerator" | "get_jsGenerator" | "jsAsyncGenerator" | "get_jsAsyncGenerator" | ".ctor"),
       ([] | [ Value(UnitConstant, _) ]) -> Value(Null t, r) |> Some
     | "Yield", [ value ] -> yieldValue Unit value |> Some
-    | "YieldFrom", [ values ] -> yieldAll Unit values |> Some
+    | "YieldFrom", [ values ] -> yieldAll false Unit values |> Some
     | "Return", [ value ] -> returnValue value |> Some
-    | "ReturnFrom", [ generator ] -> yieldAll returnType generator |> returnValue |> Some
+    | "ReturnFrom", [ generator ] ->
+        marked "fickl-generator-return" Unit true [ yieldAll true returnType generator ] "return $0"
+        |> Some
     | "Bind", [ value; Body(arg, body) ] ->
         let isYieldRequest =
             match value.Type with
@@ -5316,7 +5378,12 @@ let private nativeGenerator isAsync (com: ICompiler) (ctx: Context) r t (info: C
             if isAsync && not isYieldRequest then
                 marked "fickl-native-await" arg.Type false [ value ] "await $0"
             else
-                yieldValue arg.Type value
+                let payload =
+                    match value with
+                    | TypeCast(payload, _) when isYieldRequest -> payload
+                    | _ -> value
+
+                yieldValue arg.Type payload
 
         Let(arg, binding, body) |> Some
     | "Zero", ([] | [ Value(UnitConstant, _) ]) -> Value(UnitConstant, r) |> Some
@@ -5418,7 +5485,7 @@ let private nativeAsync (com: ICompiler) (ctx: Context) r t (info: CallInfo) arg
 
     match info.CompiledName, args with
     | ("jsAsync" | "get_jsAsync" | ".ctor"), [] -> Value(Null t, r) |> Some
-    | "Return", [ value ] -> Some value
+    | "Return", [ value ] -> resolvedAsyncPayload com r value |> Some
     | "ReturnFrom", [ promise ] -> awaitPromise (genArg com ctx r 0 info.GenericArgs) promise |> Some
     | "Bind", [ promise; Body(arg, body) ] -> Let(arg, awaitPromise arg.Type promise, body) |> Some
     | "Zero", ([] | [ Value(UnitConstant, _) ]) -> Some unitValue
@@ -5427,7 +5494,8 @@ let private nativeAsync (com: ICompiler) (ctx: Context) r t (info: CallInfo) arg
         let callback =
             Delegate([], code body, None, [ "not-arrow"; "fickl-async-function" ])
 
-        Call(callback, makeCallInfo None [] [], t, r) |> Some
+        let callInfo = { makeCallInfo None [] [] with Tags = [ "fickl-async-run" ] }
+        Call(callback, callInfo, t, r) |> Some
     | "Combine", [ first; second ] -> Sequential [ code first; code second ] |> Some
     | "While", [ Body(_, guard); body ] -> WhileLoop(guard, code body, r) |> Some
     | "TryWith", [ body; Body(error, handler) ] -> TryCatch(code body, Some(error, handler), None, r) |> Some
