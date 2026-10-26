@@ -118,6 +118,121 @@ module Enumerator =
 
         fromFunctions current next dispose
 
+#if FABLE_COMPILER_TYPESCRIPT || FABLE_COMPILER_JAVASCRIPT
+    /// The enumerator of a concatenation. A source that is itself a concatenation not yet enumerated gives its
+    /// sources to this one instead of being nested in it, so `yield!` recursion and chains of Seq.append keep a
+    /// constant stack depth (as .NET's sequence expressions do), see #68
+    [<Sealed>]
+    type ConcatEnumerator<'T>(openSources: unit -> IEnumerator<IEnumerator<'T>>) =
+        let mutable pending = Some openSources
+        let mutable stack: IEnumerator<IEnumerator<'T>> list = []
+        let mutable innerOpt: IEnumerator<'T> option = None
+        let mutable started = false
+        let mutable finished = false
+        let mutable curr = None
+
+        let finish () =
+            finished <- true
+
+            try
+                match innerOpt with
+                | None -> ()
+                | Some inner ->
+                    try
+                        inner.Dispose()
+                    finally
+                        innerOpt <- None
+            finally
+                let sources = stack
+                stack <- []
+
+                for outer in sources do
+                    outer.Dispose()
+
+        /// The sources of an enumerator nobody has moved yet, for a concatenation that enumerates it
+        member _.TryTakeSources() =
+            if started then
+                None
+            else
+                started <- true
+                finished <- true
+                let sources = pending
+                pending <- None
+                sources
+
+        interface IEnumerator<'T> with
+            member _.Current =
+                if not started then
+                    notStarted ()
+                elif finished then
+                    alreadyFinished ()
+
+                match curr with
+                | None -> alreadyFinished ()
+                | Some x -> x
+
+        interface System.Collections.IEnumerator with
+            member this.Current = box (this :> IEnumerator<'T>).Current
+
+            member _.MoveNext() =
+                started <- true
+
+                if finished then
+                    false
+                else
+                    let mutable res = None
+
+                    while Option.isNone res do
+                        match innerOpt, pending, stack with
+                        | Some inner, _, _ ->
+                            if inner.MoveNext() then
+                                curr <- Some inner.Current
+                                res <- Some true
+                            else
+                                try
+                                    inner.Dispose()
+                                finally
+                                    innerOpt <- None
+                        | None, Some openSources, _ ->
+                            pending <- None
+                            stack <- openSources () :: stack
+                        | None, None, outer :: rest ->
+                            if outer.MoveNext() then
+                                match outer.Current with
+                                | :? ConcatEnumerator<'T> as nested ->
+                                    match nested.TryTakeSources() with
+                                    | Some openNested -> stack <- openNested () :: stack
+                                    | None -> innerOpt <- Some(nested :> IEnumerator<'T>)
+                                | inner -> innerOpt <- Some inner
+                            else
+                                try
+                                    outer.Dispose()
+                                finally
+                                    stack <- rest
+                        | None, None, [] ->
+                            finish ()
+                            res <- Some false
+
+                    res.Value
+
+            member _.Reset() = noReset ()
+
+        interface System.IDisposable with
+            member _.Dispose() =
+                if not finished then
+                    finish ()
+
+    let concat<'T, 'U when 'U :> seq<'T>> (sources: seq<'U>) : IEnumerator<'T> =
+        new ConcatEnumerator<'T>(fun () ->
+            let outer = sources.GetEnumerator()
+
+            fromFunctions
+                (fun () -> outer.Current.GetEnumerator())
+                (fun () -> outer.MoveNext())
+                (fun () -> outer.Dispose())
+        )
+        :> IEnumerator<'T>
+#else
     let concat<'T, 'U when 'U :> seq<'T>> (sources: seq<'U>) =
         let mutable outerOpt: IEnumerator<'U> option = None
         let mutable innerOpt: IEnumerator<'T> option = None
@@ -193,6 +308,8 @@ module Enumerator =
                 finish ()
 
         fromFunctions current next dispose
+
+#endif
 
     let enumerateThenFinally f (e: IEnumerator<'T>) : IEnumerator<'T> =
         let current () = e.Current
