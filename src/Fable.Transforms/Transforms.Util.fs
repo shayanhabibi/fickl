@@ -124,6 +124,8 @@ module Atts =
     let ficklAsyncFunction = "Fickl.Core.AsyncFunctionAttribute"
 
     [<Literal>]
+    let ficklSymbolKey = "Fickl.Core.SymbolKeyAttribute"
+
     let ficklAsyncGeneratorFunction = "Fickl.Core.AsyncGeneratorFunctionAttribute"
 
     let ficklGeneratorFunction = "Fickl.Core.GeneratorFunctionAttribute"

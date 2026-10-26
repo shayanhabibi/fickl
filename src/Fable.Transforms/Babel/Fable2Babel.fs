@@ -51,6 +51,8 @@ type Context =
         ForcedIdents: Set<string>
         IsNativeAsync: bool
         NativeGeneratorType: Fable.Type option
+        /// <summary>Caches resolved symbol access keys within one emitted module.</summary>
+        SymbolAccessCache: Dictionary<string, Expression option>
     }
 
 type ModuleDecl(name, ?isPublic, ?isMutable, ?typ, ?doc) =
@@ -64,6 +66,10 @@ type IBabelCompiler =
     inherit Compiler
     abstract IsTypeScript: bool
     abstract GetAllImports: unit -> Import seq
+    /// <summary>Resolves a symbol key, preserving imported and cross-file unique-symbol identity.</summary>
+    abstract GetSymbolKey: Context * expression: string * path: string * sourceFile: string option -> Expression
+    /// <summary>Returns generated symbol bindings to emit before declarations that reference them.</summary>
+    abstract GetSymbolDeclarations: unit -> ModuleDeclaration list
 
     abstract GetImportExpr:
         Context * selector: string * path: string * range: SourceLocation option * ?noMangle: bool -> Expression
@@ -162,6 +168,131 @@ module Lib =
         | "__proto__" -> memberName + "$"
         | _ -> memberName
 
+module private SymbolKeys =
+    let isWellKnownMember name (memberInfo: Fable.MemberFunctionOrValue) =
+        memberInfo.Attributes
+        |> Seq.exists (fun att ->
+            att.Entity.FullName = Atts.ficklSymbolKey
+            && (
+                match att.ConstructorArgs with
+                | (:? string as expression) :: rest ->
+                    expression.Trim() = name
+                    && (rest
+                        |> List.forall (
+                            function
+                            | :? string as path -> String.IsNullOrEmpty path
+                            | _ -> false
+                        ))
+                | _ -> false
+            )
+        )
+
+    let private expression (com: IBabelCompiler) ctx sourceFile (att: Fable.Attribute) =
+        match att.ConstructorArgs with
+        | (:? string as expression) :: rest ->
+            let path =
+                match rest with
+                | (:? string as path) :: _ -> path
+                | _ -> ""
+
+            com.GetSymbolKey(ctx, expression, path, sourceFile)
+        | _ ->
+            addError com [] None "SymbolKey requires a symbol expression"
+            Expression.nullLiteral ()
+
+    let tryMember (com: IBabelCompiler) ctx (memberInfo: Fable.MemberFunctionOrValue) =
+        memberInfo.Attributes
+        |> Seq.tryFind (fun att -> att.Entity.FullName = Atts.ficklSymbolKey)
+        |> Option.map (expression com ctx (memberInfo.DeclaringEntity |> Option.bind _.SourcePath))
+
+    let tryField com ctx field =
+        FSharp2Fable.FsField.TrySymbolKey field
+        |> Option.map (fun (att, file) -> expression com ctx (Some file) att)
+
+    let memberKey com ctx info name =
+        match tryMember com ctx info with
+        | Some key -> key, true
+        | None -> Util.memberFromName name
+
+    let attachedKey (com: IBabelCompiler) ctx info (memb: Fable.MemberDecl) =
+        let key =
+            memb.ImplementedSignatureRef
+            |> Option.bind com.TryGetMember
+            |> Option.bind (tryMember com ctx)
+
+        match key with
+        | Some key -> key, true
+        | None -> memberKey com ctx info memb.Name
+
+    let fieldKey com ctx field =
+        match tryField com ctx field with
+        | Some key -> key, true
+        | None -> Util.memberFromName field.Name
+
+    let fieldAccess com ctx range field target =
+        match tryField com ctx field with
+        | Some key -> Expression.memberExpression (target, key, true, ?loc = range)
+        | None -> Util.get range target field.Name
+
+    let tryAccessKey (com: IBabelCompiler) (ctx: Context) typ name =
+        let rec loop visited typ =
+            match typ with
+            | Fable.DeclaredType(entRef, _) when not (Set.contains entRef.FullName visited) ->
+                let visited = Set.add entRef.FullName visited
+                let ent = com.GetEntity entRef
+
+                (ent.FSharpFields
+                 |> List.tryPick (fun field ->
+                     if field.Name = name then
+                         tryField com ctx field
+                     else
+                         None
+                 ))
+                |> Option.orElseWith (fun () ->
+                    ent.MembersFunctionsAndValues
+                    |> Seq.tryPick (fun memberInfo ->
+                        if memberInfo.CompiledName = name || memberInfo.DisplayName = name then
+                            tryMember com ctx memberInfo
+                        else
+                            None
+                    )
+                )
+                |> Option.orElseWith (fun () ->
+                    ent.BaseType
+                    |> Option.bind (fun baseType ->
+                        loop visited (Fable.DeclaredType(baseType.Entity, baseType.GenericArgs))
+                    )
+                )
+                |> Option.orElseWith (fun () ->
+                    ent.AllInterfaces
+                    |> Seq.tryPick (fun ifc -> loop visited (Fable.DeclaredType(ifc.Entity, ifc.GenericArgs)))
+                )
+            | Fable.GenericParam(_, _, constraints) ->
+                constraints
+                |> List.tryPick (
+                    function
+                    | Fable.Constraint.CoercesTo typ -> loop visited typ
+                    | _ -> None
+                )
+            | _ -> None
+
+        match typ with
+        | Fable.DeclaredType(ent, _) ->
+            let cacheKey = ent.FullName + string (char 31) + name
+
+            match ctx.SymbolAccessCache.TryGetValue cacheKey with
+            | true, key -> key
+            | _ ->
+                let key = loop Set.empty typ
+                ctx.SymbolAccessCache.Add(cacheKey, key)
+                key
+        | _ -> loop Set.empty typ
+
+    let access com ctx range typ target name =
+        match tryAccessKey com ctx typ name with
+        | Some key -> Expression.memberExpression (target, key, true, ?loc = range)
+        | None -> Util.get range target name
+
 module Reflection =
     open Lib
 
@@ -190,7 +321,12 @@ module Reflection =
 
                     let typeInfo = transformTypeInfoFor Reflection com ctx r genMap fi.FieldType
 
-                    Some(Expression.arrayExpression ([| fieldName; typeInfo |]))
+                    let fields =
+                        match SymbolKeys.tryField com ctx fi with
+                        | Some key -> [| fieldName; typeInfo; key |]
+                        | None -> [| fieldName; typeInfo |]
+
+                    Some(Expression.arrayExpression fields)
             )
             |> List.toArray
 
@@ -2270,7 +2406,8 @@ module Util =
         let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
 
         let hasExplicitDisposal name =
-            members |> List.exists (fun (memb, _) -> memb.Name = name)
+            members
+            |> List.exists (fun (memb, info) -> memb.Name = name || SymbolKeys.isWellKnownMember name info)
 
         // Optimization: Object literals with getters and setters are very slow in V8
         // so use a class expression instead. See https://github.com/fable-compiler/Fable/pull/2165#issuecomment-695835444
@@ -2287,7 +2424,7 @@ module Util =
             |> List.collect (fun (memb, info) ->
                 let entOpt = info.DeclaringEntity |> Option.bind (fun e -> com.TryGetEntity(e))
 
-                let prop, isComputed = memberFromName memb.Name
+                let prop, isComputed = SymbolKeys.memberKey com ctx info memb.Name
 
                 let makeMethod kind =
                     let args = memb.Args
@@ -2951,7 +3088,11 @@ but thanks to the optimisation done below we get
             | Some memberInfo when hasAttribute Atts.jsxComponent memberInfo.Attributes ->
                 transformJsxCall com ctx callee callInfo.Args memberInfo
             | memberInfo ->
-                let callee = com.TransformAsExpr(ctx, callee)
+                let callee =
+                    match memberInfo |> Option.bind (SymbolKeys.tryMember com ctx), callee with
+                    | Some key, Fable.Get(target, Fable.FieldGet _, _, _) ->
+                        Expression.memberExpression (com.TransformAsExpr(ctx, target), key, true)
+                    | _ -> com.TransformAsExpr(ctx, callee)
 
                 let nonNamedArgs, namedArgs = transformCallArgsWithNamedArgs com ctx callInfo
 
@@ -3143,7 +3284,7 @@ but thanks to the optimisation done below we get
                 | _ -> fableExpr
 
             let expr = com.TransformAsExpr(ctx, fableExpr)
-            get range expr info.Name
+            SymbolKeys.access com ctx range fableExpr.Type expr info.Name
 
         | Fable.ListHead ->
             // get range (com.TransformAsExpr(ctx, fableExpr)) "head"
@@ -3220,7 +3361,7 @@ but thanks to the optimisation done below we get
             match kind with
             | Fable.ValueSet -> expr
             | Fable.ExprSet(TransformExpr com ctx e) -> getExpr None expr e
-            | Fable.FieldSet(fieldName) -> get None expr fieldName
+            | Fable.FieldSet(fieldName) -> SymbolKeys.access com ctx None fableExpr.Type expr fieldName
 
         // If this is an arry setter, we need to use the `setItem` method
         // as it allows to check the bounds of the array
@@ -4511,7 +4652,7 @@ but thanks to the optimisation done below we get
             if com.IsTypeScript && not ent.IsFSharpUnion then
                 ent.FSharpFields
                 |> List.mapToArray (fun field ->
-                    let prop, isComputed = memberFromName field.Name
+                    let prop, isComputed = SymbolKeys.fieldKey com ctx field
                     let ta = makeFieldAnnotationOf com ctx field
                     // Static fields need to be initialized by static constructor
                     let am =
@@ -4540,14 +4681,41 @@ but thanks to the optimisation done below we get
         let hasExplicitDisposal name =
             ent.MembersFunctionsAndValues
             |> Seq.exists (fun memb ->
-                memb.CompiledName = name
-                && (hasAttribute Atts.attachMembers ent.Attributes
-                    || memb.IsOverrideOrExplicitInterfaceImplementation)
+                (memb.CompiledName = name
+                 && (hasAttribute Atts.attachMembers ent.Attributes
+                     || memb.IsOverrideOrExplicitInterfaceImplementation))
+                || SymbolKeys.isWellKnownMember name memb
             )
 
         let members =
             [|
                 yield! classFields
+                if
+                    (ent.IsFSharpRecord || ent.IsValueType)
+                    && (ent.FSharpFields
+                        |> List.exists (FSharp2Fable.FsField.TrySymbolKey >> Option.isSome))
+                then
+                    let fields =
+                        ent.FSharpFields
+                        |> List.filter (fun field -> not field.IsStatic)
+                        |> List.map (fun field ->
+                            let key =
+                                match SymbolKeys.tryField com ctx field with
+                                | Some key -> key
+                                | None -> Expression.stringLiteral (sanitizeMemberName field.Name)
+
+                            Expression.arrayExpression [| Expression.stringLiteral field.Name; key |]
+                        )
+                        |> List.toArray
+                        |> Expression.arrayExpression
+
+                    yield
+                        ClassMember.classProperty (
+                            libValue com ctx "Types" "recordFieldsSymbol",
+                            value = fields,
+                            isStatic = true,
+                            isComputed = true
+                        )
                 yield classCons
                 yield! classMembers
                 for interfaceName, symbolName, isAsync in
@@ -4627,7 +4795,7 @@ but thanks to the optimisation done below we get
             let assignments =
                 defaultValueFields
                 |> List.map (fun field ->
-                    let left = get None classIdent field.Name
+                    let left = SymbolKeys.fieldAccess com ctx None field classIdent
                     let right = DefaultValue.forType com ctx field.FieldType
                     assign None left right |> ExpressionStatement
                 )
@@ -4944,7 +5112,7 @@ but thanks to the optimisation done below we get
         (memb: Fable.MemberDecl)
         =
         let isStatic = not info.IsInstance
-        let key, isComputed = memberFromName memb.Name
+        let key, isComputed = SymbolKeys.attachedKey com ctx info memb
 
         let args = memb.Args
 
@@ -4992,7 +5160,11 @@ but thanks to the optimisation done below we get
         let isStatic = not info.IsInstance
 
         let makeMethod name args body returnType typeParamDecl =
-            let key, isComputed = memberFromName name
+            let key, isComputed =
+                if name = memb.Name then
+                    SymbolKeys.attachedKey com ctx info memb
+                else
+                    memberFromName name
 
             ClassMember.classMethod (
                 ClassFunction(key, isComputed),
@@ -5443,7 +5615,7 @@ but thanks to the optimisation done below we get
                         ent.FSharpFields
                         |> List.filter (fun field -> not field.IsStatic)
                         |> List.mapi (fun i field ->
-                            let left = get None thisExpr field.Name
+                            let left = SymbolKeys.fieldAccess com ctx None field thisExpr
 
                             let right = wrapIntExpression field.FieldType args[i]
 
@@ -5636,7 +5808,7 @@ but thanks to the optimisation done below we get
             else
                 memb.CompiledName
 
-        let key, isComputed = memberFromName name
+        let key, isComputed = SymbolKeys.memberKey com ctx memb name
 
         let args =
             memb.CurriedParameterGroups
@@ -6151,6 +6323,8 @@ module Compiler =
     type BabelCompiler(com: Compiler) =
         let onlyOnceWarnings = HashSet<string>()
         let imports = Dictionary<string, Import>()
+        let symbolKeys = Dictionary<string, Expression>()
+        let symbolDeclarations = ResizeArray<ModuleDeclaration>()
         let topDirectivesPrologue = HashSet<string>()
         let isTypeScript = com.Options.Language = TypeScript
 
@@ -6191,6 +6365,56 @@ module Compiler =
                     | Some localId -> Expression.identifier (localId)
                     | None -> Expression.nullLiteral ()
 
+            member bcom.GetSymbolKey(ctx, expression, path, sourceFile) =
+                if String.IsNullOrWhiteSpace expression then
+                    addError com [] None "SymbolKey requires a non-empty symbol expression"
+                    Expression.nullLiteral ()
+                elif not (String.IsNullOrEmpty path) then
+                    let path =
+                        match sourceFile with
+                        | Some file when path.StartsWith(".", StringComparison.Ordinal) ->
+                            FSharp2Fable.Util.fixImportedRelativePath com path file
+                        | _ -> path
+
+                    (bcom :> IBabelCompiler).TransformImport(ctx, expression, path)
+                elif Regex.IsMatch(expression, @"^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$") then
+                    RawExpression(expression, None)
+                else
+                    let name = "$ficklSymbol$" + (uint32 (Naming.stringHash expression)).ToString("x8")
+
+                    match sourceFile with
+                    | Some file when Path.normalizePathAndEnsureFsExtension file <> com.CurrentFile ->
+                        let path = Path.getRelativeFileOrDirPath false com.CurrentFile false file
+                        (bcom :> IBabelCompiler).GetImportExpr(ctx, name, path, None)
+                    | _ ->
+                        match symbolKeys.TryGetValue expression with
+                        | true, key -> key
+                        | _ ->
+                            if ctx.UsedNames.RootScope.Contains name then
+                                addError com [] None "A declaration conflicts with a generated SymbolKey binding"
+
+                            ctx.UsedNames.RootScope.Add name |> ignore
+                            let key = Expression.identifier name
+                            let value = RawExpression(expression, None)
+
+                            symbolDeclarations.Add(
+                                Declaration.variableDeclaration (
+                                    Const,
+                                    name,
+                                    init = value,
+                                    ?annotation =
+                                        (if isTypeScript then
+                                             Some UniqueSymbolTypeAnnotation
+                                         else
+                                             None)
+                                )
+                                |> ExportNamedDeclaration
+                            )
+
+                            symbolKeys.Add(expression, key)
+                            key
+
+            member _.GetSymbolDeclarations() = List.ofSeq symbolDeclarations
             member _.GetAllImports() = imports.Values :> _
             member bcom.TransformAsExpr(ctx, e) = transformAsExpr bcom ctx e
 
@@ -6266,13 +6490,51 @@ module Compiler =
                 ForcedIdents = Set.empty
                 IsNativeAsync = false
                 NativeGeneratorType = None
+                SymbolAccessCache = Dictionary()
             }
 
+        let registerSymbolKey (att: Fable.Attribute) =
+            match att.ConstructorArgs with
+            | (:? string as expression) :: rest when
+                not (String.IsNullOrWhiteSpace expression)
+                && (rest
+                    |> List.forall (
+                        function
+                        | :? string as path -> String.IsNullOrEmpty path
+                        | _ -> false
+                    ))
+                && not (Regex.IsMatch(expression, @"^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$"))
+                ->
+                com.GetSymbolKey(ctx, expression, "", Some com.CurrentFile) |> ignore
+            | _ -> ()
+
+        let rec registerSymbolKeys declarations =
+            for declaration in declarations do
+                match declaration with
+                | Fable.ModuleDeclaration moduleDecl -> registerSymbolKeys moduleDecl.Members
+                | Fable.ClassDeclaration classDecl ->
+                    let ent = com.GetEntity classDecl.Entity
+
+                    for field in ent.FSharpFields do
+                        FSharp2Fable.FsField.TrySymbolKey field
+                        |> Option.iter (fst >> registerSymbolKey)
+
+                    for memberInfo in ent.MembersFunctionsAndValues do
+                        memberInfo.Attributes
+                        |> Seq.filter (fun att -> att.Entity.FullName = Atts.ficklSymbolKey)
+                        |> Seq.iter registerSymbolKey
+                | _ -> ()
+
+        registerSymbolKeys file.Declarations
         let rootDecls = List.collect (transformDeclaration com ctx) file.Declarations
 
         let topDirectivesPrologue =
             com.GetAllAllTopDirectivesPrologue() |> transformDirectivesPrologue
 
         let importDecls = com.GetAllImports() |> transformImports
-        let body = topDirectivesPrologue @ importDecls @ rootDecls |> List.toArray
+
+        let body =
+            topDirectivesPrologue @ importDecls @ com.GetSymbolDeclarations() @ rootDecls
+            |> List.toArray
+
         Program(body)

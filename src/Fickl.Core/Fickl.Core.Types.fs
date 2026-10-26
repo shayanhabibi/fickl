@@ -2,6 +2,17 @@ namespace Fickl.Core
 
 open System
 
+/// <summary>Uses a symbol expression as the JavaScript key of a member, interface slot, or record field.</summary>
+/// <remarks>Use a well-known symbol, a stable global expression such as Symbol.for('key'), or an imported symbol.
+/// Imported paths are relative to the declaring F# file. The expression must identify the same symbol at every access.
+/// Applies to JavaScript and TypeScript; symbol class members attach without AttachMembers.</remarks>
+[<AttributeUsage(AttributeTargets.Method ||| AttributeTargets.Property ||| AttributeTargets.Field)>]
+type SymbolKeyAttribute(expression: string, from: string) =
+    inherit Attribute()
+    /// <summary>Uses a well-known symbol or stable global symbol expression.</summary>
+    new(expression: string) = SymbolKeyAttribute(expression, "")
+
+
 /// <summary>Emits a module function returning jsAsyncGenerator as a native async generator function.</summary>
 /// <remarks>The return type specifies yielded, terminal, and sent values. Supports JavaScript and TypeScript.</remarks>
 [<AttributeUsage(AttributeTargets.Method)>]

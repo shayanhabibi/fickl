@@ -453,6 +453,22 @@ let private transformCallee com ctx callee (calleeType: FSharpType) =
         return derefByRefReceiver com ctx callee transformed
     }
 
+let private withSymbolFieldType (com: Compiler) (ctx: Context) (field: FSharpField) (calleeType: FSharpType) callee =
+    if
+        field.IsStatic
+        && (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+        && (Seq.append field.PropertyAttributes field.FieldAttributes
+            |> hasAttrib Atts.ficklSymbolKey)
+    then
+        let typ = makeType ctx.GenericArgs calleeType
+
+        match callee with
+        | Fable.IdentExpr ident -> Fable.IdentExpr { ident with Type = typ }
+        | Fable.Import(info, _, range) -> Fable.Import(info, typ, range)
+        | _ -> callee
+    else
+        callee
+
 let private resolveImportMemberBinding (ident: Fable.Ident) (info: Fable.ImportInfo) =
     if info.Selector = Naming.placeholder then
         { info with Selector = ident.Name }
@@ -1569,6 +1585,7 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
         | FSharpExprPatterns.FSharpFieldGet(callee, calleeType, field) ->
             let r = makeRangeFrom fsExpr
             let! callee = transformCallee com ctx callee calleeType
+            let callee = withSymbolFieldType com ctx field calleeType callee
             // let typ = makeType ctx.GenericArgs fsExpr.Type // Doesn't always work
             let typ = resolveFieldType ctx calleeType field.FieldType
 
@@ -1686,6 +1703,7 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             let r = makeRangeFrom fsExpr
             let t = makeType Map.empty field.FieldType
             let! callee = transformCallee com ctx callee calleeType
+            let callee = withSymbolFieldType com ctx field calleeType callee
             let! value = transformExpr com ctx [] value
 
             return Fable.Set(callee, Fable.FieldSet(FsField.FSharpFieldName field), t, value, r)
@@ -2454,6 +2472,16 @@ let private transformMemberDecl
             UsedNamesInDeclarationScope = HashSet()
         }
 
+    if
+        (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
+        && (memb.DeclaringEntity |> Option.exists _.IsFSharpModule)
+    then
+        addError
+            com
+            ctx.InlinePath
+            (Some(makeRange memb.DeclarationLocation))
+            "SymbolKey applies to object members and record fields, not module functions"
+
     let isErasedPropertySetter (memb: FSharpMemberOrFunctionOrValue) =
         if memb.IsPropertySetterMethod then
             match memb.DeclaringEntity with
@@ -2524,7 +2552,13 @@ let private transformMemberDecl
         []
     else
         match memb.DeclaringEntity with
-        | Some ent when (isAttachMembersEntity com ent && memb.CompiledName <> ".cctor") ->
+        | Some ent when
+            (isAttachMembersEntity com ent
+             || (((com :> Compiler).Options.Language = JavaScript
+                  || (com :> Compiler).Options.Language = TypeScript)
+                 && (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome))
+            && memb.CompiledName <> ".cctor"
+            ->
             transformExplicitlyAttachedMember com ctx ent memb args body
             []
         | _ -> transformMemberFunctionOrValue com ctx memb args body

@@ -91,6 +91,18 @@ type FsField(fi: FSharpField) =
         | :? FsField as field -> field.IsCurried
         | _ -> false
 
+    /// <summary>Reads the JavaScript symbol key and its declaration file from an FCS-backed field.</summary>
+    static member TrySymbolKey(field: Fable.Field) =
+        match field with
+        | :? FsField as field -> field.SymbolKey
+        | _ -> None
+
+    /// <summary>The symbol-key attribute on a field or its record property.</summary>
+    member _.SymbolKey =
+        Seq.append fi.PropertyAttributes fi.FieldAttributes
+        |> Helpers.tryFindAttrib Atts.ficklSymbolKey
+        |> Option.map (fun att -> (FsAtt(att) :> Fable.Attribute), fi.DeclarationLocation.FileName)
+
     static member FSharpFieldName(fi: FSharpField) =
         let rec countConflictingCases acc (ent: FSharpEntity) (name: string) =
             match TypeHelpers.tryGetBaseEntity ent with
@@ -292,10 +304,33 @@ type FsMemberFunctionOrValue(m: FSharpMemberOrFunctionOrValue) =
     static member IsSetter(m: FSharpMemberOrFunctionOrValue) =
         m.IsPropertySetterMethod && Util.countNonCurriedParams m = 1
 
+    /// <summary>Finds a symbol-key attribute on a method or the property whose accessor it implements.</summary>
+    static member SymbolKeyAttribute(m: FSharpMemberOrFunctionOrValue) =
+        Helpers.tryFindAttrib Atts.ficklSymbolKey m.Attributes
+        |> Option.orElseWith (fun () ->
+            if m.IsPropertyGetterMethod || m.IsPropertySetterMethod then
+                m.DeclaringEntity
+                |> Option.bind (fun ent ->
+                    ent.MembersFunctionsAndValues
+                    |> Seq.tryFind (fun prop -> prop.IsProperty && prop.DisplayName = m.DisplayName)
+                    |> Option.bind (fun prop -> Helpers.tryFindAttrib Atts.ficklSymbolKey prop.Attributes)
+                )
+            else
+                None
+        )
+
     member _.FSharpMemberOrFunctionOrValue = m
 
     interface Fable.MemberFunctionOrValue with
-        member _.Attributes = m.Attributes |> Seq.map (fun x -> FsAtt(x) :> Fable.Attribute)
+        member _.Attributes =
+            seq {
+                yield! m.Attributes |> Seq.map (fun x -> FsAtt(x) :> Fable.Attribute)
+
+                if not (Helpers.hasAttrib Atts.ficklSymbolKey m.Attributes) then
+                    match FsMemberFunctionOrValue.SymbolKeyAttribute m with
+                    | Some att -> yield FsAtt(att) :> Fable.Attribute
+                    | None -> ()
+            }
 
         member _.CurriedParameterGroups =
             let namedParamsIndex =
@@ -2865,9 +2900,14 @@ module Util =
         let entityName = defaultArg ent.TryFullName ""
         entityName + "." + memberName + overloadHash
 
-    let getAbstractMemberInfo com (ent: FSharpEntity) (memb: FSharpMemberOrFunctionOrValue) =
+    let getAbstractMemberInfo (com: Compiler) (ent: FSharpEntity) (memb: FSharpMemberOrFunctionOrValue) =
         let ent = tryGetInterfaceDefinitionFromMethod memb |> Option.defaultValue ent
-        let isMangled = isMangledAbstractEntity com ent
+
+        let isSymbol =
+            (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+            && (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
+
+        let isMangled = not isSymbol && isMangledAbstractEntity com ent
         let isGetter = FsMemberFunctionOrValue.IsGetter(memb)
         let isSetter = not isGetter && FsMemberFunctionOrValue.IsSetter(memb)
 
@@ -3000,6 +3040,20 @@ module Util =
                 |> failwith
 
         | Some callee ->
+            let callee =
+                if
+                    not memb.IsInstanceMember
+                    && (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
+                then
+                    let typ = Fable.DeclaredType(FsEnt.Ref entity, [])
+
+                    match callee with
+                    | Fable.IdentExpr ident -> Fable.IdentExpr { ident with Type = typ }
+                    | Fable.Import(info, _, range) -> Fable.Import(info, typ, range)
+                    | _ -> callee
+                else
+                    callee
+
             let callInfo = { callInfo with ThisArg = None }
             let info = getAbstractMemberInfo com entity memb
 
@@ -3197,7 +3251,10 @@ module Util =
                 | None when
                     com.Options.Language <> Rust
                     && not (isInline memb)
-                    && (isAttachMembersEntity com e || isPojoDefinedByConsArgsFSharpEntity e)
+                    && (isAttachMembersEntity com e
+                        || isPojoDefinedByConsArgsFSharpEntity e
+                        || ((com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+                            && (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome))
                     ->
                     let classExpr = FsEnt.Ref e |> entityIdent com
 

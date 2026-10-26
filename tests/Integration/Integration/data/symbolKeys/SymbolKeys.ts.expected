@@ -1,0 +1,28 @@
+export const $ficklSymbol$0e9dc927: unique symbol = Symbol.for('fickl.snapshot.state');
+
+export interface ILabel {
+    get [Symbol.toStringTag](): string,
+    get [$ficklSymbol$0e9dc927](): string,
+    set [$ficklSymbol$0e9dc927](arg0: string)
+}
+
+export function create(label: string): ILabel {
+    let state: string = label;
+    return new (class {
+        get [Symbol.toStringTag](): string {
+            return label;
+        }
+        get [$ficklSymbol$0e9dc927](): string {
+            return state;
+        }
+        set [$ficklSymbol$0e9dc927](value: string) {
+            state = value;
+        }
+    }
+    )();
+}
+
+export function update(value: ILabel, state: string): string {
+    value[$ficklSymbol$0e9dc927] = state;
+    return value[$ficklSymbol$0e9dc927];
+}
