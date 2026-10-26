@@ -232,3 +232,58 @@ let dllAttributeTests =
             let exitCode, log = run outDir "node" [ "Program.js" ]
             Expect.equal exitCode 0 $"The compiled program failed:{System.Environment.NewLine}{log}"
         })
+
+/// <summary>Checks strict optional parameters and getters on .NET, JavaScript and TypeScript.</summary>
+let strictOptionsTests =
+    testCase "Strict options preserve nullable optional parameters" (fun () ->
+        let root = Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "../../.."))
+        let source = Path.Combine(__SOURCE_DIRECTORY__, "strictOptions")
+        let output = Path.Combine(root, "temp/tests/Integration/strictOptions")
+
+        let run (executable: string) (arguments: string list) =
+            let info =
+                System.Diagnostics.ProcessStartInfo(
+                    executable,
+                    arguments,
+                    WorkingDirectory = root,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                )
+            use child = System.Diagnostics.Process.Start info
+            let stdout = child.StandardOutput.ReadToEndAsync()
+            let stderr = child.StandardError.ReadToEndAsync()
+            child.WaitForExit()
+            Expect.equal child.ExitCode 0 (stdout.Result + stderr.Result)
+
+        run "dotnet" [ "run"; "--project"; source; "-c"; "Release" ]
+
+        for language in [ "javascript"; "typescript" ] do
+            let destination = Path.Combine(output, language)
+            let exitCode =
+                Fable.Cli.Entry.main
+                    [| source; "--outDir"; destination; "--lang"; language
+                       "--strictOptions"; "--exclude"; "Fable.Core"; "--noCache" |]
+            Expect.equal exitCode 0 $"Compiling strict options for {language} failed"
+
+            if language = "javascript" then
+                run "node" [ Path.Combine(destination, "Program.js") ]
+            else
+                let config = Path.Combine(destination, "tsconfig.json")
+                let compiled = Path.Combine(destination, "compiled")
+                let settings =
+                    {| compilerOptions =
+                        {| target = "es2020"
+                           lib = [| "es2020"; "dom"; "esnext.temporal" |]
+                           ``module`` = "es2020"
+                           moduleResolution = "bundler"
+                           strict = true
+                           allowJs = true
+                           skipLibCheck = true
+                           rewriteRelativeImportExtensions = true
+                           noEmitOnError = true
+                           rootDir = root
+                           outDir = compiled |}
+                       ``include`` = [| "Program.ts"; "fable_modules/**/*.ts"; "fable_modules/**/*.js" |] |}
+                File.WriteAllText(config, System.Text.Json.JsonSerializer.Serialize settings)
+                run "node" [ Path.Combine(root, "node_modules/typescript/lib/tsc.js"); "-p"; config ]
+                run "node" [ Path.Combine(compiled, Path.GetRelativePath(root, destination), "Program.js") ])

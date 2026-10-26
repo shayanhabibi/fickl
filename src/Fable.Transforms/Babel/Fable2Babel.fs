@@ -991,7 +991,7 @@ module Annotation =
     /// `undefined` into `0` for `int option`). Returns the unwrapped type to use for the return annotation.
     let unwrapOptionalReturn com (body: Fable.Expr) =
         match body.Type with
-        | Fable.Option(t, _) when not (mustWrapOption t) ->
+        | Fable.Option(t, isStruct) when not (mustWrapOption t || Util.isStrictOption com isStruct t) ->
             match body with
             | Fable.Value(Fable.NewOption(Some arg, _, _), _) -> Some t, arg
             | Fable.Value(Fable.NewOption(None, _, _), _) -> Some t, body
@@ -1013,8 +1013,8 @@ module Annotation =
     let makeAbstractPropertyAnnotation com ctx typ =
         let isOptional, typ =
             match typ with
-            | Fable.Option(genArg, _) ->
-                if mustWrapOption genArg then
+            | Fable.Option(genArg, isStruct) ->
+                if mustWrapOption genArg || Util.isStrictOption com isStruct genArg then
                     true, typ
                 else
                     true, genArg
@@ -1502,6 +1502,7 @@ module Util =
                 ctx, None
 
         let parameters = List.concat info.CurriedParameterGroups
+        let mutable strictOptionalBindings = []
 
         let argsWithParams (args: Fable.Ident list) =
             List.zip args parameters
@@ -1512,13 +1513,30 @@ module Util =
                     |> addWarning com [] a.Range
                 | _ -> ()
 
-                let a =
+                let rawArg =
                     if p.IsOptional then
                         { a with Type = unwrapOptionalType a.Type }
                     else
                         a
 
-                a,
+                match a.Type with
+                | Fable.Option(t, isStruct) when
+                    p.IsOptional && isStrictOption com isStruct t && not (mustWrapOption t)
+                    ->
+                    let optionIdent =
+                        { a with Name = getUniqueNameInDeclarationScope ctx (a.Name + "_option") }
+
+                    let rawValue = Fable.IdentExpr rawArg
+                    let missing = emitExpr a.Range Fable.Boolean [ rawValue ] "$0 === undefined"
+                    let none = Fable.Value(Fable.NewOption(None, t, isStruct), a.Range)
+                    let some = Fable.Value(Fable.NewOption(Some rawValue, t, isStruct), a.Range)
+
+                    strictOptionalBindings <-
+                        (a.Name, optionIdent, Fable.IfThenElse(missing, none, some, a.Range))
+                        :: strictOptionalBindings
+                | _ -> ()
+
+                rawArg,
                 ParameterFlags(
                     isNamed = p.IsNamed,
                     isOptional = (p.IsOptional && com.IsTypeScript),
@@ -1547,6 +1565,17 @@ module Util =
                 (thisArg, ParameterFlags()) :: (argsWithParams args)
             | args when List.sameLength args parameters -> argsWithParams args
             | _ -> args |> List.map (fun a -> a, ParameterFlags())
+
+        let body =
+            let replacements =
+                strictOptionalBindings
+                |> List.map (fun (name, ident, _) -> name, Fable.IdentExpr ident)
+                |> Map.ofList
+
+            let body = FableTransforms.replaceValues replacements body
+
+            (List.rev strictOptionalBindings, body)
+            ||> List.foldBack (fun (_, ident, value) body -> Fable.Let(ident, value, body))
 
         let args, body, returnType, typeParamDecl =
             transformFunctionWithReturnType com ctx funcName typeParams (List.map fst argsWithFlags) returnType body
@@ -1919,7 +1948,7 @@ module Util =
             Expression.newExpression (consRef, values, ?typeArguments = typeParamInst, ?loc = r)
         | Fable.NewAnonymousRecord(values, fieldNames, _genArgs, _isStruct) ->
             let values =
-                List.mapToArray (unwrapOptionalArg com >> snd >> transformAsExpr com ctx) values
+                List.mapToArray (unwrapOptionalReturn com >> snd >> transformAsExpr com ctx) values
 
             Array.zip fieldNames values |> makeJsObject
         | Fable.NewUnion(values, tag, entRef, genArgs) ->
@@ -2035,7 +2064,7 @@ module Util =
                 // If compileAsClass is false, it means getters don't have side effects
                 // and can be compiled as object fields (see condition above)
                 if not memb.IsMangled && (info.IsValue || (not compileAsClass && info.IsGetter)) then
-                    let _, body = unwrapOptionalArg com memb.Body
+                    let _, body = unwrapOptionalReturn com memb.Body
 
                     [
                         ObjectMember.objectProperty (prop, com.TransformAsExpr(ctx, body), isComputed = isComputed)
