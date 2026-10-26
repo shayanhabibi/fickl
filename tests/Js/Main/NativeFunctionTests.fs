@@ -10,6 +10,9 @@ type Receiver =
 type Callbacks = { run: int -> int -> int }
 
 #if FABLE_COMPILER
+[<Fable.Core.Global("decodeURIComponent")>]
+let private decodeNative (value: string) : string = Fable.Core.Util.nativeOnly
+
 [<Fable.Core.Emit("$0.call($1, $2, $3)")>]
 let private invokeWithReceiver (callback: int -> int -> string) (receiver: Receiver) (a: int) (b: int) : string =
     Fable.Core.Util.nativeOnly
@@ -37,6 +40,12 @@ let tests =
         testCase "ordinary callbacks have their own arguments" <| fun () ->
             let callback = jsFunction (fun (_: int) -> emitJsExpr () "arguments.length")
             emitJsExpr callback "Reflect.apply($0, undefined, [1, 2, 3])" |> equal 3
+
+        testCase "ordinary forwarding callbacks retain their function identity" <| fun () ->
+            let callback = jsFunction (fun value -> decodeNative value)
+            callback "hello%20world" |> equal "hello world"
+            emitJsExpr callback "Object.prototype.hasOwnProperty.call($0, 'prototype')" |> equal true
+            emitJsExpr callback "$0 === decodeURIComponent" |> equal false
 
         testCase "typed receivers are not ordinary arguments" <| fun () ->
             let callback = withThis (fun (self: Receiver) (n: int) -> self.tag + string n)

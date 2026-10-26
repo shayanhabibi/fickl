@@ -314,7 +314,7 @@ module PrinterExtensions =
 
             match body.Body with
             // Check if we can remove the function
-            | [| ReturnStatement(ImmediatelyApplied e, _) |] when not isDeclaration -> printer.Print(e)
+            | [| ReturnStatement(ImmediatelyApplied e, _) |] when isArrow && not isDeclaration -> printer.Print(e)
             | _ when isArrow ->
                 // Remove parens if we only have one argument? (and no annotation)
                 printer.Print(typeParameters)
