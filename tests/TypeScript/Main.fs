@@ -9,6 +9,7 @@ let allTests =
     Applicative.tests
     CallableInterfaces.tests
     InlineInterfaces.tests
+    NativeFunctions.tests
     Arithmetic.tests
     Arrays.tests
     Async.tests

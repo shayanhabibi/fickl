@@ -477,7 +477,9 @@ module private Transforms =
 
     let rec lambdaBetaReduction (com: Compiler) e =
         match e with
-        | Call(Delegate(args, body, _, _), info, t, r) when List.sameLength args info.Args ->
+        | Call(Delegate(args, body, _, tags), info, t, r) when
+            List.sameLength args info.Args && not (List.contains "not-arrow" tags)
+            ->
             let body = visitFromOutsideIn (lambdaBetaReduction com) body
 
             let thisArgExpr =
@@ -739,7 +741,8 @@ module private Transforms =
 
         match expr, arity with
         | MaybeCasted(LambdaUncurriedAtCompileTime arity lambda), _ -> lambda
-        | Extended(Curry(innerExpr, arity2), _), _ when matches arity arity2 -> innerExpr
+        | Extended(Curry(innerExpr, arity2), _), _
+        | TypeCast(Extended(Curry(innerExpr, arity2), _), Any), _ when matches arity arity2 -> innerExpr
         | Get(Extended(Curry(innerExpr, arity2), _), OptionValue, t, r), _ when matches arity arity2 ->
             Get(innerExpr, OptionValue, t, r)
         | Value(NewOption(Some(Extended(Curry(innerExpr, arity2), _)), t, isStruct), r), _ when matches arity arity2 ->
@@ -988,6 +991,35 @@ module private Transforms =
             fun _ -> false
 
     let uncurrySendingArgs (com: Compiler) e =
+        let nativeCallbackArgs memberRef args =
+            match com.Options.Language, memberRef |> Option.bind com.TryGetMember with
+            | (JavaScript | TypeScript), Some memb ->
+                let parameters = memb.CurriedParameterGroups |> List.concat
+
+                args
+                |> List.mapi (fun i arg ->
+                    let ordinary =
+                        parameters
+                        |> List.tryItem i
+                        |> Option.exists (fun p ->
+                            p.Attributes |> Seq.exists (fun a -> a.Entity.FullName = Atts.ficklJsFunction)
+                        )
+
+                    if ordinary then
+                        match arg with
+                        | MaybeCasted(Delegate(_, _, _, tags)) when List.contains "not-arrow" tags -> arg
+                        | MaybeCasted(Delegate(args, body, name, tags)) ->
+                            Delegate(args, body, name, "not-arrow" :: "fickl-js-function" :: tags)
+                        | MaybeCasted(NestedLambda(args, body, name)) ->
+                            Delegate(args, body, name, [ "not-arrow"; "fickl-js-function" ])
+                        | _ ->
+                            "JsFunction parameters require a literal lambda"
+                            |> addErrorAndReturnNull com [] arg.Range
+                    else
+                        arg
+                )
+            | _ -> args
+
         let uncurryConsArgs args (fields: Field seq) =
             let fields = Seq.toList fields
             let argTypes = fields |> List.map (fun fi -> fi.FieldType)
@@ -1000,12 +1032,14 @@ module private Transforms =
         | Call(callee, info, t, r) ->
             let args =
                 uncurryArgsExcept com false (keepCurriedArg com false info) info.SignatureArgTypes info.Args
+                |> nativeCallbackArgs info.MemberRef
 
             let info = { info with Args = args }
             Call(callee, info, t, r)
         | Emit({ CallInfo = callInfo } as emitInfo, t, r) ->
             let args =
                 uncurryArgsExcept com true (keepCurriedArg com true callInfo) callInfo.SignatureArgTypes callInfo.Args
+                |> nativeCallbackArgs callInfo.MemberRef
 
             Emit({ emitInfo with CallInfo = { callInfo with Args = args } }, t, r)
         // Uncurry also values in setters or new record/union/tuple

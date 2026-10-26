@@ -3431,6 +3431,14 @@ but thanks to the optimisation done below we get
                 let args, body, returnType, typeParamDecl =
                     transformFunctionWithAnnotations com ctx name None args body
 
+                let args =
+                    if List.contains "fickl-this-function" tags && not com.IsTypeScript then
+                        Array.skip 1 args
+                    elif List.contains "fickl-js-function" tags && com.IsTypeScript then
+                        Array.append [| Parameter.parameter ("this", typeAnnotation = AnyTypeAnnotation) |] args
+                    else
+                        args
+
                 Expression.functionExpression (
                     args,
                     body,
@@ -3553,12 +3561,7 @@ but thanks to the optimisation done below we get
                 |> resolveExpr expr.Type returnStrategy
             |]
 
-        | Fable.Delegate(args, body, name, _) ->
-            [|
-                transformFunctionWithAnnotations com ctx name None args body
-                |> makeArrowFunctionExpression name
-                |> resolveExpr expr.Type returnStrategy
-            |]
+        | Fable.Delegate _ -> [| transformAsExpr com ctx expr |> resolveExpr expr.Type returnStrategy |]
 
         | Fable.ObjectExpr(members, typ, baseCall) ->
             [|

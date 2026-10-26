@@ -118,6 +118,8 @@ module Atts =
     [<Literal>]
     let ficklCurried = "Fickl.Core.CurriedAttribute" // typeof<Fickl.Core.CurriedAttribute>.FullName
 
+    let ficklJsFunction = "Fickl.Core.JsFunctionAttribute"
+
     [<Literal>]
     let ficklNoOverloadSuffix = "Fickl.Core.NoOverloadSuffixAttribute" // typeof<Fickl.Core.NoOverloadSuffixAttribute>.FullName
 

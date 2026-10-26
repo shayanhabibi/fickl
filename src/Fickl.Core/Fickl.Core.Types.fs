@@ -2,6 +2,13 @@ namespace Fickl.Core
 
 open System
 
+/// <summary>Compiles literal callbacks passed to this parameter as ordinary JavaScript functions.</summary>
+/// <remarks>The callback has its own <c>this</c>, <c>arguments</c>, and prototype.
+/// Applies to JavaScript and TypeScript calls; use <c>Fickl.Core.JsInterop.withThis</c> for a typed receiver.</remarks>
+[<AttributeUsage(AttributeTargets.Parameter)>]
+type JsFunctionAttribute() =
+    inherit Attribute()
+
 /// <summary>
 /// Represents a JavaScript callable with a single generic or non-generic Invoke method.
 /// </summary>

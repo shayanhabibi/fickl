@@ -2461,9 +2461,10 @@ module Util =
             isFromDll ()
         // When compiling Fable itself, Fable.Core entities will be part of the code base, but still need to be replaced
         else
-            entFullName.StartsWith("Fable.Core.", StringComparison.Ordinal)
-            && (not (entFullName.StartsWith("Fable.Core.JS.", StringComparison.Ordinal))
-                || entFullName.EndsWith("Attribute", StringComparison.Ordinal))
+            entFullName = "Fickl.Core.JsInterop"
+            || (entFullName.StartsWith("Fable.Core.", StringComparison.Ordinal)
+                && (not (entFullName.StartsWith("Fable.Core.JS.", StringComparison.Ordinal))
+                    || entFullName.EndsWith("Attribute", StringComparison.Ordinal)))
 
     let isReplacementCandidate (ent: Fable.EntityRef) =
         let isFromDll () = isFromDllNotPrecompiled ent
