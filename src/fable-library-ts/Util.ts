@@ -119,7 +119,9 @@ export function isPromise(x: any) {
   return x instanceof Promise;
 }
 
-/** Rejects opaque thenable payloads before native async resolution can change their value or type. */
+/** Rejects opaque thenable payloads before native async resolution can change their value or type.
+ * Payloads must keep their then property stable until native resolution, which can read an accessor again.
+ */
 export function ensureResolvedAsyncValue<T>(value: T): T {
   if (value != null && (typeof value === "object" || typeof value === "function")
     && typeof (value as { then?: unknown }).then === "function") {
@@ -142,57 +144,64 @@ export function ensureResolvedAsyncIterable<T>(source: Iterable<T> | AsyncIterab
       }
       const next = iterator.next;
 
-      const closeAfterValidation = async (): Promise<void> => {
+      const closeAfterFailure = async (): Promise<void> => {
         const close = iterator.return;
         if (close != null) {
-          const result = Reflect.apply(close, iterator, []);
-          if (isAsync) {
-            await result;
-          } else if (isObject(result)) {
-            // Async-from-sync return reads done before awaiting value, without adopting the result object.
-            Boolean((result as IteratorResult<T, unknown>).done);
-            await (result as IteratorResult<T, unknown>).value;
+          const raw = Reflect.apply(close, iterator, []);
+          const result = isAsync ? await raw : raw;
+          if (!isObject(result)) {
+            throw new TypeError("Iterator result must be an object");
           }
         }
       };
 
-      const normalize = async (raw: unknown): Promise<IteratorResult<T, unknown>> => {
-        const result = isAsync ? await raw : raw;
-        if (!isObject(result)) {
-          throw new TypeError("Iterator result must be an object");
-        }
-        const done = Boolean((result as IteratorResult<T, unknown>).done);
-        let value = (result as IteratorResult<T, unknown>).value;
-        if (!done || checkReturn) {
-          try {
-            ensureResolvedAsyncValue(value);
-          } catch (error) {
-            if (!done) {
-              try {
-                await closeAfterValidation();
-              } catch {
-                // IteratorClose preserves the original abrupt completion when cleanup also fails.
-              }
-            }
-            throw error;
+      const invoke = async (method: Function, args: unknown[], closeSyncOnFailure: boolean): Promise<IteratorResult<T, unknown>> => {
+        let done = false;
+        let validationFailed = false;
+        try {
+          const raw = Reflect.apply(method, iterator, args);
+          const result = isAsync ? await raw : raw;
+          if (!isObject(result)) {
+            throw new TypeError("Iterator result must be an object");
           }
+          done = Boolean((result as IteratorResult<T, unknown>).done);
+          let value = (result as IteratorResult<T, unknown>).value;
+          if (!done || checkReturn) {
+            try {
+              ensureResolvedAsyncValue(value);
+            } catch (error) {
+              validationFailed = true;
+              throw error;
+            }
+          }
+          if (!isAsync) {
+            value = await value;
+          }
+          return done ? { done: true, value } : { done: false, value: value as T };
+        } catch (error) {
+          // Async-from-sync next/throw close on abrupt completion; async next failures do not.
+          // Our terminal validation runs after completion and must not close an already finished source.
+          if (validationFailed ? !done : !isAsync && closeSyncOnFailure) {
+            try {
+              await closeAfterFailure();
+            } catch {
+              // IteratorClose preserves the original abrupt completion when cleanup also fails.
+            }
+          }
+          throw error;
         }
-        if (!isAsync) {
-          value = await value;
-        }
-        return done ? { done: true, value } : { done: false, value: value as T };
       };
 
       return {
-        next: async (...args: [] | [unknown]) => normalize(Reflect.apply(next, iterator, args)),
+        next: (...args: [] | [unknown]) => invoke(next, args, true),
         get return() {
           const close = iterator.return;
-          return close == null ? undefined : async (...args: unknown[]) => normalize(Reflect.apply(close, iterator, args));
+          return close == null ? undefined : (...args: unknown[]) => invoke(close, args, false);
         },
         get throw() {
           const raise = iterator.throw;
           if (raise != null) {
-            return async (...args: unknown[]) => normalize(Reflect.apply(raise, iterator, args));
+            return (...args: unknown[]) => invoke(raise, args, true);
           }
           return async () => {
             // Missing throw closes without inspecting the close result's done or value properties.

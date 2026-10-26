@@ -26,6 +26,27 @@ let private opaqueDelegate<'T> (values: seq<'T>) : JsAsyncGenerator<'T, unit, un
 let tests =
     testList "NativeAsyncGenerators" [
 #if FABLE_COMPILER
+    testCaseAsync "checked sync delegation preserves throw failure cleanup and receivers" <| fun () -> async {
+        let trace = ResizeArray<string>()
+        let source: seq<obj> = emitJsExpr (fun (entry: string) -> trace.Add(entry)) "({ [Symbol.iterator]() { const iterator = Object.freeze({ next() { return { done: false, value: 1 }; }, throw() { $0(this === iterator ? 'throw receiver' : 'wrong receiver'); throw new Error('original failure'); }, return() { $0(this === iterator ? 'close receiver' : 'wrong receiver'); return { get done() { return (() => { throw new Error('unexpected done read'); })(); }, get value() { return (() => { throw new Error('unexpected value read'); })(); } }; } }); return iterator; } })"
+        let run (generator: JsAsyncGenerator<obj, unit, unit>) = async {
+            let! _ = generator.next() |> Async.AwaitPromise
+            let! originalFailure = async {
+                try
+                    let! _ = generator.throw(System.Exception("injected")) |> Async.AwaitPromise
+                    return false
+                with error -> return error.Message = "original failure"
+            }
+            originalFailure |> equal true
+            return List.ofSeq trace
+        }
+        let native: JsAsyncGenerator<obj, unit, unit> = emitJsExpr source "(async function* () { yield* $0; })()"
+        let! nativeTrace = run native
+        trace.Clear()
+        let! checkedTrace = run (opaqueDelegate source)
+        checkedTrace |> equal nativeTrace
+        checkedTrace |> equal [ "throw receiver"; "close receiver" ]
+    }
     testCaseAsync "checked async delegation preserves Promise-valued sent objects" <| fun () -> async {
         let payload = JS.Constructors.Promise.resolve(42)
         let child: JsAsyncGenerator<obj, obj, JS.Promise<int>> = jsAsyncGenerator {
