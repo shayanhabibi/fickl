@@ -1,4 +1,4 @@
-export const $ficklSymbol$0e9dc927 = Symbol.for('fickl.snapshot.state');
+export const $ficklSymbol$0e9dc927: unique symbol = Symbol.for('fickl.snapshot.state');
 
 export interface ILabel {
     get [Symbol.toStringTag](): string,

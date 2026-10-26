@@ -566,6 +566,7 @@ module PrinterExtensions =
             | CallExpression(callee, args, typeArguments, loc) ->
                 printer.PrintCallExpression(callee, args, typeArguments, loc)
             | EmitExpression(value, args, loc) -> printer.PrintEmitExpression(value, args, loc)
+            | RawExpression(value, loc) -> printer.Print(value, ?loc = loc)
             | ArrayExpression(elements, loc) ->
                 printer.Print("[", ?loc = loc)
                 printer.PrintCommaSeparatedArray(elements)
@@ -1577,6 +1578,7 @@ module PrinterExtensions =
                 printer.PrintIdent(id)
                 printer.Print(typeParams)
             | StringTypeAnnotation -> printer.Print("string")
+            | UniqueSymbolTypeAnnotation -> printer.Print("unique symbol")
             | NumberTypeAnnotation -> printer.Print("number")
             | BooleanTypeAnnotation -> printer.Print("boolean")
             | AnyTypeAnnotation -> printer.Print("any")

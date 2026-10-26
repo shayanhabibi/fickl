@@ -69,6 +69,12 @@ let private readState (value: obj) : int = jsNative
 let tests =
     testList "SymbolKeys" [
 #if FABLE_COMPILER
+        testCase "symbol expressions preserve literal Emit placeholder text" <| fun () ->
+            let value = { new IDollarKey with member _.State = "literal" }
+            let key: obj = emitJsExpr "fickl.$0.state" "Symbol.for($0)"
+            emitJsExpr<string> (value, key) "Reflect.get($0, $1)" |> equal "literal"
+            value.State |> equal "literal"
+
         testCase "symbol interface slots emit native object methods and calls" <| fun () ->
             let value = { new IPrimitive with member _.ToPrimitive(_hint) = 42 }
             emitJsExpr<int> value "+$0" |> equal 42

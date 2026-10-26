@@ -18,3 +18,7 @@ type IChild =
     inherit IPrimitive
     inherit IState
     inherit IImportedState
+
+type IDollarKey =
+    [<SymbolKey("Symbol.for('fickl.$0.state')")>]
+    abstract State: string

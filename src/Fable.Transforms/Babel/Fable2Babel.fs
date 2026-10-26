@@ -6378,7 +6378,7 @@ module Compiler =
 
                     (bcom :> IBabelCompiler).TransformImport(ctx, expression, path)
                 elif Regex.IsMatch(expression, @"^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$") then
-                    Util.emitExpression None expression []
+                    RawExpression(expression, None)
                 else
                     let name = "$ficklSymbol$" + (uint32 (Naming.stringHash expression)).ToString("x8")
 
@@ -6395,10 +6395,19 @@ module Compiler =
 
                             ctx.UsedNames.RootScope.Add name |> ignore
                             let key = Expression.identifier name
-                            let value = Util.emitExpression None expression []
+                            let value = RawExpression(expression, None)
 
                             symbolDeclarations.Add(
-                                Declaration.variableDeclaration (Const, name, init = value)
+                                Declaration.variableDeclaration (
+                                    Const,
+                                    name,
+                                    init = value,
+                                    ?annotation =
+                                        (if isTypeScript then
+                                             Some UniqueSymbolTypeAnnotation
+                                         else
+                                             None)
+                                )
                                 |> ExportNamedDeclaration
                             )
 

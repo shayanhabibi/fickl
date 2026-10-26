@@ -46,6 +46,8 @@ type Expression =
     | ObjectExpression of properties: ObjectMember array * loc: SourceLocation option
     | SequenceExpression of expressions: Expression array * loc: SourceLocation option
     | EmitExpression of value: string * args: Expression array * loc: SourceLocation option
+    /// <summary>A native expression whose text has no Emit macro placeholders.</summary>
+    | RawExpression of value: string * loc: SourceLocation option
     | CallExpression of
         callee: Expression *
         args: Expression array *
@@ -111,6 +113,7 @@ type Expression =
         | ObjectExpression(loc = loc) -> loc
         | SequenceExpression(loc = loc) -> loc
         | EmitExpression(loc = loc) -> loc
+        | RawExpression(loc = loc) -> loc
         | CallExpression(loc = loc) -> loc
         | UnaryExpression(loc = loc) -> loc
         | UpdateExpression(loc = loc) -> loc
@@ -546,6 +549,8 @@ type TypeAnnotation =
     | VoidTypeAnnotation
     | UndefinedTypeAnnotation
     | StringTypeAnnotation
+    /// <summary>The nominal type of one immutable JavaScript symbol binding.</summary>
+    | UniqueSymbolTypeAnnotation
     | NumberTypeAnnotation
     | BooleanTypeAnnotation
     | UnionTypeAnnotation of types: TypeAnnotation array
