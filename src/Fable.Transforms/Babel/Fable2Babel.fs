@@ -830,6 +830,8 @@ module Annotation =
         | Types.task
         | "System.Threading.Tasks.ValueTask" -> makeNativeTypeAnnotation com ctx [ Fable.Unit ] "Promise" |> Some
         | Types.taskGeneric -> makeNativeTypeAnnotation com ctx genArgs "Promise" |> Some
+        | "Fickl.Core.JsAsyncGenerator`3" -> makeNativeTypeAnnotation com ctx genArgs "AsyncGenerator" |> Some
+        | "Fickl.Core.JsYieldRequest`2" -> makeTypeAnnotation com ctx genArgs.Head |> Some
         | "Fickl.Core.JsGenerator`3" -> makeNativeTypeAnnotation com ctx genArgs "Generator" |> Some
         | "Fickl.Core.JsGeneratorResult`2" -> makeNativeTypeAnnotation com ctx genArgs "IteratorResult" |> Some
         | "Fickl.Core.JsYieldResult`1" -> makeNativeTypeAnnotation com ctx genArgs "IteratorYieldResult" |> Some
@@ -1361,7 +1363,35 @@ module Util =
         Expression.assignmentExpression (AssignEqual, left, right, ?loc = range)
 
     /// <summary>Checks that a generator with a non-unit terminal type cannot fall through without returning.</summary>
-    let validateGeneratorReturn (com: IBabelCompiler) generatorType body =
+    let validateGeneratorReturn (com: IBabelCompiler) generatorType (body: Fable.Expr) =
+        let rec isPromise =
+            function
+            | Fable.DeclaredType(ent, _) ->
+                ent.FullName = "Fable.Core.JS.Promise`1"
+                || ent.FullName = "System.Threading.Tasks.Task"
+                || ent.FullName = "System.Threading.Tasks.Task`1"
+                || ent.FullName = "System.Threading.Tasks.ValueTask"
+            | Fable.GenericParam(_, _, constraints) ->
+                constraints
+                |> List.exists (
+                    function
+                    | Fable.Constraint.CoercesTo typ -> isPromise typ
+                    | _ -> false
+                )
+            | _ -> false
+
+        match generatorType with
+        | Fable.DeclaredType(ent, [ yieldType; returnType; _ ]) when
+            ent.FullName = "Fickl.Core.JsAsyncGenerator`3"
+            && (isPromise yieldType || isPromise returnType)
+            ->
+            addError
+                com
+                []
+                body.Range
+                "Async generator yield and terminal types must be resolved values; await promises with let! before yielding or returning"
+        | _ -> ()
+
         let rec finishes targets visited =
             function
             | Fable.Emit(info, _, _) when List.contains "fickl-generator-return" info.CallInfo.Tags -> true
@@ -1410,7 +1440,6 @@ module Util =
             | Fable.ObjectExpr _ -> false
             | expression -> getSubExpressions expression |> List.exists containsAwait
 
-        let isAsync = ctx.IsNativeAsync && containsAwait expr
 
         let rec containsYield =
             function
@@ -1421,6 +1450,7 @@ module Util =
             | expression -> getSubExpressions expression |> List.exists containsYield
 
         let isGenerator = ctx.NativeGeneratorType.IsSome && containsYield expr
+        let isAsync = ctx.IsNativeAsync && (isGenerator || containsAwait expr)
 
         let _, body =
             com.TransformFunction(
@@ -1582,7 +1612,10 @@ module Util =
         (returnType: Fable.Type)
         (body: Fable.Expr)
         =
-        let isNativeAsync = hasAttribute Atts.ficklAsyncFunction info.Attributes
+        let isAsyncGenerator = hasAttribute Atts.ficklAsyncGeneratorFunction info.Attributes
+
+        let isNativeAsync =
+            isAsyncGenerator || hasAttribute Atts.ficklAsyncFunction info.Attributes
 
         if
             isNativeAsync
@@ -1592,12 +1625,21 @@ module Util =
                 |> Option.exists _.IsFSharpModule
             )
         then
-            addError com [] body.Range "AsyncFunction is only supported on module functions"
+            addError
+                com
+                []
+                body.Range
+                (if isAsyncGenerator then
+                     "AsyncGeneratorFunction is only supported on module functions"
+                 else
+                     "AsyncFunction is only supported on module functions")
 
-        let isGenerator = hasAttribute Atts.ficklGeneratorFunction info.Attributes
+        let isGenerator =
+            isAsyncGenerator || hasAttribute Atts.ficklGeneratorFunction info.Attributes
 
         if
             isGenerator
+            && not isAsyncGenerator
             && not (
                 info.DeclaringEntity
                 |> Option.bind com.TryGetEntity
@@ -1606,7 +1648,7 @@ module Util =
         then
             addError com [] body.Range "GeneratorFunction is only supported on module functions"
 
-        if isNativeAsync && isGenerator then
+        if isNativeAsync && isGenerator && not isAsyncGenerator then
             addError com [] body.Range "AsyncFunction and GeneratorFunction cannot be combined"
 
         let ctx =
@@ -3672,14 +3714,17 @@ but thanks to the optimisation done below we get
             |> makeArrowFunctionExpression name
 
         | Fable.Delegate(args, body, name, tags) ->
-            if List.contains "fickl-generator-function" tags then
+            if
+                List.contains "fickl-generator-function" tags
+                || List.contains "fickl-async-generator-function" tags
+            then
                 match args with
                 | [ metadata ] ->
                     validateGeneratorReturn com metadata.Type body
 
                     let ctx =
                         { ctx with
-                            IsNativeAsync = false
+                            IsNativeAsync = List.contains "fickl-async-generator-function" tags
                             NativeGeneratorType = Some metadata.Type
                         }
 
@@ -3700,7 +3745,8 @@ but thanks to the optimisation done below we get
                         parameters,
                         block,
                         ?returnType = returnType,
-                        ?typeParameters = typeParameters
+                        ?typeParameters = typeParameters,
+                        isAsync = ctx.IsNativeAsync
                     )
                 | _ -> addErrorAndReturnNull com body.Range "Invalid native generator metadata"
             elif List.contains "fickl-generator-code" tags then
@@ -3889,6 +3935,24 @@ but thanks to the optimisation done below we get
 
         | Fable.CurriedApply(callee, args, typ, range) ->
             transformCurriedApplyAsStatements com ctx range typ returnStrategy callee args
+
+        | Fable.Emit(info, _, range) when List.contains "fickl-for-await" info.CallInfo.Tags ->
+            if not ctx.IsNativeAsync then
+                addError com [] range "for await requires a native async computation"
+                [||]
+            else
+                match info.CallInfo.Args with
+                | [ values; Fable.Delegate([ arg ], body, _, _) ] ->
+                    let right = com.TransformAsExpr(ctx, values)
+                    let ctx = { ctx with BoundTypes = Map.add arg.Name arg.Type ctx.BoundTypes }
+                    let statements = com.TransformAsStatements(ctx, None, body)
+
+                    [|
+                        ForOfStatement(Identifier.identifier arg.Name, right, BlockStatement statements, true, range)
+                    |]
+                | _ ->
+                    addError com [] range "Invalid native asynchronous iteration"
+                    [||]
 
         | Fable.Emit(info, _, range) when List.contains "fickl-generator-return" info.CallInfo.Tags ->
             if ctx.NativeGeneratorType.IsNone then
@@ -4724,24 +4788,30 @@ but thanks to the optimisation done below we get
             | _ -> None
         | _ -> None
 
-    let rec private tryNativeGeneratorBody =
+    let rec private tryNativeGeneratorBody isAsync =
         function
         | Fable.Call(Fable.Delegate([ _ ], body, _, tags), info, _, _) when
-            List.contains "fickl-generator-function" tags && info.Args.IsEmpty
+            List.contains
+                (if isAsync then
+                     "fickl-async-generator-function"
+                 else
+                     "fickl-generator-function")
+                tags
+            && info.Args.IsEmpty
             ->
             Some body
-        | Fable.TypeCast(body, _) -> tryNativeGeneratorBody body
+        | Fable.TypeCast(body, _) -> tryNativeGeneratorBody isAsync body
         | Fable.Let(ident, value, body) ->
-            tryNativeGeneratorBody body
+            tryNativeGeneratorBody isAsync body
             |> Option.map (fun body -> Fable.Let(ident, value, body))
         | Fable.Sequential expressions ->
             match List.rev expressions with
             | last :: rest ->
-                tryNativeGeneratorBody last
+                tryNativeGeneratorBody isAsync last
                 |> Option.map (fun body -> Fable.Sequential(List.rev rest @ [ body ]))
             | [] -> None
         | Fable.IfThenElse(guard, first, second, range) ->
-            match tryNativeGeneratorBody first, tryNativeGeneratorBody second with
+            match tryNativeGeneratorBody isAsync first, tryNativeGeneratorBody isAsync second with
             | Some first, Some second -> Some(Fable.IfThenElse(guard, first, second, range))
             | _ -> None
         | _ -> None
@@ -4790,8 +4860,13 @@ but thanks to the optimisation done below we get
                     ?typeParameters = typeParameters
                 )
             | None -> addErrorAndReturnNull com body.Range "AsyncFunction requires a jsAsync computation"
-        elif hasAttribute Atts.ficklGeneratorFunction info.Attributes then
-            match tryNativeGeneratorBody body with
+        elif
+            hasAttribute Atts.ficklGeneratorFunction info.Attributes
+            || hasAttribute Atts.ficklAsyncGeneratorFunction info.Attributes
+        then
+            let isAsync = hasAttribute Atts.ficklAsyncGeneratorFunction info.Attributes
+
+            match tryNativeGeneratorBody isAsync body with
             | Some body ->
                 validateGeneratorReturn com info.ReturnParameter.Type body
 
@@ -4816,9 +4891,17 @@ but thanks to the optimisation done below we get
                     args,
                     body,
                     ?returnType = returnType,
-                    ?typeParameters = typeParameters
+                    ?typeParameters = typeParameters,
+                    isAsync = isAsync
                 )
-            | None -> addErrorAndReturnNull com body.Range "GeneratorFunction requires a jsGenerator computation"
+            | None ->
+                addErrorAndReturnNull
+                    com
+                    body.Range
+                    (if isAsync then
+                         "AsyncGeneratorFunction requires a jsAsyncGenerator computation"
+                     else
+                         "GeneratorFunction requires a jsGenerator computation")
         else
             let capturesReceiver = usesGeneratorReceiver body
 

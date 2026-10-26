@@ -25,6 +25,8 @@ type JsAsyncBuilder() =
     member _.While(guard: unit -> bool, body: JS.Promise<unit>) : JS.Promise<unit> = nativeOnly
     /// <summary>Runs the body for each value in a sequence.</summary>
     member _.For(values: seq<'T>, body: 'T -> JS.Promise<unit>) : JS.Promise<unit> = nativeOnly
+    /// <summary>Awaits each value from an asynchronous source, closing its iterator on early exit.</summary>
+    member _.For(values: JS.AsyncIterable<'T>, body: 'T -> JS.Promise<unit>) : JS.Promise<unit> = nativeOnly
     /// <summary>Handles exceptions from a computation, including rejected Promises.</summary>
     member _.TryWith(body: JS.Promise<'T>, handler: exn -> JS.Promise<'T>) : JS.Promise<'T> = nativeOnly
     /// <summary>Runs compensation after the computation settles.</summary>

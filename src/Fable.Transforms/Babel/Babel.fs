@@ -181,6 +181,12 @@ type Statement =
         handler: CatchClause option *
         finalizer: BlockStatement option *
         loc: SourceLocation option
+    | ForOfStatement of
+        name: Identifier *
+        right: Expression *
+        body: BlockStatement *
+        isAwait: bool *
+        loc: SourceLocation option
     | ForStatement of
         body: BlockStatement *
         init: VariableDeclaration option *

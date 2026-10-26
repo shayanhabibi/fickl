@@ -688,6 +688,20 @@ module PrinterExtensions =
             | IfStatement(test, consequent, alternate, loc) ->
                 printer.PrintIfStatement(test, consequent, alternate, loc)
             | TryStatement(block, handler, finalizer, loc) -> printer.PrintTryStatement(block, handler, finalizer, loc)
+            | ForOfStatement(name, right, body, isAwait, loc) ->
+                printer.Print(
+                    (if isAwait then
+                         "for await (const "
+                     else
+                         "for (const "),
+                    ?loc = loc
+                )
+
+                printer.PrintIdent(name)
+                printer.Print(" of ")
+                printer.Print(right)
+                printer.Print(") ")
+                printer.Print(body)
             | ForStatement(body, init, test, update, loc) -> printer.PrintForStatement(body, init, test, update, loc)
             | BreakStatement(label, loc) ->
                 printer.Print("break", ?loc = loc)

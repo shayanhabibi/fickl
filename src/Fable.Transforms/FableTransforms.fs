@@ -922,6 +922,8 @@ module private Transforms =
 
     let curryReceivedArgs (com: Compiler) e =
         match e with
+        // This parameter is an iterator payload, not a callback argument from an uncurried call.
+        | Delegate(_, _, _, tags) when List.contains "fickl-iteration-body" tags -> e
         // Args passed to a lambda are not uncurried, as it's difficult to do it right, see #2657
         // | Lambda(arg, body, name)
         | Delegate(args, body, name, tags) ->

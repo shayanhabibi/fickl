@@ -1,0 +1,14 @@
+export const conversation = async function* (this: any, request: Promise<string>): AsyncGenerator<string, string, string> {
+    const _arg: string = await request;
+    const reply: string = yield _arg;
+    yield reply;
+    return "done:" + reply;
+};
+
+export const consume = async function (this: any, source: AsyncIterable<string>): Promise<string> {
+    let result = "";
+    for await (const _arg of source) {
+        result = (result + _arg);
+    }
+    return result;
+};

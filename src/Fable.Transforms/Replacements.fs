@@ -5217,7 +5217,49 @@ let private nativeGeneratorApi (com: ICompiler) r t (info: CallInfo) thisArg arg
         Helper.InstanceCall(generator, methodName, t, args, ?loc = r) |> Some
     | _ -> None
 
-let private nativeGenerator (com: ICompiler) (ctx: Context) r t (info: CallInfo) args =
+let rec private isNativeAsyncIterable (com: ICompiler) typ =
+    match typ with
+    | DeclaredType(ent, _) ->
+        ent.FullName = "Fable.Core.JS.AsyncIterable`1"
+        || ent.FullName = "Fickl.Core.JsAsyncGenerator`3"
+        || FSharp2Fable.Util.hasInterface "Fable.Core.JS.AsyncIterable`1" (com.GetEntity ent)
+    | GenericParam(_, _, constraints) ->
+        constraints
+        |> List.exists (
+            function
+            | Constraint.CoercesTo typ -> isNativeAsyncIterable com typ
+            | _ -> false
+        )
+    | _ -> false
+
+let private nativeForAwait r values arg body =
+    let info =
+        {
+            Macro = ""
+            IsStatement = true
+            CallInfo =
+                { makeCallInfo None [ values; Delegate([ arg ], body, None, [ "fickl-iteration-body" ]) ] [] with
+                    Tags = [ "fickl-for-await"; "fickl-native-await" ]
+                }
+        }
+
+    Emit(info, Unit, r)
+
+let rec private isNativeAsyncResource (com: ICompiler) typ =
+    match typ with
+    | DeclaredType(ent, _) ->
+        [ "System.IDisposable"; Types.iasyncdisposable; "Fickl.Core.JsAsyncDisposable" ]
+        |> List.exists (fun name -> ent.FullName = name || FSharp2Fable.Util.hasInterface name (com.GetEntity ent))
+    | GenericParam(_, _, constraints) ->
+        constraints
+        |> List.exists (
+            function
+            | Constraint.CoercesTo typ -> isNativeAsyncResource com typ
+            | _ -> false
+        )
+    | _ -> false
+
+let private nativeGenerator isAsync (com: ICompiler) (ctx: Context) r t (info: CallInfo) args =
     let code =
         function
         | MaybeCasted(Delegate([], body, _, tags)) when List.contains "fickl-generator-code" tags -> body
@@ -5257,19 +5299,44 @@ let private nativeGenerator (com: ICompiler) (ctx: Context) r t (info: CallInfo)
         | _ -> Any
 
     match info.CompiledName, args with
-    | ("jsGenerator" | "get_jsGenerator" | ".ctor"), ([] | [ Value(UnitConstant, _) ]) -> Value(Null t, r) |> Some
+    | "jsYield", [ value ] -> TypeCast(value, t) |> Some
+    | ("jsGenerator" | "get_jsGenerator" | "jsAsyncGenerator" | "get_jsAsyncGenerator" | ".ctor"),
+      ([] | [ Value(UnitConstant, _) ]) -> Value(Null t, r) |> Some
     | "Yield", [ value ] -> yieldValue Unit value |> Some
     | "YieldFrom", [ values ] -> yieldAll Unit values |> Some
     | "Return", [ value ] -> returnValue value |> Some
     | "ReturnFrom", [ generator ] -> yieldAll returnType generator |> returnValue |> Some
-    | "Bind", [ value; Body(arg, body) ] -> Let(arg, yieldValue arg.Type value, body) |> Some
+    | "Bind", [ value; Body(arg, body) ] ->
+        let isYieldRequest =
+            match value.Type with
+            | DeclaredType(ent, _) -> ent.FullName = "Fickl.Core.JsYieldRequest`2"
+            | _ -> false
+
+        let binding =
+            if isAsync && not isYieldRequest then
+                marked "fickl-native-await" arg.Type false [ value ] "await $0"
+            else
+                yieldValue arg.Type value
+
+        Let(arg, binding, body) |> Some
     | "Zero", ([] | [ Value(UnitConstant, _) ]) -> Value(UnitConstant, r) |> Some
     | "Delay", [ Body(_, body) ] -> Delegate([], body, None, [ "fickl-generator-code" ]) |> Some
     | "Run", [ MaybeCasted(Delegate([], body, _, tags)) ] when List.contains "fickl-generator-code" tags ->
         let metadata = makeTypedIdent t $"generatorType{com.IncrementCounter()}"
 
         let callback =
-            Delegate([ metadata ], body, None, [ "not-arrow"; "fickl-generator-function" ])
+            Delegate(
+                [ metadata ],
+                body,
+                None,
+                [
+                    "not-arrow"
+                    if isAsync then
+                        "fickl-async-generator-function"
+                    else
+                        "fickl-generator-function"
+                ]
+            )
 
         let callInfo = { makeCallInfo None [] [] with Tags = [ "fickl-generator-run" ] }
         Call(callback, callInfo, t, r) |> Some
@@ -5278,10 +5345,23 @@ let private nativeGenerator (com: ICompiler) (ctx: Context) r t (info: CallInfo)
     | "TryWith", [ body; Body(error, handler) ] -> TryCatch(code body, Some(error, handler), None, r) |> Some
     | "TryFinally", [ body; Body(_, compensation) ] -> TryCatch(code body, None, Some compensation, r) |> Some
     | "Using", [ resource; Body(arg, body) ] ->
+        if isAsync && not (isNativeAsyncResource com arg.Type) then
+            addError
+                com
+                ctx.InlinePath
+                r
+                "jsAsyncGenerator.use requires IDisposable, IAsyncDisposable, or JsAsyncDisposable"
+
         let dispose =
-            Helper.LibCall(com, "Util", "disposeSafe", Unit, [ IdentExpr arg ], ?loc = r)
+            if isAsync then
+                Helper.LibCall(com, "Util", "disposeAsyncSafe", Any, [ IdentExpr arg ], ?loc = r)
+                |> fun promise -> marked "fickl-native-await" Unit false [ promise ] "await $0"
+            else
+                Helper.LibCall(com, "Util", "disposeSafe", Unit, [ IdentExpr arg ], ?loc = r)
 
         Let(arg, resource, TryCatch(body, None, Some dispose, r)) |> Some
+    | "For", [ values; Body(arg, body) ] when isAsync && isNativeAsyncIterable com values.Type ->
+        nativeForAwait r values arg body |> Some
     | "For", [ values; Body(arg, body) ] ->
         let iterator = makeTypedIdent Any $"iterator{com.IncrementCounter()}"
         let iteratorExpr = IdentExpr iterator
@@ -5357,6 +5437,8 @@ let private nativeAsync (com: ICompiler) (ctx: Context) r t (info: CallInfo) arg
             Helper.LibCall(com, "Util", "disposeSafe", Unit, [ IdentExpr arg ], ?loc = r)
 
         Let(arg, resource, TryCatch(body, None, Some dispose, r)) |> Some
+    | "For", [ values; Body(arg, body) ] when isNativeAsyncIterable com values.Type ->
+        nativeForAwait r values arg body |> Some
     | "For", [ values; Body(arg, body) ] ->
         let iterator = makeTypedIdent Any $"iterator{com.IncrementCounter()}"
         let iteratorExpr = IdentExpr iterator
@@ -5438,7 +5520,10 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | "Fickl.Core.JsAsyncBuilder"
     | "Fickl.Core.NativeAsync" -> nativeAsync com ctx r t info args
     | Naming.StartsWith "Fickl.Core.JsGeneratorBuilder" _
-    | "Fickl.Core.NativeGenerators" -> nativeGenerator com ctx r t info args
+    | "Fickl.Core.NativeGenerators" -> nativeGenerator false com ctx r t info args
+    | Naming.StartsWith "Fickl.Core.JsAsyncGeneratorBuilder" _
+    | "Fickl.Core.NativeAsyncGenerators" -> nativeGenerator true com ctx r t info args
+    | "Fickl.Core.JsAsyncGenerator`3"
     | "Fickl.Core.JsGenerator`3" -> nativeGeneratorApi com r t info thisArg args
     | Naming.EndsWith "Exception" _ -> exceptions com ctx r t info thisArg args
     | "System.Timers.ElapsedEventArgs" -> thisArg // only signalTime is available here

@@ -11,6 +11,7 @@ let allTests =
     NativeDisposal.tests
     NativeAsync.tests
     NativeGenerators.tests
+    NativeAsyncGenerators.tests
     Currying.tests
     FcsEdgeCases.tests
     Arithmetic.tests
