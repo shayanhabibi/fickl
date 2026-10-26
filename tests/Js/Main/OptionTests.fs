@@ -215,6 +215,13 @@ let tests =
         ValueSome 5 |> ValueOption.orElseWith (fun () -> ValueSome 1) |> equal (ValueSome 5)
         ValueNone |> ValueOption.orElseWith (fun () -> ValueSome 1) |> equal (ValueSome 1)
 
+    testCase "Option.count/ValueOption.count work" <| fun () -> // See fickl#107
+        Some 1 |> Option.count |> equal 1
+        (None: int option) |> Option.count |> equal 0
+        Some(None: int option) |> Option.count |> equal 1
+        ValueSome 1 |> ValueOption.count |> equal 1
+        (ValueNone: int voption) |> ValueOption.count |> equal 0
+
     testCase "Option.contains works" <| fun () ->
         Some "test" |> Option.contains "test" |> equal true
         Some "123" |> Option.contains "test" |> equal false

@@ -2272,7 +2272,11 @@ let optionModule isStruct (com: ICompiler) (ctx: Context) r (t: Type) (i: CallIn
     | "OrElseWith", [ ifNoneThunk; opt ] -> Options.orElseWith com ctx r t ifNoneThunk opt |> Some
     | "Iterate", [ action; opt ] -> Options.iterate com ctx r t action opt |> Some
     | ("Count" | "Contains" | "Exists" | "Fold" | "ForAll" as meth), _ ->
-        let meth = Naming.lowerFirst meth
+        let meth =
+            match meth with
+            | "Count" -> "length"
+            | meth -> Naming.lowerFirst meth
+
         let args = args |> List.replaceLast (toArray None t)
         let args = injectArg com ctx r "Seq" meth i.GenericArgs args
 

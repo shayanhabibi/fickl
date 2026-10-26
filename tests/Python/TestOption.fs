@@ -238,6 +238,14 @@ let ``test ValueOption.map/map2/map3/bind/filter/defaultWith/orElseWith work`` (
     ValueNone |> ValueOption.orElseWith (fun () -> ValueSome 1) |> equal (ValueSome 1)
 
 [<Fact>]
+let ``test Option.count/ValueOption.count work`` () =
+    Some 1 |> Option.count |> equal 1
+    (None: int option) |> Option.count |> equal 0
+    Some(None: int option) |> Option.count |> equal 1
+    ValueSome 1 |> ValueOption.count |> equal 1
+    (ValueNone: int voption) |> ValueOption.count |> equal 0
+
+[<Fact>]
 let ``test Option.contains works`` () =
     Some "test" |> Option.contains "test" |> equal true
     Some "123" |> Option.contains "test" |> equal false
