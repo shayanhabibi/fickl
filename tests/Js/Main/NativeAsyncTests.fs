@@ -43,11 +43,35 @@ let private readReceiver () : JS.Promise<string> = jsAsync {
     do! JS.Constructors.Promise.resolve(())
     return emitJsExpr () "this.tag"
 }
+
+let private expressionIdentity<'T> (value: 'T) : JS.Promise<'T> = jsAsync { return value }
+let private expressionList<'T> (value: 'T list) : JS.Promise<'T list> = jsAsync { return value }
+let private expressionArray<'T> (value: 'T array) : JS.Promise<'T array> = jsAsync { return value }
+let private expressionBind<'T> (promise: JS.Promise<'T>) : JS.Promise<'T> = jsAsync {
+    let! value = promise
+    return value
+}
+let private expressionReturnFrom<'T> (promise: JS.Promise<'T>) : JS.Promise<'T> = jsAsync { return! promise }
 #endif
 
 let tests =
     testList "NativeAsync" [
 #if FABLE_COMPILER
+        testCaseAsync "generic native async expressions retain scalar and collection types" <| fun () -> async {
+            let! scalar = expressionIdentity "value" |> Async.AwaitPromise
+            scalar |> equal "value"
+            let! values = expressionList [ 20; 22 ] |> Async.AwaitPromise
+            values |> equal [ 20; 22 ]
+            let! array = expressionArray [| "a"; "b" |] |> Async.AwaitPromise
+            array |> equal [| "a"; "b" |]
+            let! bound = expressionBind (JS.Constructors.Promise.resolve(42)) |> Async.AwaitPromise
+            bound |> equal 42
+            let! delegated = expressionReturnFrom (JS.Constructors.Promise.resolve(42)) |> Async.AwaitPromise
+            delegated |> equal 42
+            let! callback = expressionIdentity (fun first second -> first + second) |> Async.AwaitPromise
+            callback 20 22 |> equal 42
+        }
+
         testCaseAsync "native async exports await promises and retain AsyncFunction identity" <| fun () -> async {
             emitJsExpr fetchTwice "$0.constructor.name" |> equal "AsyncFunction"
             let! value = fetchTwice (JS.Constructors.Promise.resolve(21)) |> Async.AwaitPromise
