@@ -1719,35 +1719,53 @@ module Util =
     let assign range left right =
         Expression.assignmentExpression (AssignEqual, left, right, ?loc = range)
 
-    /// <summary>Checks that a generator with a non-unit terminal type cannot fall through without returning.</summary>
-    let validateGeneratorReturn (com: IBabelCompiler) generatorType (body: Fable.Expr) =
-        let rec isPromise =
-            function
-            | Fable.DeclaredType(ent, _) ->
-                ent.FullName = "Fable.Core.JS.Promise`1"
-                || ent.FullName = "System.Threading.Tasks.Task"
-                || ent.FullName = "System.Threading.Tasks.Task`1"
-                || ent.FullName = "System.Threading.Tasks.ValueTask"
-            | Fable.GenericParam(_, _, constraints) ->
-                constraints
-                |> List.exists (
-                    function
-                    | Fable.Constraint.CoercesTo typ -> isPromise typ
-                    | _ -> false
-                )
-            | _ -> false
+    let rec private isPromiseLike =
+        function
+        | Fable.DeclaredType(ent, _) ->
+            ent.FullName = "Fable.Core.JS.Promise`1"
+            || ent.FullName = "System.Threading.Tasks.Task"
+            || ent.FullName = "System.Threading.Tasks.Task`1"
+            || ent.FullName = "System.Threading.Tasks.ValueTask"
+        | Fable.GenericParam(_, _, constraints) ->
+            constraints
+            |> List.exists (
+                function
+                | Fable.Constraint.CoercesTo typ -> isPromiseLike typ
+                | _ -> false
+            )
+        | _ -> false
 
+    let private validateAsyncGeneratorPayload (com: IBabelCompiler) range generatorType =
         match generatorType with
         | Fable.DeclaredType(ent, [ yieldType; returnType; _ ]) when
             ent.FullName = "Fickl.Core.JsAsyncGenerator`3"
-            && (isPromise yieldType || isPromise returnType)
+            && (isPromiseLike yieldType || isPromiseLike returnType)
             ->
             addError
                 com
                 []
-                body.Range
+                range
                 "Async generator yield and terminal types must be resolved values; await promises with let! before yielding or returning"
         | _ -> ()
+
+    let private hasNativeAsyncPromisePayload =
+        function
+        | Fable.DeclaredType(ent, [ payload ]) -> ent.FullName = "Fable.Core.JS.Promise`1" && isPromiseLike payload
+        | _ -> false
+
+    let private validateNativeAsyncPayload (com: IBabelCompiler) range typ =
+        match typ with
+        | _ when hasNativeAsyncPromisePayload typ ->
+            addError
+                com
+                []
+                range
+                "Native async computations must return resolved values; await promises with let! or return! before returning"
+        | _ -> ()
+
+    /// <summary>Checks that a generator with a non-unit terminal type cannot fall through without returning.</summary>
+    let validateGeneratorReturn (com: IBabelCompiler) generatorType (body: Fable.Expr) =
+        validateAsyncGeneratorPayload com body.Range generatorType
 
         let rec finishes targets visited =
             function
@@ -3301,6 +3319,22 @@ but thanks to the optimisation done below we get
         | _ -> None
 
     let transformCall (com: IBabelCompiler) ctx range typ callee (callInfo: Fable.CallInfo) =
+        validateAsyncGeneratorPayload com range typ
+
+        if hasNativeAsyncPromisePayload typ then
+            let isNativeAsync =
+                List.contains "fickl-async-run" callInfo.Tags
+                || (callInfo.MemberRef
+                    |> Option.bind com.TryGetMember
+                    |> Option.exists (fun info ->
+                        hasAttribute Atts.ficklAsyncFunction info.Attributes
+                        || FSharp2Fable.Util.isNativeAsyncFactory com info
+                    ))
+                || isLocalNativeAsyncCallee ctx callee callInfo.MemberRef
+
+            if isNativeAsync then
+                validateNativeAsyncPayload com range typ
+
         // Try to optimize some patterns after FableTransforms
         match optimizeCall com ctx range typ callee callInfo with
         | Some e -> e
@@ -3349,6 +3383,22 @@ but thanks to the optimisation done below we get
                     callFunction com ctx range callee callInfo.GenericArgs (thisArg :: args)
 
     let transformCurriedApply (com: IBabelCompiler) ctx range (applied: Fable.Expr) args =
+        let resultType =
+            (applied.Type, args)
+            ||> List.fold (fun typ _ ->
+                match typ with
+                | Fable.LambdaType(_, returnType) -> returnType
+                | _ -> Fable.Any
+            )
+
+        validateAsyncGeneratorPayload com range resultType
+
+        if
+            hasNativeAsyncPromisePayload resultType
+            && isLocalNativeAsyncCallee ctx applied None
+        then
+            validateNativeAsyncPayload com range resultType
+
         // decision: declaration types preserve generic unit arguments despite specialized identifier types at call sites
         let appliedType =
             match applied with
@@ -5179,6 +5229,26 @@ but thanks to the optimisation done below we get
             | _ -> None
         | _ -> None
 
+    // Also recognize local callees without a member reference using their transformed bodies.
+    let private isLocalNativeAsyncCallee ctx callee memberRef =
+        let rec find declarations =
+            declarations
+            |> List.exists (
+                function
+                | Fable.ModuleDeclaration declaration -> find declaration.Members
+                | Fable.MemberDeclaration declaration ->
+                    let matches =
+                        match memberRef, callee with
+                        | Some memberRef, _ -> memberRef = declaration.MemberRef
+                        | None, MaybeCasted(Fable.IdentExpr ident) -> ident.Name = declaration.Name
+                        | _ -> false
+
+                    matches && Option.isSome (tryNativeAsyncBody declaration.Body)
+                | _ -> false
+            )
+
+        find ctx.File.Declarations
+
     let rec private tryNativeGeneratorBody isAsync =
         function
         | Fable.Call(Fable.Delegate([ _ ], body, _, tags), info, _, _) when
@@ -5225,6 +5295,8 @@ but thanks to the optimisation done below we get
                 args, body
 
         if hasAttribute Atts.ficklAsyncFunction info.Attributes then
+            validateNativeAsyncPayload com body.Range info.ReturnParameter.Type
+
             match tryNativeAsyncBody body with
             | Some body ->
                 let args, body, returnType, typeParameters =

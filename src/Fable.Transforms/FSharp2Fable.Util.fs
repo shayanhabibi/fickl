@@ -2282,6 +2282,58 @@ module Util =
 
         Fable.TryCatch(body, catchClause, finalizer, r)
 
+    /// <summary>Recognizes source factories whose returned computation is native async, including across files.</summary>
+    let isNativeAsyncFactory (com: Compiler) (info: Fable.MemberFunctionOrValue) =
+        let rec returnsNativeAsync =
+            function
+            | FSharpExprPatterns.Call(_, memb, _, _, [ _ ]) when
+                memb.CompiledName = "Run"
+                && (memb.DeclaringEntity
+                    |> Option.exists (fun ent -> FsEnt.FullName ent = "Fickl.Core.JsAsyncBuilder"))
+                ->
+                true
+            | FSharpExprPatterns.Let(_, body)
+            | FSharpExprPatterns.LetRec(_, body)
+            | FSharpExprPatterns.Sequential(_, body)
+            | FSharpExprPatterns.Coerce(_, body)
+            | FSharpExprPatterns.TypeLambda(_, body)
+            | FSharpExprPatterns.TryFinally(body, _, _, _) -> returnsNativeAsync body
+            | FSharpExprPatterns.Application(FSharpExprPatterns.Lambda(_, body), _, _) -> returnsNativeAsync body
+            | FSharpExprPatterns.IfThenElse(_, first, second) -> returnsNativeAsync first || returnsNativeAsync second
+            | FSharpExprPatterns.TryWith(body, _, _, _, handler, _, _) ->
+                returnsNativeAsync body || returnsNativeAsync handler
+            | _ -> false
+
+        match info with
+        | :? FsMemberFunctionOrValue as info ->
+            let target = info.FSharpMemberOrFunctionOrValue
+
+            let fileName =
+                target.DeclarationLocation.FileName |> Path.normalizePathAndEnsureFsExtension
+
+            if
+                com.SourceFiles
+                |> Array.exists (fun source -> Path.normalizePathAndEnsureFsExtension source = fileName)
+            then
+                com.AddWatchDependency fileName
+
+                let rec find declarations =
+                    declarations
+                    |> List.exists (
+                        function
+                        | FSharpImplementationFileDeclaration.Entity(_, declarations) -> find declarations
+                        | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue(memb, _, body) when
+                            memb.Equals target
+                            ->
+                            returnsNativeAsync body
+                        | _ -> false
+                    )
+
+                find (com.GetImplementationFile fileName)
+            else
+                false
+        | _ -> false
+
     /// Temporary fix for try/with with filtered (typed or `when`) handlers in seq expressions.
     /// FCS compiles the handler of RuntimeHelpers.EnumerateTryWith with FailFilter as the
     /// match-failure action (CheckSequenceExpressions.fs), so the handler's unmatched fallback

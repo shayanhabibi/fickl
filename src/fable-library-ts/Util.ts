@@ -119,6 +119,99 @@ export function isPromise(x: any) {
   return x instanceof Promise;
 }
 
+/** Rejects opaque thenable payloads before native async resolution can change their value or type. */
+export function ensureResolvedAsyncValue<T>(value: T): T {
+  if (value != null && (typeof value === "object" || typeof value === "function")
+    && typeof (value as { then?: unknown }).then === "function") {
+    throw new TypeError("Native async payloads must be resolved values; await promises before yielding or returning");
+  }
+  return value;
+}
+
+/** Checks delegated payloads before native async iteration adopts them, preserving the iterator protocol. */
+export function ensureResolvedAsyncIterable<T>(source: Iterable<T> | AsyncIterable<T>, checkReturn: boolean): AsyncIterable<T> {
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<T, unknown, unknown> {
+      const asyncMethod = (source as AsyncIterable<T>)[Symbol.asyncIterator];
+      const isAsync = asyncMethod != null;
+      const method = isAsync ? asyncMethod : (source as Iterable<T>)[Symbol.iterator];
+      const iterator = Reflect.apply(method, source, []) as Iterator<T, unknown, unknown> | AsyncIterator<T, unknown, unknown>;
+      const isObject = (value: unknown): value is object => value != null && (typeof value === "object" || typeof value === "function");
+      if (!isObject(iterator)) {
+        throw new TypeError("Iterator must be an object");
+      }
+      const next = iterator.next;
+
+      const closeAfterValidation = async (): Promise<void> => {
+        const close = iterator.return;
+        if (close != null) {
+          const result = Reflect.apply(close, iterator, []);
+          if (isAsync) {
+            await result;
+          } else if (isObject(result)) {
+            // Async-from-sync return reads done before awaiting value, without adopting the result object.
+            Boolean((result as IteratorResult<T, unknown>).done);
+            await (result as IteratorResult<T, unknown>).value;
+          }
+        }
+      };
+
+      const normalize = async (raw: unknown): Promise<IteratorResult<T, unknown>> => {
+        const result = isAsync ? await raw : raw;
+        if (!isObject(result)) {
+          throw new TypeError("Iterator result must be an object");
+        }
+        const done = Boolean((result as IteratorResult<T, unknown>).done);
+        let value = (result as IteratorResult<T, unknown>).value;
+        if (!done || checkReturn) {
+          try {
+            ensureResolvedAsyncValue(value);
+          } catch (error) {
+            if (!done) {
+              try {
+                await closeAfterValidation();
+              } catch {
+                // IteratorClose preserves the original abrupt completion when cleanup also fails.
+              }
+            }
+            throw error;
+          }
+        }
+        if (!isAsync) {
+          value = await value;
+        }
+        return done ? { done: true, value } : { done: false, value: value as T };
+      };
+
+      return {
+        next: async (...args: [] | [unknown]) => normalize(Reflect.apply(next, iterator, args)),
+        get return() {
+          const close = iterator.return;
+          return close == null ? undefined : async (...args: unknown[]) => normalize(Reflect.apply(close, iterator, args));
+        },
+        get throw() {
+          const raise = iterator.throw;
+          if (raise != null) {
+            return async (...args: unknown[]) => normalize(Reflect.apply(raise, iterator, args));
+          }
+          return async () => {
+            // Missing throw closes without inspecting the close result's done or value properties.
+            const close = iterator.return;
+            if (close != null) {
+              const raw = Reflect.apply(close, iterator, []);
+              const result = isAsync ? await raw : raw;
+              if (!isObject(result)) {
+                throw new TypeError("Iterator result must be an object");
+              }
+            }
+            throw new TypeError("Iterator does not provide a throw method");
+          };
+        },
+      };
+    },
+  };
+}
+
 export function ensureErrorOrException(e: any): any {
   // Exceptionally admitting promises as errors for compatibility with React.suspense (see #3298)
   return (isException(e) || isPromise(e)) ? e : new Exception(String(e));

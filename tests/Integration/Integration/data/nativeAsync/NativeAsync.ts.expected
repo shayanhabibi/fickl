@@ -1,7 +1,7 @@
 "use server";
 
+import { MutableArray, ensureResolvedAsyncValue } from "./fable_modules/fable-library-ts.5.24.0/Util.ts";
 import { FSharpList } from "./fable_modules/fable-library-ts.5.24.0/List.ts";
-import { MutableArray } from "./fable_modules/fable-library-ts.5.24.0/Util.ts";
 import { int32 } from "./fable_modules/fable-library-ts.5.24.0/Int32.ts";
 
 
@@ -10,23 +10,23 @@ export const load = async function (this: any, promise: Promise<string>): Promis
 };
 
 export const identity = async function <T>(this: any, value: T): Promise<T> {
-    return value;
+    return ensureResolvedAsyncValue<T>(value);
 };
 
 export function expressionIdentity<T>(value: T): Promise<T> {
-    return (async (): Promise<T> => value)();
+    return (async (): Promise<T> => ensureResolvedAsyncValue<T>(value))();
 }
 
 export function expressionList<T>(value: FSharpList<T>): Promise<FSharpList<T>> {
-    return (async (): Promise<FSharpList<T>> => value)();
+    return (async (): Promise<FSharpList<T>> => ensureResolvedAsyncValue<FSharpList<T>>(value))();
 }
 
 export function expressionArray<T>(value: MutableArray<T>): Promise<MutableArray<T>> {
-    return (async (): Promise<MutableArray<T>> => value)();
+    return (async (): Promise<MutableArray<T>> => ensureResolvedAsyncValue<MutableArray<T>>(value))();
 }
 
 export function expressionBind<T>(promise: Promise<T>): Promise<T> {
-    return (async (): Promise<T> => (await promise))();
+    return (async (): Promise<T> => ensureResolvedAsyncValue<T>(await promise))();
 }
 
 export function expressionReturnFrom<T>(promise: Promise<T>): Promise<T> {
@@ -34,7 +34,7 @@ export function expressionReturnFrom<T>(promise: Promise<T>): Promise<T> {
 }
 
 export function expressionConditional<T>(choose: boolean, first: T, second: T): Promise<T> {
-    return (async (): Promise<T> => (choose ? first : second))();
+    return (async (): Promise<T> => (choose ? ensureResolvedAsyncValue<T>(first) : ensureResolvedAsyncValue<T>(second)))();
 }
 
 function genericFunction<$a>(value: $a): $a {
@@ -46,13 +46,13 @@ function genericCurried<$a, $b>(first: $a, _second: $b): $a {
 }
 
 export function specializedFunction(): Promise<((arg0: int32) => int32)> {
-    return (async (): Promise<((arg0: int32) => int32)> => ((value: int32): int32 => (genericFunction<int32>(value) | 0)))();
+    return (async (): Promise<((arg0: int32) => int32)> => ensureResolvedAsyncValue<((arg0: int32) => int32)>((value: int32): int32 => (genericFunction<int32>(value) | 0)))();
 }
 
 export function specializedCurriedFunction(): Promise<((arg0: int32) => ((arg0: string) => int32))> {
-    return (async (): Promise<((arg0: int32) => ((arg0: string) => int32))> => ((first: int32): ((arg0: string) => int32) => ((_second: string): int32 => (genericCurried<int32, string>(first, _second) | 0))))();
+    return (async (): Promise<((arg0: int32) => ((arg0: string) => int32))> => ensureResolvedAsyncValue<((arg0: int32) => ((arg0: string) => int32))>((first: int32): ((arg0: string) => int32) => ((_second: string): int32 => (genericCurried<int32, string>(first, _second) | 0))))();
 }
 
 export function specializedLocalFunction(): Promise<((arg0: int32) => int32)> {
-    return (async (): Promise<((arg0: int32) => int32)> => ((value: int32): int32 => (value | 0)))();
+    return (async (): Promise<((arg0: int32) => int32)> => ensureResolvedAsyncValue<((arg0: int32) => int32)>((value: int32): int32 => (value | 0)))();
 }

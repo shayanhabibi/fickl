@@ -5,9 +5,11 @@ open Fable.Core
 
 /// <summary>Builds native JavaScript async computations with Promise bindings.</summary>
 /// <remarks>Use through <c>jsAsync</c>. Bindings compile to <c>await</c>; execution starts immediately.
-/// Supports JavaScript and TypeScript and has no F# Async cancellation token.</remarks>
+/// Supports JavaScript and TypeScript and has no F# Async cancellation token.
+/// Return resolved values; use <c>return!</c> to adopt a Promise instead of constructing a nested Promise type.
+/// Top-level thenables are rejected at runtime when their types are opaque; use a record to carry a Promise as data.</remarks>
 type JsAsyncBuilder() =
-    /// <summary>Returns a value from the computation.</summary>
+    /// <summary>Returns a resolved value from the computation.</summary>
     member _.Return(value: 'T) : JS.Promise<'T> = nativeOnly
     /// <summary>Awaits and returns another Promise.</summary>
     member _.ReturnFrom(promise: JS.Promise<'T>) : JS.Promise<'T> = nativeOnly
