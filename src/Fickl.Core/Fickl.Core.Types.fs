@@ -52,8 +52,8 @@ type CaseTestAttribute(test: string) =
 ///     | Save
 /// </code>
 /// The TypeScript type of the <c>Take</c> case is <c>Take &amp; { type: "take" }</c>.
-/// Constructing the case copies the field value with its prototype and sets the tag on the copy.
-/// Reading the field returns the union value.
+/// Constructing the case creates a tagged view that forwards properties and methods to the original field value.
+/// The tag leaves the original value unchanged. Reading the field returns the original object with its identity and state.
 /// </remarks>
 type InlineInterfaceAttribute() =
     inherit Attribute()
