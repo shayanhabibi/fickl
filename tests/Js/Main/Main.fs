@@ -10,6 +10,7 @@ let allTests =
     NativeFunctions.tests
     NativeDisposal.tests
     NativeAsync.tests
+    NativeGenerators.tests
     Currying.tests
     FcsEdgeCases.tests
     Arithmetic.tests

@@ -2464,6 +2464,9 @@ module Util =
             entFullName = "Fickl.Core.JsInterop"
             || entFullName = "Fickl.Core.JsAsyncBuilder"
             || entFullName = "Fickl.Core.NativeAsync"
+            || entFullName.StartsWith("Fickl.Core.JsGeneratorBuilder", StringComparison.Ordinal)
+            || entFullName = "Fickl.Core.NativeGenerators"
+            || entFullName = "Fickl.Core.JsGenerator`3"
             || (entFullName.StartsWith("Fable.Core.", StringComparison.Ordinal)
                 && (not (entFullName.StartsWith("Fable.Core.JS.", StringComparison.Ordinal))
                     || entFullName.EndsWith("Attribute", StringComparison.Ordinal)))

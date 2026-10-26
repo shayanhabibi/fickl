@@ -286,7 +286,8 @@ module PrinterExtensions =
                 loc,
                 ?isDeclaration,
                 ?isArrow,
-                ?isAsync
+                ?isAsync,
+                ?isGenerator
             )
             =
 
@@ -344,7 +345,13 @@ module PrinterExtensions =
                 if isAsync then
                     printer.Print("async ")
 
-                printer.Print("function ")
+                printer.Print(
+                    if defaultArg isGenerator false then
+                        "function* "
+                    else
+                        "function "
+                )
+
                 printer.PrintOptional(id)
                 printer.Print(typeParameters)
                 printer.Print("(")
@@ -375,7 +382,8 @@ module PrinterExtensions =
             | ObjectExpression _
             | ClassExpression _
             | FunctionExpression _
-            | AsyncFunctionExpression _ -> true
+            | AsyncFunctionExpression _
+            | GeneratorFunctionExpression _ -> true
             | AsExpression(e, _) -> printer.NeedsParensAsExpressionStatement(e)
             | BinaryExpression(left, _, _, _)
             | LogicalExpression(left, _, _, _)
@@ -611,6 +619,17 @@ module PrinterExtensions =
                     loc,
                     isAsync = true,
                     isArrow = isArrow
+                )
+            | GeneratorFunctionExpression(id, parameters, body, returnType, typeParameters, loc, isAsync) ->
+                printer.PrintFunction(
+                    id,
+                    parameters,
+                    body,
+                    typeParameters,
+                    returnType,
+                    loc,
+                    isAsync = isAsync,
+                    isGenerator = true
                 )
             | ArrowFunctionExpression(parameters, body, returnType, typeParameters, loc) ->
                 printer.PrintArrowFunctionExpression(parameters, body, returnType, typeParameters, loc)

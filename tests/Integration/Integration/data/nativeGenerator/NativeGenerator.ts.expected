@@ -1,0 +1,8 @@
+
+
+export const conversation = function* (this: any, request: string): Generator<string, string, string> {
+    const reply: string = yield request;
+    yield reply;
+    return "done:" + reply;
+};
+

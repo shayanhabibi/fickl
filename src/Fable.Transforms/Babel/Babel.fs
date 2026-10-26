@@ -83,6 +83,15 @@ type Expression =
         typeParameters: TypeParameter array *
         loc: SourceLocation option *
         isArrow: bool
+    /// <summary>A native generator function, optionally asynchronous.</summary>
+    | GeneratorFunctionExpression of
+        id: Identifier option *
+        parameters: Parameter array *
+        body: BlockStatement *
+        returnType: TypeAnnotation option *
+        typeParameters: TypeParameter array *
+        loc: SourceLocation option *
+        isAsync: bool
     | ArrowFunctionExpression of
         parameters: Parameter array *
         body: BlockStatement *
@@ -113,6 +122,7 @@ type Expression =
         | NewExpression(loc = loc) -> loc
         | FunctionExpression(loc = loc) -> loc
         | AsyncFunctionExpression(loc = loc) -> loc
+        | GeneratorFunctionExpression(loc = loc) -> loc
         | ArrowFunctionExpression(loc = loc) -> loc
         | _ -> None
 
@@ -665,6 +675,18 @@ module Helpers =
                 defaultArg typeParameters [||],
                 loc,
                 defaultArg isArrow false
+            )
+
+        /// <summary>Creates a native generator function with optional TypeScript annotations.</summary>
+        static member generatorFunctionExpression(parameters, body, ?id, ?returnType, ?typeParameters, ?loc, ?isAsync) =
+            GeneratorFunctionExpression(
+                id,
+                parameters,
+                body,
+                returnType,
+                defaultArg typeParameters [||],
+                loc,
+                defaultArg isAsync false
             )
 
         static member classExpression(members, ?id, ?isAbstract, ?superClass, ?typeParameters, ?implements, ?loc) =

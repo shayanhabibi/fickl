@@ -124,6 +124,9 @@ module Atts =
     let ficklAsyncFunction = "Fickl.Core.AsyncFunctionAttribute"
 
     [<Literal>]
+    let ficklGeneratorFunction = "Fickl.Core.GeneratorFunctionAttribute"
+
+    [<Literal>]
     let ficklNoOverloadSuffix = "Fickl.Core.NoOverloadSuffixAttribute" // typeof<Fickl.Core.NoOverloadSuffixAttribute>.FullName
 
     [<Literal>]

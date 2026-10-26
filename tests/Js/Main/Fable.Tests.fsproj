@@ -67,6 +67,7 @@
     <Compile Include="NativeFunctionTests.fs" />
     <Compile Include="NativeDisposalTests.fs" />
     <Compile Include="NativeAsyncTests.fs" />
+    <Compile Include="NativeGeneratorTests.fs" />
     <Compile Include="CurryingTests.fs" />
     <Compile Include="FcsEdgeCasesHelper.fs" />
     <Compile Include="FcsEdgeCaseTests.fs" />
