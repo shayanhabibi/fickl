@@ -15,6 +15,109 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "Native decorators reject mixed property and accessor placements" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid() =
+    let mutable value = ""
+    [<JsDecorator("decorate")>]
+    member _.Value
+        with get() = value
+        and [<JsDecorator("other")>] set(next) = value <- next
+"""
+      |> Assert.Exists.errorWith "JsDecorator cannot combine property-level and explicit accessor decorators"
+      |> ignore
+
+    testCase "Native decorators reject module functions" <| fun _ ->
+      compile """
+open Fickl.Core
+[<JsDecorator("decorate")>]
+let invalid value = value
+"""
+      |> Assert.Exists.errorWith "JsDecorator requires a concrete class member"
+      |> ignore
+
+    testCase "Native decorators reject abstract interface slots" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid =
+    [<JsDecorator("decorate")>]
+    abstract Value: string
+"""
+      |> Assert.Exists.errorWith "JsDecorator requires a concrete class member"
+      |> ignore
+
+    testCase "Native decorators reject erased class targets" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+[<Erase; JsDecorator("decorate")>]
+type Invalid() = class end
+"""
+      |> Assert.Exists.errorWith "JsDecorator requires a concrete emitted class"
+      |> ignore
+
+    testCase "Native decorators reject constructor-dependent property initializers" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid(value: int) =
+    [<JsDecorator("decorate")>]
+    member val Value = value with get, set
+"""
+      |> Assert.Exists.errorWith "Decorated auto-properties require literal initializers before constructor side effects"
+      |> ignore
+
+    testCase "Native decorators preserve constructor side-effect ordering" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid() =
+    do printfn "before"
+    [<JsDecorator("decorate")>]
+    member val Value = 0 with get, set
+"""
+      |> Assert.Exists.errorWith "Decorated auto-properties require literal initializers before constructor side effects"
+      |> ignore
+
+    testCase "Native decorators reject conflicting property storage modes" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid() =
+    [<JsDecorator("decorate", true); JsDecorator("other")>]
+    member val Value = 0 with get, set
+"""
+      |> Assert.Exists.errorWith "Decorators on one auto-property must agree on field mode"
+      |> ignore
+
+    testCase "Native decorators reject empty expressions" <| fun _ ->
+      compile """
+open Fickl.Core
+[<JsDecorator("")>]
+type Invalid() = class end
+"""
+      |> Assert.Exists.errorWith "JsDecorator requires a non-empty decorator expression"
+      |> ignore
+
+    testCase "Native decorators reject invalid field mode placements" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid() =
+    [<JsDecorator("decorate", true)>]
+    member _.Value = 42
+"""
+      |> Assert.Exists.errorWith "JsDecorator field mode requires a mutable auto-property"
+      |> ignore
+
+    testCase "Native decorators reject overloaded F# methods" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid() =
+    [<JsDecorator("decorate")>]
+    member _.Value(value: int) = string value
+    member _.Value(value: string) = value
+"""
+      |> Assert.Exists.errorWith "JsDecorator does not support overloaded F# members"
+      |> ignore
+
     testCase "Symbol keys require a non-empty expression" <| fun _ ->
       compile """
 open Fickl.Core

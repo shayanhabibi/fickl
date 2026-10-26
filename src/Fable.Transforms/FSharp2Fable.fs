@@ -2482,6 +2482,49 @@ let private transformMemberDecl
             (Some(makeRange memb.DeclarationLocation))
             "SymbolKey applies to object members and record fields, not module functions"
 
+    if
+        FsMemberFunctionOrValue.HasJsDecorator memb
+        && ((com :> Compiler).Options.Language = JavaScript
+            || (com :> Compiler).Options.Language = TypeScript)
+    then
+        let _, _, _, hasConflictingDecorators =
+            FsMemberFunctionOrValue.JsDecoratorAttributes memb
+
+        if
+            (memb.IsPropertyGetterMethod || memb.IsPropertySetterMethod)
+            && hasConflictingDecorators
+        then
+            addError
+                com
+                ctx.InlinePath
+                (Some(makeRange memb.DeclarationLocation))
+                "JsDecorator cannot combine property-level and explicit accessor decorators"
+
+        match memb.DeclaringEntity with
+        | _ when
+            isInline memb
+            || isEmittedOrImportedMember memb
+            || hasAttrib Atts.erase memb.Attributes
+            ->
+            addError
+                com
+                ctx.InlinePath
+                (Some(makeRange memb.DeclarationLocation))
+                "JsDecorator requires a concrete emitted class member; inline, Emit, import and erased members are unsupported"
+        | Some ent when ent.IsFSharpModule || ent.IsInterface || memb.IsDispatchSlot ->
+            addError
+                com
+                ctx.InlinePath
+                (Some(makeRange memb.DeclarationLocation))
+                "JsDecorator requires a concrete class member"
+        | Some ent when getOverloads ent memb > 1 ->
+            addError
+                com
+                ctx.InlinePath
+                (Some(makeRange memb.DeclarationLocation))
+                "JsDecorator does not support overloaded F# members; use distinct member names"
+        | _ -> ()
+
     let isErasedPropertySetter (memb: FSharpMemberOrFunctionOrValue) =
         if memb.IsPropertySetterMethod then
             match memb.DeclaringEntity with
@@ -2556,7 +2599,8 @@ let private transformMemberDecl
             (isAttachMembersEntity com ent
              || (((com :> Compiler).Options.Language = JavaScript
                   || (com :> Compiler).Options.Language = TypeScript)
-                 && (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome))
+                 && ((FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
+                     || FsMemberFunctionOrValue.HasJsDecorator memb)))
             && memb.CompiledName <> ".cctor"
             ->
             transformExplicitlyAttachedMember com ctx ent memb args body
@@ -2702,6 +2746,39 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
             warnIgnoredCaseTests com ctx fsEnt
             checkInlinedTaggedUnionCases com ctx fsEnt
             warnDuplicateCompiledNames com ctx fsEnt
+
+            if
+                (com :> Compiler).Options.Language = JavaScript
+                || (com :> Compiler).Options.Language = TypeScript
+            then
+                if
+                    (hasAttrib Atts.ficklJsDecorator fsEnt.Attributes)
+                    && (fsEnt.IsInterface
+                        || fsEnt.IsFSharpUnion
+                        || isErasedOrStringEnumFSharpEntity fsEnt
+                        || isGlobalOrImportedFSharpEntity fsEnt)
+                then
+                    addError
+                        com
+                        ctx.InlinePath
+                        (Some(makeRange fsEnt.DeclarationLocation))
+                        "JsDecorator requires a concrete emitted class"
+
+                for memberInfo in fsEnt.MembersFunctionsAndValues do
+                    if memberInfo.IsDispatchSlot && FsMemberFunctionOrValue.HasJsDecorator memberInfo then
+                        addError
+                            com
+                            ctx.InlinePath
+                            (Some(makeRange memberInfo.DeclarationLocation))
+                            "JsDecorator requires a concrete class member"
+
+                for field in fsEnt.FSharpFields do
+                    if hasAttrib Atts.ficklJsDecorator (Seq.append field.PropertyAttributes field.FieldAttributes) then
+                        addError
+                            com
+                            ctx.InlinePath
+                            (Some(makeRange field.DeclarationLocation))
+                            "JsDecorator on F# fields is unsupported; decorate a mutable auto-property with field mode"
 
             // An abbreviation reports its target's interfaces but implements none of them.
             let inheritsCallable =

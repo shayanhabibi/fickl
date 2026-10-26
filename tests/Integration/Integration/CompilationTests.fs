@@ -287,3 +287,64 @@ let strictOptionsTests =
                 File.WriteAllText(config, System.Text.Json.JsonSerializer.Serialize settings)
                 run "node" [ Path.Combine(root, "node_modules/typescript/lib/tsc.js"); "-p"; config ]
                 run "node" [ Path.Combine(compiled, Path.GetRelativePath(root, destination), "Program.js") ])
+
+/// <summary>Executes native decorator output with standard and legacy TypeScript transforms.</summary>
+let nativeDecoratorTests =
+    testCase "Native decorators execute in JavaScript and TypeScript" (fun () ->
+        let root = Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "../../.."))
+        let source = Path.Combine(__SOURCE_DIRECTORY__, "data/nativeDecorators")
+        let output = Path.Combine(root, "temp/tests/Integration/nativeDecorators")
+        let run (executable: string) (arguments: string list) =
+            let info = System.Diagnostics.ProcessStartInfo(executable, arguments,
+                            WorkingDirectory = root, RedirectStandardOutput = true, RedirectStandardError = true)
+            use child = System.Diagnostics.Process.Start info
+            let stdout = child.StandardOutput.ReadToEndAsync()
+            let stderr = child.StandardError.ReadToEndAsync()
+            child.WaitForExit()
+            Expect.equal child.ExitCode 0 (stdout.Result + stderr.Result)
+
+        for language in [ "javascript"; "typescript" ] do
+            let destination = Path.Combine(output, language)
+            let extension = if language = "javascript" then ".js" else ".ts"
+            let arguments =
+                [| Path.Combine(source, "nativeDecorators.fsproj"); "--outDir"; destination
+                   "--lang"; language; "-e"; extension; "--exclude"; "Fable.Core"; "--noCache" |]
+            let arguments = if language = "javascript" then Array.append arguments [|"--declaration"|] else arguments
+            Expect.equal (Fable.Cli.Entry.main arguments) 0 $"Compiling native decorators for {language} failed"
+            File.WriteAllText(Path.Combine(destination, "Consumer.ts"), """
+import { Counter, create, read } from './NativeDecorators.js';
+const value: Counter = create();
+const result: [string, string, number, number] = read(value);
+value.Count = 42;
+// @ts-expect-error readonly getters remain readonly
+value.ReadOnly = 'invalid';
+// @ts-expect-error decorated methods preserve their F# parameter types
+value.Message(42);
+            """)
+            if language = "typescript" then
+                File.AppendAllText(Path.Combine(destination, "Consumer.ts"), "\n// @ts-expect-error native fields preserve their F# types\nvalue.Field = 'invalid';\n")
+            for mode in [ "standard"; "legacy" ] do
+                let compiled = Path.Combine(destination, "compiled", mode)
+                let config = Path.Combine(destination, "tsconfig.json")
+                let settings =
+                    {| compilerOptions =
+                        {| target = "es2020"
+                           lib = [| "es2020"; "dom"; "esnext.temporal" |]
+                           ``module`` = "es2020"
+                           moduleResolution = "bundler"
+                           strict = true
+                           allowJs = true
+                           skipLibCheck = true
+                           rewriteRelativeImportExtensions = true
+                           experimentalDecorators = (mode = "legacy")
+                           noEmitOnError = true
+                           rootDir = root
+                           outDir = compiled |}
+                       ``include`` = [| "NativeDecorators" + extension; "Consumer.ts"
+                                        "fable_modules/**/*.ts"; "fable_modules/**/*.js"
+                                        Path.Combine(source, "decorators.js") |] |}
+                File.WriteAllText(config, System.Text.Json.JsonSerializer.Serialize settings)
+                run "node" [ Path.Combine(root, "node_modules/typescript/lib/tsc.js"); "-p"; config ]
+                let modulePath = Path.Combine(compiled, Path.GetRelativePath(root, destination), "NativeDecorators.js")
+                let helperPath = Path.Combine(compiled, Path.GetRelativePath(root, source), "decorators.js")
+                run "node" [ Path.Combine(source, "assertions.mjs"); modulePath; helperPath; mode ])

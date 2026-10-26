@@ -240,6 +240,8 @@ type DirectivePrologue = | DirectivePrologue of text: string
 
 /// A module import or export declaration.
 type ModuleDeclaration =
+    /// <summary>Decorators applied to the following class declaration in source order.</summary>
+    | DecoratedModuleDeclaration of decorators: Expression array * declaration: ModuleDeclaration
     | PrivateModuleDeclaration of statement: Statement
     /// An export isNamed declaration, e.g., export {foo, bar};, export {foo} from "mod"; or export var foo = 1;.
     /// Note: Having declaration populated with non-empty specifiers or non-null source results in an invalid state.
@@ -491,6 +493,16 @@ type SuperClass =
     | SuperExpression of Expression
 
 type ClassMember =
+    /// <summary>Decorators applied to the following class member in source order.</summary>
+    | DecoratedClassMember of decorators: Expression array * memberDeclaration: ClassMember
+    /// <summary>A native accessor declaration with optional initial storage and type annotation.</summary>
+    | ClassAutoAccessor of
+        key: Expression *
+        value: Expression option *
+        isComputed: bool *
+        isStatic: bool *
+        typeAnnotation: TypeAnnotation option *
+        loc: SourceLocation option
     | ClassMethod of
         kind: ClassMethodKind *
         parameters: Parameter array *

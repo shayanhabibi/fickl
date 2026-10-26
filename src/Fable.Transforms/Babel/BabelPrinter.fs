@@ -817,6 +817,14 @@ module PrinterExtensions =
 
         member printer.Print(md: ModuleDeclaration) =
             match md with
+            | DecoratedModuleDeclaration(decorators, declaration) ->
+                for decorator in decorators do
+                    printer.Print("@(")
+                    printer.Print(decorator)
+                    printer.Print(")")
+                    printer.PrintNewLine()
+
+                printer.Print(declaration)
             | ImportDeclaration(specifiers, source) -> printer.PrintImportDeclaration(specifiers, source)
             | ExportNamedReferences(specifiers, source) ->
                 printer.Print("export ")
@@ -1396,6 +1404,26 @@ module PrinterExtensions =
 
         member printer.PrintClassMember(memb: ClassMember) =
             match memb with
+            | DecoratedClassMember(decorators, declaration) ->
+                for decorator in decorators do
+                    printer.Print("@(")
+                    printer.Print(decorator)
+                    printer.Print(")")
+                    printer.PrintNewLine()
+
+                printer.PrintClassMember(declaration)
+            | ClassAutoAccessor(key, value, isComputed, isStatic, annotation, loc) ->
+                printer.PrintClassProperty(
+                    key,
+                    value,
+                    isComputed,
+                    isStatic,
+                    false,
+                    annotation,
+                    None,
+                    loc,
+                    isAccessor = true
+                )
             | ClassMethod(kind, parameters, body, isStatic, isAbstract, returnType, typeParameters, loc, doc) ->
                 printer.PrintJsDoc(doc)
 
@@ -1477,7 +1505,7 @@ module PrinterExtensions =
             | Some Readonly -> printer.Print("readonly ")
 
         member printer.PrintClassProperty
-            (key, value, isComputed, isStatic, isOptional, typeAnnotation, accessModifier, loc)
+            (key, value, isComputed, isStatic, isOptional, typeAnnotation, accessModifier, loc, ?isAccessor: bool)
             =
             printer.AddLocation(loc)
 
@@ -1485,6 +1513,9 @@ module PrinterExtensions =
                 printer.Print("static ")
 
             printer.PrintAccessModifier(accessModifier)
+
+            if defaultArg isAccessor false then
+                printer.Print("accessor ")
 
             if isComputed then
                 printer.Print("[")

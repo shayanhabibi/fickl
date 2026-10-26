@@ -124,6 +124,8 @@ module Atts =
     let ficklAsyncFunction = "Fickl.Core.AsyncFunctionAttribute"
 
     [<Literal>]
+    let ficklJsDecorator = "Fickl.Core.JsDecoratorAttribute"
+
     let ficklSymbolKey = "Fickl.Core.SymbolKeyAttribute"
 
     let ficklAsyncGeneratorFunction = "Fickl.Core.AsyncGeneratorFunctionAttribute"
