@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 
 const [modulePath, helperPath, mode] = process.argv.slice(2);
 const output = await import(pathToFileURL(modulePath));
-const { events } = await import(pathToFileURL(helperPath));
+const { events, setterEvents } = await import(pathToFileURL(helperPath));
 const value = output.create();
 const standard = mode === "standard";
 
@@ -20,6 +20,26 @@ assert.equal(Object.isFrozen(output.Frozen), true);
 assert.deepEqual(output.manualRead("start"), ["start:manual", "sink:manual"]);
 assert.deepEqual(output.overrideRead(), ["hellooverride", "hellooverride"]);
 assert.deepEqual(output.optionalRead(), [true, "optional"]);
+assert.deepEqual(output.hiddenRead(), [[1, 2], [11, 2], [1, 2], [1, 2]]);
+assert.equal(output.hiddenCallback(), 7);
+assert.deepEqual(output.hiddenReceiver(), [3, 8, 2]);
+assert.deepEqual(output.hiddenNull(), [true, 0]);
+assert.deepEqual(output.hiddenNullSetter(), [true, 1]);
+assert.deepEqual(output.frozenHidden(), [9, 2]);
+assert.deepEqual(output.distinctHiddenFields(), [8, 2]);
+assert.equal(output.opaqueRead(), 5);
+assert.deepEqual(output.argumentShapes(), [5, 9, 8, 9]);
+const opaqueDescriptor = Object.getOwnPropertyDescriptor(output.HiddenBase.prototype, 'Opaque');
+Object.defineProperty(output.HiddenBase.prototype, 'Opaque', { configurable: true, value: 1 });
+assert.deepEqual(output.nonCallableRead(), [true, 1]);
+if (opaqueDescriptor) Object.defineProperty(output.HiddenBase.prototype, 'Opaque', opaqueDescriptor);
+else delete output.HiddenBase.prototype.Opaque;
+assert.deepEqual(output.explicitBaseRead(), [3, 1, 1]);
+assert.equal(output.explicitBaseFieldRead(), 9);
+setterEvents.length = 0;
+output.orderedSetter();
+assert.deepEqual(setterEvents, ['key', 'rhs']);
+assert.equal(output.explicitState(), 8);
 assert.ok(events.includes("set:sink"));
 
 const memberFactories = ["outer", "inner", "count", "label", "field", "readonly", "static", "symbol", "$0"];

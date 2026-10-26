@@ -2745,6 +2745,205 @@ let private warnDuplicateCompiledNames (com: FableCompiler) ctx (ent: FSharpEnti
                 |> addWarningWithCode com ctx.InlinePath (makeRange uci.DeclarationLocation |> Some)
         )
 
+let private checkNativeMemberCollisions (com: FableCompiler) ctx (ent: FSharpEntity) =
+    let rawAttributes (owner: FSharpEntity) =
+        owner.MembersFunctionsAndValues |> Seq.collect _.Attributes
+
+    let hasNativeAttributes owner =
+        rawAttributes owner
+        |> Seq.exists (fun att ->
+            att.AttributeType.TryFullName = Some Atts.ficklJsDecorator
+            || att.AttributeType.TryFullName = Some Atts.ficklSymbolKey
+        )
+
+    let hasNativeField owner =
+        rawAttributes owner
+        |> Seq.exists (fun att ->
+            att.AttributeType.TryFullName = Some Atts.ficklJsDecorator
+            && (att.ConstructorArguments
+                |> Seq.exists (fun (_, value) -> value :? bool && unbox<bool> value))
+        )
+
+    let rec hasInheritedNativeField owner =
+        match TypeHelpers.tryGetBaseEntity owner with
+        | None -> false
+        | Some(baseEnt, _) -> hasNativeField baseEnt || hasInheritedNativeField baseEnt
+
+    let isNativeField (m: FSharpMemberOrFunctionOrValue) =
+        let attributes, _, _, _ = FsMemberFunctionOrValue.JsDecoratorAttributes m
+
+        attributes
+        |> List.exists (fun att ->
+            att.ConstructorArguments
+            |> Seq.exists (fun (_, value) -> value :? bool && unbox<bool> value)
+        )
+
+    let implementedSlot (m: FSharpMemberOrFunctionOrValue) =
+        m.ImplementedAbstractSignatures
+        |> Seq.tryHead
+        |> Option.bind (fun signature ->
+            tryDefinition signature.DeclaringType
+            |> Option.bind (fun (owner, _) ->
+                let paramTypes =
+                    if signature.AbstractArguments.Count = 1 then
+                        signature.AbstractArguments[0]
+                        |> Seq.map (fun parameter -> makeType Map.empty parameter.Type)
+                        |> Seq.toArray
+                        |> Some
+                    else
+                        None
+
+                tryFindAbstractMember com owner signature.Name m.IsInstanceMember paramTypes
+                |> Option.map (fun slot -> owner, slot)
+            )
+        )
+
+    let key (m: FSharpMemberOrFunctionOrValue) =
+        let slot = implementedSlot m
+
+        let name =
+            slot
+            |> Option.map (fun (owner, slot) -> (getAbstractMemberInfo com owner slot).name)
+            |> Option.defaultWith (fun () -> FsMemberFunctionOrValue.CompiledName m)
+
+        let symbol =
+            slot
+            |> Option.bind (fun (_, slot) ->
+                FsMemberFunctionOrValue.SymbolKeyAttribute slot
+                |> Option.map (fun attribute -> attribute, slot.DeclarationLocation.FileName)
+            )
+            |> Option.orElseWith (fun () ->
+                FsMemberFunctionOrValue.SymbolKeyAttribute m
+                |> Option.map (fun attribute -> attribute, m.DeclarationLocation.FileName)
+            )
+
+        match symbol with
+        | None when name.StartsWith("Symbol.", StringComparison.Ordinal) -> Choice2Of2(name, "")
+        | None -> Choice1Of2 name
+        | Some(att, sourceFile) ->
+            let args = (FsAtt(att) :> Fable.Attribute).ConstructorArgs
+            let expression = args |> List.tryHead |> Option.map string |> Option.defaultValue ""
+            let path = args |> List.tryItem 1 |> Option.map string |> Option.defaultValue ""
+
+            let path =
+                if path.StartsWith(".", StringComparison.Ordinal) then
+                    Path.Combine(Path.GetDirectoryName sourceFile, path) |> Path.normalizeFullPath
+                else
+                    path
+
+            Choice2Of2(expression.Trim(), path)
+
+    let members (owner: FSharpEntity) =
+        owner.MembersFunctionsAndValues
+        |> Seq.filter (fun m ->
+            not m.IsProperty
+            && not m.IsConstructor
+            && not m.IsDispatchSlot
+            && (isAttachMembersEntity com owner
+                || m.IsOverrideOrExplicitInterfaceImplementation
+                || FsMemberFunctionOrValue.HasJsDecorator m
+                || (FsMemberFunctionOrValue.SymbolKeyAttribute m).IsSome)
+        )
+
+    let seen = Dictionary<_, FSharpMemberOrFunctionOrValue>()
+
+    let isNative (m: FSharpMemberOrFunctionOrValue) =
+        FsMemberFunctionOrValue.HasJsDecorator m
+        || (FsMemberFunctionOrValue.SymbolKeyAttribute m).IsSome
+        || (implementedSlot m
+            |> Option.exists (fun (_, slot) ->
+                FsMemberFunctionOrValue.HasJsDecorator slot
+                || (FsMemberFunctionOrValue.SymbolKeyAttribute slot).IsSome
+            ))
+
+    let propertyIdentity (m: FSharpMemberOrFunctionOrValue) =
+        m.ImplementedAbstractSignatures
+        |> Seq.tryHead
+        |> Option.bind (fun signature ->
+            tryDefinition signature.DeclaringType
+            |> Option.map (fun (owner, _) -> owner.FullName, Naming.removeGetSetPrefix signature.Name)
+        )
+        |> Option.defaultWith (fun () -> ent.FullName, Naming.removeGetSetPrefix m.LogicalName)
+
+    let accessorKind (m: FSharpMemberOrFunctionOrValue) =
+        match implementedSlot m with
+        | Some(owner, slot) ->
+            let info = getAbstractMemberInfo com owner slot
+            info.isGetter, info.isSetter
+        | None -> FsMemberFunctionOrValue.IsGetter m, FsMemberFunctionOrValue.IsSetter m
+
+    let complementaryAccessors m previous =
+        let getter, setter = accessorKind m
+        let previousGetter, previousSetter = accessorKind previous
+
+        ((getter && previousSetter) || (setter && previousGetter))
+        && propertyIdentity m = propertyIdentity previous
+
+    let hasNativeInterface =
+        ent.AllInterfaces
+        |> Seq.exists (fun interfaceType ->
+            tryDefinition interfaceType
+            |> Option.exists (fun (owner, _) -> hasNativeAttributes owner)
+        )
+
+    let candidates =
+        if
+            hasNativeAttributes ent
+            || hasNativeInterface
+            || ((isAttachMembersEntity com ent
+                 || (ent.MembersFunctionsAndValues
+                     |> Seq.exists _.IsOverrideOrExplicitInterfaceImplementation))
+                && hasInheritedNativeField ent)
+        then
+            members ent
+        else
+            Seq.empty
+
+    for m in candidates do
+        let identity = m.IsInstanceMember, key m
+
+        match seen.TryGetValue identity with
+        | true, previous when not (complementaryAccessors m previous) && (isNative m || isNative previous) ->
+            addError
+                com
+                ctx.InlinePath
+                (Some(makeRange m.DeclarationLocation))
+                "Native members cannot share the same JavaScript key within one class"
+        | _ -> seen[identity] <- m
+
+        let setterWithoutGetter =
+            (accessorKind m |> snd)
+            && not (
+                ent.MembersFunctionsAndValues
+                |> Seq.exists (fun candidate ->
+                    (accessorKind candidate |> fst)
+                    && propertyIdentity candidate = propertyIdentity m
+                )
+            )
+
+        if m.IsInstanceMember && (not (accessorKind m |> snd) || setterWithoutGetter) then
+            let rec checkBase owner =
+                match TypeHelpers.tryGetBaseEntity owner with
+                | None -> ()
+                | Some(baseEnt, _) ->
+                    if
+                        members baseEnt
+                        |> Seq.exists (fun inherited ->
+                            (isNativeField m || isNativeField inherited)
+                            && inherited.IsInstanceMember = m.IsInstanceMember
+                            && key inherited = key m
+                        )
+                    then
+                        addError
+                            com
+                            ctx.InlinePath
+                            (Some(makeRange m.DeclarationLocation))
+                            "Native field-mode properties cannot share a JavaScript key with inherited attached members"
+                    else
+                        checkBase baseEnt
+
+            checkBase ent
+
 let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
     fsDecls
     |> List.collect (fun fsDecl ->
@@ -2758,6 +2957,8 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
                 (com :> Compiler).Options.Language = JavaScript
                 || (com :> Compiler).Options.Language = TypeScript
             then
+                checkNativeMemberCollisions com ctx fsEnt
+
                 if
                     (hasAttrib Atts.ficklJsDecorator fsEnt.Attributes)
                     && (fsEnt.IsInterface

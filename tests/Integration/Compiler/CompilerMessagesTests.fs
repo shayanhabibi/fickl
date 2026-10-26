@@ -117,6 +117,155 @@ let invalid () = Library.factory true (JS.Constructors.Promise.resolve(42))
       |> Assert.Exists.errorWith "Native async computations must return resolved values"
       |> ignore
 
+    testCase "Distinct interface properties cannot share a native symbol key" <| fun _ ->
+      compile """
+open Fickl.Core
+type IFirst =
+    [<SymbolKey("Symbol.for('duplicate.property')")>]
+    abstract State: int with get, set
+type ISecond =
+    [<SymbolKey("Symbol.for('duplicate.property')")>]
+    abstract State: int with get, set
+type Invalid() =
+    interface IFirst with member _.State with get() = 1 and set _ = ()
+    interface ISecond with member _.State with get() = 2 and set _ = ()
+"""
+      |> Assert.Exists.errorWith "Native members cannot share the same JavaScript key within one class"
+      |> ignore
+
+    testCase "Explicit interfaces reject duplicate effective native symbol keys" <| fun _ ->
+      compile """
+open Fickl.Core
+type IFirst =
+    [<SymbolKey("Symbol.iterator")>]
+    abstract First: unit -> int
+type ISecond =
+    [<SymbolKey("Symbol.iterator")>]
+    abstract Second: unit -> int
+type Invalid() =
+    interface IFirst with member _.First() = 1
+    interface ISecond with member _.Second() = 2
+"""
+      |> Assert.Exists.errorWith "Native members cannot share the same JavaScript key within one class"
+      |> ignore
+
+    testCase "Native fields reject inherited explicit interface symbol slots" <| fun _ ->
+      compile """
+open Fickl.Core
+type IState =
+    [<SymbolKey("Symbol.for('collision')")>]
+    abstract State: int with get, set
+type Base() =
+    [<SymbolKey("Symbol.for('collision')"); JsDecorator("value => value", true)>]
+    member val Storage = 1 with get, set
+type Derived() =
+    inherit Base()
+    interface IState with
+        member _.State with get() = 42 and set _ = ()
+"""
+      |> Assert.Exists.errorWith "Native field-mode properties cannot share a JavaScript key with inherited attached members"
+      |> ignore
+
+    testCase "Native fields reject explicit interface symbol slots in one class" <| fun _ ->
+      compile """
+open Fickl.Core
+type IState =
+    [<SymbolKey("Symbol.for('collision')")>]
+    abstract State: int with get, set
+type Invalid() =
+    [<SymbolKey("Symbol.for('collision')"); JsDecorator("value => value", true)>]
+    member val Storage = 1 with get, set
+    interface IState with
+        member _.State with get() = 42 and set _ = ()
+"""
+      |> Assert.Exists.errorWith "Native members cannot share the same JavaScript key within one class"
+      |> ignore
+
+    testCase "Native fields reject inherited legacy symbol names" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+type Base() =
+    [<SymbolKey("Symbol.toStringTag"); JsDecorator("value => value", true)>]
+    member val Storage = 1 with get, set
+[<AttachMembers>]
+type Derived() =
+    inherit Base()
+    member _.``Symbol.toStringTag`` = 42
+"""
+      |> Assert.Exists.errorWith "Native field-mode properties cannot share a JavaScript key with inherited attached members"
+      |> ignore
+
+    testCase "Native fields reject inherited storage with the same key" <| fun _ ->
+      compile """
+open Fickl.Core
+type Base() =
+    [<JsDecorator("value => value", true)>]
+    member val Value = 1 with get, set
+type Derived() =
+    inherit Base()
+    [<JsDecorator("value => value", true)>]
+    member val Value = 2 with get, set
+"""
+      |> Assert.Exists.errorWith "Native field-mode properties cannot share a JavaScript key with inherited attached members"
+      |> ignore
+
+    testCase "Native fields reject inherited ordinary attached accessors" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+[<AttachMembers>]
+type Base() =
+    member val Value = 1 with get, set
+type Derived() =
+    inherit Base()
+    [<JsDecorator("value => value", true)>]
+    member val Value = 2 with get, set
+"""
+      |> Assert.Exists.errorWith "Native field-mode properties cannot share a JavaScript key with inherited attached members"
+      |> ignore
+
+    testCase "Ordinary attached accessors reject inherited native fields" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+type Base() =
+    [<JsDecorator("value => value", true)>]
+    member val Value = 1 with get, set
+[<AttachMembers>]
+type Derived() =
+    inherit Base()
+    member val Value = 2 with get, set
+"""
+      |> Assert.Exists.errorWith "Native field-mode properties cannot share a JavaScript key with inherited attached members"
+      |> ignore
+
+    testCase "Native accessors reject inherited native fields" <| fun _ ->
+      compile """
+open Fickl.Core
+type Base() =
+    [<JsDecorator("value => value", true)>]
+    member val Value = 1 with get, set
+type Derived() =
+    inherit Base()
+    [<JsDecorator("value => value")>]
+    member val Value = 2 with get, set
+"""
+      |> Assert.Exists.errorWith "Native field-mode properties cannot share a JavaScript key with inherited attached members"
+      |> ignore
+
+    testCase "Native members reject duplicate symbol keys in one class" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid() =
+    [<SymbolKey("Symbol.iterator")>]
+    member _.First() = 1
+    [<SymbolKey("Symbol.iterator")>]
+    member _.Second() = 2
+"""
+      |> Assert.Exists.errorWith "Native members cannot share the same JavaScript key within one class"
+      |> ignore
+
     testCase "Native decorators reject mixed property and accessor placements" <| fun _ ->
       compile """
 open Fickl.Core

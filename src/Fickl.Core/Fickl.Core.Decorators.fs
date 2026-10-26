@@ -3,11 +3,9 @@ namespace Fickl.Core
 open System
 
 /// <summary>Emits a native JavaScript or TypeScript decorator on a class or concrete class member.</summary>
-/// <remarks>Imported decorator expressions begin with an exported identifier; paths are relative to the declaring file.
-/// Mutable auto-properties need literal initializers before constructor effects; isField selects native field storage.
-/// Property-level decorators cannot be combined with explicit accessor decorators.
-/// Decorating both accessors explicitly requires standard decorators; legacy tools allow only one.
-/// Decorators execute through the consumer's standard or legacy decorator toolchain.</remarks>
+/// <remarks>Imported expressions use exported identifiers and source-relative paths. Mutable auto-properties need literals before effects.
+/// isField selects native fields, whose keys cannot collide with inherited attached members; use distinct SymbolKey values or accessor mode.
+/// Consumer tools execute decorators. Property and accessor decorators cannot mix; decorating both accessors requires standard tools.</remarks>
 [<AttributeUsage(AttributeTargets.Class
                  ||| AttributeTargets.Struct
                  ||| AttributeTargets.Method

@@ -1,10 +1,22 @@
 
+import { subclassDecorator, opaqueMethodDecorator, identityDecorator, setterFactory, classFactory as classFactory_1, getterFactory, methodFactory, fieldFactory, accessorFactory, setterRegistry as setterRegistry_1 } from "./decorators.js";
 import { int32 } from "./fable_modules/fable-library-ts.5.24.0/Int32.ts";
-import { identityDecorator, setterFactory, classFactory as classFactory_1, getterFactory, methodFactory, fieldFactory, accessorFactory } from "./decorators.js";
 import { class_type, TypeInfo } from "./fable_modules/fable-library-ts.5.24.0/Reflection.ts";
-import { value as value_1, Option } from "./fable_modules/fable-library-ts.5.24.0/Option.ts";
+import { defaultArg, value as value_1, Option } from "./fable_modules/fable-library-ts.5.24.0/Option.ts";
+import { sum } from "./fable_modules/fable-library-ts.5.24.0/Array.ts";
+import { defaultOf } from "./fable_modules/fable-library-ts.5.24.0/Util.ts";
+
+export const $ficklSymbol$393ec1a9: unique symbol = Symbol.for('fickl.hidden.method');
+
+export const $ficklSymbol$472d3e41: unique symbol = Symbol.for('fickl.hidden.baseField');
+
+export const $ficklSymbol$911043f9: unique symbol = Symbol.for('fickl.hidden.derivedField');
+
+export const $ficklSymbol$7dcf56c1: unique symbol = Symbol.for('fickl.explicit.positive');
 
 export const classFactory = "import alias collision";
+
+export const setterRegistry: any = setterRegistry_1;
 
 @(classFactory_1('class'))
 export class Counter {
@@ -159,7 +171,7 @@ export function create(): Counter {
 }
 
 export function read(value: Counter): [string, string, int32, int32] {
-    return [value.Message("hello"), value.Label, value.Count, value.Field] as [string, string, int32, int32];
+    return [((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver, nativeArgs))))(Reflect.get(Counter.prototype, "Message", nativeReceiver)))))(value)("hello"), ((nativeReceiver_1: any) => ((nativeReceiver_1 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(Counter.prototype, "Label", nativeReceiver_1)))))(value), ((nativeReceiver_2: any) => ((nativeReceiver_2 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(Counter.prototype, "Count", nativeReceiver_2)))))(value), value.Field] as [string, string, int32, int32];
 }
 
 export function staticRead(): string {
@@ -168,10 +180,10 @@ export function staticRead(): string {
 
 export function manualRead(value: string): [string, string] {
     const accessors: ManualAccessors = ManualAccessors_$ctor();
-    accessors.Value = value;
-    const first: string = accessors.Value;
-    accessors.Sink = "sink";
-    return [first, accessors.Value] as [string, string];
+    ((nativeReceiver: any) => ((nativeTarget: any, nativeKey: any) => ((nativeValue: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set(nativeTarget, nativeKey, nativeValue, nativeReceiver) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })()))))(ManualAccessors.prototype, "Value"))(accessors)(value);
+    const first: string = ((nativeReceiver_1: any) => ((nativeReceiver_1 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(ManualAccessors.prototype, "Value", nativeReceiver_1)))))(accessors);
+    ((nativeReceiver_2: any) => ((nativeTarget_1: any, nativeKey_1: any) => ((nativeValue_1: any) => ((nativeReceiver_2 == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set(nativeTarget_1, nativeKey_1, nativeValue_1, nativeReceiver_2) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })()))))(ManualAccessors.prototype, "Sink"))(accessors)("sink");
+    return [first, ((nativeReceiver_3: any) => ((nativeReceiver_3 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(ManualAccessors.prototype, "Value", nativeReceiver_3)))))(accessors)] as [string, string];
 }
 
 export function overrideRead(): [string, string] {
@@ -181,7 +193,268 @@ export function overrideRead(): [string, string] {
 
 export function optionalRead(): [boolean, string] {
     const value: Optional$1<string> = Optional$1_$ctor<string>();
-    const wasNone: boolean = value.Value == null;
-    value.Value = "optional";
-    return [wasNone, value_1(value.Value)] as [boolean, string];
+    const wasNone: boolean = ((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(Optional$1.prototype, "Value", nativeReceiver)))))(value) == null;
+    ((nativeReceiver_1: any) => ((nativeTarget: any, nativeKey: any) => ((nativeValue: any) => ((nativeReceiver_1 == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set(nativeTarget, nativeKey, nativeValue, nativeReceiver_1) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })()))))(Optional$1.prototype, "Value"))(value)("optional");
+    return [wasNone, value_1(((nativeReceiver_2: any) => ((nativeReceiver_2 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(Optional$1.prototype, "Value", nativeReceiver_2)))))(value))] as [boolean, string];
+}
+
+@(subclassDecorator)
+export class HiddenBase {
+    constructor() {
+    }
+    @(identityDecorator)
+    accessor Value: int32 = 1;
+    @(identityDecorator)
+    Read(): int32 {
+        return 1;
+    }
+    [$ficklSymbol$393ec1a9](): int32 {
+        return 1;
+    }
+    @(identityDecorator)
+    Apply(callback: ((arg0: int32, arg1: int32) => int32), a: int32, b: int32): int32 {
+        return callback(a, b) | 0;
+    }
+    @(opaqueMethodDecorator)
+    Opaque(value: int32): int32 {
+        return (value + 1) | 0;
+    }
+    @(identityDecorator)
+    Optional(value?: int32): int32 {
+        return defaultArg<int32>(value, 5) | 0;
+    }
+    @(identityDecorator)
+    Named({ left, right }: {left?: int32, right?: int32 }): int32 {
+        return (defaultArg<int32>(left, 1) + defaultArg<int32>(right, 2)) | 0;
+    }
+    @(identityDecorator)
+    Sum(...values: int32[]): int32 {
+        return sum<int32>(values, {
+            GetZero: (): int32 => 0,
+            Add: (x: int32, y: int32): int32 => ((x + y) | 0),
+        }) | 0;
+    }
+}
+
+export function HiddenBase_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.HiddenBase", undefined, HiddenBase);
+}
+
+export function HiddenBase_$ctor(): HiddenBase {
+    return new HiddenBase();
+}
+
+export class HiddenDerived extends HiddenBase {
+    constructor() {
+        super();
+    }
+    @(identityDecorator)
+    accessor Value: int32 = 2;
+    @(identityDecorator)
+    Read(): int32 {
+        return 2;
+    }
+    [$ficklSymbol$393ec1a9](): int32 {
+        return 2;
+    }
+    @(identityDecorator)
+    BaseRead(): [int32, int32, int32] {
+        const _: HiddenDerived = this;
+        ((nativeReceiver: any) => ((nativeTarget: any, nativeKey: any) => ((nativeValue: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set(nativeTarget, nativeKey, nativeValue, nativeReceiver) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })()))))(HiddenBase.prototype, "Value"))(_)(3);
+        return [((nativeReceiver_1: any) => ((nativeReceiver_1 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(HiddenBase.prototype, "Value", nativeReceiver_1)))))(_), ((nativeReceiver_2: any) => ((nativeReceiver_2 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver_2, nativeArgs))))(Reflect.get(HiddenBase.prototype, "Read", nativeReceiver_2)))))(_)(), ((nativeReceiver_3: any) => ((nativeReceiver_3 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod_1: any) => ((...nativeArgs_1: any[]): any => (Reflect.apply(nativeMethod_1, nativeReceiver_3, nativeArgs_1))))(Reflect.get(HiddenBase.prototype, $ficklSymbol$393ec1a9, nativeReceiver_3)))))(_)()] as [int32, int32, int32];
+    }
+}
+
+export function HiddenDerived_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.HiddenDerived", undefined, HiddenDerived, HiddenBase_$reflection());
+}
+
+export function HiddenDerived_$ctor(): HiddenDerived {
+    return new HiddenDerived();
+}
+
+export function hiddenRead(): [[int32, int32], [int32, int32], [int32, int32], [int32, int32]] {
+    const value: HiddenDerived = HiddenDerived_$ctor();
+    const before = [((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(HiddenBase.prototype, "Value", nativeReceiver)))))(value), ((nativeReceiver_1: any) => ((nativeReceiver_1 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(HiddenDerived.prototype, "Value", nativeReceiver_1)))))(value)] as [int32, int32];
+    ((nativeReceiver_2: any) => ((nativeTarget: any, nativeKey: any) => ((nativeValue: any) => ((nativeReceiver_2 == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set(nativeTarget, nativeKey, nativeValue, nativeReceiver_2) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })()))))(HiddenBase.prototype, "Value"))(value)(11);
+    return [before, [((nativeReceiver_3: any) => ((nativeReceiver_3 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(HiddenBase.prototype, "Value", nativeReceiver_3)))))(value), ((nativeReceiver_4: any) => ((nativeReceiver_4 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(HiddenDerived.prototype, "Value", nativeReceiver_4)))))(value)] as [int32, int32], [((nativeReceiver_5: any) => ((nativeReceiver_5 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver_5, nativeArgs))))(Reflect.get(HiddenBase.prototype, "Read", nativeReceiver_5)))))(value)(), ((nativeReceiver_6: any) => ((nativeReceiver_6 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod_1: any) => ((...nativeArgs_1: any[]): any => (Reflect.apply(nativeMethod_1, nativeReceiver_6, nativeArgs_1))))(Reflect.get(HiddenDerived.prototype, "Read", nativeReceiver_6)))))(value)()] as [int32, int32], [((nativeReceiver_7: any) => ((nativeReceiver_7 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod_2: any) => ((...nativeArgs_2: any[]): any => (Reflect.apply(nativeMethod_2, nativeReceiver_7, nativeArgs_2))))(Reflect.get(HiddenBase.prototype, $ficklSymbol$393ec1a9, nativeReceiver_7)))))(value)(), ((nativeReceiver_8: any) => ((nativeReceiver_8 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod_3: any) => ((...nativeArgs_3: any[]): any => (Reflect.apply(nativeMethod_3, nativeReceiver_8, nativeArgs_3))))(Reflect.get(HiddenDerived.prototype, $ficklSymbol$393ec1a9, nativeReceiver_8)))))(value)()] as [int32, int32]] as [[int32, int32], [int32, int32], [int32, int32], [int32, int32]];
+}
+
+export function hiddenCallback(): int32 {
+    return ((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver, nativeArgs))))(Reflect.get(HiddenBase.prototype, "Apply", nativeReceiver)))))(HiddenDerived_$ctor())((a: int32, b: int32): int32 => ((a + b) | 0), 3, 4) | 0;
+}
+
+export function opaqueRead(): int32 {
+    return ((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver, nativeArgs))))(Reflect.get(HiddenBase.prototype, "Opaque", nativeReceiver)))))(HiddenDerived_$ctor())(4) | 0;
+}
+
+export function argumentShapes(): [int32, int32, int32, int32] {
+    const value: HiddenDerived = HiddenDerived_$ctor();
+    return [((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver, nativeArgs))))(Reflect.get(HiddenBase.prototype, "Optional", nativeReceiver)))))(value)(), ((nativeReceiver_1: any) => ((nativeReceiver_1 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod_1: any) => ((...nativeArgs_1: any[]): any => (Reflect.apply(nativeMethod_1, nativeReceiver_1, nativeArgs_1))))(Reflect.get(HiddenBase.prototype, "Optional", nativeReceiver_1)))))(value)(9), ((nativeReceiver_2: any) => ((nativeReceiver_2 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod_2: any) => ((...nativeArgs_2: any[]): any => (Reflect.apply(nativeMethod_2, nativeReceiver_2, nativeArgs_2))))(Reflect.get(HiddenBase.prototype, "Named", nativeReceiver_2)))))(value)({
+        right: 7,
+    }), ((nativeReceiver_3: any) => ((nativeReceiver_3 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod_3: any) => ((...nativeArgs_3: any[]): any => (Reflect.apply(nativeMethod_3, nativeReceiver_3, nativeArgs_3))))(Reflect.get(HiddenBase.prototype, "Sum", nativeReceiver_3)))))(value)(2, 3, 4)] as [int32, int32, int32, int32];
+}
+
+export function nonCallableRead(): [boolean, int32] {
+    let calls = 0;
+    try {
+        ((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver, nativeArgs))))(Reflect.get(HiddenBase.prototype, "Opaque", nativeReceiver)))))(HiddenDerived_$ctor())((calls = ((calls + 1) | 0), 1));
+        return [false, calls] as [boolean, int32];
+    }
+    catch (matchValue: any) {
+        return [true, calls] as [boolean, int32];
+    }
+}
+
+export function explicitBaseRead(): [int32, int32, int32] {
+    return ((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver, nativeArgs))))(Reflect.get(HiddenDerived.prototype, "BaseRead", nativeReceiver)))))(HiddenDerived_$ctor())();
+}
+
+export function hiddenReceiver(): [int32, int32, int32] {
+    const value: HiddenDerived = HiddenDerived_$ctor();
+    let calls = 0;
+    const receiver = (): HiddenBase => {
+        calls = ((calls + 1) | 0);
+        return value;
+    };
+    ((nativeReceiver: any) => ((nativeTarget: any, nativeKey: any) => ((nativeValue: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set(nativeTarget, nativeKey, nativeValue, nativeReceiver) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })()))))(HiddenBase.prototype, "Value"))(receiver())(7);
+    const actual: int32 = (((nativeReceiver_1: any) => ((nativeReceiver_1 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(HiddenBase.prototype, "Value", nativeReceiver_1)))))(receiver()) + ((nativeReceiver_2: any) => ((nativeReceiver_2 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver_2, nativeArgs))))(Reflect.get(HiddenBase.prototype, "Read", nativeReceiver_2)))))(receiver())()) | 0;
+    return [calls, actual, ((nativeReceiver_3: any) => ((nativeReceiver_3 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(HiddenDerived.prototype, "Value", nativeReceiver_3)))))(value)] as [int32, int32, int32];
+}
+
+export function hiddenNull(): [boolean, int32] {
+    let calls = 0;
+    try {
+        ((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver, nativeArgs))))(Reflect.get(HiddenBase.prototype, "Apply", nativeReceiver)))))(defaultOf())((a: int32, b: int32): int32 => ((a + b) | 0), (calls = ((calls + 1) | 0), 1), 2);
+        return [false, calls] as [boolean, int32];
+    }
+    catch (matchValue: any) {
+        return [true, calls] as [boolean, int32];
+    }
+}
+
+export function hiddenNullSetter(): [boolean, int32] {
+    let calls = 0;
+    try {
+        ((nativeReceiver: any) => ((nativeTarget: any, nativeKey: any) => ((nativeValue: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set(nativeTarget, nativeKey, nativeValue, nativeReceiver) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })()))))(HiddenBase.prototype, "Value"))(defaultOf())((calls = ((calls + 1) | 0), 1));
+        return [false, calls] as [boolean, int32];
+    }
+    catch (matchValue: any) {
+        return [true, calls] as [boolean, int32];
+    }
+}
+
+export function frozenHidden(): [int32, int32] {
+    const value: HiddenDerived = HiddenDerived_$ctor();
+    Object.freeze(value);
+    ((nativeReceiver: any) => ((nativeTarget: any, nativeKey: any) => ((nativeValue: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set(nativeTarget, nativeKey, nativeValue, nativeReceiver) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })()))))(HiddenBase.prototype, "Value"))(value)(9);
+    return [((nativeReceiver_1: any) => ((nativeReceiver_1 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(HiddenBase.prototype, "Value", nativeReceiver_1)))))(value), ((nativeReceiver_2: any) => ((nativeReceiver_2 == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : (Reflect.get(HiddenDerived.prototype, "Value", nativeReceiver_2)))))(value)] as [int32, int32];
+}
+
+export class HiddenFieldBase {
+    constructor() {
+    }
+    @(identityDecorator)
+    [$ficklSymbol$472d3e41]: int32 = 1;
+}
+
+export function HiddenFieldBase_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.HiddenFieldBase", undefined, HiddenFieldBase);
+}
+
+export function HiddenFieldBase_$ctor(): HiddenFieldBase {
+    return new HiddenFieldBase();
+}
+
+export class HiddenFieldDerived extends HiddenFieldBase {
+    constructor() {
+        super();
+    }
+    @(identityDecorator)
+    [$ficklSymbol$911043f9]: int32 = 2;
+    @(identityDecorator)
+    BaseRead(): int32 {
+        const _: HiddenFieldDerived = this;
+        _[$ficklSymbol$911043f9] = 9;
+        return _[$ficklSymbol$911043f9] | 0;
+    }
+}
+
+export function HiddenFieldDerived_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.HiddenFieldDerived", undefined, HiddenFieldDerived, HiddenFieldBase_$reflection());
+}
+
+export function HiddenFieldDerived_$ctor(): HiddenFieldDerived {
+    return new HiddenFieldDerived();
+}
+
+export function distinctHiddenFields(): [int32, int32] {
+    const value: HiddenFieldDerived = HiddenFieldDerived_$ctor();
+    value[$ficklSymbol$472d3e41] = 8;
+    return [value[$ficklSymbol$472d3e41], value[$ficklSymbol$911043f9]] as [int32, int32];
+}
+
+export function explicitBaseFieldRead(): int32 {
+    return ((nativeReceiver: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot access native member on null'); })() : ((nativeMethod: any) => ((...nativeArgs: any[]): any => (Reflect.apply(nativeMethod, nativeReceiver, nativeArgs))))(Reflect.get(HiddenFieldDerived.prototype, "BaseRead", nativeReceiver)))))(HiddenFieldDerived_$ctor())() | 0;
+}
+
+export class OrderedAccessor {
+    value: int32;
+    constructor() {
+        this.value = 0;
+    }
+    get [setterRegistry.key](): int32 {
+        const _: OrderedAccessor = this;
+        return _.value | 0;
+    }
+    set [setterRegistry.key](next: int32) {
+        const _: OrderedAccessor = this;
+        _.value = (next | 0);
+    }
+}
+
+export function OrderedAccessor_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.OrderedAccessor", undefined, OrderedAccessor);
+}
+
+export function OrderedAccessor_$ctor(): OrderedAccessor {
+    return new OrderedAccessor();
+}
+
+export function orderedSetter(): void {
+    ((nativeReceiver: any) => ((nativeTarget: any, nativeKey: any) => ((nativeValue: any) => ((nativeReceiver == null ? (() => { throw new TypeError('Cannot assign native member on null'); })() : Reflect.set(nativeTarget, nativeKey, nativeValue, nativeReceiver) ? void 0 : (() => { throw new TypeError('Cannot assign native member'); })()))))(OrderedAccessor.prototype, setterRegistry.key))(OrderedAccessor_$ctor())((setterRegistry.events.push('rhs'), 7));
+}
+
+export interface IExplicitState {
+    get [$ficklSymbol$7dcf56c1](): int32,
+    set [$ficklSymbol$7dcf56c1](arg0: int32)
+}
+
+export class ExplicitState implements IExplicitState {
+    state: int32;
+    constructor() {
+        this.state = 1;
+    }
+    get [$ficklSymbol$7dcf56c1](): int32 {
+        const _: ExplicitState = this;
+        return _.state | 0;
+    }
+    set [$ficklSymbol$7dcf56c1](value: int32) {
+        const _: ExplicitState = this;
+        _.state = (value | 0);
+    }
+}
+
+export function ExplicitState_$reflection(): TypeInfo {
+    return class_type("NativeDecorators.ExplicitState", undefined, ExplicitState);
+}
+
+export function ExplicitState_$ctor(): ExplicitState {
+    return new ExplicitState();
+}
+
+export function explicitState(): int32 {
+    const value: IExplicitState = ExplicitState_$ctor();
+    value[$ficklSymbol$7dcf56c1] = 8;
+    return value[$ficklSymbol$7dcf56c1] | 0;
 }
