@@ -15,6 +15,26 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "Symbol keys require a non-empty expression" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid =
+    [<SymbolKey("")>]
+    abstract Value: int
+let invalid () = { new Invalid with member _.Value = 42 }
+"""
+      |> Assert.Exists.errorWith "SymbolKey requires a non-empty symbol expression"
+      |> ignore
+
+    testCase "Symbol keys reject module functions" <| fun _ ->
+      compile """
+open Fickl.Core
+[<SymbolKey("Symbol.toPrimitive")>]
+let invalid (hint: string) = 42
+"""
+      |> Assert.Exists.errorWith "SymbolKey applies to object members and record fields, not module functions"
+      |> ignore
+
     testCase "Native async generators reject promise-valued yields" <| fun _ ->
       compile """
 open Fable.Core

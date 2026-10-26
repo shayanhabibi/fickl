@@ -69,6 +69,8 @@
     <Compile Include="NativeAsyncTests.fs" />
     <Compile Include="NativeGeneratorTests.fs" />
     <Compile Include="NativeAsyncGeneratorTests.fs" />
+    <Compile Include="SymbolKeyBindings.fs" />
+    <Compile Include="SymbolKeyTests.fs" />
     <Compile Include="CurryingTests.fs" />
     <Compile Include="FcsEdgeCasesHelper.fs" />
     <Compile Include="FcsEdgeCaseTests.fs" />

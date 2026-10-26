@@ -1,9 +1,9 @@
-import { FSharpRef, Record, Union } from "./Types.ts";
+import { FSharpRef, Record, Union, recordFieldsSymbol } from "./Types.ts";
 import { Exception, MutableArray, combineHashCodes, equalArraysWith, fieldKey, IEquatable, stringHash } from "./Util.ts";
 import Decimal from "./Decimal.ts";
 import { Some, some } from "./Option.ts";
 
-export type FieldInfo = [string, TypeInfo];
+export type FieldInfo = [string, TypeInfo, PropertyKey?];
 export type PropertyInfo = FieldInfo;
 export type ParameterInfo = FieldInfo;
 
@@ -494,13 +494,17 @@ export function getUnionCaseFields(uci: CaseInfo): FieldInfo[] {
 // without adding a __fields__ to every anonymous record being created
 export function getRecordFields(v: any, t: TypeInfo): MutableArray<any> {
   if (t.fields != null) {
-    return t.fields().map(([key, _]) => v[fieldKey(key)]);
+    return t.fields().map(([key, _, backingKey]) => v[backingKey ?? fieldKey(key)]);
+  }
+  const fields: ReadonlyArray<readonly [string, PropertyKey]> | undefined = v.constructor?.[recordFieldsSymbol];
+  if (fields != null) {
+    return fields.map(([, key]) => v[key]);
   }
   return Object.keys(v).map((k) => v[k]);
 }
 
 export function getRecordField(v: any, field: FieldInfo): any {
-  return v[fieldKey(field[0])];
+  return v[field[2] ?? fieldKey(field[0])];
 }
 
 export function getTupleFields(v: any): MutableArray<any> {
@@ -540,8 +544,8 @@ export function makeRecord(t: TypeInfo, values: MutableArray<any>): any {
   }
   return t.construct != null
     ? new t.construct(...values)
-    : fields.reduce((obj, [key, _t], i) => {
-      obj[fieldKey(key)] = values[i];
+    : fields.reduce((obj, [key, _t, backingKey], i) => {
+      obj[backingKey ?? fieldKey(key)] = values[i];
       return obj;
     }, {} as any);
 }

@@ -118,22 +118,35 @@ export abstract class Union<Tag extends number, Name extends string> implements 
   }
 }
 
+// Symbol-keyed records retain declaration order and F# display names in constructor metadata.
+export const recordFieldsSymbol: unique symbol = Symbol("fickl.record.fields");
+
+function recordFields(self: any): ReadonlyArray<readonly [string, PropertyKey]> {
+  return self.constructor?.[recordFieldsSymbol]
+    ?? Object.keys(self).map((key) => [fieldName(key), key] as const);
+}
+
+function recordKeys(self: any): PropertyKey[] {
+  const fields: ReadonlyArray<readonly [string, PropertyKey]> | undefined = self.constructor?.[recordFieldsSymbol];
+  return fields?.map(([, key]) => key) ?? Object.keys(self);
+}
+
 function recordToJSON<T>(self: T) {
   const o: any = {};
-  const keys = Object.keys(self as any);
-  for (let i = 0; i < keys.length; i++) {
-    o[fieldName(keys[i])] = (self as any)[keys[i]];
+  for (const [name, key] of recordFields(self)) {
+    o[name] = (self as any)[key];
   }
   return o;
 }
 
 function recordToString<T>(self: T) {
-  return "{ " + Object.entries(self as any).map(([k, v]) => fieldName(k) + " = " + toStringQuoted(v)).join("\n  ") + " }";
+  return "{ " + recordFields(self).map(([name, key]) => name + " = " + toStringQuoted((self as any)[key])).join("\n  ") + " }";
 }
 
 function recordGetHashCode<T>(self: T) {
   // Snapshot all values before calling any user-defined hash functions.
-  const values = Object.values(self as any);
+  const fields: ReadonlyArray<readonly [string, PropertyKey]> | undefined = (self as any).constructor?.[recordFieldsSymbol];
+  const values = fields?.map(([, key]) => (self as any)[key]) ?? Object.values(self as any);
   let hash = 0;
   for (let i = 0; i < values.length; i++) {
     const fieldHash = structuralHash(values[i]);
@@ -148,7 +161,7 @@ function recordEquals<T>(self: T, other: T) {
   } else if (!sameConstructor(self, other)) {
     return false;
   } else {
-    const thisNames = Object.keys(self as any);
+    const thisNames = recordKeys(self);
     for (let i = 0; i < thisNames.length; i++) {
       if (!equals((self as any)[thisNames[i]], (other as any)[thisNames[i]])) {
         return false;
@@ -164,7 +177,7 @@ function recordCompareTo<T>(self: T, other: T) {
   } else if (!sameConstructor(self, other)) {
     return -1;
   } else {
-    const thisNames = Object.keys(self as any);
+    const thisNames = recordKeys(self);
     for (let i = 0; i < thisNames.length; i++) {
       const result = compare((self as any)[thisNames[i]], (other as any)[thisNames[i]]);
       if (result !== 0) {
