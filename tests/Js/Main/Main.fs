@@ -8,6 +8,7 @@ let allTests =
     CallableInterfaces.tests
     InlineInterfaces.tests
     NativeFunctions.tests
+    NativeDisposal.tests
     Currying.tests
     FcsEdgeCases.tests
     Arithmetic.tests

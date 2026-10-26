@@ -1,5 +1,6 @@
 import { IObservable, subscribe } from "./Observable.ts";
 import { Option, some, value } from "./Option.ts";
+import { createDisposable } from "./Util.ts";
 import { FSharpChoice$2_$union, Choice_tryValueIfChoice1Of2, Choice_tryValueIfChoice2Of2 } from "./Choice.ts";
 
 export type Handler<T> = (sender: any, x: T) => void;
@@ -119,9 +120,7 @@ export function createEvent<Del extends Function, T>(addHandler: (h: Del) => voi
     Subscribe(r) {
       const h = ((_: any, args: T) => r.OnNext(args)) as unknown as Del;
       addHandler(h);
-      return {
-        Dispose() { removeHandler(h); }
-      };
+      return createDisposable(() => removeHandler(h));
     }
   };
 }

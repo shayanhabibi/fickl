@@ -5,7 +5,7 @@ import { protectedCont, protectedBind, protectedReturn } from "./AsyncBuilder.ts
 import type { IEvent$2 } from "./Event.ts";
 import { FSharpChoice$2_$union, Choice_makeChoice1Of2, Choice_makeChoice2Of2 } from "./Choice.ts";
 import { ArgumentException_$ctor_Z384F8060, InvalidOperationException_$ctor_Z721C83C5, TimeoutException_$ctor } from "./System.ts";
-import { Exception, ensureErrorOrException, IDisposable } from "./Util.ts";
+import { Exception, ensureErrorOrException, IDisposable, createDisposable } from "./Util.ts";
 import type { Option } from "./Option.ts";
 
 function emptyContinuation<T>(_x: T) {
@@ -283,15 +283,13 @@ export function onCancel(interruption: () => void): Async<IDisposable> {
     };
     const id = token.addListener(interrupt);
     let disposed = false;
-    ctx.onSuccess({
-      Dispose() {
+    ctx.onSuccess(createDisposable(() => {
         if (disposed) { return; }
         disposed = true;
         token.removeListener(id);
         // With use! Dispose runs inside cancel() before this listener gets its turn
         if (token.isCancelled) { interrupt(); }
-      },
-    });
+    }));
   });
 }
 

@@ -1,7 +1,7 @@
 
 import { FSharpChoice$2_$union, Choice_tryValueIfChoice1Of2, Choice_tryValueIfChoice2Of2 } from "./Choice.ts";
 import { Option, some, value } from "./Option.ts";
-import { IDisposable } from "./Util.ts";
+import { IDisposable, createDisposable } from "./Util.ts";
 
 export interface IObserver<T> {
   OnNext: (x: T) => void;
@@ -108,12 +108,10 @@ export function merge<T>(source1: IObservable<T>, source2: IObservable<T>): IObs
           }
         }
       }));
-    return {
-      Dispose() {
-        h1.Dispose();
-        h2.Dispose();
-      },
-    };
+    return createDisposable(() => {
+      h1.Dispose();
+      h2.Dispose();
+    });
   });
 }
 

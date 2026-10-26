@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+
 export type Nullable<T> = T | null | undefined;
 
 export interface MutableArray<T> extends Iterable<T> {
@@ -55,6 +57,19 @@ export interface IHashable {
 
 export interface IDisposable {
   Dispose(): void;
+  [Symbol.dispose]?(): void;
+}
+
+export interface IAsyncDisposable {
+  DisposeAsync(): PromiseLike<void>;
+  [Symbol.asyncDispose]?(): PromiseLike<void>;
+}
+
+export const disposeSymbol: typeof Symbol.dispose = Symbol.dispose ?? Symbol.for("Symbol.dispose") as typeof Symbol.dispose;
+export const asyncDisposeSymbol: typeof Symbol.asyncDispose = Symbol.asyncDispose ?? Symbol.for("Symbol.asyncDispose") as typeof Symbol.asyncDispose;
+
+export function createDisposable(dispose: () => void): IDisposable & Disposable {
+  return { Dispose: dispose, [disposeSymbol]() { this.Dispose(); } };
 }
 
 export interface IComparer<T> {
@@ -148,6 +163,21 @@ export function isDisposable<T>(x: T | IDisposable): x is IDisposable {
 export function disposeSafe(x: any) {
   if (isDisposable(x)) {
     x.Dispose();
+  } else if (x != null && typeof x[disposeSymbol] === "function") {
+    x[disposeSymbol]();
+  }
+}
+
+export async function disposeAsyncSafe(x: any): Promise<void> {
+  if (x == null) {
+    return;
+  }
+  if (typeof x.DisposeAsync === "function") {
+    await x.DisposeAsync();
+  } else if (typeof x[asyncDisposeSymbol] === "function") {
+    await x[asyncDisposeSymbol]();
+  } else {
+    disposeSafe(x);
   }
 }
 
@@ -187,7 +217,7 @@ export class Enumerable<T> implements IEnumerable<T> {
   }
 }
 
-export class Enumerator<T> implements IEnumerator<T> {
+export class Enumerator<T> implements IEnumerator<T>, Disposable {
   private current: T = defaultOf();
   private iter: Iterator<T>;
   constructor(iter: Iterator<T>) { this.iter = iter; }
@@ -207,6 +237,9 @@ export class Enumerator<T> implements IEnumerator<T> {
   }
   public Dispose() {
     return;
+  }
+  public [disposeSymbol]() {
+    this.Dispose();
   }
 }
 

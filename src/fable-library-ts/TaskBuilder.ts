@@ -1,4 +1,4 @@
-import { IDisposable } from "./Util.ts";
+import { IDisposable, IAsyncDisposable, disposeSafe, disposeAsyncSafe } from "./Util.ts";
 import { zero } from "./Task.ts";
 
 export class TaskBuilder {
@@ -57,7 +57,15 @@ export class TaskBuilder {
   }
 
   public Using<T extends IDisposable, U>(resource: T, binder: (x: T) => Promise<U>): Promise<U> {
-    return this.TryFinally(() => binder(resource), () => resource.Dispose());
+    return this.TryFinally(() => binder(resource), () => disposeSafe(resource));
+  }
+
+  public async UsingAsync<T extends IAsyncDisposable, U>(resource: T, binder: (x: T) => Promise<U>): Promise<U> {
+    try {
+      return await binder(resource);
+    } finally {
+      await disposeAsyncSafe(resource);
+    }
   }
 
   public While(guard: () => boolean, computation: () => Promise<void>): Promise<void> {
