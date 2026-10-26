@@ -50,6 +50,7 @@ type Context =
         BoundTypes: Map<string, Fable.Type>
         ForcedIdents: Set<string>
         IsNativeAsync: bool
+        NativeGeneratorType: Fable.Type option
     }
 
 type ModuleDecl(name, ?isPublic, ?isMutable, ?typ, ?doc) =
@@ -661,6 +662,7 @@ module Annotation =
             | _, Some(Literal(RegExp _))
             | _, Some(FunctionExpression _)
             | _, Some(AsyncFunctionExpression _)
+            | _, Some(GeneratorFunctionExpression _)
             | _, Some(ArrowFunctionExpression _) -> None
             | _, Some(AsExpression _) -> None
             | _ -> makeTypeAnnotation com ctx typ |> Some
@@ -828,6 +830,10 @@ module Annotation =
         | Types.task
         | "System.Threading.Tasks.ValueTask" -> makeNativeTypeAnnotation com ctx [ Fable.Unit ] "Promise" |> Some
         | Types.taskGeneric -> makeNativeTypeAnnotation com ctx genArgs "Promise" |> Some
+        | "Fickl.Core.JsGenerator`3" -> makeNativeTypeAnnotation com ctx genArgs "Generator" |> Some
+        | "Fickl.Core.JsGeneratorResult`2" -> makeNativeTypeAnnotation com ctx genArgs "IteratorResult" |> Some
+        | "Fickl.Core.JsYieldResult`1" -> makeNativeTypeAnnotation com ctx genArgs "IteratorYieldResult" |> Some
+        | "Fickl.Core.JsReturnResult`1" -> makeNativeTypeAnnotation com ctx genArgs "IteratorReturnResult" |> Some
         | _ when not ent.IsInterface -> None
         // everything below is an interface
         | Types.icollection ->
@@ -1084,7 +1090,17 @@ module Annotation =
         (args: Fable.Ident list)
         (body: Fable.Expr)
         =
-        transformFunctionWithReturnType com { ctx with IsNativeAsync = false } name typeParams args body.Type body
+        transformFunctionWithReturnType
+            com
+            { ctx with
+                IsNativeAsync = false
+                NativeGeneratorType = None
+            }
+            name
+            typeParams
+            args
+            body.Type
+            body
 
 module Util =
     open Lib
@@ -1344,6 +1360,46 @@ module Util =
     let assign range left right =
         Expression.assignmentExpression (AssignEqual, left, right, ?loc = range)
 
+    /// <summary>Checks that a generator with a non-unit terminal type cannot fall through without returning.</summary>
+    let validateGeneratorReturn (com: IBabelCompiler) generatorType body =
+        let rec finishes targets visited =
+            function
+            | Fable.Emit(info, _, _) when List.contains "fickl-generator-return" info.CallInfo.Tags -> true
+            | Fable.Extended(Fable.Throw _, _) -> true
+            | Fable.Sequential expressions -> List.exists (finishes targets visited) expressions
+            | Fable.Let(_, _, body)
+            | Fable.TypeCast(body, _) -> finishes targets visited body
+            | Fable.IfThenElse(_, first, second, _) -> finishes targets visited first && finishes targets visited second
+            | Fable.TryCatch(body, handler, finalizer, _) ->
+                Option.exists (finishes targets visited) finalizer
+                || (finishes targets visited body
+                    && (handler |> Option.forall (snd >> finishes targets visited)))
+            | Fable.DecisionTree(tree, targets) -> finishes targets Set.empty tree
+            | Fable.DecisionTreeSuccess(index, _, _) when not (Set.contains index visited) ->
+                targets
+                |> List.tryItem index
+                |> Option.exists (snd >> finishes targets (Set.add index visited))
+            | Fable.WhileLoop(Fable.Value(Fable.BoolConstant true, _), _, _) -> true
+            | _ -> false
+
+        match generatorType with
+        | Fable.DeclaredType(_, [ _; (Fable.Unit | Fable.Any); _ ]) -> ()
+        | _ when finishes [] Set.empty body -> ()
+        | _ ->
+            addError com [] body.Range "A jsGenerator with a non-unit terminal type must return a value on every path"
+
+    /// <summary>Whether a generator invocation captures the containing function's receiver.</summary>
+    let rec usesGeneratorReceiver =
+        function
+        | Fable.Call(_, info, _, _) when List.contains "fickl-generator-run" info.Tags -> true
+        | Fable.Delegate(_, _, _, tags) when
+            List.contains "not-arrow" tags
+            && not (List.contains "fickl-async-function" tags)
+            ->
+            false
+        | Fable.ObjectExpr _ -> false
+        | expression -> getSubExpressions expression |> List.exists usesGeneratorReceiver
+
     /// Immediately Invoked Function Expression
     let iife (com: IBabelCompiler) ctx (expr: Fable.Expr) =
         let rec containsAwait =
@@ -1356,10 +1412,64 @@ module Util =
 
         let isAsync = ctx.IsNativeAsync && containsAwait expr
 
-        let _, body =
-            com.TransformFunction({ ctx with IsNativeAsync = isAsync }, None, [], expr)
+        let rec containsYield =
+            function
+            | Fable.Emit(info, _, _) when List.contains "fickl-native-yield" info.CallInfo.Tags -> true
+            | Fable.Lambda _
+            | Fable.Delegate _
+            | Fable.ObjectExpr _ -> false
+            | expression -> getSubExpressions expression |> List.exists containsYield
 
-        if isAsync then
+        let isGenerator = ctx.NativeGeneratorType.IsSome && containsYield expr
+
+        let _, body =
+            com.TransformFunction(
+                { ctx with
+                    IsNativeAsync = isAsync
+                    NativeGeneratorType =
+                        if isGenerator then
+                            ctx.NativeGeneratorType
+                        else
+                            None
+                },
+                None,
+                [],
+                expr
+            )
+
+        if isGenerator then
+            let returnType =
+                ctx.NativeGeneratorType
+                |> Option.map (
+                    function
+                    | Fable.DeclaredType(ent, [ yieldType; _; nextType ]) ->
+                        Fable.DeclaredType(ent, [ yieldType; expr.Type; nextType ])
+                    | typ -> typ
+                )
+                |> Option.bind (fun typ ->
+                    if com.IsTypeScript then
+                        Some(makeTypeAnnotation com ctx typ)
+                    else
+                        None
+                )
+
+            let parameters =
+                if com.IsTypeScript then
+                    [| Parameter.parameter ("this", typeAnnotation = AnyTypeAnnotation) |]
+                else
+                    [||]
+
+            let callback =
+                Expression.generatorFunctionExpression (parameters, body, ?returnType = returnType, isAsync = isAsync)
+
+            let call =
+                Expression.callExpression (
+                    Expression.memberExpression (callback, Expression.identifier "call"),
+                    [| Expression.thisExpression () |]
+                )
+
+            emitExpression None "(yield* $0)" [ call ]
+        elif isAsync then
             let returnType =
                 if com.IsTypeScript then
                     Some(makeNativeTypeAnnotation com ctx [ expr.Type ] "Promise")
@@ -1484,7 +1594,30 @@ module Util =
         then
             addError com [] body.Range "AsyncFunction is only supported on module functions"
 
-        let ctx = { ctx with IsNativeAsync = isNativeAsync }
+        let isGenerator = hasAttribute Atts.ficklGeneratorFunction info.Attributes
+
+        if
+            isGenerator
+            && not (
+                info.DeclaringEntity
+                |> Option.bind com.TryGetEntity
+                |> Option.exists _.IsFSharpModule
+            )
+        then
+            addError com [] body.Range "GeneratorFunction is only supported on module functions"
+
+        if isNativeAsync && isGenerator then
+            addError com [] body.Range "AsyncFunction and GeneratorFunction cannot be combined"
+
+        let ctx =
+            { ctx with
+                IsNativeAsync = isNativeAsync
+                NativeGeneratorType =
+                    if isGenerator then
+                        Some info.ReturnParameter.Type
+                    else
+                        None
+            }
 
         let funcName, args, body =
             match kind, args with
@@ -2283,8 +2416,16 @@ module Util =
                     self.Name, args, body
                 | args -> "Invoke", args, memberInfo.Body
 
+            let capturesReceiver = usesGeneratorReceiver body
+
             let args, body, returnType, typeParameters =
                 getMemberArgsAndBody com ctx (NonAttached name) (Some entity) info args body
+
+            let args =
+                if com.IsTypeScript && capturesReceiver then
+                    Array.append [| Parameter.parameter ("this", typeAnnotation = AnyTypeAnnotation) |] args
+                else
+                    args
 
             Expression.functionExpression (
                 args,
@@ -2422,6 +2563,9 @@ module Util =
 
     let transformEmit (com: IBabelCompiler) ctx range (info: Fable.EmitInfo) =
         match info.CallInfo.Tags with
+        | Fable.Tags.Contains "fickl-native-yield"
+        | Fable.Tags.Contains "fickl-generator-return" when ctx.NativeGeneratorType.IsNone ->
+            addErrorAndReturnNull com range "Native yields and returns must be inside a jsGenerator computation"
         | Fable.Tags.Contains "fickl-native-await" when not ctx.IsNativeAsync ->
             addErrorAndReturnNull com range "Native promise bindings must be inside a jsAsync computation"
         | Fable.Tags.Contains "topDirectiveProloge" ->
@@ -2655,6 +2799,14 @@ but thanks to the optimisation done below we get
     let optimizeCall (com: IBabelCompiler) ctx range typ callee (callInfo: Fable.CallInfo) =
         // Try to optimize some patterns after FableTransforms
         match callInfo.Tags, callInfo.Args with
+        | Fable.Tags.Contains "fickl-generator-run", [] ->
+            let callback = transformAsExpr com ctx callee
+
+            Expression.callExpression (
+                Expression.memberExpression (callback, Expression.identifier "call"),
+                [| Expression.thisExpression () |]
+            )
+            |> Some
         | Fable.Tags.Contains "downcast", [ e ] ->
             let e = transformAsExpr com ctx e
 
@@ -3520,9 +3672,52 @@ but thanks to the optimisation done below we get
             |> makeArrowFunctionExpression name
 
         | Fable.Delegate(args, body, name, tags) ->
-            if List.contains "fickl-async-function" tags then
+            if List.contains "fickl-generator-function" tags then
+                match args with
+                | [ metadata ] ->
+                    validateGeneratorReturn com metadata.Type body
+
+                    let ctx =
+                        { ctx with
+                            IsNativeAsync = false
+                            NativeGeneratorType = Some metadata.Type
+                        }
+
+                    let parameters, block, returnType, typeParameters =
+                        transformFunctionWithReturnType com ctx name None args metadata.Type body
+
+                    let parameters = Array.skip 1 parameters
+
+                    let parameters =
+                        if com.IsTypeScript then
+                            Array.append
+                                [| Parameter.parameter ("this", typeAnnotation = AnyTypeAnnotation) |]
+                                parameters
+                        else
+                            parameters
+
+                    Expression.generatorFunctionExpression (
+                        parameters,
+                        block,
+                        ?returnType = returnType,
+                        ?typeParameters = typeParameters
+                    )
+                | _ -> addErrorAndReturnNull com body.Range "Invalid native generator metadata"
+            elif List.contains "fickl-generator-code" tags then
+                addErrorAndReturnNull com body.Range "Deferred jsGenerator code must be consumed by jsGenerator.Run"
+            elif List.contains "fickl-async-function" tags then
                 let parameters, block, _, typeParameters =
-                    transformFunctionWithReturnType com { ctx with IsNativeAsync = true } name None args body.Type body
+                    transformFunctionWithReturnType
+                        com
+                        { ctx with
+                            IsNativeAsync = true
+                            NativeGeneratorType = None
+                        }
+                        name
+                        None
+                        args
+                        body.Type
+                        body
 
                 let returnType =
                     if com.IsTypeScript then
@@ -3541,6 +3736,7 @@ but thanks to the optimisation done below we get
                 addErrorAndReturnNull com body.Range "Deferred jsAsync code must be consumed by jsAsync.Run"
             elif List.contains "not-arrow" tags then
                 let id = name |> Option.map Identifier.identifier
+                let capturesReceiver = usesGeneratorReceiver body
 
                 let args, body, returnType, typeParamDecl =
                     transformFunctionWithAnnotations com ctx name None args body
@@ -3549,6 +3745,12 @@ but thanks to the optimisation done below we get
                     if List.contains "fickl-this-function" tags && not com.IsTypeScript then
                         Array.skip 1 args
                     elif List.contains "fickl-js-function" tags && com.IsTypeScript then
+                        Array.append [| Parameter.parameter ("this", typeAnnotation = AnyTypeAnnotation) |] args
+                    elif
+                        com.IsTypeScript
+                        && capturesReceiver
+                        && not (List.contains "fickl-this-function" tags)
+                    then
                         Array.append [| Parameter.parameter ("this", typeAnnotation = AnyTypeAnnotation) |] args
                     else
                         args
@@ -3687,6 +3889,17 @@ but thanks to the optimisation done below we get
 
         | Fable.CurriedApply(callee, args, typ, range) ->
             transformCurriedApplyAsStatements com ctx range typ returnStrategy callee args
+
+        | Fable.Emit(info, _, range) when List.contains "fickl-generator-return" info.CallInfo.Tags ->
+            if ctx.NativeGeneratorType.IsNone then
+                addError com [] range "Native yields and returns must be inside a jsGenerator computation"
+                [||]
+            else
+                match info.CallInfo.Args with
+                | [ value ] -> com.TransformAsStatements(ctx, Some Return, value)
+                | _ ->
+                    addError com [] range "Invalid native generator return"
+                    [||]
 
         | Fable.Emit(info, t, range) ->
             let e = transformEmit com ctx range info
@@ -4511,6 +4724,28 @@ but thanks to the optimisation done below we get
             | _ -> None
         | _ -> None
 
+    let rec private tryNativeGeneratorBody =
+        function
+        | Fable.Call(Fable.Delegate([ _ ], body, _, tags), info, _, _) when
+            List.contains "fickl-generator-function" tags && info.Args.IsEmpty
+            ->
+            Some body
+        | Fable.TypeCast(body, _) -> tryNativeGeneratorBody body
+        | Fable.Let(ident, value, body) ->
+            tryNativeGeneratorBody body
+            |> Option.map (fun body -> Fable.Let(ident, value, body))
+        | Fable.Sequential expressions ->
+            match List.rev expressions with
+            | last :: rest ->
+                tryNativeGeneratorBody last
+                |> Option.map (fun body -> Fable.Sequential(List.rev rest @ [ body ]))
+            | [] -> None
+        | Fable.IfThenElse(guard, first, second, range) ->
+            match tryNativeGeneratorBody first, tryNativeGeneratorBody second with
+            | Some first, Some second -> Some(Fable.IfThenElse(guard, first, second, range))
+            | _ -> None
+        | _ -> None
+
     let transformModuleFunction com ctx (info: Fable.MemberFunctionOrValue) membName (args: Fable.Ident list) body =
         let args, body =
             if info.Attributes |> hasAttribute Atts.jsxComponent then
@@ -4555,9 +4790,46 @@ but thanks to the optimisation done below we get
                     ?typeParameters = typeParameters
                 )
             | None -> addErrorAndReturnNull com body.Range "AsyncFunction requires a jsAsync computation"
+        elif hasAttribute Atts.ficklGeneratorFunction info.Attributes then
+            match tryNativeGeneratorBody body with
+            | Some body ->
+                validateGeneratorReturn com info.ReturnParameter.Type body
+
+                let args, body, returnType, typeParameters =
+                    getMemberArgsAndBodyWithReturnType
+                        com
+                        ctx
+                        (NonAttached membName)
+                        None
+                        info
+                        args
+                        info.ReturnParameter.Type
+                        body
+
+                let args =
+                    if com.IsTypeScript then
+                        Array.append [| Parameter.parameter ("this", typeAnnotation = AnyTypeAnnotation) |] args
+                    else
+                        args
+
+                Expression.generatorFunctionExpression (
+                    args,
+                    body,
+                    ?returnType = returnType,
+                    ?typeParameters = typeParameters
+                )
+            | None -> addErrorAndReturnNull com body.Range "GeneratorFunction requires a jsGenerator computation"
         else
+            let capturesReceiver = usesGeneratorReceiver body
+
             let args, body, returnType, typeParamDecl =
                 getMemberArgsAndBody com ctx (NonAttached membName) None info args body
+
+            let args =
+                if com.IsTypeScript && capturesReceiver then
+                    Array.append [| Parameter.parameter ("this", typeAnnotation = AnyTypeAnnotation) |] args
+                else
+                    args
 
             Expression.functionExpression (args, body, ?returnType = returnType, ?typeParameters = typeParamDecl)
 
@@ -5910,6 +6182,7 @@ module Compiler =
                 BoundTypes = Map.empty
                 ForcedIdents = Set.empty
                 IsNativeAsync = false
+                NativeGeneratorType = None
             }
 
         let rootDecls = List.collect (transformDeclaration com ctx) file.Declarations

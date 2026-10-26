@@ -204,6 +204,7 @@ export interface IEnumerable<T> extends Iterable<T> {
 
 export class Enumerable<T> implements IEnumerable<T> {
   private en: IEnumerator<T>;
+  private closed = false;
   constructor(en: IEnumerator<T>) { this.en = en; }
   public GetEnumerator(): IEnumerator<T> { return this.en; }
   public "System.Collections.IEnumerable.GetEnumerator"(): IEnumerator<any> { return this.en; }
@@ -211,15 +212,31 @@ export class Enumerable<T> implements IEnumerable<T> {
     return this;
   }
   next() {
-    const hasNext = this.en["System.Collections.IEnumerator.MoveNext"]();
-    const current = hasNext ? this.en["System.Collections.Generic.IEnumerator`1.get_Current"]() : undefined;
-    return { done: !hasNext, value: current } as IteratorResult<T>;
+    if (this.closed) { return { done: true, value: undefined } as IteratorResult<T>; }
+    try {
+      const hasNext = this.en["System.Collections.IEnumerator.MoveNext"]();
+      const current = hasNext ? this.en["System.Collections.Generic.IEnumerator`1.get_Current"]() : undefined;
+      if (!hasNext) { this.return(); }
+      return { done: !hasNext, value: current } as IteratorResult<T>;
+    } catch (error) {
+      this.return();
+      throw error;
+    }
+  }
+  return(value?: unknown): IteratorResult<T> {
+    if (!this.closed) {
+      this.closed = true;
+      disposeSafe(this.en);
+    }
+    return { done: true, value } as IteratorResult<T>;
   }
 }
 
 export class Enumerator<T> implements IEnumerator<T>, Disposable {
   private current: T = defaultOf();
   private iter: Iterator<T>;
+  private disposed = false;
+  private completed = false;
   constructor(iter: Iterator<T>) { this.iter = iter; }
   public ["System.Collections.Generic.IEnumerator`1.get_Current"]() {
     return this.current;
@@ -229,6 +246,7 @@ export class Enumerator<T> implements IEnumerator<T>, Disposable {
   }
   public ["System.Collections.IEnumerator.MoveNext"]() {
     const cur = this.iter.next();
+    this.completed ||= !!cur.done;
     this.current = cur.value;
     return !cur.done;
   }
@@ -236,7 +254,10 @@ export class Enumerator<T> implements IEnumerator<T>, Disposable {
     throw new Exception("JS iterators cannot be reset");
   }
   public Dispose() {
-    return;
+    if (!this.disposed) {
+      this.disposed = true;
+      if (!this.completed) { this.iter.return?.(); }
+    }
   }
   public [disposeSymbol]() {
     this.Dispose();
@@ -254,13 +275,7 @@ export function getEnumerator<T>(e: IEnumerable<T> | Iterable<T>): IEnumerator<T
 }
 
 export function toIterator<T>(en: IEnumerator<T>): Iterator<T> {
-  return {
-    next() {
-      const hasNext = en["System.Collections.IEnumerator.MoveNext"]();
-      const current = hasNext ? en["System.Collections.Generic.IEnumerator`1.get_Current"]() : undefined;
-      return { done: !hasNext, value: current } as IteratorResult<T>;
-    },
-  };
+  return new Enumerable(en);
 }
 
 export function enumerableToIterator<T>(e: IEnumerable<T> | Iterable<T>): Iterator<T> {

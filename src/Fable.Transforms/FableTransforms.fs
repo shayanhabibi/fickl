@@ -1036,6 +1036,11 @@ module private Transforms =
 
             let info = { info with Args = args }
             Call(callee, info, t, r)
+        | Emit({ CallInfo = { Tags = tags } }, _, _) when
+            List.contains "fickl-native-yield" tags
+            || List.contains "fickl-generator-return" tags
+            ->
+            e
         | Emit({ CallInfo = callInfo } as emitInfo, t, r) ->
             let args =
                 uncurryArgsExcept com true (keepCurriedArg com true callInfo) callInfo.SignatureArgTypes callInfo.Args

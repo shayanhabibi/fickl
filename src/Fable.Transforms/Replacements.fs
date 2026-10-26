@@ -5200,6 +5200,118 @@ let private replacedModules =
             "System.Reflection.TypeInfo", types
         ]
 
+let private nativeGeneratorApi (com: ICompiler) r t (info: CallInfo) thisArg args =
+    match thisArg, info.CompiledName with
+    | Some generator, ("next" | "return" | "throw" as methodName) ->
+        let args =
+            if methodName = "next" then
+                match args with
+                | [ Value(NewOption(None, _, _), _) ] -> []
+                | [ Value(NewOption(Some value, _, _), _) ] -> [ value ]
+                | [ ExprType(Option(typ, _)) as option ] ->
+                    [ Helper.LibCall(com, "Option", "unwrap", typ, [ option ], ?loc = r) ]
+                | args -> args
+            else
+                args
+
+        Helper.InstanceCall(generator, methodName, t, args, ?loc = r) |> Some
+    | _ -> None
+
+let private nativeGenerator (com: ICompiler) (ctx: Context) r t (info: CallInfo) args =
+    let code =
+        function
+        | MaybeCasted(Delegate([], body, _, tags)) when List.contains "fickl-generator-code" tags -> body
+        | body -> body
+
+    let (|Body|_|) =
+        function
+        | MaybeCasted(Lambda(arg, body, _)) -> Some(arg, code body)
+        | MaybeCasted(Delegate([ arg ], body, _, _)) -> Some(arg, code body)
+        | _ -> None
+
+    let marked tag typ isStatement values macro =
+        match emitExpr r typ values macro with
+        | Emit(info, typ, range) ->
+            Emit(
+                { info with
+                    IsStatement = isStatement
+                    CallInfo = { info.CallInfo with Tags = tag :: info.CallInfo.Tags }
+                },
+                typ,
+                range
+            )
+        | expression -> expression
+
+    let yieldValue typ value =
+        marked "fickl-native-yield" typ false [ value ] "yield $0"
+
+    let yieldAll typ value =
+        marked "fickl-native-yield" typ false [ value ] "yield* $0"
+
+    let returnValue value =
+        marked "fickl-generator-return" Unit true [ value ] "return $0"
+
+    let returnType =
+        match t with
+        | DeclaredType(_, [ _; typ; _ ]) -> typ
+        | _ -> Any
+
+    match info.CompiledName, args with
+    | ("jsGenerator" | "get_jsGenerator" | ".ctor"), ([] | [ Value(UnitConstant, _) ]) -> Value(Null t, r) |> Some
+    | "Yield", [ value ] -> yieldValue Unit value |> Some
+    | "YieldFrom", [ values ] -> yieldAll Unit values |> Some
+    | "Return", [ value ] -> returnValue value |> Some
+    | "ReturnFrom", [ generator ] -> yieldAll returnType generator |> returnValue |> Some
+    | "Bind", [ value; Body(arg, body) ] -> Let(arg, yieldValue arg.Type value, body) |> Some
+    | "Zero", ([] | [ Value(UnitConstant, _) ]) -> Value(UnitConstant, r) |> Some
+    | "Delay", [ Body(_, body) ] -> Delegate([], body, None, [ "fickl-generator-code" ]) |> Some
+    | "Run", [ MaybeCasted(Delegate([], body, _, tags)) ] when List.contains "fickl-generator-code" tags ->
+        let metadata = makeTypedIdent t $"generatorType{com.IncrementCounter()}"
+
+        let callback =
+            Delegate([ metadata ], body, None, [ "not-arrow"; "fickl-generator-function" ])
+
+        let callInfo = { makeCallInfo None [] [] with Tags = [ "fickl-generator-run" ] }
+        Call(callback, callInfo, t, r) |> Some
+    | "Combine", [ first; second ] -> Sequential [ code first; code second ] |> Some
+    | "While", [ Body(_, guard); body ] -> WhileLoop(guard, code body, r) |> Some
+    | "TryWith", [ body; Body(error, handler) ] -> TryCatch(code body, Some(error, handler), None, r) |> Some
+    | "TryFinally", [ body; Body(_, compensation) ] -> TryCatch(code body, None, Some compensation, r) |> Some
+    | "Using", [ resource; Body(arg, body) ] ->
+        let dispose =
+            Helper.LibCall(com, "Util", "disposeSafe", Unit, [ IdentExpr arg ], ?loc = r)
+
+        Let(arg, resource, TryCatch(body, None, Some dispose, r)) |> Some
+    | "For", [ values; Body(arg, body) ] ->
+        let iterator = makeTypedIdent Any $"iterator{com.IncrementCounter()}"
+        let iteratorExpr = IdentExpr iterator
+
+        let value =
+            Helper.InstanceCall(
+                iteratorExpr,
+                "System.Collections.Generic.IEnumerator`1.get_Current",
+                arg.Type,
+                [],
+                ?loc = r
+            )
+
+        let guard =
+            Helper.InstanceCall(iteratorExpr, "System.Collections.IEnumerator.MoveNext", Boolean, [], ?loc = r)
+
+        let loop = WhileLoop(guard, Let(arg, value, body), r)
+
+        let dispose =
+            Helper.LibCall(com, "Util", "disposeSafe", Unit, [ iteratorExpr ], ?loc = r)
+
+        let enumerator =
+            Helper.LibCall(com, "Util", "getEnumerator", Any, [ values ], ?loc = r)
+
+        Let(iterator, enumerator, TryCatch(loop, None, Some dispose, r)) |> Some
+    | _ ->
+        $"jsGenerator.{info.CompiledName} requires a computation expression with literal continuations"
+        |> addErrorAndReturnNull com ctx.InlinePath r
+        |> Some
+
 let private nativeAsync (com: ICompiler) (ctx: Context) r t (info: CallInfo) args =
     let code =
         function
@@ -5325,6 +5437,9 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
     | "Fickl.Core.JsAsyncBuilder"
     | "Fickl.Core.NativeAsync" -> nativeAsync com ctx r t info args
+    | Naming.StartsWith "Fickl.Core.JsGeneratorBuilder" _
+    | "Fickl.Core.NativeGenerators" -> nativeGenerator com ctx r t info args
+    | "Fickl.Core.JsGenerator`3" -> nativeGeneratorApi com r t info thisArg args
     | Naming.EndsWith "Exception" _ -> exceptions com ctx r t info thisArg args
     | "System.Timers.ElapsedEventArgs" -> thisArg // only signalTime is available here
     | Naming.StartsWith "System.Tuple" _

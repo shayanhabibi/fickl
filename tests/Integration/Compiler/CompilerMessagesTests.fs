@@ -15,6 +15,41 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    testCase "Native generator attributes require a native computation" <| fun _ ->
+      compile """
+open Fickl.Core
+[<GeneratorFunction>]
+let invalid () = seq { yield 1 }
+"""
+      |> Assert.Exists.errorWith "GeneratorFunction requires a jsGenerator computation"
+      |> ignore
+
+    testCase "Native generator control cannot escape its computation" <| fun _ ->
+      compile """
+open Fickl.Core
+let invalid () = jsGenerator.Return("invalid")
+"""
+      |> Assert.Exists.errorWith "Native yields and returns must be inside a jsGenerator computation"
+      |> ignore
+
+    testCase "Native generators require a terminal value on every completing path" <| fun _ ->
+      compile """
+open Fickl.Core
+let invalid () : JsGenerator<int, string, unit> = jsGenerator { yield 1 }
+"""
+      |> Assert.Exists.errorWith "A jsGenerator with a non-unit terminal type must return a value on every path"
+      |> ignore
+
+    testCase "Native generator attributes reject class methods" <| fun _ ->
+      compile """
+open Fickl.Core
+type Invalid() =
+    [<GeneratorFunction>]
+    member _.Run() : JsGenerator<int, string, unit> = jsGenerator { return "done" }
+"""
+      |> Assert.Exists.errorWith "GeneratorFunction is only supported on module functions"
+      |> ignore
+
     testCase "Native async attributes require a native computation" <| fun _ ->
       compile """
 open Fable.Core
