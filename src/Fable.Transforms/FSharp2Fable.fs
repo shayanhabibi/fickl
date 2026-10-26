@@ -144,23 +144,14 @@ let private transformNewUnion com ctx r fsType (unionCase: FSharpUnionCase) (arg
             let expr =
                 match inlined, argExprs with
                 | Some _, [ argExpr ] ->
-                    // A copy of the interface value, with its prototype, carrying the tag
-                    let tag =
-                        Fable.NewAnonymousRecord([ tagExpr ], [| tagName |], [ tagExpr.Type ], false)
-                        |> makeValue r
-
-                    let makeCopy argExpr =
-                        emitExpr
-                            r
-                            Fable.Any
-                            [ argExpr; tag ]
-                            "Object.assign(Object.create(Object.getPrototypeOf($0)), $0, $1)"
-
-                    if canHaveSideEffects com argExpr then
-                        let ident = getIdentUniqueName com ctx "caseValue" |> makeTypedIdent argExpr.Type
-                        Fable.Let(ident, argExpr, makeCopy (Fable.IdentExpr ident))
-                    else
-                        makeCopy argExpr
+                    Replacements.Util.Helper.LibCall(
+                        com,
+                        "TaggedUnion",
+                        "withInlineInterfaceTag",
+                        Fable.Any,
+                        [ argExpr; makeStrConst tagName; tagExpr ],
+                        ?loc = r
+                    )
                 | _ ->
                     Fable.NewAnonymousRecord(
                         tagExpr :: argExprs,
@@ -1641,12 +1632,19 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
 
                     return Fable.Get(unionExpr, Fable.TupleIndex index, fieldType, r)
             | TypeScriptTaggedUnion(tdef, _, _, _) ->
-                match
-                    inlinedInterface com ctx r tdef unionCase
-                    |> Option.orElseWith (fun () -> tryInlinedTaggedUnionCase com unionCase)
-                with
-                | Some _ -> return Fable.TypeCast(unionExpr, fieldType)
-                | None ->
+                match inlinedInterface com ctx r tdef unionCase, tryInlinedTaggedUnionCase com unionCase with
+                | Some _, _ ->
+                    return
+                        Replacements.Util.Helper.LibCall(
+                            com,
+                            "TaggedUnion",
+                            "getInlineInterfaceValue",
+                            fieldType,
+                            [ Fable.TypeCast(unionExpr, fieldType) ],
+                            ?loc = r
+                        )
+                | _, Some _ -> return Fable.TypeCast(unionExpr, fieldType)
+                | _ ->
                     let kind =
                         Fable.FieldInfo.Create(
                             FsField.FSharpFieldName field,
