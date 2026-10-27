@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 742" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<style>
+  svg { --surface: #fcfcfb; --ink: #0b0b0b; --muted: #52514e; --grid: #e4e3df;
+        --fable: #2a78d6; --nopkg: #1baf7a; --hit: #eda100; }
+  @media (prefers-color-scheme: dark) {
+    svg { --surface: #1a1a19; --ink: #f0efec; --muted: #c3c2b7; --grid: #383835;
+          --fable: #3987e5; --nopkg: #199e70; --hit: #c98500; }
+  }
+  .surface { fill: var(--surface); } .ink { fill: var(--ink); } .muted { fill: var(--muted); }
+  .grid { stroke: var(--grid); stroke-width: 1; }
+  .fable { fill: var(--fable); } .nopkg { fill: var(--nopkg); } .hit { fill: var(--hit); }
+</style>
+<rect class="surface" width="960" height="742"/>
+<text class="ink" x="32" y="52" font-size="28" font-weight="700">Fickl 0.7.2 against Fable 5.24.0</text>
+<text class="muted" x="32" y="80" font-size="14">End-to-end compilation time · fresh process · median of interleaved runs · lower is better</text>
+<path class="fable" d="M32 93h10a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-10z"/>
+<text class="ink" x="54" y="104" font-size="13">Fable 5.24.0</text>
+<path class="nopkg" d="M412 93h10a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-10z"/>
+<text class="ink" x="434" y="104" font-size="13">Fickl 0.7.2 · package cache off</text>
+<path class="hit" d="M32 115h10a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-10z"/>
+<text class="ink" x="54" y="126" font-size="13">Fickl 0.7.2 · package cache hit</text>
+<line class="grid" x1="250" y1="152" x2="250" y2="632"/>
+<text class="muted" x="250" y="650" font-size="11" text-anchor="middle">0.0 s</text>
+<line class="grid" x1="362.01" y1="152" x2="362.01" y2="632"/>
+<text class="muted" x="362.01" y="650" font-size="11" text-anchor="middle">5.0 s</text>
+<line class="grid" x1="474.01" y1="152" x2="474.01" y2="632"/>
+<text class="muted" x="474.01" y="650" font-size="11" text-anchor="middle">10.0 s</text>
+<line class="grid" x1="586.02" y1="152" x2="586.02" y2="632"/>
+<text class="muted" x="586.02" y="650" font-size="11" text-anchor="middle">15.0 s</text>
+<line class="grid" x1="698.02" y1="152" x2="698.02" y2="632"/>
+<text class="muted" x="698.02" y="650" font-size="11" text-anchor="middle">20.0 s</text>
+<line class="grid" x1="810.03" y1="152" x2="810.03" y2="632"/>
+<text class="muted" x="810.03" y="650" font-size="11" text-anchor="middle">25.0 s</text>
+<text class="ink" x="234" y="190" font-size="14" font-weight="600" text-anchor="end">Sutil demo app</text>
+<path class="fable" d="M250 160h368.69a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-368.69z"/>
+<text class="ink" x="628.69" y="171" font-size="11">16.6 s</text>
+<path class="nopkg" d="M250 178h514.18a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-514.18z"/>
+<text class="ink" x="774.18" y="189" font-size="11">23.1 s</text>
+<path class="hit" d="M250 196h188.72a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-188.72z"/>
+<text class="ink" x="448.72" y="207" font-size="11">8.6 s</text>
+<text class="ink" x="844" y="189" font-size="22" font-weight="700">1.9×</text>
+<text class="muted" x="844" y="207" font-size="11">faster*</text>
+<text class="ink" x="234" y="270" font-size="14" font-weight="600" text-anchor="end">Fantomas online tools</text>
+<path class="fable" d="M250 240h260.27a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-260.27z"/>
+<text class="ink" x="520.27" y="251" font-size="11">11.8 s</text>
+<path class="nopkg" d="M250 258h170.82a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-170.82z"/>
+<text class="ink" x="430.82" y="269" font-size="11">7.8 s</text>
+<path class="hit" d="M250 276h82.8a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-82.8z"/>
+<text class="ink" x="342.8" y="287" font-size="11">3.9 s</text>
+<text class="ink" x="844" y="269" font-size="22" font-weight="700">3.0×</text>
+<text class="muted" x="844" y="287" font-size="11">faster*</text>
+<text class="ink" x="234" y="350" font-size="14" font-weight="600" text-anchor="end">Ionide for VS Code</text>
+<path class="fable" d="M250 320h136.16a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-136.16z"/>
+<text class="ink" x="396.16" y="331" font-size="11">6.3 s</text>
+<path class="nopkg" d="M250 338h75.01a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-75.01z"/>
+<text class="ink" x="335.01" y="349" font-size="11">3.5 s</text>
+<path class="hit" d="M250 356h68.92a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-68.92z"/>
+<text class="ink" x="328.92" y="367" font-size="11">3.3 s</text>
+<text class="ink" x="844" y="349" font-size="22" font-weight="700">1.9×</text>
+<text class="muted" x="844" y="367" font-size="11">faster*</text>
+<text class="ink" x="234" y="430" font-size="14" font-weight="600" text-anchor="end">Fable JS test suite</text>
+<path class="fable" d="M250 400h458.11a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-458.11z"/>
+<text class="ink" x="718.11" y="411" font-size="11">20.6 s</text>
+<path class="nopkg" d="M250 418h291.69a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-291.69z"/>
+<text class="ink" x="551.69" y="429" font-size="11">13.2 s</text>
+<path class="hit" d="M250 436h292.14a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-292.14z"/>
+<text class="ink" x="552.14" y="447" font-size="11">13.2 s</text>
+<text class="ink" x="844" y="429" font-size="22" font-weight="700">1.6×</text>
+<text class="muted" x="844" y="447" font-size="11">faster*</text>
+<text class="ink" x="234" y="510" font-size="14" font-weight="600" text-anchor="end">Python package workload</text>
+<path class="fable" d="M250 480h294.43a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-294.43z"/>
+<text class="ink" x="554.43" y="491" font-size="11">13.3 s</text>
+<path class="nopkg" d="M250 498h56.21a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-56.21z"/>
+<text class="ink" x="316.21" y="509" font-size="11">2.7 s</text>
+<path class="hit" d="M250 516h36.55a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-36.55z"/>
+<text class="ink" x="296.55" y="527" font-size="11">1.8 s</text>
+<text class="ink" x="844" y="509" font-size="22" font-weight="700">7.4×</text>
+<text class="muted" x="844" y="527" font-size="11">faster*</text>
+<text class="ink" x="234" y="590" font-size="14" font-weight="600" text-anchor="end">BEAM package workload</text>
+<path class="fable" d="M250 560h349.51a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-349.51z"/>
+<text class="ink" x="609.51" y="571" font-size="11">15.8 s</text>
+<path class="nopkg" d="M250 578h61.99a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-61.99z"/>
+<text class="ink" x="321.99" y="589" font-size="11">2.9 s</text>
+<path class="hit" d="M250 596h45.8a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-45.8z"/>
+<text class="ink" x="305.8" y="607" font-size="11">2.2 s</text>
+<text class="ink" x="844" y="589" font-size="22" font-weight="700">7.1×</text>
+<text class="muted" x="844" y="607" font-size="11">faster*</text>
+<text class="muted" x="32" y="678" font-size="11">*Cache-hit speedup versus Fable 5.24.0 with default settings. All runs use --noCache; restores are included.</text>
+<text class="muted" x="32" y="696" font-size="11">Median of 5 runs after a warm-up that fills the package cache. JS suite uses --exclude Fable.Core.</text>
+<text class="muted" x="32" y="714" font-size="11">Ubuntu 24.04.5 LTS X64 · .NET 10.0.14 · 27 Oct 2026</text>
+</svg>
