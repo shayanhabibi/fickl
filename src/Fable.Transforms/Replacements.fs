@@ -1746,24 +1746,12 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
       _ -> fsFormat com ctx r t i thisArg args
     // Failure matches System.Exception itself, not the exceptions derived from it
     | "FailurePattern", [ exn ] -> Helper.LibCall(com, "Util", "failurePattern", t, [ exn ], ?loc = r) |> Some
-    | ("Failure" | "FailurePattern" | "LazyPattern" | "Lock" | "NullArg" | "Using"), _ ->
+    | ("Failure" | "FailurePattern" | "InvalidArg" | "InvalidOp" | "LazyPattern" | "Lock" | "NullArg" | "Using"), _ ->
         fsharpModule com ctx r t i thisArg args
     | ("IsNull" | "IsNotNull" | "IsNullV" | "NonNull" | "NonNullV" | "NullMatchPattern" | "NullValueMatchPattern" | "NonNullQuickPattern" | "NonNullQuickValuePattern" | "WithNull" | "WithNullV" | "NullV" | "NullArgCheck"),
       _ -> fsharpModule com ctx r t i thisArg args
     // Exceptions
     | "FailWith", [ msg ] -> makeThrow r t (error com msg) |> Some
-    // The exceptions .NET raises, so `:? InvalidOperationException` and `:? ArgumentException` handlers catch them
-    | "InvalidOp", [ msg ] ->
-        Helper.LibCall(com, "System", "InvalidOperationException", Any, [ msg ], isConstructor = true)
-        |> makeThrow r t
-        |> Some
-    | "InvalidArg", [ argName; msg ] ->
-        // ArgumentException appends " (Parameter '<name>')" to the message itself; no inner exception
-        let noInner = Helper.LibCall(com, "Util", "defaultOf", Any, [])
-
-        Helper.LibCall(com, "System", "ArgumentException", Any, [ msg; argName; noInner ], isConstructor = true)
-        |> makeThrow r t
-        |> Some
     | "Raise", [ arg ] -> makeThrow r t arg |> Some
     | "Reraise", _ ->
         match ctx.CaughtException with
@@ -2499,8 +2487,6 @@ let nativeArrayFunctions =
             "Filter", "filter"
             "ForAll", "every"
             "Iterate", "forEach"
-            "Reduce", "reduce"
-            "ReduceBack", "reduceRight"
             "SortInPlaceWith", "sort"
         |]
 
@@ -2619,7 +2605,13 @@ let arrayModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Ex
 
 let lists (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
-    // Use methods for Head and Tail (instead of Get(ListHead) for example) to check for empty lists
+    // list.Head and list.Tail raise InvalidOperationException, List.head and List.tail ArgumentException
+    // PHP's FSharpList has no such members, so PHP keeps the head/tail functions below.
+    | ("get_Head" | "get_Tail"), Some x, _ when com.Options.Language <> Php ->
+        let mangledName =
+            Naming.buildNameWithoutSanitationFrom "FSharpList" false i.CompiledName ""
+
+        Helper.LibCall(com, "List", mangledName, t, [], thisArg = x, ?loc = r) |> Some
     | ReplaceName [ "get_Head", "head"
                     "get_Tail", "tail"
                     "get_Item", "item"

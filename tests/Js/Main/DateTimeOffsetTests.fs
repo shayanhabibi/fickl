@@ -113,8 +113,7 @@ let tests =
         |> equal "2014-09-01T16:37:02"
 
     testCase "DateTimeOffset.ToString uses the offset's date in every local timezone" <| fun _ ->
-        // At +14 and -12 the offset's date differs from the UTC date, so one of the two
-        // differs from the date in any local timezone
+        // At +14 and -12 the offset's date differs from the UTC date, so one of them differs from any local date
         let early = DateTimeOffset(2014, 9, 1, 0, 30, 5, TimeSpan.FromHours 14)
         let late = DateTimeOffset(2014, 9, 1, 23, 30, 5, TimeSpan.FromHours -12)
         for d in [ early; late ] do
