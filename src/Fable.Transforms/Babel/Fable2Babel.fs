@@ -5232,6 +5232,57 @@ but thanks to the optimisation done below we get
         ModuleDecl(entName + Naming.reflectionSuffix, isPublic = ent.IsPublic)
         |> declareModuleMember com ctx fnExpr
 
+    let hasClassMethod name (classMembers: ClassMember array) =
+        classMembers
+        |> Array.exists (
+            function
+            | ClassMethod(ClassFunction(Expression.Identifier(Identifier(key, _)), _), _, _, _, _, _, _, _, _) ->
+                key = name
+            | _ -> false
+        )
+
+    let withReferenceEquality (com: IBabelCompiler) ctx (ent: Fable.Entity) (classMembers: ClassMember array) =
+        let isReferenceEqualityType =
+            (ent.IsFSharpRecord || ent.IsFSharpUnion)
+            && not ent.IsValueType
+            && not (FSharp2Fable.Util.hasStructuralEquality ent)
+
+        if not isReferenceEqualityType then
+            classMembers
+        else
+            let ifTypeScript annotation =
+                if com.IsTypeScript then
+                    Some annotation
+                else
+                    None
+
+            let makeMethod name parameters returnExpr returnType =
+                ClassMember.classMethod (
+                    ClassFunction(Expression.identifier name, false),
+                    parameters,
+                    Some(BlockStatement [| Statement.returnStatement returnExpr |]),
+                    ?returnType = ifTypeScript returnType
+                )
+
+            [|
+                yield! classMembers
+                if not (hasClassMethod "Equals" classMembers) then
+                    let other =
+                        Parameter.parameter ("other", ?typeAnnotation = ifTypeScript AnyTypeAnnotation)
+
+                    makeMethod
+                        "Equals"
+                        [| other |]
+                        (Expression.binaryExpression (BinaryEqual, thisExpr, Expression.identifier other.Name))
+                        BooleanTypeAnnotation
+                if not (hasClassMethod "GetHashCode" classMembers) then
+                    makeMethod
+                        "GetHashCode"
+                        [||]
+                        (libCall com ctx None "Util" "physicalHash" [] [ thisExpr ])
+                        NumberTypeAnnotation
+            |]
+
     let declareType
         (com: IBabelCompiler)
         ctx
@@ -5244,63 +5295,6 @@ but thanks to the optimisation done below we get
         classMembers
         : ModuleDeclaration list
         =
-        // fickl: Record and Union compare fields, so a record or union that .NET compares by reference,
-        // [<ReferenceEquality>] or [<NoEquality>], overrides their Equals and GetHashCode
-        let classMembers =
-            if
-                (ent.IsFSharpRecord || ent.IsFSharpUnion)
-                && not ent.IsValueType
-                && not (FSharp2Fable.Util.hasStructuralEquality ent)
-            then
-                let other = "other"
-
-                [|
-                    ClassMember.classMethod (
-                        ClassFunction(Expression.identifier "Equals", false),
-                        [|
-                            Parameter.parameter (
-                                other,
-                                ?typeAnnotation =
-                                    (if com.IsTypeScript then
-                                         Some AnyTypeAnnotation
-                                     else
-                                         None)
-                            )
-                        |],
-                        Some(
-                            BlockStatement
-                                [|
-                                    Expression.binaryExpression (BinaryEqual, thisExpr, Expression.identifier other)
-                                    |> Statement.returnStatement
-                                |]
-                        ),
-                        ?returnType =
-                            (if com.IsTypeScript then
-                                 Some BooleanTypeAnnotation
-                             else
-                                 None)
-                    )
-                    ClassMember.classMethod (
-                        ClassFunction(Expression.identifier "GetHashCode", false),
-                        [||],
-                        Some(
-                            BlockStatement
-                                [|
-                                    libCall com ctx None "Util" "physicalHash" [] [ thisExpr ]
-                                    |> Statement.returnStatement
-                                |]
-                        ),
-                        ?returnType =
-                            (if com.IsTypeScript then
-                                 Some NumberTypeAnnotation
-                             else
-                                 None)
-                    )
-                |]
-                |> Array.append classMembers
-            else
-                classMembers
-
         let typeDeclaration =
             declareClass com ctx ent entName doc consArgs consBody baseExpr classMembers
 
@@ -5699,6 +5693,7 @@ but thanks to the optimisation done below we get
         (doc: string option)
         classMembers
         =
+        let classMembers = withReferenceEquality com ctx ent classMembers
         let isPublic = ent.IsPublic
         let tagArgName = "Tag"
         let tagArgTa = makeAliasTypeAnnotation com ctx tagArgName
@@ -6004,6 +5999,7 @@ but thanks to the optimisation done below we get
         (decl: Fable.ClassDecl)
         classMembers
         =
+        let classMembers = withReferenceEquality com ctx ent classMembers
         let fieldIds = getEntityFieldsAsIdents ent |> List.toArray
         let args = fieldIds |> Array.map identAsExpr
 

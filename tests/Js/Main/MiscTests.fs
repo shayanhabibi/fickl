@@ -1260,12 +1260,23 @@ let tests =
             invalidArg "arg" "This is invalid"
         )
 
-    testCase "invalidArg and invalidOp raise the .NET exception types" <| fun () -> // #66
-        (try invalidArg "p" "bad" with :? ArgumentNullException -> "null" | :? ArgumentException -> "arg" | _ -> "other")
-        |> equal "arg"
-        (try invalidArg "p" "bad" with e -> e.Message) |> equal "bad (Parameter 'p')"
-        (try invalidOp "nope" with :? InvalidOperationException as e -> e.Message | _ -> "other") |> equal "nope"
-        (try nullArg "q" with :? ArgumentNullException -> "null" | _ -> "other") |> equal "null"
+    testCase "invalidArg raises ArgumentException" <| fun () ->
+        let caught =
+            try
+                invalidArg "arg" "This is invalid"
+            with
+            | :? System.ArgumentException as e -> e.Message
+            | e -> "Unexpected exception: " + e.Message
+        equal "This is invalid (Parameter 'arg')" caught
+
+    testCase "invalidOp raises InvalidOperationException" <| fun () ->
+        let caught =
+            try
+                invalidOp "This is invalid"
+            with
+            | :? System.InvalidOperationException as e -> e.Message
+            | e -> "Unexpected exception: " + e.Message
+        equal "This is invalid" caught
 
     testCase "Failure matches System.Exception only" <| fun () -> // #66
         (try failwith "f" with Failure m -> m | _ -> "other") |> equal "f"

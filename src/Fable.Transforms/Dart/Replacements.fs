@@ -1036,16 +1036,12 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     // Strings
     | ("PrintFormatToString" | "PrintFormatToStringThen" | "PrintFormat" | "PrintFormatLine" | "PrintFormatToError" | "PrintFormatLineToError" | "PrintFormatThen" | "PrintFormatToStringThenFail" | "PrintFormatToStringBuilder" | "PrintFormatToStringBuilderThen"), // Printf.kbprintf
       _ -> fsFormat com ctx r t i thisArg args
-    | ("Failure" | "FailurePattern" | "LazyPattern" | "Lock" | "NullArg" | "Using"), _ ->
+    | ("Failure" | "FailurePattern" | "InvalidArg" | "InvalidOp" | "LazyPattern" | "Lock" | "NullArg" | "Using"), _ ->
         fsharpModule com ctx r t i thisArg args
     | ("IsNull" | "IsNotNull" | "IsNullV" | "NonNull" | "NonNullV" | "NullMatchPattern" | "NullValueMatchPattern" | "NonNullQuickPattern" | "NonNullQuickValuePattern" | "WithNull" | "WithNullV" | "NullV" | "NullArgCheck"),
       _ -> fsharpModule com ctx r t i thisArg args
     // Exceptions
-    | "FailWith", [ msg ]
-    | "InvalidOp", [ msg ] -> makeThrow r t (error com msg) |> Some
-    | "InvalidArg", [ argName; msg ] ->
-        let msg = add msg (add (add (str " (Parameter '") argName) (str "')"))
-        makeThrow r t (error com msg) |> Some
+    | "FailWith", [ msg ] -> makeThrow r t (error com msg) |> Some
     | "Raise", [ arg ] -> makeThrow r t arg |> Some
     | "Reraise", _ -> Extended(Throw(None, t), r) |> Some
     // Math functions
@@ -1878,14 +1874,24 @@ let arrayModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Ex
 
 let lists (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
-    // Use methods for Head and Tail (instead of Get(ListHead) for example) to check for empty lists
-    | ReplaceName [ "get_Head", "head"
-                    "get_Tail", "tail"
-                    "get_Item", "item"
-                    "get_Length", "length"
-                    "GetSlice", "getSlice" ] methName,
-      Some x,
-      _ ->
+    // list.Head and list.Tail raise InvalidOperationException, List.head and List.tail ArgumentException
+    | ("get_Head" | "get_Tail"), Some x, _ ->
+        let mangledName =
+            Naming.buildNameWithoutSanitationFrom "FSharpList" false i.CompiledName ""
+
+        Helper.LibCall(
+            com,
+            "List",
+            mangledName,
+            t,
+            [],
+            i.SignatureArgTypes,
+            genArgs = i.GenericArgs,
+            thisArg = x,
+            ?loc = r
+        )
+        |> Some
+    | ReplaceName [ "get_Item", "item"; "get_Length", "length"; "GetSlice", "getSlice" ] methName, Some x, _ ->
         let args =
             match args with
             | [ ExprType Unit ] -> [ x ]

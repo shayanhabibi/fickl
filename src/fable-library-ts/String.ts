@@ -1,5 +1,5 @@
 import { toString as dateToString } from "./Date.ts";
-import { compare as numericCompare, divide, isNumeric, isIntegral, multiply, Numeric, toExponential, toFixed, toHex, toOctal, toPrecision } from "./Numeric.ts";
+import { compare as numericCompare, divide, isNumeric, isIntegral, multiply, Numeric, toExponential, toFixed, toHex, toPrecision, toRadix } from "./Numeric.ts";
 import { escape } from "./RegExp.ts";
 import { toString } from "./Types.ts";
 import { Exception } from "./Util.ts";
@@ -232,17 +232,14 @@ function formatReplacement(rep: any, flags: any, padLength: any, precision: any,
   flags = flags || "";
   format = format || "";
   if (isNumeric(rep)) {
-    if (format.toLowerCase() !== "x" && format !== "o") {
-      if (isLessThan(rep, 0)) {
-        rep = multiply(rep, -1);
-        sign = "-";
-      } else {
-        if (flags.indexOf(" ") >= 0) {
-          sign = " ";
-        } else if (flags.indexOf("+") >= 0) {
-          sign = "+";
-        }
-      }
+    const radix = format === "x" || format === "X" ? 16 : format === "o" ? 8 : 10;
+    if (radix === 10 && isLessThan(rep, 0)) {
+      rep = multiply(rep, -1);
+      sign = "-";
+    } else if (flags.indexOf(" ") >= 0) {
+      sign = " ";
+    } else if (flags.indexOf("+") >= 0) {
+      sign = "+";
     }
     precision = precision == null ? null : parseInt(precision, 10);
     switch (format) {
@@ -259,14 +256,11 @@ function formatReplacement(rep: any, flags: any, padLength: any, precision: any,
           .replace(/e([+-])(\d+)$/, (_: string, sign: string, digits: string) => "e" + sign + digits.padStart(3, "0"));
         if (format === "E") { rep = rep.toUpperCase(); }
         break;
-      case "x":
-        rep = toHex(rep);
+      case "x": case "o":
+        rep = toRadix(rep, radix);
         break;
       case "X":
-        rep = toHex(rep).toUpperCase();
-        break;
-      case "o":
-        rep = toOctal(rep);
+        rep = toRadix(rep, radix).toUpperCase();
         break;
       default: // AOid
         rep = String(rep);
