@@ -90,6 +90,15 @@ let tests =
             JsInterop.emitJsExpr message "structuredClone($0).text" |> equal "hello"
             JsInterop.emitJsExpr message "Object.isFrozen(Object.freeze($0))" |> equal true
 
+        testCase "inline interface payload with a different tag value is not held as the case value" <| fun () ->
+            let text: Text = JsInterop.emitJsExpr () "({ type: 'image', text: 'hello' })"
+            let message = Content.Text text
+            obj.ReferenceEquals(box message, box text) |> equal false
+            JsInterop.emitJsExpr message "$0.type" |> equal "text"
+            JsInterop.emitJsExpr text "$0.type" |> equal "image"
+            let copied = CopiedMessage.Count(JsInterop.emitJsExpr () "({ type: 'other', count: 1, inc() {} })")
+            JsInterop.emitJsExpr copied "$0.type" |> equal "count"
+
         testCase "copied inline interface value can be cloned and frozen" <| fun () ->
             let counter = CounterClass() :> Counter
             let message = CopiedMessage.Count counter
