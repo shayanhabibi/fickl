@@ -1264,6 +1264,20 @@ module Annotation =
         | "Fable.Core.JS.Map`2" -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IMap" |> Some
         | _ -> None
 
+    /// The literal type of a union case's `[<CompiledValue>]`, which is the value emitted for the case
+    let tryCompiledValueLiteral (uci: Fable.UnionCase) =
+        uci.Attributes
+        |> Seq.tryFind (fun att -> att.Entity.FullName = Atts.compiledValue)
+        |> Option.bind (fun att ->
+            match att.ConstructorArgs with
+            | (:? int as value) :: _ -> Literal.numericLiteral (float value) |> Some
+            | (:? float as value) :: _ -> Literal.numericLiteral value |> Some
+            | (:? bool as value) :: _ -> Literal.booleanLiteral value |> Some
+            | (:? Enum as value) :: _ when Enum.GetUnderlyingType(value.GetType()) = typeof<int> ->
+                Literal.numericLiteral (float (box value :?> int)) |> Some
+            | _ -> None
+        )
+
     let makeStringEnumTypeAnnotation (ent: Fable.Entity) (attArgs: obj list) =
         let rule =
             match List.tryHead attArgs with
@@ -1272,11 +1286,15 @@ module Annotation =
 
         ent.UnionCases
         |> List.mapToArray (fun uci ->
-            match uci.CompiledName with
-            | Some name -> name
-            | None -> Naming.applyCaseRule rule uci.Name
-            |> Literal.stringLiteral
-            |> LiteralTypeAnnotation
+            // Same precedence as FSharp2Fable.Util.transformStringEnum, which emits the values
+            match uci.CompiledName, tryCompiledValueLiteral uci with
+            | Some name, _ -> Literal.stringLiteral name |> LiteralTypeAnnotation
+            | None, Some value -> LiteralTypeAnnotation value
+            | None, None when Util.hasAttribute Atts.emitAttr uci.Attributes -> AnyTypeAnnotation
+            | None, None ->
+                Naming.applyCaseRule rule uci.Name
+                |> Literal.stringLiteral
+                |> LiteralTypeAnnotation
         )
         |> UnionTypeAnnotation
 
