@@ -644,5 +644,8 @@ type CompilerImpl
                 )
 
             if not isSuppressed then
+                // Ranges spell the file as FCS registered it (backslashes on Windows); logs are matched against normalized paths
+                let fileName = fileName |> Option.map Path.normalizePath
+
                 LogEntry.Make(severity, msg, ?range = range, ?fileName = fileName, ?tag = tag, ?code = code)
                 |> logs.Add
