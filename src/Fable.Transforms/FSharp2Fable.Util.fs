@@ -2490,6 +2490,23 @@ module Util =
             makeImportUserGenerated None typ selector path |> Some
         | _ -> None
 
+    /// Fable.Core's own JS and Python bindings carry no Global attribute and are recognised by namespace.
+    /// The namespace alone is not enough: a library may declare its own types in it, e.g. so that
+    /// `open Fable.Core.JS` brings them into scope, and those keep the usual semantics.
+    let isFableCoreFSharpEntity (ent: FSharpEntity) = ent.Assembly.SimpleName = "Fable.Core"
+
+    let isFableCoreBinding (fullName: string) (ent: FSharpEntity) =
+        fullName.StartsWithAny("Fable.Core.JS.", "Fable.Core.Py.")
+        && isFableCoreFSharpEntity ent
+
+    let private isFableCoreEntityRef (entRef: Fable.EntityRef) =
+        match entRef.Path with
+        | Fable.CoreAssemblyName name -> name = "Fable.Core"
+        | Fable.AssemblyPath path
+        | Fable.PrecompiledLib(_, path) -> System.IO.Path.GetFileNameWithoutExtension(path) = "Fable.Core"
+        // Compiling Fable.Core from source, as Fable's own tests do; its files are all named Fable.Core.*.fs
+        | Fable.SourcePath path -> System.IO.Path.GetFileName(path).StartsWith("Fable.Core.", StringComparison.Ordinal)
+
     let tryGlobalOrImportedAttributes (com: Compiler) (entRef: Fable.EntityRef) (attributes: Fable.Attribute seq) =
         let globalRef customName =
             defaultArg customName entRef.DisplayName
@@ -2498,7 +2515,11 @@ module Util =
             |> Some
 
         match com, attributes with
-        | _ when entRef.FullName.StartsWith("Fable.Core.JS.", StringComparison.Ordinal) -> globalRef None
+        | _ when
+            entRef.FullName.StartsWith("Fable.Core.JS.", StringComparison.Ordinal)
+            && isFableCoreEntityRef entRef
+            ->
+            globalRef None
         | GlobalAtt customName -> globalRef customName
         | ImportAtt(selector, path) ->
             let selector =
@@ -2971,7 +2992,7 @@ module Util =
             | Types.icomparableGeneric -> false
             | _ -> true
         // Don't mangle abstract classes in Fable.Core.JS and Fable.Core.Py namespaces
-        | Some fullName when fullName.StartsWithAny("Fable.Core.JS.", "Fable.Core.Py.") -> false
+        | Some fullName when isFableCoreBinding fullName ent -> false
         // Don't mangle interfaces by default (for better interop) unless they have Mangle attribute
         | _ when ent.IsInterface -> tryMangleAttribute ent.Attributes |> Option.defaultValue false
         // Mangle members from abstract classes unless they are global/imported or with explicitly attached members
@@ -3001,7 +3022,11 @@ module Util =
             | Types.icomparable
             | Types.icomparableGeneric -> false
             | _ -> true
-        | fullName when fullName.StartsWithAny("Fable.Core.JS.", "Fable.Core.Py.") -> false
+        | fullName when
+            fullName.StartsWithAny("Fable.Core.JS.", "Fable.Core.Py.")
+            && isFableCoreEntityRef ent.Ref
+            ->
+            false
         | _ when ent.IsInterface ->
             ent.Attributes
             |> Seq.tryFind (fun att -> att.Entity.FullName = Atts.mangle)
@@ -3563,7 +3588,7 @@ module Util =
                // Fable's own bindings carry no attribute, match by namespace.
                || (
                    match ent.TryFullName with
-                   | Some name -> name.StartsWithAny("Fable.Core.JS.", "Fable.Core.Py.")
+                   | Some name -> isFableCoreBinding name ent
                    | None -> false
                )
            | None -> false

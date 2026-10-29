@@ -62,6 +62,8 @@
     <Compile Include="../Js/Main/NativeAsyncGeneratorTests.fs" />
     <Compile Include="../Js/Main/SymbolKeyBindings.fs" />
     <Compile Include="../Js/Main/SymbolKeyTests.fs" />
+    <Compile Include="../Js/Main/JsNamespaceLibraryBindings.fs" />
+    <Compile Include="../Js/Main/JsNamespaceLibraryTests.fs" />
     <!-- <Compile Include="../Js/Main/ListCollectorTests.fs" /> -->
     <Compile Include="../Js/Main/ListTests.fs" />
     <Compile Include="../Js/Main/MapTests.fs" />
