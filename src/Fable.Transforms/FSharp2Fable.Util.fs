@@ -3359,12 +3359,20 @@ module Util =
                 let isStatement = tryAttribConsArg att 1 false tryBoolean
                 let macro = tryAttribConsArg att 0 "" tryString
 
+                // JS names such as "the-name" need bracket access
+                let access name =
+                    match com.Options.Language with
+                    | JavaScript
+                    | TypeScript when Naming.hasIdentForbiddenChars Naming.isJsIdentChar name ->
+                        "$0[\"" + name.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"]"
+                    | _ -> "$0." + name
+
                 let macro =
                     match attFullName with
-                    | Atts.emitMethod -> "$0." + macro + "($1...)"
+                    | Atts.emitMethod -> access macro + "($1...)"
                     | Atts.emitConstructor -> "new $0($1...)"
                     | Atts.emitIndexer -> "$0[$1]{{=$2}}"
-                    | Atts.emitProperty -> "$0." + macro + "{{=$1}}"
+                    | Atts.emitProperty -> access macro + "{{=$1}}"
                     | _ -> macro
 
                 let emitInfo: Fable.EmitInfo =

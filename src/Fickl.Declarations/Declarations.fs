@@ -242,7 +242,11 @@ and private addTypeParameterNames names (typeParameters: TypeParameter array) =
 
 and private addAbstractMemberNames names (memb: AbstractMember) =
     match memb with
-    | AbstractCallSignature(parameters, returnType, typeParameters, _) ->
+    | AbstractIndexSignature(_, keyType, valueType, _, _) ->
+        addTypeNames names keyType
+        addTypeNames names valueType
+    | AbstractCallSignature(parameters, returnType, typeParameters, _)
+    | AbstractConstructSignature(parameters, returnType, typeParameters, _) ->
         addParameterNames names parameters
         addTypeNames names returnType
         addTypeParameterNames names typeParameters

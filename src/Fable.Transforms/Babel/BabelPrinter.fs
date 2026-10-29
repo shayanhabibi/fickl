@@ -1212,6 +1212,24 @@ module PrinterExtensions =
                 printer.PrintParameters(parameters)
                 printer.Print("): ")
                 printer.Print(returnType)
+            | AbstractIndexSignature(keyName, keyType, valueType, isReadonly, doc) ->
+                printer.PrintJsDoc(doc)
+
+                if isReadonly then
+                    printer.Print("readonly ")
+
+                printer.Print("[" + keyName + ": ")
+                printer.Print(keyType)
+                printer.Print("]: ")
+                printer.Print(valueType)
+            | AbstractConstructSignature(parameters, returnType, typeParameters, doc) ->
+                printer.PrintJsDoc(doc)
+                printer.Print("new ")
+                printer.Print(typeParameters)
+                printer.Print("(")
+                printer.PrintParameters(parameters)
+                printer.Print("): ")
+                printer.Print(returnType)
             | AbstractProperty(key, returnType, isComputed, isOptional, doc) ->
                 printer.PrintJsDoc(doc)
 

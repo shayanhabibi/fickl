@@ -427,6 +427,19 @@ type AbstractMember =
         isComputed: bool *
         isOptional: bool *
         doc: string option
+    /// e.g. `[key: string]: string` in `interface Headers { [key: string]: string }`
+    | AbstractIndexSignature of
+        keyName: string *
+        keyType: TypeAnnotation *
+        valueType: TypeAnnotation *
+        isReadonly: bool *
+        doc: string option
+    /// e.g. `new (name: string): Widget` in `interface WidgetCtor { new (name: string): Widget }`
+    | AbstractConstructSignature of
+        parameters: Parameter array *
+        returnType: TypeAnnotation *
+        typeParameters: TypeParameter array *
+        doc: string option
     | AbstractMethod of
         kind: ObjectMethodKind *
         key: Expression *

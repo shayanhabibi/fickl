@@ -1,0 +1,30 @@
+
+import { int32 } from "./fable_modules/fable-library-ts.5.24.0/Int32.ts";
+
+export interface Widget {
+    get name(): string
+}
+
+export interface Headers {
+    [key: string]: string
+}
+
+export interface ReadOnlyHeaders {
+    readonly [key: number]: string
+}
+
+export interface WidgetCtor {
+    new (name: string): Widget,
+    get version(): string
+}
+
+export interface Api {
+    doIt(arg0: int32): int32,
+    get "the-name"(): string
+}
+
+export function useAll(h: Headers, r: ReadOnlyHeaders, c: WidgetCtor, a: Api): [string, string, string, int32, string] {
+    h["x"]="y";
+    return [h["x"], r[0], (new c("w")).name, a.doIt(1), a["the-name"]] as [string, string, string, int32, string];
+}
+
