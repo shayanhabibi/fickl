@@ -41,6 +41,16 @@ module TaggedUnion =
         | Take of Take
         | Edit of edit: Edit
         | Save
+
+[<StringEnum; RequireQualifiedAccess>]
+type Level =
+    | [<CompiledValue(1)>] One
+    | [<CompiledValue(2.5)>] Two
+    | [<CompiledValue(true)>] Yes
+    | [<CompiledName("auto")>] Auto
+    | Plain
+
+let private pickLevel (level: Level) = level
 #endif
 
 let tests =
@@ -92,5 +102,12 @@ let tests =
         TaggedUnion.Command.Edit { new TaggedUnion.Edit with member _.text = "hi" } |> describe |> equal "edit: hi"
         TaggedUnion.Command.Save |> describe |> equal "save"
         !!{| ``type`` = "take"; fromIndex = 2; toIndex = 5 |} |> describe |> equal "take: 2-5"
+
+    testCase "StringEnum CompiledValue cases are typed as their values" <| fun () ->
+        pickLevel Level.One |> box |> equal (box 1)
+        pickLevel Level.Two |> box |> equal (box 2.5)
+        pickLevel Level.Yes |> box |> equal (box true)
+        pickLevel Level.Auto |> box |> equal (box "auto")
+        pickLevel Level.Plain |> box |> equal (box "plain")
     #endif
   ]
