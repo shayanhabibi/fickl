@@ -34,9 +34,9 @@ Time from saving a file to `Watching` in one `--watch` session per compiler. Raw
 ## Differences from Fable
 
 <!-- fickl-differences:start -->
-What Fickl gets right that Fable 5.24.0 does not, checked by compiling each case in [tests/Differences](tests/Differences) with both and running it with node. A case leaves this table once Fable passes it too.
+What Fickl gets right that Fable 5.25.0 does not, checked by compiling each case in [tests/Differences](tests/Differences) with both and running it with node. A case leaves this table once Fable passes it too.
 
-| Change | Fickl | Fable 5.24.0 | Issues |
+| Change | Fickl | Fable 5.25.0 | Issues |
 | --- | --- | --- | --- |
 | `[<CallableInterface>]` | An object expression implementing a callable interface compiles to a plain JavaScript function, and keeps a generic `Invoke` generic. | doesn't type-check: The namespace or module 'Fickl' is not defined. | [#8](https://github.com/shayanhabibi/fickl/issues/8), [#10](https://github.com/shayanhabibi/fickl/issues/10), [#11](https://github.com/shayanhabibi/fickl/issues/11) |
 | `--clampByteArrays` | Compiles byte arrays as `Uint8ClampedArray`, the type canvas pixel data uses, so they can be passed to it without a copy. | doesn't compile: Unknown argument: --clampbytearrays | [#39](https://github.com/shayanhabibi/fickl/issues/39) |
@@ -51,8 +51,6 @@ What Fickl gets right that Fable 5.24.0 does not, checked by compiling each case
 | reading another file's `mutable` value | The read stays before later side effects; it is not inlined past a call that changes the value. | compiles, but fails at runtime: expected 1, got 0 | [#15](https://github.com/shayanhabibi/fickl/issues/15) |
 | `[<NoOverloadSuffix>]` | Drops the overload hash from a method's compiled name, `Counter__Add` instead of `Counter__Add_Z524259A4`, so JavaScript can call it by a predictable name. O... | doesn't type-check: The namespace or module 'Fickl' is not defined. | [#35](https://github.com/shayanhabibi/fickl/issues/35) |
 | an explicit class inheriting a class with a primary constructor | The class extends its base, so `{ inherit Base("derived"); Extra = 5 }` has its `Name`. | compiles, but fails at runtime: expected derived, got undefined | [#96](https://github.com/shayanhabibi/fickl/issues/96) |
-| `%o` in printf formats | Formats in octal, as .NET does; the value is not printed in decimal. | compiles, but fails at runtime: expected 10\|37777777777\|  100, got 8\|-1\|   64 | [#16](https://github.com/shayanhabibi/fickl/issues/16) |
-| `[<ReferenceEquality>]` and `[<NoEquality>]` records and unions | Compares them by reference, as .NET does; two values with equal fields are not equal. | compiles, but fails at runtime: expected false, got true | [#30](https://github.com/shayanhabibi/fickl/issues/30) |
 | `--strictOptions` | `Some null` of a string, array, class, record or function stays `Some`, as on .NET, built the same way at concrete and generic sites. Value options stay erased. | doesn't compile: Unknown argument: --strictoptions | [#32](https://github.com/shayanhabibi/fickl/issues/32) |
 <!-- fickl-differences:end -->
 
