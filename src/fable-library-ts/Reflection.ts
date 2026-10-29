@@ -13,7 +13,7 @@ export class CaseInfo {
   public declaringType: TypeInfo;
   public tag: number;
   public name: string;
-  public fields?: FieldInfo[];
+  public fields?: FieldInfo[] | undefined;
 
   constructor(
     declaringType: TypeInfo,
@@ -48,12 +48,12 @@ export class MethodInfo {
 
 export class TypeInfo implements IEquatable<TypeInfo> {
   public fullname: string;
-  public generics?: TypeInfo[];
-  public construct?: Constructor;
-  public parent?: TypeInfo;
-  public fields?: () => FieldInfo[];
-  public cases?: () => CaseInfo[];
-  public enumCases?: EnumCase[];
+  public generics?: TypeInfo[] | undefined;
+  public construct?: Constructor | undefined;
+  public parent?: TypeInfo | undefined;
+  public fields?: (() => FieldInfo[]) | undefined;
+  public cases?: (() => CaseInfo[]) | undefined;
+  public enumCases?: EnumCase[] | undefined;
 
   constructor(
     fullname: string,

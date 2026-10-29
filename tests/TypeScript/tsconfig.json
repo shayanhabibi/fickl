@@ -1,10 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "target": "es2020",
+    // From es2022 class fields use define semantics, as they do in consumers on a modern target,
+    // so the tests run against that behaviour rather than the older assignment semantics.
+    "target": "es2022",
     // Temporal types (used by the --jsTemporal library files) live in lib.esnext.temporal;
-    // the rest mirrors the default lib set for target es2020.
-    "lib": ["es2020", "dom", "esnext.temporal"],
+    // the rest mirrors the default lib set for target es2022.
+    "lib": ["es2022", "dom", "esnext.temporal"],
     "module": "es2020",
     "rewriteRelativeImportExtensions": true,
     "erasableSyntaxOnly": true,
@@ -23,6 +25,10 @@
     // so the repo root is the common source directory. TS7 requires it to be explicit.
     "rootDir": "../../..",
     "strict": true,
+    // Absent and undefined optional properties are distinct in the interop types
+    "exactOptionalPropertyTypes": true,
+    // Fails when an exported type cannot be written to a declaration file
+    "declaration": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noEmitOnError": true,
