@@ -51,6 +51,16 @@ type Level =
     | Plain
 
 let private pickLevel (level: Level) = level
+
+[<TypeScriptTaggedUnion("ok")>]
+type Res =
+    | [<CompiledValue(true)>] Good of value: int
+    | [<CompiledValue(false)>] Bad of error: string
+
+[<TypeScriptTaggedUnion("kind"); RequireQualifiedAccess>]
+type Msg =
+    | [<CompiledValue(0)>] Text of text: string
+    | [<CompiledValue(1)>] Code of code: int
 #endif
 
 let tests =
@@ -109,5 +119,22 @@ let tests =
         pickLevel Level.Yes |> box |> equal (box true)
         pickLevel Level.Auto |> box |> equal (box "auto")
         pickLevel Level.Plain |> box |> equal (box "plain")
+
+    testCase "TS tagged union with boolean tags compiles and matches" <| fun () ->
+        let describe = function
+            | Good value -> sprintf "good %d" value
+            | Bad error -> sprintf "bad %s" error
+        Good 1 |> describe |> equal "good 1"
+        Bad "no" |> describe |> equal "bad no"
+        (Good 1)?ok |> equal true
+        !!{| ok = false; error = "raw" |} |> describe |> equal "bad raw"
+
+    testCase "TS tagged union with numeric tags compiles and matches" <| fun () ->
+        let describe = function
+            | Msg.Text text -> text
+            | Msg.Code code -> string code
+        Msg.Text "hi" |> describe |> equal "hi"
+        Msg.Code 42 |> describe |> equal "42"
+        (Msg.Code 42)?kind |> equal 1
     #endif
   ]

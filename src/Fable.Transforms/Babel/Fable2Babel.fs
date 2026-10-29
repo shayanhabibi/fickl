@@ -1322,12 +1322,15 @@ module Annotation =
         ent.UnionCases
         |> List.mapToArray (fun uci ->
             let tagMember =
+                // Same precedence as FSharp2Fable's tag value: CompiledValue, then CompiledName, then the case rule
                 let tagType =
-                    match uci.CompiledName with
-                    | Some name -> name
-                    | None -> Naming.applyCaseRule rule uci.Name
-                    |> Literal.stringLiteral
-                    |> LiteralTypeAnnotation
+                    match tryCompiledValueLiteral uci, uci.CompiledName with
+                    | Some value, _ -> LiteralTypeAnnotation value
+                    | None, Some name -> Literal.stringLiteral name |> LiteralTypeAnnotation
+                    | None, None ->
+                        Naming.applyCaseRule rule uci.Name
+                        |> Literal.stringLiteral
+                        |> LiteralTypeAnnotation
 
                 let prop, isComputed = Util.memberFromName tag
 
