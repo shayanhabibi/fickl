@@ -4755,9 +4755,12 @@ but thanks to the optimisation done below we get
 
         args |> List.toArray, body
 
-    let declareEntryPoint _com _ctx (funcExpr: Expression) =
+    let declareEntryPoint (com: IBabelCompiler) _ctx (funcExpr: Expression) =
         let argv =
-            emitExpression None "typeof process === 'object' ? process.argv.slice(2) : []" []
+            match com.Options.Language with
+            // Don't refer to `process` directly, its declaration needs @types/node
+            | TypeScript -> emitExpression None "(globalThis as any).process?.argv?.slice(2) ?? []" []
+            | _ -> emitExpression None "typeof process === 'object' ? process.argv.slice(2) : []" []
 
         let main = Expression.callExpression (funcExpr, [| argv |])
         // Don't exit the process after leaving main, as there may be a server running
