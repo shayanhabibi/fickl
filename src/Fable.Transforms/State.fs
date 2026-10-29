@@ -621,6 +621,9 @@ type CompilerImpl
             | _ -> ()
 
         member _.AddLog(msg, severity, ?range, ?fileName: string, ?tag: string, ?code: string) =
+            // Ranges spell the file as FCS registered it (backslashes on Windows); suppressions and logs are keyed by normalized paths
+            let fileName = fileName |> Option.map Path.normalizePath
+
             // Only warnings can be suppressed, errors always surface (matches F#'s own #nowarn),
             // and neither can the warnings about the `fable-disable` directives themselves.
             let isSuppressed =
@@ -635,7 +638,7 @@ type CompilerImpl
                             | Some f -> f
                             | None ->
                                 match r.File with
-                                | Some f -> f
+                                | Some f -> Path.normalizePath f
                                 | None -> currentFile
 
                         // The whole range, not just its first line, so a trailing
@@ -644,8 +647,5 @@ type CompilerImpl
                 )
 
             if not isSuppressed then
-                // Ranges spell the file as FCS registered it (backslashes on Windows); logs are matched against normalized paths
-                let fileName = fileName |> Option.map Path.normalizePath
-
                 LogEntry.Make(severity, msg, ?range = range, ?fileName = fileName, ?tag = tag, ?code = code)
                 |> logs.Add
