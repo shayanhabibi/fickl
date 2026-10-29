@@ -960,6 +960,7 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
             let checker = InteractiveChecker.Create(projCracked.ProjectOptions)
             let! assemblies = checker.GetImportedAssemblies()
 
+            // fickl: cached package sources resolve inline imports from this project's fable_modules
             let fableProj =
                 Project.From(
                     projCracked.ProjectFile,
@@ -967,7 +968,6 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                     [],
                     assemblies,
                     Log.log,
-                    // fickl: cached package sources resolve inline imports from this project's fable_modules
                     ?precompiledInfo = (projCracked.PrecompiledInfo |> Option.map PackageCache.asPrecompiledInfo),
                     getPlugin = Reflection.loadType projCracked.CliArgs
                 )
