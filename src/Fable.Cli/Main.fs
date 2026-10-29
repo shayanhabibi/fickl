@@ -608,11 +608,13 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                     (fun () ->
                         let filePaths, sourceReader = Fable.Compiler.File.MakeSourceReader sourceFiles
 
+                        let filePaths, sourceReader = CodeServices.checkerFileNames filePaths sourceReader
+
                         checker.ParseAndCheckProject(
                             projCracked.ProjectFile,
                             filePaths,
                             sourceReader,
-                            lastFile,
+                            CodeServices.checkerFileName lastFile,
                             ?subscriber = subscriber
                         )
                         |> Timings.timeCheck
@@ -968,6 +970,7 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                     assemblies,
                     Log.log,
                     // fickl: cached package sources resolve inline imports from this project's fable_modules
+
                     ?precompiledInfo = (projCracked.PrecompiledInfo |> Option.map PackageCache.asPrecompiledInfo),
                     getPlugin = Reflection.loadType projCracked.CliArgs
                 )
@@ -978,6 +981,8 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
     member _.CompileToFile(outFile: string) =
         let filePaths, sourceReader =
             Fable.Compiler.File.MakeSourceReader projCracked.SourceFiles
+
+        let filePaths, sourceReader = CodeServices.checkerFileNames filePaths sourceReader
 
         checker.Compile(filePaths, sourceReader, outFile)
 
@@ -1976,7 +1981,7 @@ let startCompilationAsync state =
             let logs = Array.append compilationResult.ErrorLogs compilationResult.OtherLogs
 
             match compilationResult.ExitCode with
-            | 0 -> return Ok(state, logs)
+            | 0 -> return Ok(compilationResult.State, logs)
             | _ -> return Error("Compilation failed", logs)
 
         with

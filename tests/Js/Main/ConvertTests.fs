@@ -26,6 +26,10 @@ let parse f (a: string) =
 #endif
 
 
+// The one-argument overload depends on the current culture on .NET, and the explicit style would trigger FABLE0103 on Fable
+let tryParseFloat (s: string) =
+    Double.TryParse(s, NumberStyles.Float ||| NumberStyles.AllowThousands, CultureInfo.InvariantCulture)
+
 let private toPlainArray (bytes: byte[]) : byte[] =
 #if FABLE_COMPILER
     ResizeArray bytes |> unbox
@@ -100,6 +104,186 @@ let tests =
         tryParse Single.TryParse 0.0f "X9TRE34" |> equal (false, 0.0f)
         tryParse Single.TryParse 0.0f "9SayWhat12Huh" |> equal (false, 0.0f)
         tryParse Single.TryParse 0.0f "-1.5" |> equal (true, -1.5f)
+
+    testCase "System.Double.Parse follows .NET's Float grammar" <| fun () ->
+        let parse (s: string) = Double.Parse(s, CultureInfo.InvariantCulture)
+        parse "1." |> equal 1.0
+        parse ".5" |> equal 0.5
+        parse "+.5" |> equal 0.5
+        parse "-1.5e3" |> equal -1500.0
+        parse "25E-2" |> equal 0.25
+        parse "\t1\n" |> equal 1.0
+        parse "\v1\f" |> equal 1.0
+        parse "1\u0000" |> equal 1.0
+        parse "1 \u0000\u0000" |> equal 1.0
+        parse "1e99999" |> equal Double.PositiveInfinity
+        for s in [ "0x10"; "0X1A"; "0b101"; "0o7"; "\u00a01"; "\ufeff1"; "1\ufeff"; "\u20281"; "\u30001"; "1\u0000 "; "\u00001"; "1e"; "e5"; "."; "+"; "\uff11" ] do
+            (fun () -> parse s) |> throwsAnyError
+
+    testCase "System.Double.Parse accepts the NaN and infinity symbols ignoring case" <| fun () ->
+        let parse (s: string) = Double.Parse(s, CultureInfo.InvariantCulture)
+        for s in [ "NaN"; "nan"; "NAN"; "-NaN"; "+nan"; " NaN\n" ] do
+            parse s |> Double.IsNaN |> equal true
+        parse "infinity" |> equal Double.PositiveInfinity
+        parse "+Infinity" |> equal Double.PositiveInfinity
+        parse " -INFINITY " |> equal Double.NegativeInfinity
+        parse " NaN" |> Double.IsNaN |> equal true
+        parse "\u0085Infinity\u2028" |> equal Double.PositiveInfinity
+        parse "\u3000-Infinity" |> equal Double.NegativeInfinity
+        for s in [ "inf"; "\u221e"; "NaN\u0000"; "\ufeffNaN"; "NaN\ufeff"; "- NaN"; "+-Infinity"; "Infinityx"; "NaN0" ] do
+            (fun () -> parse s) |> throwsAnyError
+
+    testCase "System.Double.TryParse follows .NET's Float grammar" <| fun () ->
+        tryParseFloat "1." |> equal (true, 1.0)
+        tryParseFloat "  .5\r\n" |> equal (true, 0.5)
+        tryParseFloat "1\u0000" |> equal (true, 1.0)
+        tryParseFloat "-infinity" |> equal (true, Double.NegativeInfinity)
+        tryParseFloat "nan" |> fst |> equal true
+        tryParseFloat "0x10" |> equal (false, 0.0)
+        tryParseFloat "\u00a01" |> equal (false, 0.0)
+        tryParseFloat "1_0" |> equal (false, 0.0)
+        tryParseFloat "_" |> equal (false, 0.0)
+        tryParseFloat null |> equal (false, 0.0)
+
+    testCase "System.Single.Parse follows .NET's Float grammar" <| fun () ->
+        let parse (s: string) = Single.Parse(s, CultureInfo.InvariantCulture)
+        parse ".5" |> equal 0.5f
+        parse "-Infinity" |> float |> equal Double.NegativeInfinity
+        parse "nan" |> float |> Double.IsNaN |> equal true
+        (fun () -> parse "0x10") |> throwsAnyError
+        (fun () -> parse "1_0") |> throwsAnyError
+
+    testCase "System.Double.Parse accepts group separators like invariant .NET" <| fun () ->
+        let parse (s: string) = Double.Parse(s, CultureInfo.InvariantCulture)
+        parse "1,5" |> equal 15.0
+        parse "1,000.5" |> equal 1000.5
+        parse "1,,0" |> equal 10.0
+        parse "1," |> equal 1.0
+        parse "1,.5" |> equal 1.5
+        parse "1,e2" |> equal 100.0
+        parse "-1,000" |> equal -1000.0
+        Single.Parse("1,5", CultureInfo.InvariantCulture) |> equal 15.0f
+        Convert.ToDouble("1,000", CultureInfo.InvariantCulture) |> equal 1000.0
+        tryParseFloat "1,000" |> equal (true, 1000.0)
+        for s in [ ","; ",1"; "1.5,0"; "1e1,0"; "-,1" ] do
+            (fun () -> parse s) |> throwsAnyError
+        (fun () -> float "1,5") |> throwsAnyError
+        (fun () -> float32 "1,5") |> throwsAnyError
+
+    testCase "System.Double.Parse honors NumberStyles" <| fun () ->
+        let parse (s: string) (style: NumberStyles) = Double.Parse(s, style, CultureInfo.InvariantCulture)
+        parse "1e3" NumberStyles.Float |> equal 1000.0
+        parse "1,000" NumberStyles.Number |> equal 1000.0
+        parse "1.5-" NumberStyles.Number |> equal -1.5
+        parse "(1.5)" (NumberStyles.Float ||| NumberStyles.AllowParentheses) |> equal -1.5
+        parse "1" NumberStyles.None |> equal 1.0
+        for s, style in [ "1,5", NumberStyles.Float; "1e3", NumberStyles.Number; "1.5", NumberStyles.Integer; " 1 ", NumberStyles.None; "-1", NumberStyles.None; "+1", NumberStyles.AllowTrailingSign ] do
+            (fun () -> parse s style) |> throwsAnyError
+        let result = ref 0.0
+        Double.TryParse("1,5", NumberStyles.Float, CultureInfo.InvariantCulture, result) |> equal false
+        Double.TryParse("1,5", NumberStyles.Number, CultureInfo.InvariantCulture, result) |> equal true
+        result.Value |> equal 15.0
+        Single.Parse("1,5", NumberStyles.Float ||| NumberStyles.AllowThousands, CultureInfo.InvariantCulture) |> equal 15.0f
+        (fun () -> Single.Parse("1,5", NumberStyles.Float, CultureInfo.InvariantCulture)) |> throwsAnyError
+
+    testCase "System.Decimal.Parse accepts .NET's group separator placements" <| fun () ->
+        let parse (s: string) = Decimal.Parse(s, CultureInfo.InvariantCulture)
+        parse "1,,0" |> equal 10M
+        parse "1," |> equal 1M
+        parse "1,.5" |> equal 1.5M
+        for s in [ ","; ",1"; "1.5,0" ] do
+            (fun () -> parse s) |> throwsAnyError
+
+    testCase "Double.Parse and Convert.ToDouble reject underscores" <| fun () ->
+        for s in [ "1_0"; "_1"; "1_"; "_"; "1e1_0"; "1._5" ] do
+            (fun () -> Double.Parse(s, CultureInfo.InvariantCulture)) |> throwsAnyError
+            (fun () -> Convert.ToDouble(s, CultureInfo.InvariantCulture)) |> throwsAnyError
+
+    testCase "float and float32 remove underscores like FSharp.Core" <| fun () ->
+        float "1_0_0" |> equal 100.0
+        float "_1" |> equal 1.0
+        float "1_" |> equal 1.0
+        float "1e1_0" |> equal 1e10
+        float " _1" |> equal 1.0
+        float "Na_N" |> Double.IsNaN |> equal true
+        float32 "1__0" |> equal 10.0f
+        (fun () -> float "_") |> throwsAnyError
+        (fun () -> float32 "__") |> throwsAnyError
+        (fun () -> float "0x10") |> throwsAnyError
+        (fun () -> float "\u00a01") |> throwsAnyError
+
+    testCase "System.Decimal.Parse trims only .NET's white space" <| fun () ->
+        let parse (s: string) = Decimal.Parse(s, CultureInfo.InvariantCulture)
+        parse "\t12\r\n" |> equal 12M
+        parse "12\u0000" |> equal 12M
+        parse "12 \u0000" |> equal 12M
+        for s in [ "\u00a012"; "\ufeff12"; "12\u3000"; "12\u0000 " ] do
+            (fun () -> parse s) |> throwsAnyError
+
+    testCase "decimal parses like System.Decimal.Parse with NumberStyles.Float" <| fun () ->
+        decimal " 12 " |> equal 12M
+        decimal "+12" |> equal 12M
+        decimal "\t12\n" |> equal 12M
+        decimal "12\u0000" |> equal 12M
+        decimal "1e3" |> equal 1000M
+        for s in [ "1,000"; "(1)"; "1-"; "1_0"; "\u00a012"; "0x10"; "NaN" ] do
+            (fun () -> decimal s) |> throwsAnyError
+
+    testCase "Convert.ToDecimal parses like System.Decimal.Parse" <| fun () ->
+        Convert.ToDecimal(" 12 ", CultureInfo.InvariantCulture) |> equal 12M
+        Convert.ToDecimal("1,000", CultureInfo.InvariantCulture) |> equal 1000M
+        Convert.ToDecimal("1-", CultureInfo.InvariantCulture) |> equal -1M
+        (fun () -> Convert.ToDecimal("1e3", CultureInfo.InvariantCulture)) |> throwsAnyError
+
+    testCase "BigInteger.Parse follows .NET's Integer grammar" <| fun () ->
+        bigint.Parse " 12 " |> equal 12I
+        bigint.Parse "+12" |> equal 12I
+        bigint.Parse "-12\u0000" |> equal -12I
+        for s in [ ""; " "; "-"; "0x10"; "1_0"; "1.5"; "1e3"; "\u00a012" ] do
+            (fun () -> bigint.Parse s) |> throwsAnyError
+        tryParse bigint.TryParse 0I "" |> equal (false, 0I)
+        tryParse bigint.TryParse 0I "0x10" |> equal (false, 0I)
+        tryParse bigint.TryParse 0I " 12 " |> equal (true, 12I)
+
+    testCase "Parsing numbers raises .NET's exception types" <| fun () ->
+        raisedExceptionType (fun () -> Double.Parse("1e", CultureInfo.InvariantCulture)) |> equal "FormatException"
+        raisedExceptionType (fun () -> Double.Parse(null, CultureInfo.InvariantCulture)) |> equal "ArgumentNullException"
+        raisedExceptionType (fun () -> Single.Parse("abc", CultureInfo.InvariantCulture)) |> equal "FormatException"
+        raisedExceptionType (fun () -> float "abc") |> equal "FormatException"
+        raisedExceptionType (fun () -> float32 (null: string)) |> equal "ArgumentNullException"
+        raisedExceptionType (fun () -> Int32.Parse "abc") |> equal "FormatException"
+        raisedExceptionType (fun () -> Int32.Parse(null: string)) |> equal "ArgumentNullException"
+        raisedExceptionType (fun () -> Int32.Parse "2147483648") |> equal "OverflowException"
+        raisedExceptionType (fun () -> UInt32.Parse "4294967296") |> equal "OverflowException"
+        raisedExceptionType (fun () -> Byte.Parse "256") |> equal "OverflowException"
+        raisedExceptionType (fun () -> SByte.Parse "-129") |> equal "OverflowException"
+        raisedExceptionType (fun () -> UInt16.Parse "-1") |> equal "OverflowException"
+        raisedExceptionType (fun () -> Int64.Parse "abc") |> equal "FormatException"
+        raisedExceptionType (fun () -> Int64.Parse(null: string)) |> equal "ArgumentNullException"
+        raisedExceptionType (fun () -> UInt64.Parse "-1") |> equal "OverflowException"
+        raisedExceptionType (fun () -> int "1.5") |> equal "FormatException"
+        raisedExceptionType (fun () -> uint32 "4294967296") |> equal "OverflowException"
+        raisedExceptionType (fun () -> int64 "99999999999999999999") |> equal "OverflowException"
+        raisedExceptionType (fun () -> Decimal.Parse("abc", CultureInfo.InvariantCulture)) |> equal "FormatException"
+        raisedExceptionType (fun () -> Decimal.Parse(null, CultureInfo.InvariantCulture)) |> equal "ArgumentNullException"
+        raisedExceptionType (fun () -> Decimal.Parse("79228162514264337593543950336", CultureInfo.InvariantCulture)) |> equal "OverflowException"
+        raisedExceptionType (fun () -> decimal "abc") |> equal "FormatException"
+        raisedExceptionType (fun () -> decimal "1e30") |> equal "OverflowException"
+        raisedExceptionType (fun () -> bigint.Parse "abc") |> equal "FormatException"
+        raisedExceptionType (fun () -> bigint.Parse null) |> equal "ArgumentNullException"
+        tryParse Int32.TryParse 0 null |> equal (false, 0)
+        tryParse Decimal.TryParse 0M null |> equal (false, 0M)
+
+    testCase "Parsing numbers raises .NET's exception messages" <| fun () ->
+        (fun () -> Int32.Parse "abc") |> throwsError "The input string 'abc' was not in a correct format."
+        (fun () -> Double.Parse("abc", CultureInfo.InvariantCulture)) |> throwsError "The input string 'abc' was not in a correct format."
+        (fun () -> Int32.Parse(null: string)) |> throwsError "Value cannot be null. (Parameter 's')"
+        (fun () -> Int32.Parse "2147483648") |> throwsError "Value was either too large or too small for an Int32."
+        (fun () -> UInt32.Parse "4294967296") |> throwsError "Value was either too large or too small for a UInt32."
+        (fun () -> Byte.Parse "256") |> throwsError "Value was either too large or too small for an unsigned byte."
+        (fun () -> SByte.Parse "128") |> throwsError "Value was either too large or too small for a signed byte."
+        (fun () -> Int64.Parse "9223372036854775808") |> throwsError "Value was either too large or too small for an Int64."
+        (fun () -> bigint.Parse "abc") |> throwsError "The value could not be parsed."
 
     testCase "System.Boolean.Parse works" <| fun () ->
         Boolean.Parse "true" |> equal true
@@ -1297,6 +1481,14 @@ let tests =
         Convert.ToChar(97uL) |> equal x
         Convert.ToChar("a") |> equal x
         Convert.ToChar('a') |> equal x
+
+    testCase "Negative fractions truncate toward zero when converted to small integers" <| fun () ->
+        sbyte(-7.9) |> equal -7y
+        sbyte(-7.9f) |> equal -7y
+        int16(-7.9) |> equal -7s
+        int16(-7.9f) |> equal -7s
+        byte(7.9) |> equal 7uy
+        uint16(7.9) |> equal 7us
 
     testCase "System.Convert.ToSByte works" <| fun () ->
         let x = 1y

@@ -88,9 +88,11 @@ export abstract class Union<Tag extends number, Name extends string> implements 
   }
 
   public GetHashCode() {
-    const hashes = this.fields.map((x: any) => structuralHash(x));
-    hashes.splice(0, 0, numberHash(this.tag));
-    return combineHashCodes(hashes);
+    let h = combineHashCode(0, numberHash(this.tag));
+    for (let i = 0; i < this.fields.length; i++) {
+      h = combineHashCode(h, structuralHash(this.fields[i]));
+    }
+    return h;
   }
 
   public Equals(other: Union<Tag, Name>) {
@@ -196,24 +198,32 @@ export abstract class Record implements IEquatable<Record>, IComparable<Record>,
 }
 
 export class FSharpRef<T> {
-  private readonly getter: () => T;
-  private readonly setter: (v: T) => void;
+  private readonly getter: (() => T) | undefined;
+  private readonly setter: ((v: T) => void) | undefined;
+  private value: T | undefined;
 
   get contents() {
-    return this.getter();
+    return this.getter === undefined ? this.value as T : this.getter();
   }
 
   set contents(v) {
-    this.setter(v)
+    if (this.setter === undefined) {
+      this.value = v;
+    } else {
+      this.setter(v);
+    }
   }
 
+  // Same field layout on both paths so every cell shares one hidden class
   constructor(contentsOrGetter: T | (() => T), setter?: (v: T) => void) {
     if (typeof setter === "function") {
       this.getter = contentsOrGetter as () => T;
-      this.setter = setter
+      this.setter = setter;
+      this.value = undefined;
     } else {
-      this.getter = () => contentsOrGetter as T;
-      this.setter = (v) => { contentsOrGetter = v };
+      this.getter = undefined;
+      this.setter = undefined;
+      this.value = contentsOrGetter as T;
     }
   }
 }

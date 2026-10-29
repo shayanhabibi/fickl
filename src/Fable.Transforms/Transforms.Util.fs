@@ -344,6 +344,8 @@ module Types =
     [<Literal>]
     let regexCaptureCollection = "System.Text.RegularExpressions.CaptureCollection"
 
+    let regexOptions = "System.Text.RegularExpressions.RegexOptions"
+
     [<Literal>]
     let random = "System.Random"
 
@@ -1116,6 +1118,12 @@ module AST =
         | GenericParam _
         | Option _ -> true
         | _ -> false
+
+    let rec containsFunctionType (t: Type) =
+        match t with
+        | LambdaType _
+        | DelegateType _ -> true
+        | t -> t.Generics |> List.exists containsFunctionType
 
     let isUnitOfMeasure t =
         match t with

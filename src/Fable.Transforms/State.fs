@@ -325,15 +325,14 @@ type ImplFile =
         FSharp2Fable.Compiler.getRootFSharpEntities declarations |> loop entities
         let rootModule, rootComment = FSharp2Fable.Compiler.getRootModule declarations
 
+        let fileName = Path.normalizePathAndEnsureFsExtension file.FileName
+
         {
             Declarations = declarations
             Entities = entities
             RootModule = rootModule
             RootComment = rootComment
-            // fickl: FCS names a file with a signature after its .fsi, but changes and watch dependencies name the .fs,
-            // so files that inline from it were not recompiled when it changed
-            InlineExprs =
-                FSharp2Fable.Compiler.getInlineExprs (Path.normalizePathAndEnsureFsExtension file.FileName) declarations
+            InlineExprs = FSharp2Fable.Compiler.getInlineExprs fileName declarations
             Signature = signature declarations
         }
 

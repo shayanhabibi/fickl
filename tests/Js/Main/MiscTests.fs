@@ -1289,6 +1289,14 @@ let tests =
         (try JsInterop.emitJsExpr<obj> () "JSON.parse('{')" |> ignore; "none" with Failure _ -> "failure" | _ -> "other")
         |> equal "failure"
 #endif
+    testCase "invalidArg and invalidOp work in expression position" <| fun () ->
+        let pick b = if b then 1 else invalidArg "b" "This is invalid"
+        pick true |> equal 1
+        throwsError "This is invalid (Parameter 'b')" (fun () -> pick false)
+        let wrap (x: int) = x + 1
+        throwsError "This is invalid" (fun () -> wrap (invalidOp "This is invalid"))
+        Option.defaultWith (fun () -> invalidOp "This is invalid") (Some 3) |> equal 3
+        throwsError "This is invalid" (fun () -> Option.defaultWith (fun () -> invalidOp "This is invalid") None)
 
     testCase "Pattern matching optimization works (switch statement)" <| fun () ->
         let mutable x = ""

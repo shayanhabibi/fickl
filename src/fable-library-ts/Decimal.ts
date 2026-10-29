@@ -2,6 +2,8 @@ import Decimal, { type BigSource } from "./lib/big.js";
 import { type Numeric, symbol } from "./Numeric.ts";
 import { FSharpRef } from "./Types.ts";
 import { Exception, combineHashCodes } from "./Util.ts";
+import { NumberStyles, splitNumber } from "./NumberStyles.ts";
+import { ArgumentNullException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
 import { type int8, type uint8, type int16, type uint16, type int32, type uint32, type float16, type float32, type float64 } from "./Int32.ts";
 import { fromDecimal, type int64, type uint64, type int128, type uint128, type nativeint, type unativeint } from "./BigInt.ts";
 import * as bigInt from "./BigInt.ts";
@@ -143,57 +145,20 @@ export function toString(x: Decimal) {
   return x.toString();
 }
 
-const NumberStyles = {
-  AllowLeadingWhite: 1,
-  AllowTrailingWhite: 2,
-  AllowLeadingSign: 4,
-  AllowTrailingSign: 8,
-  AllowParentheses: 16,
-  AllowDecimalPoint: 32,
-  AllowThousands: 64,
-  AllowExponent: 128,
-  AllowHexSpecifier: 512,
-  Number: 111,
-} as const;
-
-// The digits of a decimal string once whitespace, sign and parentheses are stripped
-function digitsPattern(style: number): RegExp {
-  const integral = style & NumberStyles.AllowThousands ? "\\d+(?:,\\d+)*" : "\\d+";
-  const point = style & NumberStyles.AllowDecimalPoint ? "(?:\\.\\d*)?" : "";
-  const leadingPoint = style & NumberStyles.AllowDecimalPoint ? "|\\.\\d+" : "";
-  const exponent = style & NumberStyles.AllowExponent ? "(?:[eE][+-]?\\d+)?" : "";
-  return new RegExp(`^(?:${integral}${point}${leadingPoint})${exponent}$`);
-}
-
 // Returns undefined when the string does not have the format allowed by the style
 function parseWithStyle(str: string, style: number): Decimal | undefined {
-  if (style & NumberStyles.AllowHexSpecifier) {
-    throw new Exception("The number style AllowHexSpecifier is not supported on floating point data types.");
-  }
-  let s = str;
-  if (style & NumberStyles.AllowLeadingWhite) {
-    s = s.replace(/^\s+/, "");
-  }
-  if (style & NumberStyles.AllowTrailingWhite) {
-    s = s.replace(/\s+$/, "");
-  }
-  let negative = false;
-  if (style & NumberStyles.AllowParentheses && s.startsWith("(") && s.endsWith(")")) {
-    s = s.slice(1, -1);
-    negative = true;
-  }
-  if (style & NumberStyles.AllowLeadingSign && /^[+-]/.test(s)) {
-    negative = s[0] === "-" ? !negative : negative;
-    s = s.slice(1);
-  } else if (style & NumberStyles.AllowTrailingSign && /[+-]$/.test(s)) {
-    negative = s[s.length - 1] === "-" ? !negative : negative;
-    s = s.slice(0, -1);
-  }
-  if (!digitsPattern(style).test(s)) {
+  const parts = splitNumber(str, style);
+  if (parts === undefined) {
     return undefined;
   }
-  const d = new Decimal(s.replace(/,/g, ""));
-  if (negative) {
+  let d: Decimal;
+  try {
+    d = new Decimal(parts.digits);
+  } catch {
+    // Fable's big.js fork throws for values outside the decimal range
+    throw OverflowException_$ctor_Z721C83C5(OVERFLOW);
+  }
+  if (parts.negative) {
     d.s = -1;
   }
   return d;
@@ -213,9 +178,12 @@ export function tryParse(str: string, style: number, defValue: FSharpRef<Decimal
 }
 
 export function parse(str: string, style: number = NumberStyles.Number): Decimal {
+  if (str == null) {
+    throw ArgumentNullException_$ctor_Z721C83C5("s");
+  }
   const d = parseWithStyle(str, style);
   if (d === undefined) {
-    throw new Exception(`The input string ${str} was not in a correct format.`);
+    throw FormatException_$ctor_Z721C83C5(`The input string '${str}' was not in a correct format.`);
   }
   return d;
 }

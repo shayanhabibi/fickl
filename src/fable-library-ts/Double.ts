@@ -1,36 +1,47 @@
 import { FSharpRef } from "./Types.ts";
-import { Exception } from "./Util.ts";
+import { ArgumentNullException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5 } from "./System.ts";
+import { NumberStyles, splitNumber } from "./NumberStyles.ts";
 
-// JS's unary + also reads 0x, 0b and 0o literals, which .NET does not parse as a Double
-function hasRadixPrefix(str: string) {
-  return /^\s*[+-]?0[xXbBoO]/.test(str);
-}
+// .NET's NaN and infinity symbols, ignoring case, allowing a sign and trimmed like String.Trim
+const symbolRegex = /^[\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*(?:[+-]?nan|([+-]?)infinity)[\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$/i;
 
-export function tryParse(str: string, defValue: FSharpRef<number>): boolean {
-  // TODO: test if value is valid and in range
-  if (str != null && /\S/.test(str) && !hasRadixPrefix(str)) {
-    const v = +str.replace("_", "");
-    if (!Number.isNaN(v)) {
-      defValue.contents = v;
+const defaultStyle = NumberStyles.Float | NumberStyles.AllowThousands;
+
+export function tryParse(str: string, style: number, defValue: FSharpRef<number>): boolean {
+  if (str != null) {
+    const parts = splitNumber(str, style);
+    if (parts !== undefined) {
+      const value = Number.parseFloat(parts.digits);
+      defValue.contents = parts.negative ? -value : value;
+      return true;
+    }
+    const symbol = symbolRegex.exec(str);
+    if (symbol != null) {
+      defValue.contents = symbol[1] == null ? NaN : symbol[1] === "-" ? -Infinity : Infinity;
       return true;
     }
   }
   return false;
 }
 
-export function parse(str: string): number {
-  if (str != null && /\S/.test(str) && !hasRadixPrefix(str)) {
-    const v = +str.replace("_", "");
-    if (!Number.isNaN(v)) {
-      return v;
-    }
+export function parse(str: string, style: number = defaultStyle): number {
+  const defValue = new FSharpRef(0);
+  if (tryParse(str, style, defValue)) {
+    return defValue.contents;
+  } else if (str == null) {
+    throw ArgumentNullException_$ctor_Z721C83C5("s");
+  } else {
+    throw FormatException_$ctor_Z721C83C5(`The input string '${str}' was not in a correct format.`);
   }
-  throw new Exception(`The input string ${str} was not in a correct format.`);
 }
 
 // Double.Equals and Single.Equals: unlike ==, NaN equals itself
 export function equals(x: number, y: number): boolean {
   return x === y || (x !== x && y !== y);
+}
+
+export function parseIgnoringUnderscores(str: string): number {
+  return parse(str == null ? str : str.replace(/_/g, ""), NumberStyles.Float);
 }
 
 // JS Number.isFinite function evals false for NaN

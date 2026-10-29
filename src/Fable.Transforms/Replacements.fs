@@ -269,7 +269,14 @@ let toFloat com (ctx: Context) r targetType (args: Expr list) : Expr =
     let converted =
         match args.Head.Type with
         | Char -> Helper.InstanceCall(args.Head, "charCodeAt", Int32.Number, [ makeIntConst 0 ])
-        | String -> Helper.LibCall(com, "Double", "parse", targetType, args)
+        | String ->
+            let style =
+                int (
+                    System.Globalization.NumberStyles.Float
+                    ||| System.Globalization.NumberStyles.AllowThousands
+                )
+
+            Helper.LibCall(com, "Double", "parse", targetType, [ args.Head; makeIntConst style ])
         | Number(kind, _) ->
             match kind with
             | Decimal -> Helper.LibCall(com, "Decimal", "toFloat64", targetType, args)
@@ -291,7 +298,10 @@ let toDecimal com (ctx: Context) r targetType (args: Expr list) : Expr =
     | Char ->
         Helper.InstanceCall(args.Head, "charCodeAt", Int32.Number, [ makeIntConst 0 ])
         |> makeDecimalFromExpr com r targetType
-    | String -> makeDecimalFromExpr com r targetType args.Head
+    // FSharp.Core's decimal parses with NumberStyles.Float
+    | String ->
+        let style = int System.Globalization.NumberStyles.Float
+        Helper.LibCall(com, "Decimal", "parse", targetType, [ args.Head; makeIntConst style ], ?loc = r)
     | Number(kind, _) ->
         match kind with
         | Decimal -> args.Head
@@ -359,11 +369,12 @@ let toLong com (ctx: Context) r targetType (args: Expr list) : Expr =
 
 let emitIntCast toKind arg =
     match toKind with
-    | Int8 -> emitExpr None Int8.Number [ arg ] "($0 + 0x80 & 0xFF) - 0x80"
-    | Int16 -> emitExpr None Int16.Number [ arg ] "($0 + 0x8000 & 0xFFFF) - 0x8000"
+    // `~~` truncates toward zero before the wrap, so negative fractions round like .NET
+    | Int8 -> emitExpr None Int8.Number [ arg ] "(~~$0 + 0x80 & 0xFF) - 0x80"
+    | Int16 -> emitExpr None Int16.Number [ arg ] "(~~$0 + 0x8000 & 0xFFFF) - 0x8000"
     | Int32 -> fastIntFloor arg
-    | UInt8 -> emitExpr None UInt8.Number [ arg ] "$0 & 0xFF"
-    | UInt16 -> emitExpr None UInt16.Number [ arg ] "$0 & 0xFFFF"
+    | UInt8 -> emitExpr None UInt8.Number [ arg ] "~~$0 & 0xFF"
+    | UInt16 -> emitExpr None UInt16.Number [ arg ] "~~$0 & 0xFFFF"
     | UInt32 -> emitExpr None UInt32.Number [ arg ] "$0 >>> 0"
     | _ -> FableError $"Unexpected non-integer type %A{toKind}" |> raise
 
@@ -1705,6 +1716,10 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     | ("ToSByte" | "ToByte" | "ToInt8" | "ToUInt8" | "ToInt16" | "ToUInt16" | "ToInt" | "ToUInt" | "ToInt32" | "ToUInt32"),
       _ -> toInt com ctx r t args |> Some
     | ("ToInt64" | "ToUInt64" | "ToIntPtr" | "ToUIntPtr"), _ -> toLong com ctx r t args |> Some
+    // Unlike Double.Parse, FSharp.Core's float and float32 remove underscores
+    | ("ToSingle" | "ToDouble"), [ ExprType String as str ] ->
+        Helper.LibCall(com, "Double", "parseIgnoringUnderscores", t, [ str ], ?loc = r)
+        |> Some
     | ("ToSingle" | "ToDouble"), _ -> toFloat com ctx r t args |> Some
     | "ToDecimal", _ -> toDecimal com ctx r t args |> Some
     | "ToChar", _ -> toChar com ctx r args.Head |> Some
@@ -1746,9 +1761,11 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
       _ -> fsFormat com ctx r t i thisArg args
     // Failure matches System.Exception itself, not the exceptions derived from it
     | "FailurePattern", [ exn ] -> Helper.LibCall(com, "Util", "failurePattern", t, [ exn ], ?loc = r) |> Some
-    | ("Failure" | "FailurePattern" | "InvalidArg" | "InvalidOp" | "LazyPattern" | "Lock" | "NullArg" | "Using"), _ ->
+    | ("Failure" | "FailurePattern" | "LazyPattern" | "Lock" | "NullArg" | "Using"), _ ->
         fsharpModule com ctx r t i thisArg args
-    | ("IsNull" | "IsNotNull" | "IsNullV" | "NonNull" | "NonNullV" | "NullMatchPattern" | "NullValueMatchPattern" | "NonNullQuickPattern" | "NonNullQuickValuePattern" | "WithNull" | "WithNullV" | "NullV" | "NullArgCheck"),
+    // Thrown at the call site so V8 sees a non-returning branch rather than a call
+    | ("InvalidArg" | "InvalidOp"), _ -> fsharpModule com ctx r t i thisArg args |> Option.map (makeThrow r t)
+    | ("IsNullV" | "NonNull" | "NonNullV" | "NullMatchPattern" | "NullValueMatchPattern" | "NonNullQuickPattern" | "NonNullQuickValuePattern" | "WithNull" | "WithNullV" | "NullV" | "NullArgCheck"),
       _ -> fsharpModule com ctx r t i thisArg args
     // Exceptions
     | "FailWith", [ msg ] -> makeThrow r t (error com msg) |> Some
@@ -1880,6 +1897,7 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     | (Operators.inequality | "Neq"), [ left; right ] -> equals com ctx r false left right |> Some
     | (Operators.equality | "Eq"), [ left; right ] -> equals com ctx r true left right |> Some
     | "IsNull", [ arg ] -> nullCheck r true arg |> Some
+    | "IsNotNull", [ arg ] -> nullCheck r false arg |> Some
     | "Hash", [ arg ] -> structuralHash com r arg |> Some
     // Comparison
     | "Compare", [ left; right ] -> compare com ctx r left right |> Some
@@ -2359,6 +2377,28 @@ let copyToArray (com: ICompiler) r t (i: CallInfo) args =
     Helper.LibCall(com, "Util", "copyToArray", t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
     |> Some
 
+let binarySearch (com: ICompiler) ctx r t rangeMeth (ar: Expr) args =
+    let call meth args comparer =
+        let comparer =
+            match comparer with
+            // .NET uses the default comparer when the comparer is null. The null literal
+            // gets here as Util.defaultOf() unless its type is nullable (see defaultof)
+            | None
+            | Some NullConst
+            | Some(MaybeCasted(Call(Import({ Selector = "defaultOf" }, _, _), _, _, _))) ->
+                makeComparer com ctx (getElementType ar.Type)
+            | Some comparer -> comparer
+
+        Helper.LibCall(com, "Array", meth, t, ar :: args @ [ comparer ], ?loc = r)
+        |> Some
+
+    match args with
+    | [ value ] -> call "binarySearch" [ value ] None
+    | [ value; comparer ] -> call "binarySearch" [ value ] (Some comparer)
+    | [ index; length; value ] -> call rangeMeth [ index; length; value ] None
+    | [ index; length; value; comparer ] -> call rangeMeth [ index; length; value ] (Some comparer)
+    | _ -> None
+
 let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
     | ".ctor", _, [] -> makeResizeArray (getElementType t) [] |> Some
@@ -2437,6 +2477,7 @@ let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (this
     | "IndexOf", Some ar, args ->
         let args = injectIndexOfArgs com ctx r i.GenericArgs (ar :: args)
         Helper.LibCall(com, "Array", "indexOf", t, args, ?loc = r) |> Some
+    | "BinarySearch", Some ar, args -> binarySearch com ctx r t "binarySearchRangeCount" ar args
     | "Insert", Some ar, [ idx; arg ] ->
         Helper.InstanceCall(ar, "splice", t, [ idx; makeIntConst 0; arg ], ?loc = r)
         |> Some
@@ -2516,14 +2557,26 @@ let tuples (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: E
     | "ToTuple", _ -> changeKind false args
     | _ -> None
 
+let arrayCopy (com: ICompiler) (ctx: Context) r t source sourceIndex target targetIndex count =
+    let toInt32 (arg: Expr) =
+        match arg.Type with
+        | Number(Int32, _) -> arg
+        | _ -> toInt com ctx r Int32.Number [ arg ]
+
+    let args =
+        [ source; toInt32 sourceIndex; target; toInt32 targetIndex; toInt32 count ]
+
+    Helper.LibCall(com, "Array", "copyTo", t, args, ?loc = r) |> Some
+
 let arrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
     | "get_Length", Some arg, _ -> getFieldWith r t arg "length" |> Some
     | "get_Item", Some arg, [ idx ] -> getExpr r t arg idx |> Some
     | "set_Item", Some arg, [ idx; value ] -> setExpr r arg idx value |> Some
-    | "Copy", None, [ _source; _sourceIndex; _target; _targetIndex; _count ] -> copyToArray com r t i args
+    | "Copy", None, [ source; sourceIndex; target; targetIndex; count ] ->
+        arrayCopy com ctx r t source sourceIndex target targetIndex count
     | "Copy", None, [ source; target; count ] ->
-        copyToArray com r t i [ source; makeIntConst 0; target; makeIntConst 0; count ]
+        arrayCopy com ctx r t source (makeIntConst 0) target (makeIntConst 0) count
     | "ConvertAll", None, [ source; mapping ] ->
         Helper.LibCall(com, "Array", "map", t, [ mapping; source ], ?loc = r) |> Some
     | "IndexOf", None, args ->
@@ -2531,6 +2584,7 @@ let arrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: E
 
         Helper.LibCall(com, "Array", "indexOf", t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
         |> Some
+    | "BinarySearch", None, ar :: args -> binarySearch com ctx r t "binarySearchRange" ar args
     | "GetEnumerator", Some arg, _ -> getEnumerator com r t arg |> Some
     | "Resize", None, args ->
         let args =
@@ -2551,7 +2605,7 @@ let arrayModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Ex
 
     let createArray size value =
         match t, value with
-        | Array(Number _ as t2, _), None when com.Options.TypedArrays -> newArrayAlloc size t2
+        | Array(TypedArrayCompatible com MutableArray _ as t2, _), None -> newArrayAlloc size t2
         | Array(t2, _), value ->
             let value = value |> Option.defaultWith (fun () -> getZero com ctx t2)
             // If we don't fill the array some operations may behave unexpectedly, like Array.prototype.reduce
@@ -2743,6 +2797,35 @@ let nullables (com: ICompiler) (_: Context) r (t: Type) (i: CallInfo) (thisArg: 
     | "get_HasValue", Some c -> Test(c, OptionTest true, r) |> Some
     | _ -> None
 
+let nullableModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Expr option) (args: Expr list) =
+    let convert (targetType: Type) (value: Expr) =
+        match targetType with
+        | Char -> toChar com ctx r value
+        | Number(BigIntegers _, _) -> toLong com ctx r targetType [ value ]
+        | Number(Integers _, _) -> toInt com ctx r targetType [ value ]
+        | Number(Floats _, _) -> toFloat com ctx r targetType [ value ]
+        | Number(Decimal, _) -> toDecimal com ctx r targetType [ value ]
+        | _ -> TypeCast(value, targetType)
+
+    match i.CompiledName.Replace("$W", ""), List.tryLast args, t with
+    | ("ToByte" | "ToUInt8" | "ToSByte" | "ToInt8" | "ToInt16" | "ToUInt16" | "ToInt" | "ToInt32" | "ToUInt" | "ToUInt32" | "ToInt64" | "ToUInt64" | "ToIntPtr" | "ToUIntPtr" | "ToSingle" | "ToFloat32" | "ToDouble" | "ToFloat" | "ToDecimal" | "ToChar" | "ToEnum"),
+      Some value,
+      Nullable(targetType, _) ->
+        match value with
+        | Value(Null _, _) -> Value(Null t, None) |> Some
+        | Value((NumberConstant _ | CharConstant _), _) -> convert targetType value |> Some
+        | _ ->
+            let sourceType =
+                match value.Type with
+                | Nullable(sourceType, _) -> sourceType
+                | sourceType -> sourceType
+
+            let v = makeUniqueIdent com ctx sourceType "v"
+            let mapping = Delegate([ v ], convert targetType (IdentExpr v), None, Tags.empty)
+
+            Helper.LibCall(com, "Option", "map", t, [ mapping; value ], ?loc = r) |> Some
+    | _ -> None
+
 // See fable-library-ts/Option.ts for more info on how options behave in Fable runtime
 let options isStruct (com: ICompiler) (_: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg with
@@ -2896,7 +2979,7 @@ let numericStringFormat (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisA
 
 
 let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
-    let parseCall meth str args style =
+    let parseCall meth str args (style: Expr) =
         let kind =
             match i.DeclaringEntityFullName with
             | Patterns.DicContains FSharp2Fable.TypeHelpers.numberTypes kind -> kind
@@ -2911,13 +2994,10 @@ let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
                 []
 
         let args =
-            if kind = Decimal then
-                [ str; makeIntConst style ] @ outValue
-            elif isFloatOrDecimal then
-                [ str ] @ outValue
+            if isFloatOrDecimal then
+                [ str; style ] @ outValue
             else
-                [ str; makeIntConst style; makeBoolConst unsigned; makeIntConst bitsize ]
-                @ outValue
+                [ str; style; makeBoolConst unsigned; makeIntConst bitsize ] @ outValue
 
         let callExpr =
             Helper.LibCall(com, numberModule, Naming.lowerFirst meth, t, args, ?loc = r)
@@ -2925,6 +3005,36 @@ let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
         match t with
         | Number(BigIntegers _, _) -> wrapLong com ctx r t callExpr
         | _ -> callExpr
+
+    let isFloatOrDecimalType =
+        match i.DeclaringEntityFullName with
+        | Types.decimal
+        | Types.float32
+        | Types.float64 -> true
+        | _ -> false
+
+    let supportedFloatStyles =
+        int (
+            System.Globalization.NumberStyles.Any
+            &&& ~~~System.Globalization.NumberStyles.AllowCurrencySymbol
+        )
+
+    let checkFormatProvider meth hasStyle =
+        let acceptedArgs =
+            (if meth = "Parse" then
+                 1
+             else
+                 2)
+            + (if hasStyle then
+                   1
+               else
+                   0)
+
+        match List.tryItem acceptedArgs args with
+        // InvariantCulture asks for exactly what Fable does, so there is nothing to report.
+        | None
+        | Some InvariantCulture -> ()
+        | Some _ -> WarningCodes.formatProviderIgnored |> addWarningWithCode com ctx.InlinePath r
 
     let isFloat =
         match i.SignatureArgTypes with
@@ -2958,55 +3068,34 @@ let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
         Helper.LibCall(com, "Double", "isInfinity", t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
     | ("Min" | "Max" | "MinMagnitude" | "MaxMagnitude" | "Clamp"), _ -> operators com ctx r t i thisArg args
-    | ("Parse" | "TryParse") as meth, str :: NumberConst(NumberValue.Int32 style, _) :: _ ->
-        let hexConst = int System.Globalization.NumberStyles.HexNumber
-        let intConst = int System.Globalization.NumberStyles.Integer
-
-        if
-            style <> hexConst
-            && style <> intConst
-            && i.DeclaringEntityFullName <> Types.decimal
-        then
+    | ("Parse" | "TryParse") as meth, str :: (ExprType(Number(Int32, _)) as style) :: _ ->
+        match style with
+        | NumberConst(NumberValue.Int32 style, _) when
+            (if isFloatOrDecimalType then
+                 style &&& ~~~supportedFloatStyles <> 0
+             else
+                 style <> int System.Globalization.NumberStyles.HexNumber
+                 && style <> int System.Globalization.NumberStyles.Integer)
+            ->
             WarningCodes.numberStylesIgnored style
             |> addWarningWithCode com ctx.InlinePath r
+        | _ -> ()
 
-        let acceptedArgs =
-            if meth = "Parse" then
-                2
-            else
-                3
-
-        match List.tryItem acceptedArgs args with
-        // InvariantCulture asks for exactly what Fable does, so there is nothing to report.
-        | None
-        | Some InvariantCulture -> ()
-        | Some _ ->
-            // e.g. Double.Parse(string, style, IFormatProvider) etc.
-            WarningCodes.formatProviderIgnored |> addWarningWithCode com ctx.InlinePath r
-
+        checkFormatProvider meth true
         parseCall meth str args style |> Some
     | ("Parse" | "TryParse") as meth, str :: _ ->
-        let acceptedArgs =
-            if meth = "Parse" then
-                1
-            else
-                2
-
-        match List.tryItem acceptedArgs args with
-        // InvariantCulture asks for exactly what Fable does, so there is nothing to report.
-        | None
-        | Some InvariantCulture -> ()
-        | Some _ ->
-            // e.g. Double.Parse(string, IFormatProvider) etc.
-            WarningCodes.formatProviderIgnored |> addWarningWithCode com ctx.InlinePath r
+        checkFormatProvider meth false
 
         let style =
-            if i.DeclaringEntityFullName = Types.decimal then
-                int System.Globalization.NumberStyles.Number
-            else
-                int System.Globalization.NumberStyles.Any
+            match i.DeclaringEntityFullName with
+            | Types.decimal -> System.Globalization.NumberStyles.Number
+            | Types.float32
+            | Types.float64 ->
+                System.Globalization.NumberStyles.Float
+                ||| System.Globalization.NumberStyles.AllowThousands
+            | _ -> System.Globalization.NumberStyles.Any
 
-        parseCall meth str args style |> Some
+        parseCall meth str args (makeIntConst (int style)) |> Some
     | "Pow", _ ->
         Helper.GlobalCall("Math", t, args, i.SignatureArgTypes, memb = "pow", ?loc = r)
         |> Some
@@ -3192,7 +3281,9 @@ let intrinsicFunctions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisAr
         |> withTag "downcast"
         |> Some
     | "MakeDecimal", _, _ -> decimals com ctx r t i thisArg args
-    | "GetString", _, [ ar; idx ] -> getExpr r t ar idx |> Some
+    | "GetString", _, [ str; idx ] ->
+        Helper.LibCall(com, "String", "getCharAtIndex", t, [ str; idx ], i.SignatureArgTypes, ?loc = r)
+        |> Some
     | "GetArray", _, [ ar; idx ] -> arrayGetItem com r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
     | "SetArray", _, [ ar; idx; value ] -> setExpr r ar idx value |> Some
     | ("GetArraySlice" | "GetStringSlice"), None, [ ar; lower; upper ] ->
@@ -3552,7 +3643,11 @@ let convert (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (
     | "ToUInt64" -> round com args |> toLong com ctx r t |> Some
     | "ToSingle"
     | "ToDouble" -> toFloat com ctx r t args |> Some
-    | "ToDecimal" -> toDecimal com ctx r t args |> Some
+    | "ToDecimal" ->
+        match args with
+        // Convert.ToDecimal(string) parses with Decimal.Parse's default style
+        | ExprType String :: _ -> Helper.LibCall(com, "Decimal", "parse", t, [ args.Head ], ?loc = r) |> Some
+        | _ -> toDecimal com ctx r t args |> Some
     | "ToChar" -> toChar com ctx r args.Head |> Some
     | "ToString" -> toString com ctx r args |> Some
     | "ToBase64String"
@@ -4248,6 +4343,18 @@ let activator (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
 let regex com (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     let propInt p callee = getExpr r t callee (makeIntConst p)
     let propStr p callee = getExpr r t callee (makeStrConst p)
+
+    checkRegexOptions
+        com
+        ctx
+        r
+        (RegexOption.IgnoreCase
+         ||| RegexOption.Multiline
+         ||| RegexOption.Compiled
+         ||| RegexOption.Singleline
+         ||| RegexOption.ECMAScript
+         ||| RegexOption.NonBacktracking)
+        args
 
     let isGroup =
         match thisArg with
@@ -5039,6 +5146,7 @@ let private replacedModules =
             "System.Math", operators
             "System.MathF", operators
             "Microsoft.FSharp.Core.Operators", operators
+            "Microsoft.FSharp.Linq.NullableModule", nullableModule
             "Microsoft.FSharp.Core.Operators.Checked", operators
             "Microsoft.FSharp.Core.Operators.Unchecked", unchecked
             "Microsoft.FSharp.Core.Operators.OperatorIntrinsics", intrinsicFunctions

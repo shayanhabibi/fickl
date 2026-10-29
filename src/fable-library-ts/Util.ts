@@ -382,8 +382,39 @@ export function toEnumerable<T>(e: IEnumerable<T> | Iterable<T>): IEnumerable<T>
   else { return new Enumerable(new Enumerator(e[Symbol.iterator]())); }
 }
 
+// Walks an array by index: the iterator protocol allocates a result object per element
+export class ArrayEnumerator<T> implements IEnumerator<T> {
+  private readonly array: ArrayLike<T>;
+  private current: T = defaultOf();
+  private index = -1;
+  constructor(array: ArrayLike<T>) { this.array = array; }
+  public ["System.Collections.Generic.IEnumerator`1.get_Current"]() {
+    return this.current;
+  }
+  public ["System.Collections.IEnumerator.get_Current"]() {
+    return this.current;
+  }
+  public ["System.Collections.IEnumerator.MoveNext"]() {
+    const i = ++this.index;
+    if (i < this.array.length) {
+      this.current = this.array[i];
+      return true;
+    }
+    this.current = defaultOf();
+    return false;
+  }
+  public ["System.Collections.IEnumerator.Reset"]() {
+    this.index = -1;
+    this.current = defaultOf();
+  }
+  public Dispose() {
+    return;
+  }
+}
+
 export function getEnumerator<T>(e: IEnumerable<T> | Iterable<T>): IEnumerator<T> {
   if (isEnumerable(e)) { return e.GetEnumerator(); }
+  else if (Array.isArray(e)) { return new ArrayEnumerator(e); }
   else { return new Enumerator(e[Symbol.iterator]()); }
 }
 
@@ -605,13 +636,11 @@ export function dateHash(x: Date): number {
 }
 
 export function arrayHash<T>(x: ArrayLike<T>): number {
-  const len = x.length;
-  let hash = 0;
-  for (let i = 0; i < len; i++) {
-    const elementHash = structuralHash(x[i]);
-    hash = ((hash << 5) + hash) ^ elementHash;
+  let h = 0;
+  for (let i = 0; i < x.length; i++) {
+    h = combineHashCode(h, structuralHash(x[i]));
   }
-  return hash;
+  return h;
 }
 
 export function structuralHash<T>(x: T): number {
@@ -915,28 +944,34 @@ export function clear<T>(col: Iterable<T>): void {
   }
 }
 
-const curried = new WeakMap<object, object>();
+// The original curried function rides on its adapter so curryN can hand it back
+const curriedKey = Symbol("curried");
+type CurriedAdapter = { [curriedKey]?: object };
+
+function getCurried(f: object | null | undefined): object | undefined {
+  return f == null ? undefined : (f as CurriedAdapter)[curriedKey];
+}
 
 export function uncurry2<T1, T2, TResult>(f: (a1: T1) => (a2: T2) => TResult) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2) => TResult }
   const f2 = (a1: T1, a2: T2) => f(a1)(a2);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry2<T1, T2, TResult>(f: (a1: T1, a2: T2) => TResult) {
-  return curried.get(f) as ((a1: T1) => (a2: T2) => TResult) ?? ((a1: T1) => (a2: T2) => f(a1, a2));
+  return getCurried(f) as ((a1: T1) => (a2: T2) => TResult) ?? ((a1: T1) => (a2: T2) => f(a1, a2));
 }
 
 export function uncurry3<T1, T2, T3, TResult>(f: (a1: T1) => (a2: T2) => (a3: T3) => TResult) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3) => f(a1)(a2)(a3);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry3<T1, T2, T3, TResult>(f: (a1: T1, a2: T2, a3: T3) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => f(a1, a2, a3));
 }
 
@@ -945,12 +980,12 @@ export function uncurry4<T1, T2, T3, T4, TResult>(
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4) => f(a1)(a2)(a3)(a4);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry4<T1, T2, T3, T4, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => f(a1, a2, a3, a4));
 }
 
@@ -959,12 +994,12 @@ export function uncurry5<T1, T2, T3, T4, T5, TResult>(
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5) => f(a1)(a2)(a3)(a4)(a5);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry5<T1, T2, T3, T4, T5, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => f(a1, a2, a3, a4, a5));
 }
 
@@ -973,12 +1008,12 @@ export function uncurry6<T1, T2, T3, T4, T5, T6, TResult>(
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6) => f(a1)(a2)(a3)(a4)(a5)(a6);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry6<T1, T2, T3, T4, T5, T6, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => f(a1, a2, a3, a4, a5, a6));
 }
 
@@ -987,12 +1022,12 @@ export function uncurry7<T1, T2, T3, T4, T5, T6, T7, TResult>(
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry7<T1, T2, T3, T4, T5, T6, T7, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => f(a1, a2, a3, a4, a5, a6, a7));
 }
 
@@ -1001,12 +1036,12 @@ export function uncurry8<T1, T2, T3, T4, T5, T6, T7, T8, TResult>(
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry8<T1, T2, T3, T4, T5, T6, T7, T8, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => f(a1, a2, a3, a4, a5, a6, a7, a8));
 }
 
@@ -1015,12 +1050,12 @@ export function uncurry9<T1, T2, T3, T4, T5, T6, T7, T8, T9, TResult>(
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry9<T1, T2, T3, T4, T5, T6, T7, T8, T9, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9));
 }
 
@@ -1029,12 +1064,12 @@ export function uncurry10<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TResult>(
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry10<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10));
 }
 
@@ -1043,12 +1078,12 @@ export function uncurry11<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TResult>
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry11<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11));
 }
 
@@ -1057,12 +1092,12 @@ export function uncurry12<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TRe
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11)(a12);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry12<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12));
 }
 
@@ -1071,12 +1106,12 @@ export function uncurry13<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11)(a12)(a13);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry13<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13));
 }
 
@@ -1085,12 +1120,12 @@ export function uncurry14<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11)(a12)(a13)(a14);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry14<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14));
 }
 
@@ -1099,12 +1134,12 @@ export function uncurry15<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11)(a12)(a13)(a14)(a15);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry15<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15));
 }
 
@@ -1113,12 +1148,12 @@ export function uncurry16<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11)(a12)(a13)(a14)(a15)(a16);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry16<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16));
 }
 
@@ -1127,12 +1162,12 @@ export function uncurry17<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11)(a12)(a13)(a14)(a15)(a16)(a17);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry17<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17));
 }
 
@@ -1141,12 +1176,12 @@ export function uncurry18<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17, a18: T18) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17, a18: T18) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11)(a12)(a13)(a14)(a15)(a16)(a17)(a18);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry18<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17, a18: T18) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18));
 }
 
@@ -1155,12 +1190,12 @@ export function uncurry19<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17, a18: T18, a19: T19) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17, a18: T18, a19: T19) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11)(a12)(a13)(a14)(a15)(a16)(a17)(a18)(a19);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry19<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17, a18: T18, a19: T19) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => (a19: T19) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => (a19: T19) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => (a19: T19) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19));
 }
 
@@ -1169,12 +1204,12 @@ export function uncurry20<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
 ) {
   if (f == null) { return null as unknown as (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17, a18: T18, a19: T19, a20: T20) => TResult }
   const f2 = (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17, a18: T18, a19: T19, a20: T20) => f(a1)(a2)(a3)(a4)(a5)(a6)(a7)(a8)(a9)(a10)(a11)(a12)(a13)(a14)(a15)(a16)(a17)(a18)(a19)(a20);
-  curried.set(f2, f);
+  (f2 as CurriedAdapter)[curriedKey] = f;
   return f2;
 }
 
 export function curry20<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, TResult>(f: (a1: T1, a2: T2, a3: T3, a4: T4, a5: T5, a6: T6, a7: T7, a8: T8, a9: T9, a10: T10, a11: T11, a12: T12, a13: T13, a14: T14, a15: T15, a16: T16, a17: T17, a18: T18, a19: T19, a20: T20) => TResult) {
-  return curried.get(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => (a19: T19) => (a20: T20) => TResult
+  return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => (a19: T19) => (a20: T20) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => (a19: T19) => (a20: T20) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20));
 }
 

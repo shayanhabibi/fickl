@@ -14,6 +14,10 @@ open Fable.Core
 
 [<Emit("$1.constructor.name == $0")>]
 let jsConstructorIs (s: string) (ar: 'T[]) = true
+
+/// Expected JS constructor name of a numeric array, depending on the --typedArrays option
+let typedArrayOr (typedArrayName: string) =
+    if Compiler.typedArrays then typedArrayName else "Array"
 #endif
 
 type ExceptFoo = { Bar:string }
@@ -100,6 +104,67 @@ let tests =
         let xs = [| "1"; "2"; "3"; |] |> Array.map int
         xs |> jsConstructorIs "Int32Array" |> equal true
         xs |> Array.sum |> equal 6
+#endif
+
+#if FABLE_COMPILER
+    testCase "Numeric array literals respect --typedArrays" <| fun () ->
+        [| 1y |] |> jsConstructorIs (typedArrayOr "Int8Array") |> equal true
+        [| 1uy |] |> jsConstructorIs (typedArrayOr "Uint8Array") |> equal true
+        [| 1s |] |> jsConstructorIs (typedArrayOr "Int16Array") |> equal true
+        [| 1us |] |> jsConstructorIs (typedArrayOr "Uint16Array") |> equal true
+        [| 1 |] |> jsConstructorIs (typedArrayOr "Int32Array") |> equal true
+        [| 1u |] |> jsConstructorIs (typedArrayOr "Uint32Array") |> equal true
+        [| 1L |] |> jsConstructorIs (typedArrayOr "BigInt64Array") |> equal true
+        [| 1UL |] |> jsConstructorIs (typedArrayOr "BigUint64Array") |> equal true
+        [| 1.f |] |> jsConstructorIs (typedArrayOr "Float32Array") |> equal true
+        [| 1. |] |> jsConstructorIs (typedArrayOr "Float64Array") |> equal true
+        [| 1M |] |> jsConstructorIs "Array" |> equal true
+        [| 1I |] |> jsConstructorIs "Array" |> equal true
+        [| 'a' |] |> jsConstructorIs "Array" |> equal true
+
+    testCase "Array.zeroCreate respects --typedArrays" <| fun () ->
+        Array.zeroCreate<int8> 2 |> jsConstructorIs (typedArrayOr "Int8Array") |> equal true
+        Array.zeroCreate<uint8> 2 |> jsConstructorIs (typedArrayOr "Uint8Array") |> equal true
+        Array.zeroCreate<int16> 2 |> jsConstructorIs (typedArrayOr "Int16Array") |> equal true
+        Array.zeroCreate<uint16> 2 |> jsConstructorIs (typedArrayOr "Uint16Array") |> equal true
+        Array.zeroCreate<int> 2 |> jsConstructorIs (typedArrayOr "Int32Array") |> equal true
+        Array.zeroCreate<uint32> 2 |> jsConstructorIs (typedArrayOr "Uint32Array") |> equal true
+        Array.zeroCreate<int64> 2 |> jsConstructorIs (typedArrayOr "BigInt64Array") |> equal true
+        Array.zeroCreate<uint64> 2 |> jsConstructorIs (typedArrayOr "BigUint64Array") |> equal true
+        Array.zeroCreate<float32> 2 |> jsConstructorIs (typedArrayOr "Float32Array") |> equal true
+        Array.zeroCreate<float> 2 |> jsConstructorIs (typedArrayOr "Float64Array") |> equal true
+        Array.zeroCreate<decimal> 2 |> jsConstructorIs "Array" |> equal true
+        Array.zeroCreate<int64> 2 |> equal [| 0L; 0L |]
+        Array.zeroCreate<float> 2 |> equal [| 0.; 0. |]
+        Array.zeroCreate<decimal> 2 |> equal [| 0M; 0M |]
+
+    testCase "Array module functions respect --typedArrays" <| fun () ->
+        let xs = Array.init 3 int8
+        xs |> jsConstructorIs (typedArrayOr "Int8Array") |> equal true
+        xs |> equal [| 0y; 1y; 2y |]
+        let xs = Array.create 2 7us
+        xs |> jsConstructorIs (typedArrayOr "Uint16Array") |> equal true
+        xs |> equal [| 7us; 7us |]
+        let xs = Array.ofSeq (seq { 1L; 2L })
+        xs |> jsConstructorIs (typedArrayOr "BigInt64Array") |> equal true
+        xs |> Array.sum |> equal 3L
+        let xs = Array.ofSeq (seq { 1UL; 2UL })
+        xs |> jsConstructorIs (typedArrayOr "BigUint64Array") |> equal true
+        xs |> Array.sum |> equal 3UL
+        let xs = [| 1; 2 |] |> Array.map float32
+        xs |> jsConstructorIs (typedArrayOr "Float32Array") |> equal true
+        xs |> equal [| 1.f; 2.f |]
+        let xs = [| 1.5; 2.5 |] |> Array.map string
+        xs |> jsConstructorIs "Array" |> equal true
+        xs |> equal [| "1.5"; "2.5" |]
+
+    testCase "Byte arrays respect --typedArrays" <| fun () ->
+        let xs = System.Text.Encoding.UTF8.GetBytes("ab")
+        xs |> jsConstructorIs (typedArrayOr "Uint8Array") |> equal true
+        xs |> equal [| 97uy; 98uy |]
+        let xs = System.BitConverter.GetBytes(1s)
+        xs |> jsConstructorIs (typedArrayOr "Uint8Array") |> equal true
+        xs |> equal [| 1uy; 0uy |]
 #endif
 
     testCase "Mapping from values to functions works" <| fun () ->
@@ -205,6 +270,15 @@ let tests =
         // Check empty array
         let b = [| |]
         throwsAnyError (fun () -> b.[0])
+
+    testCase "Array getter returns None for an in-bounds option element" <| fun () ->
+        let xs = [| Some 1; None; Some 3 |]
+        Array.get xs 1 |> equal None
+        xs[1] |> equal None
+        xs.[1] |> equal None
+        Array.item 1 xs |> equal None
+        xs[2] |> equal (Some 3)
+        throwsAnyError (fun () -> xs[3])
 
     testCase "Array setter works" <| fun () ->
         let x = [| 1.; 2.; 3.; 4.; 5. |]
@@ -378,6 +452,14 @@ let tests =
         let ys = Array.zeroCreate 20
         Array.blit xs 3 ys 5 4
         ys.[5] + ys.[6] + ys.[7] + ys.[8] |> equal "defg"
+
+    testCase "Array.blit works with overlapping ranges in the same array" <| fun () ->
+        let xs = [| "a"; "b"; "c"; "d"; "e" |]
+        Array.blit xs 0 xs 1 3
+        xs |> equal [| "a"; "a"; "b"; "c"; "e" |]
+        let ys = [| "a"; "b"; "c"; "d"; "e" |]
+        Array.blit ys 1 ys 0 3
+        ys |> equal [| "b"; "c"; "d"; "d"; "e" |]
 
 #if FABLE_COMPILER
     testCase "Array.blit works with deceiving typed arrays" <| fun () ->
@@ -594,6 +676,133 @@ let tests =
         System.Array.IndexOf(myArray, Dog 3) |> equal 1
         System.Array.IndexOf(myArray, Dog 3, 0, 1) |> equal -1
         System.Array.IndexOf(myArray, Duck 5, 1) |> equal -1
+
+    testCase "System.Array.BinarySearch works" <| fun () ->
+        let xs = [|1; 3; 5; 7; 9|]
+        System.Array.BinarySearch(xs, 0) |> equal -1
+        System.Array.BinarySearch(xs, 1) |> equal 0
+        System.Array.BinarySearch(xs, 2) |> equal -2
+        System.Array.BinarySearch(xs, 7) |> equal 3
+        System.Array.BinarySearch(xs, 8) |> equal -5
+        System.Array.BinarySearch(xs, 10) |> equal -6
+        System.Array.BinarySearch(([||]: int[]), 3) |> equal -1
+
+    testCase "System.Array.BinarySearch works with duplicates" <| fun () ->
+        System.Array.BinarySearch([|2; 2; 2; 2; 2; 2; 2; 2|], 2) |> equal 3
+        System.Array.BinarySearch([|1; 2; 2; 2; 2; 3; 4; 5; 6|], 2) |> equal 4
+
+    testCase "System.Array.BinarySearch works with a range" <| fun () ->
+        let xs = [|1; 3; 5; 7; 9|]
+        System.Array.BinarySearch(xs, 1, 3, 7) |> equal 3
+        System.Array.BinarySearch(xs, 1, 3, 2) |> equal -2
+        System.Array.BinarySearch(xs, 1, 3, 9) |> equal -5
+        System.Array.BinarySearch(xs, 1, 2, 9) |> equal -4
+        System.Array.BinarySearch(xs, 2, 0, 5) |> equal -3
+        System.Array.BinarySearch(xs, 5, 0, 5) |> equal -6
+
+    testCase "System.Array.BinarySearch works with a comparer" <| fun () ->
+        let desc = ComparisonIdentity.FromFunction(fun (a: int) b -> compare b a)
+        let ys = [|9; 7; 5; 3; 1|]
+        System.Array.BinarySearch(ys, 3, desc) |> equal 3
+        System.Array.BinarySearch(ys, 4, desc) |> equal -4
+        System.Array.BinarySearch(ys, 1, 3, 3, desc) |> equal 3
+        System.Array.BinarySearch([|1; 3; 5; 7; 9|], 7, (null: IComparer<int>)) |> equal 3
+
+    testCase "System.Array.BinarySearch passes the array element to the comparer first" <| fun () ->
+        let xs = [|1; 3; 5; 7; 9|]
+        let calls = ResizeArray<int * int>()
+        let logging =
+            { new IComparer<int> with
+                member _.Compare(x, y) =
+                    calls.Add((x, y))
+                    compare x y }
+        System.Array.BinarySearch(xs, 9, logging) |> equal 4
+        List.ofSeq calls |> equal [(5, 9); (7, 9); (9, 9)]
+        calls.Clear()
+        System.Array.BinarySearch(xs, 4, logging) |> equal -3
+        List.ofSeq calls |> equal [(5, 4); (1, 4); (3, 4)]
+
+    testCase "System.Array.BinarySearch works with other element types" <| fun () ->
+        let strings = [|"apple"; "banana"; "cherry"|]
+        System.Array.BinarySearch(strings, "banana") |> equal 1
+        System.Array.BinarySearch(strings, "blue") |> equal -3
+        let floats = [|1.5; 2.5; 3.5|]
+        System.Array.BinarySearch(floats, 2.5) |> equal 1
+        System.Array.BinarySearch(floats, 3.0) |> equal -3
+        let longs = [|1L; 5L; 10L|]
+        System.Array.BinarySearch(longs, 10L) |> equal 2
+        System.Array.BinarySearch(longs, 6L) |> equal -3
+        let things = [|{ MainThing = 1; OtherThing = "x" }; { MainThing = 2; OtherThing = "a" }; { MainThing = 2; OtherThing = "b" }|]
+        System.Array.BinarySearch(things, { MainThing = 2; OtherThing = "b" }) |> equal 2
+        System.Array.BinarySearch(things, { MainThing = 1; OtherThing = "z" }) |> equal -2
+        let animals = [|Duck 1; Duck 4; Dog 0|]
+        System.Array.BinarySearch(animals, Dog 0) |> equal 2
+        System.Array.BinarySearch(animals, Duck 2) |> equal -2
+
+    testCase "System.Array.BinarySearch works with a range and a null comparer" <| fun () ->
+        let xs = [|1; 3; 5; 7; 9|]
+        System.Array.BinarySearch(xs, 1, 3, 7, null) |> equal 3
+        System.Array.BinarySearch(xs, 1, 3, 2, null) |> equal -2
+
+    testCase "System.Array.BinarySearch works with a single element and a large array" <| fun () ->
+        System.Array.BinarySearch([|5|], 5) |> equal 0
+        System.Array.BinarySearch([|5|], 3) |> equal -1
+        System.Array.BinarySearch([|5|], 7) |> equal -2
+        let big = Array.init 1000 (fun i -> i * 2)
+        System.Array.BinarySearch(big, 998) |> equal 499
+        System.Array.BinarySearch(big, 999) |> equal -501
+
+    testCase "System.Array.BinarySearch works with more element types" <| fun () ->
+        System.Array.BinarySearch([|1uy; 3uy; 5uy|], 3uy) |> equal 1
+        System.Array.BinarySearch([|1uy; 3uy; 5uy|], 4uy) |> equal -3
+        System.Array.BinarySearch([|-5s; 0s; 5s|], 0s) |> equal 1
+        System.Array.BinarySearch([|-5s; 0s; 5s|], -6s) |> equal -1
+        System.Array.BinarySearch([|'a'; 'c'; 'e'|], 'c') |> equal 1
+        System.Array.BinarySearch([|'a'; 'c'; 'e'|], 'd') |> equal -3
+        System.Array.BinarySearch([|(1, "a"); (1, "b"); (2, "a")|], (1, "b")) |> equal 1
+        System.Array.BinarySearch([|(1, "a"); (1, "b"); (2, "a")|], (1, "c")) |> equal -3
+        System.Array.BinarySearch([|1.5M; 2.5M; 3.5M|], 2.5M) |> equal 1
+        System.Array.BinarySearch([|1.5M; 2.5M; 3.5M|], 3.0M) |> equal -3
+        let dates = [|System.DateTime(2020, 1, 1); System.DateTime(2021, 1, 1)|]
+        System.Array.BinarySearch(dates, System.DateTime(2021, 1, 1)) |> equal 1
+        System.Array.BinarySearch(dates, System.DateTime(2020, 6, 1)) |> equal -2
+        System.Array.BinarySearch([|1I; 5I; 10I|], 5I) |> equal 1
+        System.Array.BinarySearch([|1I; 5I; 10I|], 11I) |> equal -4
+        System.Array.BinarySearch([|None; Some 1; Some 3|], Some 1) |> equal 1
+        System.Array.BinarySearch([|None; Some 1; Some 3|], Some 2) |> equal -3
+
+    testCase "System.Array.BinarySearch with a range passes the array element to the comparer first" <| fun () ->
+        let xs = [|1; 3; 5; 7; 9|]
+        let calls = ResizeArray<int * int>()
+        let logging =
+            { new System.Collections.Generic.IComparer<int> with
+                    member _.Compare(x, y) =
+                        calls.Add((x, y))
+                        compare x y }
+        System.Array.BinarySearch(xs, 1, 3, 4, logging) |> equal -3
+        List.ofSeq calls |> equal [(5, 4); (3, 4)]
+
+    testCase "System.Array.BinarySearch non-generic overloads work" <| fun () ->
+        let xs = [|1; 3; 5; 7; 9|]
+        System.Array.BinarySearch(xs :> System.Array, box 7) |> equal 3
+        System.Array.BinarySearch(xs :> System.Array, box 4) |> equal -3
+        System.Array.BinarySearch(xs :> System.Array, 1, 3, box 5) |> equal 2
+
+    testCase "System.Array.BinarySearch with a range checks its arguments" <| fun () ->
+        let xs = [|1; 3; 5; 7; 9|]
+        let raised (f: unit -> int) =
+            try
+                f () |> ignore
+                "none"
+            with
+            | :? System.ArgumentOutOfRangeException -> "ArgumentOutOfRangeException"
+            | :? System.ArgumentException -> "ArgumentException"
+            | _ -> "other"
+        raised (fun () -> System.Array.BinarySearch(xs, -1, 2, 5)) |> equal "ArgumentOutOfRangeException"
+        raised (fun () -> System.Array.BinarySearch(xs, -1, -1, 5)) |> equal "ArgumentOutOfRangeException"
+        raised (fun () -> System.Array.BinarySearch(xs, 1, -1, 5)) |> equal "ArgumentOutOfRangeException"
+        raised (fun () -> System.Array.BinarySearch(xs, 3, 3, 5)) |> equal "ArgumentException"
+        raised (fun () -> System.Array.BinarySearch(xs, 6, 0, 5)) |> equal "ArgumentException"
 
     testCase "Array.findIndex works" <| fun () ->
         let xs = [|1.f; 2.f; 3.f; 4.f|]
@@ -1232,6 +1441,14 @@ let tests =
         System.Array.Copy(source, 1, destination, 1, 2)
         equal [| "a"; "xx"; "xyz" |] destination
 
+    testCase "System.Array.Copy works with Int64 indexes and length" <| fun () ->
+        let source = [| "xy"; "xx"; "xyz" |]
+        let destination = [| "a"; "b"; "c"; "d" |]
+        System.Array.Copy(source, destination, 3L)
+        equal [| "xy"; "xx"; "xyz"; "d" |] destination
+        System.Array.Copy(source, 1L, destination, 2L, 2L)
+        equal [| "xy"; "xx"; "xx"; "xyz" |] destination
+
     testCase "Array.splitInto works" <| fun () ->
         [|1..10|] |> Array.splitInto 3 |> equal [| [|1..4|]; [|5..7|]; [|8..10|] |]
         [|1..11|] |> Array.splitInto 3 |> equal [| [|1..4|]; [|5..8|]; [|9..11|] |]
@@ -1611,5 +1828,74 @@ let tests =
         raisedExceptionType (fun () -> Array.randomChoiceBy (fun () -> 1.0) [|1; 2|]) |> equal "ArgumentOutOfRangeException"
         raisedExceptionType (fun () -> Array.randomChoicesBy (fun () -> 1.0) 2 [|1; 2|]) |> equal "ArgumentOutOfRangeException"
         raisedExceptionType (fun () -> Array.randomSampleBy (fun () -> -0.1) 1 [|1; 2|]) |> equal "ArgumentOutOfRangeException"
+
+    testCase "Array.sub raises FSharp.Core's exception types for out of range arguments" <| fun () ->
+        let xs = [|1; 2; 3|]
+        raisedExceptionType (fun () -> Array.sub xs -1 2) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.sub xs 1 -1) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.sub xs 2 5) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> Array.sub xs 4 0) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> Array.sub [|"a"; "b"; "c"|] 3 1) |> equal "ArgumentOutOfRangeException"
+        Array.sub xs 3 0 |> equal [||]
+
+    testCase "Array.fill raises FSharp.Core's exception types for out of range arguments" <| fun () ->
+        let xs = [|1; 2; 3|]
+        raisedExceptionType (fun () -> Array.fill xs -1 2 0) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.fill xs 0 -1 0) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.fill xs 3 1 0) |> equal "IndexOutOfRangeException"
+        raisedExceptionType (fun () -> Array.fill [|"a"; "b"; "c"|] 2 5 "z") |> equal "IndexOutOfRangeException"
+        xs |> equal [|1; 2; 3|]
+        Array.fill xs 4 0 0
+        xs |> equal [|1; 2; 3|]
+
+    testCase "Array.blit raises System.Array.Copy's exception types for out of range arguments" <| fun () ->
+        let xs = [|1; 2; 3|]
+        let ys: int[] = Array.zeroCreate 5
+        raisedExceptionType (fun () -> Array.blit xs 0 ys 0 -1) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> Array.blit xs -1 ys 0 2) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> Array.blit xs 0 ys -1 2) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> Array.blit xs 2 ys 0 2) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.blit xs 0 ys 4 2) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.blit xs 4 ys 0 0) |> equal "ArgumentException"
+        ys |> equal [|0; 0; 0; 0; 0|]
+        let zs = [|"a"; "b"; "c"|]
+        let ws = Array.create 5 "_"
+        raisedExceptionType (fun () -> Array.blit zs 0 ws 0 -1) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> Array.blit zs -1 ws 0 2) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> Array.blit zs 0 ws -1 2) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> Array.blit zs 2 ws 0 2) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.blit zs 0 ws 4 2) |> equal "ArgumentException"
+        ws |> equal [|"_"; "_"; "_"; "_"; "_"|]
+        Array.blit zs 3 ws 5 0
+        Array.blit zs 1 ws 3 2
+        ws |> equal [|"_"; "_"; "_"; "b"; "c"|]
+
+    testCase "System.Array.Copy raises .NET's exception types for out of range arguments" <| fun () ->
+        let xs = [|1; 2; 3|]
+        let ys: int[] = Array.zeroCreate 5
+        raisedExceptionType (fun () -> System.Array.Copy(xs, 0, ys, 0, -1)) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> System.Array.Copy(xs, -1, ys, 0, 2)) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> System.Array.Copy(xs, 0, ys, -1, 2)) |> equal "ArgumentOutOfRangeException"
+        raisedExceptionType (fun () -> System.Array.Copy(xs, 2, ys, 0, 2)) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> System.Array.Copy(xs, 0, ys, 4, 2)) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> System.Array.Copy(xs, ys, 4)) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> System.Array.Copy([|"a"; "b"|], [|"c"|], 2)) |> equal "ArgumentException"
+        ys |> equal [|0; 0; 0; 0; 0|]
+
+    testCase "Array.removeManyAt raises ArgumentException only when FSharp.Core does" <| fun () ->
+        let xs = [|1; 2; 3|]
+        let empty: int[] = [||]
+        raisedExceptionType (fun () -> Array.removeManyAt -1 0 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.removeManyAt -1 1 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.removeManyAt 1 3 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.removeManyAt 3 1 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.removeManyAt 4 0 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> Array.removeManyAt 0 1 empty) |> equal "ArgumentException"
+        Array.removeManyAt 0 0 xs |> equal [|1; 2; 3|]
+        Array.removeManyAt 1 0 xs |> equal [|1; 2; 3|]
+        Array.removeManyAt 3 0 xs |> equal [|1; 2; 3|]
+        Array.removeManyAt 0 0 empty |> equal [||]
+        Array.removeManyAt 1 2 xs |> equal [|1|]
+        Array.removeManyAt 0 2 [|"a"; "b"; "c"|] |> equal [|"c"|]
 
   ]

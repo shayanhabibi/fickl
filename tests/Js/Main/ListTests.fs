@@ -1095,6 +1095,27 @@ let tests =
         raisedExceptionType (fun () -> [1].Tail.Head) |> equal "InvalidOperationException"
         raisedExceptionType (fun () -> [1].Tail.Tail) |> equal "InvalidOperationException"
 
+    testCase "List builders leave the empty list untouched" <| fun () ->
+        let xs = [1; 2; 3]
+        List.map ((+) 1) xs |> equal [2; 3; 4]
+        List.filter (fun x -> x > 1) xs |> equal [2; 3]
+        List.filter (fun _ -> false) xs |> equal []
+        List.choose (fun x -> if x > 2 then Some x else None) xs |> equal [3]
+        List.collect (fun x -> [x; x]) xs |> equal [1; 1; 2; 2; 3; 3]
+        List.append xs xs |> equal [1; 2; 3; 1; 2; 3]
+        List.concat [xs; xs] |> equal [1; 2; 3; 1; 2; 3]
+        List.ofSeq (seq { 1 .. 3 }) |> equal xs
+        List.partition (fun x -> x > 1) xs |> equal ([2; 3], [1])
+        List.scan (+) 0 xs |> equal [0; 1; 3; 6]
+        List.take 2 xs |> equal [1; 2]
+        List.init 3 id |> equal [0; 1; 2]
+        List.unfold (fun s -> if s < 3 then Some (s, s + 1) else None) 0 |> equal [0; 1; 2]
+        let empty: int list = []
+        List.isEmpty empty |> equal true
+        List.length empty |> equal 0
+        List.isEmpty (List.map ((+) 1) empty) |> equal true
+        empty |> equal []
+
     testCase "List functions raise FSharp.Core's exception types for out of range counts" <| fun () ->
         raisedExceptionType (fun () -> List.take 5 [1]) |> equal "InvalidOperationException"
         raisedExceptionType (fun () -> List.take -1 [1]) |> equal "ArgumentException"
@@ -1112,4 +1133,63 @@ let tests =
         raisedExceptionType (fun () -> List.randomChoiceBy (fun () -> 1.0) [1; 2]) |> equal "ArgumentOutOfRangeException"
         raisedExceptionType (fun () -> List.randomChoicesBy (fun () -> 1.0) 2 [1; 2]) |> equal "ArgumentOutOfRangeException"
         raisedExceptionType (fun () -> List.randomSampleBy (fun () -> -0.1) 1 [1; 2]) |> equal "ArgumentOutOfRangeException"
+
+    testCase "List functions raise ArgumentException for lists of different lengths" <| fun () ->
+        let xs = [1; 2]
+        let ys = [1; 2; 3]
+        let empty: int list = []
+        raisedExceptionType (fun () -> List.fold2 (fun acc x y -> acc + x + y) 0 xs ys) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.fold2 (fun acc x y -> acc + x + y) 0 ys xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.foldBack2 (fun x y acc -> x + y + acc) empty xs 0) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.map2 (+) xs ys) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.mapi2 (fun i x y -> i + x + y) ys xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.map3 (fun x y z -> x + y + z) xs ys ys) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.map3 (fun x y z -> x + y + z) ys ys xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.zip empty xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.zip xs empty) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.zip3 xs ys ys) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.iter2 (fun _ _ -> ()) xs ys) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.iteri2 (fun _ _ _ -> ()) ys xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.forall2 (fun x y -> x = y) xs ys) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.forall2 (fun x y -> x = y) empty xs) |> equal "ArgumentException"
+
+    testCase "List functions call the function on the common items of lists of different lengths before raising" <| fun () ->
+        let mutable calls = 0
+        raisedExceptionType (fun () -> List.iter2 (fun _ _ -> calls <- calls + 1) [1; 2] [1; 2; 3]) |> equal "ArgumentException"
+        equal 2 calls
+        raisedExceptionType (fun () -> List.map3 (fun x _ _ -> calls <- calls + 1; x) [1; 2; 3] [1; 2] [1; 2; 3]) |> equal "ArgumentException"
+        equal 4 calls
+
+    testCase "List.forall2 returns false before reaching the end of lists of different lengths" <| fun () ->
+        List.forall2 (fun x y -> x + y < 3) [1; 2] [1; 2; 3] |> equal false
+        List.forall2 (fun _ _ -> false) [1; 2; 3] [1; 2] |> equal false
+
+    testCase "List.init and List.replicate raise ArgumentException for negative counts" <| fun () ->
+        raisedExceptionType (fun () -> List.init -1 id) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.replicate -1 "a") |> equal "ArgumentException"
+        List.init 0 id |> equal []
+
+    testCase "List.average and List.averageBy raise ArgumentException on empty lists" <| fun () ->
+        let xs: float list = []
+        let ys: decimal list = []
+        raisedExceptionType (fun () -> List.average xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.averageBy (fun x -> x * 2.) xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.average ys) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.averageBy id ys) |> equal "ArgumentException"
+
+    testCase "List.removeManyAt raises ArgumentException only when FSharp.Core does" <| fun () ->
+        let xs = [1; 2; 3]
+        let empty: int list = []
+        raisedExceptionType (fun () -> List.removeManyAt -1 0 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.removeManyAt -1 1 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.removeManyAt 2 2 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.removeManyAt 3 1 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.removeManyAt 4 0 xs) |> equal "ArgumentException"
+        raisedExceptionType (fun () -> List.removeManyAt 0 1 empty) |> equal "ArgumentException"
+        List.removeManyAt 0 0 xs |> equal [1; 2; 3]
+        List.removeManyAt 1 0 xs |> equal [1; 2; 3]
+        List.removeManyAt 3 0 xs |> equal [1; 2; 3]
+        List.removeManyAt 1 -1 xs |> equal [1; 2; 3]
+        List.removeManyAt 0 0 empty |> equal []
+        List.removeManyAt 1 2 xs |> equal [1]
   ]

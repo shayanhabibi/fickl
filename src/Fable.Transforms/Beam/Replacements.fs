@@ -2144,6 +2144,26 @@ let private stringModule
 let private makeComparer (com: ICompiler) ctx typArg =
     objExpr [ "Compare", makeComparerFunction com ctx typArg ]
 
+/// BinarySearch of an array or ResizeArray `list`, where a range search goes to `rangeFuncName`.
+/// A missing comparer, or a literal null one as .NET allows, means the default comparer.
+let private binarySearch (com: ICompiler) ctx r t rangeFuncName (list: Expr) (args: Expr list) =
+    let call funcName searchArgs (value: Expr) comparer =
+        let comparer =
+            match comparer with
+            | None
+            | Some NullConst -> makeComparer com ctx value.Type
+            | Some comparer -> comparer
+
+        Helper.LibCall(com, "fable_resize_array", funcName, t, list :: searchArgs @ [ comparer ], ?loc = r)
+        |> Some
+
+    match args with
+    | [ value ] -> call "binary_search" [ value ] value None
+    | [ value; comparer ] -> call "binary_search" [ value ] value (Some comparer)
+    | [ index; count; value ] -> call rangeFuncName [ index; count; value ] value None
+    | [ index; count; value; comparer ] -> call rangeFuncName [ index; count; value ] value (Some comparer)
+    | _ -> None
+
 let private makeEqualityFunction (com: ICompiler) ctx typArg =
     let x = makeUniqueIdent com ctx typArg "x"
     let y = makeUniqueIdent com ctx typArg "y"
@@ -2390,6 +2410,9 @@ let private arrays
     | "IndexOf", None, [ arr; value ] ->
         let arr = derefArr r arr
         Helper.LibCall(com, "fable_list", "index_of_value", t, [ value; arr ]) |> Some
+    // System.Array.BinarySearch, with or without a range and a comparer
+    | "BinarySearch", None, (ExprType(Array _) as arr) :: args ->
+        binarySearch com _ctx r t "binary_search_range" (derefArr r arr) args
     // Iterating an array as a non-generic IEnumerable (e.g. `for v in Enum.GetValues t do`).
     // Deref via derefArr so byte arrays (atomics, not process-dict refs) are handled too;
     // the non-generic System.Array of Enum.GetValues stays a ref, which get_enumerator accepts.
@@ -2884,7 +2907,7 @@ let private arrayModule
     | ("Sub" | "GetSubArray"), [ arr; start; count ] ->
         let arr = derefArr r arr
 
-        emitExpr r t [ arr; start; count ] "lists:sublist($0, $1 + 1, $2)"
+        Helper.LibCall(com, "fable_list", "sub", t, [ arr; start; count ])
         |> wrapArr com r t
         |> Some
     | "Except", [ excludeArr; arr ] ->
@@ -2955,11 +2978,11 @@ let private arrayModule
     | "Exists2", [ fn; a1; a2 ] ->
         let a1 = derefArr r a1
         let a2 = derefArr r a2
-        Helper.LibCall(com, "fable_list", "exists2", t, [ fn; a1; a2 ]) |> Some
+        Helper.LibCall(com, "fable_list", "array_exists2", t, [ fn; a1; a2 ]) |> Some
     | "ForAll2", [ fn; a1; a2 ] ->
         let a1 = derefArr r a1
         let a2 = derefArr r a2
-        Helper.LibCall(com, "fable_list", "forall2", t, [ fn; a1; a2 ]) |> Some
+        Helper.LibCall(com, "fable_list", "array_forall2", t, [ fn; a1; a2 ]) |> Some
     | "Fold2", [ fn; state; a1; a2 ] ->
         let a1 = derefArr r a1
         let a2 = derefArr r a2
@@ -3111,7 +3134,7 @@ let private arrayModule
                 let blitted =
                     Helper.LibCall(
                         com,
-                        "fable_resize_array",
+                        "fable_list",
                         "blit",
                         t,
                         [ derefSource; sourceIdx; derefTarget; targetIdx; count ]
@@ -3493,13 +3516,25 @@ let mailbox (com: ICompiler) (_ctx: Context) r t (i: CallInfo) (thisArg: Expr op
 
 let private regex
     (com: ICompiler)
-    (_ctx: Context)
+    (ctx: Context)
     r
     (t: Type)
     (info: CallInfo)
     (thisArg: Expr option)
     (args: Expr list)
     =
+    checkRegexOptions
+        com
+        ctx
+        r
+        (RegexOption.IgnoreCase
+         ||| RegexOption.Multiline
+         ||| RegexOption.Compiled
+         ||| RegexOption.Singleline
+         ||| RegexOption.ECMAScript
+         ||| RegexOption.NonBacktracking)
+        args
+
     match info.CompiledName, thisArg, args with
     // Constructor
     | ".ctor", _, [ pattern ] -> Helper.LibCall(com, "fable_regex", "create", t, [ pattern ], ?loc = r) |> Some
@@ -3700,6 +3735,9 @@ let private resizeArrays
             ?loc = r
         )
         |> Some
+    // BinarySearch
+    | "BinarySearch", Some callee, args ->
+        binarySearch com _ctx r t "binary_search_range_count" (emitExpr r (List Any) [ callee ] "get($0)") args
     // Remove
     | "Remove", Some callee, [ arg ] ->
         let listExpr = emitExpr r (List Any) [ callee ] "get($0)"
