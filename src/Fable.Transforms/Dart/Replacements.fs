@@ -232,6 +232,7 @@ let toChar com (ctx: Context) r (arg: Expr) =
     // TODO: Check length
     | Char -> arg
     | String -> Helper.InstanceCall(arg, "codeUnitAt", Char, [ makeIntConst 0 ])
+    | Number((Float16 | Float32 | Float64), _) -> Helper.InstanceCall(arg, "toInt", Char, [])
     | _ -> TypeCast(arg, Char)
 
 let charToString =
@@ -1696,6 +1697,25 @@ let seqModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg
         )
         |> Some
 
+/// BinarySearch without a comparer, or with a null one, uses the default comparer, like ResizeArray.Sort()
+let binarySearch (com: ICompiler) ctx r t (i: CallInfo) rangeMeth (ar: Expr) args =
+    let call meth args comparer =
+        let comparer =
+            match comparer with
+            | None
+            | Some NullConst -> makeComparer com ctx (getElementType ar.Type)
+            | Some comparer -> comparer
+
+        Helper.LibCall(com, "Array", meth, t, ar :: args @ [ comparer ], genArgs = i.GenericArgs, ?loc = r)
+        |> Some
+
+    match args with
+    | [ value ] -> call "binarySearch" [ value ] None
+    | [ value; comparer ] -> call "binarySearch" [ value ] (Some comparer)
+    | [ index; length; value ] -> call rangeMeth [ index; length; value ] None
+    | [ index; length; value; comparer ] -> call rangeMeth [ index; length; value ] (Some comparer)
+    | _ -> None
+
 let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
     | ".ctor", _, [] -> makeResizeArray (getElementType t) [] |> Some
@@ -1741,6 +1761,7 @@ let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (this
         Helper.LibCall(com, "Array", "getSubArray", t, [ ar; idx; cnt ], genArgs = i.GenericArgs, ?loc = r)
         |> Some
     | "IndexOf", Some ar, args -> Helper.InstanceCall(ar, "indexOf", t, args, ?loc = r) |> Some
+    | "BinarySearch", Some ar, args -> binarySearch com ctx r t i "binarySearchRangeCount" ar args
     | "Insert", Some ar, [ idx; arg ] -> Helper.InstanceCall(ar, "insert", t, [ idx; arg ], ?loc = r) |> Some
     | "InsertRange", Some ar, [ idx; arg ] -> Helper.InstanceCall(ar, "insertAll", t, [ idx; arg ], ?loc = r) |> Some
     | "RemoveRange", Some ar, [ startIdx; count ] ->
@@ -1823,6 +1844,7 @@ let arrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: E
     | "IndexOf", None, args ->
         Helper.LibCall(com, "Array", "indexOf", t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
         |> Some
+    | "BinarySearch", None, ar :: args -> binarySearch com ctx r t i "binarySearchRange" ar args
     | "GetEnumerator", Some arg, _ -> getEnumerator com r t arg |> Some
     | _ -> None
 
@@ -1855,6 +1877,10 @@ let arrayModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Ex
     | "IsEmpty", [ ar ] -> getFieldWith r t ar "isEmpty" |> Some
     | "Contains", [ value; ar ] -> Helper.LibCall(com, "Array", "contains", t, [ value; ar ], ?loc = r) |> Some
     | "CopyTo", args -> copyToArray com r t i args
+    // getSubArray is shared with ResizeArray.GetRange, which must stay unchecked
+    | "GetSubArray", args ->
+        Helper.LibCall(com, "Array", "sub", t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
+        |> Some
     | ("Distinct" | "DistinctBy" | "Except" | "GroupBy" | "CountBy" as meth), args ->
         let meth = Naming.lowerFirst meth
         let args = injectArg com ctx r "Seq2" meth i.GenericArgs args
@@ -2031,6 +2057,43 @@ let nullables (com: ICompiler) (_: Context) r (t: Type) (i: CallInfo) (thisArg: 
         | [] -> makeNull () |> Some
     | "get_Value", Some c -> Helper.LibCall(com, "Util", "value", t, [ c ], ?loc = r) |> Some
     | "get_HasValue", Some c -> makeEqOp r c (makeNull ()) BinaryUnequal |> Some
+    | _ -> None
+
+let nullableModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Expr option) (args: Expr list) =
+    let convert (targetType: Type) (value: Expr) =
+        match targetType with
+        | Char -> toChar com ctx r value
+        | Number((Float16 | Float32 | Float64), _) -> toFloat com ctx r targetType [ value ]
+        | Number(Decimal, _) -> toDecimal com ctx r targetType [ value ]
+        | Number _ -> toInt com ctx r targetType [ value ]
+        | _ -> TypeCast(value, targetType)
+
+    match i.CompiledName.Replace("$W", ""), List.tryLast args, t with
+    | ("ToByte" | "ToUInt8" | "ToSByte" | "ToInt8" | "ToInt16" | "ToUInt16" | "ToInt" | "ToInt32" | "ToUInt" | "ToUInt32" | "ToInt64" | "ToUInt64" | "ToIntPtr" | "ToUIntPtr" | "ToSingle" | "ToFloat32" | "ToDouble" | "ToFloat" | "ToDecimal" | "ToChar" | "ToEnum"),
+      Some value,
+      Nullable(targetType, _) ->
+        match value with
+        | Value(Null _, _) -> makeNull () |> Some
+        | Value((NumberConstant _ | CharConstant _), _) -> convert targetType value |> Some
+        | _ ->
+            let sourceType =
+                match value.Type with
+                | Nullable(sourceType, _) -> sourceType
+                | sourceType -> sourceType
+
+            let v = makeUniqueIdent com ctx value.Type "v"
+
+            Let(
+                v,
+                value,
+                IfThenElse(
+                    makeEqOp None (IdentExpr v) (makeNull ()) BinaryUnequal,
+                    TypeCast(convert targetType (TypeCast(IdentExpr v, sourceType)), t),
+                    makeNull (),
+                    r
+                )
+            )
+            |> Some
     | _ -> None
 
 let options isStruct (com: ICompiler) (_: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
@@ -3288,6 +3351,18 @@ let regexMatchToSeq com t e =
     Helper.LibCall(com, "RegExp", "GroupIterable", t, [ e ])
 
 let regex com (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    checkRegexOptions
+        com
+        ctx
+        r
+        (RegexOption.IgnoreCase
+         ||| RegexOption.Multiline
+         ||| RegexOption.Compiled
+         ||| RegexOption.Singleline
+         ||| RegexOption.ECMAScript
+         ||| RegexOption.NonBacktracking)
+        args
+
     let isGroup =
         function
         | ExprType(DeclaredTypeFullName Types.regexGroup) -> true
@@ -3988,6 +4063,7 @@ let private replacedModules =
             "System.Math", operators
             "System.MathF", operators
             "Microsoft.FSharp.Core.Operators", operators
+            "Microsoft.FSharp.Linq.NullableModule", nullableModule
             "Microsoft.FSharp.Core.Operators.Checked", operators
             "Microsoft.FSharp.Core.Operators.Unchecked", unchecked
             "Microsoft.FSharp.Core.Operators.OperatorIntrinsics", intrinsicFunctions

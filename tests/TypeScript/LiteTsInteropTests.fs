@@ -61,6 +61,19 @@ type Res =
 type Msg =
     | [<CompiledValue(0)>] Text of text: string
     | [<CompiledValue(1)>] Code of code: int
+// Top level values get TS annotations, so tsc checks the typed array type names exist
+module TypedArrays =
+    let int8s = JS.Constructors.Int8Array.Create [| 1y; -2y |]
+    let uint8s = JS.Constructors.Uint8Array.Create [| 1uy; 2uy |]
+    let uint8Clamped = JS.Constructors.Uint8ClampedArray.Create [| 1; 300 |]
+    let int16s = JS.Constructors.Int16Array.Create [| 1s; -2s |]
+    let uint16s = JS.Constructors.Uint16Array.Create [| 1us; 2us |]
+    let int32s = JS.Constructors.Int32Array.Create [| 1; -2 |]
+    let uint32s = JS.Constructors.Uint32Array.Create [| 1u; 2u |]
+    let float32s = JS.Constructors.Float32Array.Create [| 1.5; -2.5 |]
+    let float64s = JS.Constructors.Float64Array.Create [| 1.5; -2.5 |]
+    let bigInt64s = JS.Constructors.BigInt64Array.Create 2
+    let makeFloat32s () = JS.Constructors.Float32Array.Create [| 0.0; 1.0 |]
 #endif
 
 let tests =
@@ -136,5 +149,17 @@ let tests =
         Msg.Text "hi" |> describe |> equal "hi"
         Msg.Code 42 |> describe |> equal "42"
         (Msg.Code 42)?kind |> equal 1
+    testCase "Fable.Core typed arrays are annotated with native TS types" <| fun () ->
+        TypedArrays.int8s.[1] |> equal -2y
+        TypedArrays.uint8s.[1] |> equal 2uy
+        TypedArrays.uint8Clamped.[1] |> equal 255uy
+        TypedArrays.int16s.[1] |> equal -2s
+        TypedArrays.uint16s.[1] |> equal 2us
+        TypedArrays.int32s.[1] |> equal -2
+        TypedArrays.uint32s.[1] |> equal 2u
+        TypedArrays.float32s.[1] |> equal -2.5f
+        TypedArrays.float64s.[1] |> equal -2.5
+        TypedArrays.bigInt64s.length |> equal 2
+        TypedArrays.makeFloat32s().[1] |> equal 1.0f
     #endif
   ]

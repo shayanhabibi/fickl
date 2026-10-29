@@ -12,6 +12,10 @@ type MyRecord = { a: int }
 
 type R = { i: int; s: string }
 
+type DictKey =
+    | Int of int
+    | Str of string
+
 type Table<'K, 'V when 'K: equality and 'K: not null> () =
 
     let dic = new Dictionary<'K,'V>()
@@ -217,6 +221,54 @@ let tests =
         dic.Add("B", "World!")
         dic.Remove("A") |> equal true
         dic.Remove("C") |> equal false
+        dic.Count |> equal 1
+
+    testCase "Dictionary works when keys share a hash" <| fun () ->
+        let comparer =
+            { new IEqualityComparer<string> with
+                member _.Equals(x, y) = x = y
+                member _.GetHashCode(_) = 1 }
+        let dic = Dictionary<_,_>(comparer)
+        dic.Add("A", 1)
+        dic.Add("B", 2)
+        dic.Add("C", 3)
+        dic.Count |> equal 3
+        dic.["C"] |> equal 3
+        dic.ContainsKey("B") |> equal true
+        dic.ContainsKey("D") |> equal false
+        dic.Remove("B") |> equal true
+        dic.Remove("B") |> equal false
+        dic.ContainsKey("C") |> equal true
+        dic.Count |> equal 2
+        throwsAnyError (fun _ -> dic.Add("A", 4))
+
+    testCase "Dictionary.Count works with indexer insert" <| fun () ->
+        let dic = Dictionary<string,int>()
+        dic.["A"] <- 1
+        dic.["B"] <- 2
+        dic.Count |> equal 2
+
+    testCase "Dictionary.Count works with indexer replace" <| fun () ->
+        let dic = Dictionary<string,int>()
+        dic.Add("A", 1)
+        dic.["A"] <- 2
+        dic.Count |> equal 1
+        dic.["A"] |> equal 2
+
+    testCase "Dictionary works with union keys" <| fun () ->
+        let dic = Dictionary<DictKey, int>()
+        dic.Add(Int 1, 1)
+        dic.Add(Str "a", 2)
+        dic.[Int 1] |> equal 1
+        dic.[Str "a"] |> equal 2
+        dic.ContainsKey(Int 1) |> equal true
+        dic.ContainsKey(Int 2) |> equal false
+        dic.ContainsKey(Str "b") |> equal false
+        dic.[Int 1] <- 3
+        dic.[Int 1] |> equal 3
+        dic.Count |> equal 2
+        dic.Remove(Str "a") |> equal true
+        dic.ContainsKey(Str "a") |> equal false
         dic.Count |> equal 1
 
     testCase "Dictionary.Remove with complex keys works" <| fun () ->

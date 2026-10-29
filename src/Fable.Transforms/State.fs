@@ -325,15 +325,14 @@ type ImplFile =
         FSharp2Fable.Compiler.getRootFSharpEntities declarations |> loop entities
         let rootModule, rootComment = FSharp2Fable.Compiler.getRootModule declarations
 
+        let fileName = Path.normalizePathAndEnsureFsExtension file.FileName
+
         {
             Declarations = declarations
             Entities = entities
             RootModule = rootModule
             RootComment = rootComment
-            // fickl: FCS names a file with a signature after its .fsi, but changes and watch dependencies name the .fs,
-            // so files that inline from it were not recompiled when it changed
-            InlineExprs =
-                FSharp2Fable.Compiler.getInlineExprs (Path.normalizePathAndEnsureFsExtension file.FileName) declarations
+            InlineExprs = FSharp2Fable.Compiler.getInlineExprs fileName declarations
             Signature = signature declarations
         }
 
@@ -622,6 +621,9 @@ type CompilerImpl
             | _ -> ()
 
         member _.AddLog(msg, severity, ?range, ?fileName: string, ?tag: string, ?code: string) =
+            // Ranges spell the file as FCS registered it (backslashes on Windows); suppressions and logs are keyed by normalized paths
+            let fileName = fileName |> Option.map Path.normalizePath
+
             // Only warnings can be suppressed, errors always surface (matches F#'s own #nowarn),
             // and neither can the warnings about the `fable-disable` directives themselves.
             let isSuppressed =
@@ -636,7 +638,7 @@ type CompilerImpl
                             | Some f -> f
                             | None ->
                                 match r.File with
-                                | Some f -> f
+                                | Some f -> Path.normalizePath f
                                 | None -> currentFile
 
                         // The whole range, not just its first line, so a trailing
