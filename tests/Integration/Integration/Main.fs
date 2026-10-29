@@ -4,6 +4,7 @@ open System
 let allTests =
   [
     Cli.tests
+    ProjectCracker.tests
     FileWatcher.tests
     CompilationTests.tests
     CompilationTests.dllAttributeTests

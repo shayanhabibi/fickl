@@ -252,6 +252,16 @@ let makeProjectOptions (opts: CrackerOptions) otherOptions sources : FSharpProje
         Stamp = None
     }
 
+/// A package assembly sits at `<package root>/lib/<tfm>/` or `<package root>/ref/<tfm>/`. Project output such as
+/// `obj/Release/net10.0/ref/` does not, though its `obj/Release` can hold a nuspec and a staged `fable/` project after packing.
+let isPackageAssemblyPath (dllPath: string) =
+    let layoutDir =
+        Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath dllPath))
+        |> Path.GetFileName
+
+    String.Equals(layoutDir, "lib", StringComparison.OrdinalIgnoreCase)
+    || String.Equals(layoutDir, "ref", StringComparison.OrdinalIgnoreCase)
+
 let tryGetFablePackage (opts: CrackerOptions) (dllPath: string) =
     let tryFileWithPattern dir pattern =
         try
@@ -287,7 +297,10 @@ let tryGetFablePackage (opts: CrackerOptions) (dllPath: string) =
         | Some firstGroup -> elements firstGroup
         | None -> dependencies
 
-    if Path.GetFileNameWithoutExtension(dllPath) |> Metadata.isSystemPackage then
+    if
+        Path.GetFileNameWithoutExtension(dllPath) |> Metadata.isSystemPackage
+        || not (isPackageAssemblyPath dllPath)
+    then
         None
     else
         let rootDir = IO.Path.Combine(IO.Path.GetDirectoryName(dllPath), "..", "..")
@@ -535,7 +548,14 @@ let getCrackedMainFsproj (opts: CrackerOptions) (projectOptionsResponse: Project
     let fablePkgs =
         let dllRefs' = dllRefs |> Seq.map (fun (KeyValue(k, v)) -> k, v) |> Seq.toArray
 
+        let projRefNames =
+            projectOptionsResponse.ProjectReferences
+            |> Array.map Path.GetFileNameWithoutExtension
+            |> fun names -> HashSet(names, StringComparer.OrdinalIgnoreCase)
+
         dllRefs'
+        // A known project reference compiles from its sources, never as a package
+        |> Seq.filter (fun (dllName, _) -> not (projRefNames.Contains dllName))
         |> Seq.choose (fun (dllName, dllPath) ->
             match tryGetFablePackage opts dllPath with
             | Some pkg ->
