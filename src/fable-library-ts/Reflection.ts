@@ -338,8 +338,12 @@ export function getGenericTypeDefinition(t: TypeInfo) {
   return t.generics == null ? t : new TypeInfo(t.fullname, t.generics.map(() => obj_type));
 }
 
-export function getEnumUnderlyingType(t: TypeInfo) {
-  return t.generics?.[0];
+export function getEnumUnderlyingType(t: TypeInfo): TypeInfo {
+  const underlyingType = t.enumCases != null ? t.generics?.[0] : undefined;
+  if (underlyingType == null) {
+    throw new Exception(`${t.fullname} is not an enum type`);
+  }
+  return underlyingType;
 }
 
 export function getEnumValues(t: TypeInfo): number[] {
