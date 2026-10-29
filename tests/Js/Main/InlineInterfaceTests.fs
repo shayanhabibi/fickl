@@ -70,7 +70,7 @@ let tests =
             | Content.Text value ->
                 value.text |> equal "hello"
                 obj.ReferenceEquals(value, text) |> equal true
-            | _ -> failwith "Expected Text"
+            | Content.Empty -> failwith "Expected Text"
 
         testCase "copied inline interface payload shares state with the original through the field" <| fun () ->
             let counter = CounterClass() :> Counter
@@ -80,14 +80,22 @@ let tests =
             | CopiedMessage.Count value ->
                 value.count |> equal 1
                 obj.ReferenceEquals(value, counter) |> equal true
-            | _ -> failwith "Expected Count"
+            | CopiedMessage.Nothing -> failwith "Expected Count"
+        testCase "inline interface construction keeps the union type for other case arms" <| fun () ->
+            let counter = CounterClass() :> Counter
+            match Message.Count counter with
+            | Message.Count value -> value.count |> equal 0
+            | Message.Nothing -> failwith "Expected Count"
+            match Message.Nothing with
+            | Message.Count _ -> failwith "Expected Nothing"
+            | Message.Nothing -> ()
 
 #if FABLE_COMPILER
         testCase "inline interface payload carrying its tag is the case value and can be cloned" <| fun () ->
             let text: Text = JsInterop.emitJsExpr () "({ type: 'text', text: 'hello' })"
             let message = Content.Text text
             obj.ReferenceEquals(box message, box text) |> equal true
-            JsInterop.emitJsExpr message "structuredClone($0).text" |> equal "hello"
+            JsInterop.emitJsExpr message "Reflect.get(structuredClone($0), 'text')" |> equal "hello"
             JsInterop.emitJsExpr message "Object.isFrozen(Object.freeze($0))" |> equal true
 
         testCase "inline interface payload with a different tag value is not held as the case value" <| fun () ->
@@ -113,18 +121,18 @@ let tests =
             JsInterop.emitJsExpr plainMessage "$0.type" |> equal "count"
             match plainMessage with
             | PlainCopiedMessage.Count value -> obj.ReferenceEquals(value, plain) |> equal true
-            | _ -> failwith "Expected Count"
+            | PlainCopiedMessage.Nothing -> failwith "Expected Count"
             let counter = CounterClass() :> Counter
             let classMessage = PlainCopiedMessage.Count counter
             counter.inc()
-            JsInterop.emitJsExpr classMessage "$0.count" |> equal 1
+            JsInterop.emitJsExpr classMessage "Reflect.get($0, 'count')" |> equal 1
 
         testCase "inline interface JavaScript view forwards state and keeps the tag separate" <| fun () ->
             let counter = CounterClass() :> Counter
             let message = Message.Count counter
             counter.inc()
-            JsInterop.emitJsExpr message "$0.count" |> equal 1
-            JsInterop.emitJsStatement message "$0.inc()"
+            JsInterop.emitJsExpr message "Reflect.get($0, 'count')" |> equal 1
+            JsInterop.emitJsStatement message "Reflect.get($0, 'inc').call($0)"
             counter.count |> equal 2
             JsInterop.emitJsExpr message "$0.type" |> equal "count"
             JsInterop.emitJsExpr counter "Reflect.get($0, 'type') === undefined" |> equal true
@@ -135,13 +143,13 @@ let tests =
             let counter: Counter =
                 JsInterop.emitJsExpr () "new (class { #n = 0; get count() { return this.#n; } inc() { this.#n++; } })()"
             let message = Message.Count counter
-            JsInterop.emitJsStatement message "$0.inc()"
+            JsInterop.emitJsStatement message "Reflect.get($0, 'inc').call($0)"
             read message |> equal 1
             obj.ReferenceEquals(payload message, counter) |> equal true
             let frozen: Counter =
                 JsInterop.emitJsExpr () "Object.freeze({ count: 9, inc() {} })"
             let frozenMessage = Message.Count frozen
-            JsInterop.emitJsExpr frozenMessage "$0.count" |> equal 9
+            JsInterop.emitJsExpr frozenMessage "Reflect.get($0, 'count')" |> equal 9
             JsInterop.emitJsExpr frozenMessage "Object.keys($0).sort()" |> equal [| "count"; "inc"; "type" |]
             obj.ReferenceEquals(payload frozenMessage, frozen) |> equal true
 
@@ -162,8 +170,8 @@ let tests =
                 JsInterop.emitJsExpr () "new (class { #n = 0; get count() { return this.#n; } inc() { this.#n++; } })()"
             let message = Message.Count counter
             JsInterop.emitJsStatement (message, counter) "Object.defineProperty($0, 'inc', {value: $1.inc.bind($1), configurable: false, writable: false})"
-            JsInterop.emitJsStatement message "$0.inc()"
+            JsInterop.emitJsStatement message "Reflect.get($0, 'inc').call($0)"
             counter.count |> equal 1
-            JsInterop.emitJsExpr message "Object.getOwnPropertyDescriptor($0, 'inc')?.value === $0.inc" |> equal true
+            JsInterop.emitJsExpr message "Object.getOwnPropertyDescriptor($0, 'inc')?.value === Reflect.get($0, 'inc')" |> equal true
 #endif
     ]
