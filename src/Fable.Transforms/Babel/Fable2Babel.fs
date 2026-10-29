@@ -2721,6 +2721,21 @@ module Util =
                     && (info.IsSetter || (info.IsGetter && canHaveSideEffects com memb.Body)))
             )
 
+        // Members of a base class the object expression overrides
+        let overrideNames =
+            members
+            |> List.choose (fun (memb, info) ->
+                match info.DeclaringEntity |> Option.bind com.TryGetEntity with
+                | Some ent when not ent.IsInterface && ent.FullName <> Types.object ->
+                    match SymbolKeys.memberKey com ctx info memb.Name with
+                    | Expression.Identifier(Identifier(name, _)), false
+                    | Expression.Literal(Literal.StringLiteral(StringLiteral(name, _))), false -> Some name
+                    | _ -> None
+                | _ -> None
+            )
+            |> List.append objectPrototypeNames
+            |> set
+
         let members =
             members
             |> List.collect (fun (memb, info) ->
@@ -2868,8 +2883,11 @@ module Util =
                 )
                 |> Option.defaultValue (None, classMembers)
 
-            let classExpr =
-                Expression.classExpression (List.toArray classMembers, ?superClass = baseExpr)
+            let classMembers =
+                List.toArray classMembers
+                |> markOverrides com overrideNames (Option.isSome baseExpr)
+
+            let classExpr = Expression.classExpression (classMembers, ?superClass = baseExpr)
 
             Expression.newExpression (classExpr, [||])
 
@@ -5058,6 +5076,102 @@ but thanks to the optimisation done below we get
 
             rewrite body
 
+    /// Whether a member overrides a member of a base class, rather than implementing an interface. `info` is the
+    /// member the declaration implements, if any. System.Object members are left out: TypeScript's base type only has
+    /// them when the base class declares them (see `overrideNames`)
+    let isBaseClassOverride
+        (com: IBabelCompiler)
+        (ent: Fable.Entity)
+        (info: Fable.MemberFunctionOrValue)
+        (memb: Fable.MemberDecl)
+        =
+        com.IsTypeScript
+        && Option.isSome memb.ImplementedSignatureRef
+        && info.DeclaringEntity
+           // A default implementation implements its own class's abstract member
+           |> Option.filter (fun entRef -> entRef.FullName <> Types.object && entRef.FullName <> ent.FullName)
+           |> Option.bind com.TryGetEntity
+           |> Option.exists (fun ent -> not ent.IsInterface)
+
+    /// Object.prototype members are in the type of any base class
+    let objectPrototypeNames = [ "toString"; "toLocaleString"; "valueOf" ]
+
+    /// Names of the members a class's emitted base class declares, apart from F# overrides `isBaseClassOverride` finds
+    let overrideNames (com: IBabelCompiler) (ent: Fable.Entity) =
+        let rec ancestorOverrides (ent: Fable.Entity) =
+            match ent.BaseType |> Option.bind (fun baseType -> com.TryGetEntity(baseType.Entity)) with
+            | Some baseEnt when baseEnt.FullName <> Types.object ->
+                [
+                    for memb in baseEnt.MembersFunctionsAndValues do
+                        if memb.IsOverrideOrExplicitInterfaceImplementation then
+                            match memb.CompiledName with
+                            | "ToString" -> "toString"
+                            | name -> name
+                    yield! ancestorOverrides baseEnt
+                ]
+            | _ -> []
+
+        set
+            [
+                yield! objectPrototypeNames
+                // Members of Record, Union and FSharpException in fable-library
+                if
+                    ent.IsFSharpRecord
+                    || ent.IsValueType
+                    || ent.IsFSharpUnion
+                    || ent.IsFSharpExceptionDeclaration
+                then
+                    yield! [ "toJSON"; "GetHashCode"; "Equals"; "CompareTo" ]
+                yield! ancestorOverrides ent
+            ]
+
+    /// TypeScript's `noImplicitOverride` needs `override` on a member the base class declares,
+    /// and rejects it in a class without a base class
+    let markOverrides (com: IBabelCompiler) (names: Set<string>) hasBaseClass (members: ClassMember array) =
+        if not com.IsTypeScript then
+            members
+        else
+            let rec mark memb =
+                match memb with
+                | DecoratedClassMember(decorators, memb) -> DecoratedClassMember(decorators, mark memb)
+                | ClassMethod(kind,
+                              parameters,
+                              body,
+                              isStatic,
+                              isAbstract,
+                              isOverride,
+                              returnType,
+                              typeParameters,
+                              loc,
+                              doc) when not isStatic && not isAbstract ->
+                    let isOverride =
+                        match kind with
+                        | ClassFunction(key, false)
+                        | ClassGetter(key, false)
+                        | ClassSetter(key, false) ->
+                            match key with
+                            | Expression.Identifier(Identifier(name, _))
+                            | Expression.Literal(Literal.StringLiteral(StringLiteral(name, _))) ->
+                                hasBaseClass && (isOverride || names.Contains name)
+                            | _ -> hasBaseClass && isOverride
+                        | _ -> hasBaseClass && isOverride
+
+                    ClassMethod(
+                        kind,
+                        parameters,
+                        body,
+                        isStatic,
+                        isAbstract,
+                        isOverride,
+                        returnType,
+                        typeParameters,
+                        loc,
+                        doc
+                    )
+                | memb -> memb
+
+            Array.map mark members
+
     let declareClassWithParams
         (com: IBabelCompiler)
         ctx
@@ -5208,6 +5322,9 @@ but thanks to the optimisation done below we get
                             )
             |]
 
+        let members =
+            markOverrides com (overrideNames com ent) (Option.isSome superClass) members
+
         let classExpr =
             Expression.classExpression (
                 members,
@@ -5304,7 +5421,7 @@ but thanks to the optimisation done below we get
         classMembers
         |> Array.exists (
             function
-            | ClassMethod(ClassFunction(Expression.Identifier(Identifier(key, _)), _), _, _, _, _, _, _, _, _) ->
+            | ClassMethod(ClassFunction(Expression.Identifier(Identifier(key, _)), _), _, _, _, _, _, _, _, _, _) ->
                 key = name
             | _ -> false
         )
@@ -5632,6 +5749,7 @@ but thanks to the optimisation done below we get
             args,
             Some body,
             isStatic = isStatic,
+            isOverride = isBaseClassOverride com ent info memb,
             ?returnType = returnType,
             ?doc = memb.XmlDoc
         ) //, ?typeParameters=typeParamDecl)
@@ -5676,6 +5794,7 @@ but thanks to the optimisation done below we get
                 args,
                 Some body,
                 isStatic = isStatic,
+                isOverride = (name = memb.Name && isBaseClassOverride com ent info memb),
                 ?returnType = returnType,
                 ?typeParameters = typeParamDecl,
                 ?doc = memb.XmlDoc
@@ -6502,10 +6621,10 @@ but thanks to the optimisation done below we get
                         kind,
                         parameters,
                         body,
-                        isStatic,
-                        isAbstract,
-                        returnType,
-                        typeParameters,
+                        isStatic = isStatic,
+                        isAbstract = isAbstract,
+                        returnType = returnType,
+                        typeParameters = typeParameters,
                         ?doc = doc
                     )
 
@@ -6787,11 +6906,11 @@ but thanks to the optimisation done below we get
                     classMembers
                     |> Array.choose (
                         function
-                        | ClassMethod(ClassFunction(key, _), _, _, _, _, _, _, _, _) ->
+                        | ClassMethod(ClassFunction(key, _), _, _, _, _, _, _, _, _, _) ->
                             tryKeyName key |> Option.map (fun n -> n, false, false)
-                        | ClassMethod(ClassGetter(key, _), _, _, _, _, _, _, _, _) ->
+                        | ClassMethod(ClassGetter(key, _), _, _, _, _, _, _, _, _, _) ->
                             tryKeyName key |> Option.map (fun n -> n, true, false)
-                        | ClassMethod(ClassSetter(key, _), _, _, _, _, _, _, _, _) ->
+                        | ClassMethod(ClassSetter(key, _), _, _, _, _, _, _, _, _, _) ->
                             tryKeyName key |> Option.map (fun n -> n, false, true)
                         | _ -> None
                     )

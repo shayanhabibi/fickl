@@ -141,7 +141,7 @@ let rec private classMemberKey (memb: ClassMember) =
     match memb with
     | DecoratedClassMember(_, memberDeclaration) -> classMemberKey memberDeclaration
     | ClassAutoAccessor(key, _, _, isStatic, _, _) -> Some(isStatic, keyName key)
-    | ClassMethod(kind, _, _, isStatic, _, _, _, _, _) ->
+    | ClassMethod(kind, _, _, isStatic, _, _, _, _, _, _) ->
         match kind with
         | ClassPrimaryConstructor _ -> None
         | ClassFunction(key, _)
@@ -259,7 +259,7 @@ and private addAbstractMemberNames names (memb: AbstractMember) =
 let rec private addClassMemberNames names memberDeclaration =
     match memberDeclaration with
     | DecoratedClassMember(_, memberDeclaration) -> addClassMemberNames names memberDeclaration
-    | ClassMethod(_, parameters, _, _, _, returnType, typeParameters, _, _) ->
+    | ClassMethod(_, parameters, _, _, _, _, returnType, typeParameters, _, _) ->
         addParameterNames names parameters
         returnType |> Option.iter (addTypeNames names)
         addTypeParameterNames names typeParameters
@@ -387,6 +387,7 @@ let rec private declarationClassMembers
                       isStatic,
                       isAbstract,
                       _,
+                      _,
                       typeParameters,
                       loc,
                       doc) ->
@@ -424,6 +425,7 @@ let rec private declarationClassMembers
                     None,
                     isStatic,
                     isAbstract,
+                    false,
                     None,
                     typeParameters,
                     loc,
@@ -463,7 +465,7 @@ let rec private declarationClassMembers
                     doc
                 )
             |]
-        | ClassMethod(kind, parameters, _, isStatic, isAbstract, returnType, typeParameters, loc, doc) ->
+        | ClassMethod(kind, parameters, _, isStatic, isAbstract, isOverride, returnType, typeParameters, loc, doc) ->
             let returnType =
                 match kind, returnType with
                 | ClassSetter _, _ -> None
@@ -481,6 +483,7 @@ let rec private declarationClassMembers
                     None,
                     isStatic,
                     isAbstract,
+                    isOverride,
                     returnType,
                     typeParameters,
                     loc,

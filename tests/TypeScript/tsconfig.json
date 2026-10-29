@@ -24,6 +24,7 @@
     "rootDir": "../../..",
     "strict": true,
     "noImplicitReturns": true,
+    "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "noEmitOnError": true,
     "newLine": "lf",

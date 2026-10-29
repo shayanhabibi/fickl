@@ -1443,7 +1443,7 @@ module PrinterExtensions =
                     loc,
                     isAccessor = true
                 )
-            | ClassMethod(kind, parameters, body, isStatic, isAbstract, returnType, typeParameters, loc, doc) ->
+            | ClassMethod(kind, parameters, body, isStatic, isAbstract, isOverride, returnType, typeParameters, loc, doc) ->
                 printer.PrintJsDoc(doc)
 
                 printer.PrintClassMethod(
@@ -1452,6 +1452,7 @@ module PrinterExtensions =
                     body,
                     isStatic = isStatic,
                     isAbstract = isAbstract,
+                    isOverride = isOverride,
                     returnType = returnType,
                     typeParameters = typeParameters,
                     loc = loc
@@ -1470,7 +1471,9 @@ module PrinterExtensions =
                     loc = loc
                 )
 
-        member printer.PrintClassMethod(kind, parameters, body, isStatic, isAbstract, returnType, typeParameters, loc) =
+        member printer.PrintClassMethod
+            (kind, parameters, body, isStatic, isAbstract, isOverride, returnType, typeParameters, loc)
+            =
             printer.AddLocation(loc)
 
             if isStatic then
@@ -1478,6 +1481,9 @@ module PrinterExtensions =
 
             if isAbstract then
                 printer.Print("abstract ")
+
+            if isOverride then
+                printer.Print("override ")
 
             let isSetter =
                 match kind with

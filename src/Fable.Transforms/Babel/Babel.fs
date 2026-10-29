@@ -522,6 +522,8 @@ type ClassMember =
         body: BlockStatement option *
         isStatic: bool *
         isAbstract: bool *
+        /// TypeScript `override` modifier
+        isOverride: bool *
         returnType: TypeAnnotation option *
         typeParameters: TypeParameter array *
         loc: SourceLocation option *
@@ -941,7 +943,7 @@ module Helpers =
     type ClassMember with
 
         static member classMethod
-            (kind, parameters, body, ?isStatic, ?isAbstract, ?returnType, ?typeParameters, ?loc, ?doc)
+            (kind, parameters, body, ?isStatic, ?isAbstract, ?isOverride, ?returnType, ?typeParameters, ?loc, ?doc)
             : ClassMember
             =
             ClassMethod(
@@ -950,6 +952,7 @@ module Helpers =
                 body,
                 defaultArg isStatic false,
                 defaultArg isAbstract false,
+                defaultArg isOverride false,
                 returnType,
                 defaultArg typeParameters [||],
                 loc,
