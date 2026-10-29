@@ -15,6 +15,7 @@ let allTests =
     NativeGenerators.tests
     NativeAsyncGenerators.tests
     SymbolKeys.tests
+    JsNamespaceLibrary.tests
     Arithmetic.tests
     Arrays.tests
     Async.tests

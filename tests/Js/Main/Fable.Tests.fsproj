@@ -71,6 +71,8 @@
     <Compile Include="NativeAsyncGeneratorTests.fs" />
     <Compile Include="SymbolKeyBindings.fs" />
     <Compile Include="SymbolKeyTests.fs" />
+    <Compile Include="JsNamespaceLibraryBindings.fs" />
+    <Compile Include="JsNamespaceLibraryTests.fs" />
     <Compile Include="CurryingTests.fs" />
     <Compile Include="FcsEdgeCasesHelper.fs" />
     <Compile Include="FcsEdgeCaseTests.fs" />
