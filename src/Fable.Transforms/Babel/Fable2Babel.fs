@@ -430,8 +430,27 @@ module private SymbolKeys =
         FSharp2Fable.FsField.TrySymbolKey field
         |> Option.map (fun (att, file) -> expression com ctx (Some file) att)
 
+    /// Interop slots such as `JS.AsyncIterable.asyncIterator` are bound with `[<Emit("$0[Symbol.asyncIterator]()")>]`,
+    /// so implementations must use the same computed key for JS protocols like `for await` to find them.
+    let private tryEmittedSymbol (memberInfo: Fable.MemberFunctionOrValue) =
+        memberInfo.Attributes
+        |> Seq.tryPick (fun att ->
+            match att.ConstructorArgs with
+            | (:? string as macro) :: _ when att.Entity.FullName = Atts.emitAttr ->
+                let m = Regex.Match(macro, @"^\$0\[(Symbol\.[A-Za-z_$][\w$]*)\]\((?:\$1\.\.\.)?\)$")
+
+                if m.Success then
+                    Some(RawExpression(m.Groups[1].Value, None))
+                else
+                    None
+            | _ -> None
+        )
+
+    let private trySlotKey com ctx info =
+        tryMember com ctx info |> Option.orElseWith (fun () -> tryEmittedSymbol info)
+
     let memberKey com ctx info name =
-        match tryMember com ctx info with
+        match trySlotKey com ctx info with
         | Some key -> key, true
         | None -> Util.memberFromName name
 
@@ -439,7 +458,7 @@ module private SymbolKeys =
         let key =
             memb.ImplementedSignatureRef
             |> Option.bind com.TryGetMember
-            |> Option.bind (tryMember com ctx)
+            |> Option.bind (trySlotKey com ctx)
 
         match key with
         | Some key -> key, true
@@ -5022,7 +5041,9 @@ but thanks to the optimisation done below we get
                     | Types.icomparable
                     | Types.iStructuralComparable
                     | Types.ienumerable
-                    | Types.ienumerator -> None
+                    | Types.ienumerator
+                    // Marker base of JS.AsyncIterable<'T>; TypeScript's AsyncIterable needs a type argument
+                    | "Fable.Core.JS.AsyncIterable" -> None
                     | Types.ienumerableGeneric ->
                         // makeFableLibImportTypeAnnotation com ctx ifc.GenericArgs "Util" "IEnumerable" |> Some
                         makeNativeTypeAnnotation com ctx ifc.GenericArgs "Iterable" |> Some

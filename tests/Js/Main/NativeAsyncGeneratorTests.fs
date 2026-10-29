@@ -21,6 +21,12 @@ let private terminal (result: JsGeneratorResult<int, string>) =
 let private opaqueYield<'T> (value: 'T) : JsAsyncGenerator<'T, unit, unit> = jsAsyncGenerator { yield value }
 let private opaqueReturn<'T> (value: 'T) : JsAsyncGenerator<int, 'T, unit> = jsAsyncGenerator { return value }
 let private opaqueDelegate<'T> (values: seq<'T>) : JsAsyncGenerator<'T, unit, unit> = jsAsyncGenerator { yield! values }
+
+let private nativeSource () : JS.AsyncIterable<int> = emitJsExpr () "(async function* () { yield 20; yield 22; })()"
+
+type private DelegatingAsyncIterable() =
+    interface JS.AsyncIterable<int> with
+        member _.asyncIterator() = nativeSource().asyncIterator()
 #endif
 
 let tests =
@@ -175,6 +181,18 @@ let tests =
                 total <- total + ready
         } |> Async.AwaitPromise)
         total |> equal 42
+    }
+    testCaseAsync "implemented JS.AsyncIterable is iterable with for await" <| fun () -> async {
+        let fromClass: JS.AsyncIterable<int> = DelegatingAsyncIterable()
+        let fromObject =
+            { new JS.AsyncIterable<int> with
+                member _.asyncIterator() = nativeSource().asyncIterator() }
+        let mutable total = 0
+        do! (jsAsync {
+            for value in fromClass do total <- total + value
+            for value in fromObject do total <- total + value
+        } |> Async.AwaitPromise)
+        total |> equal 84
     }
     testCaseAsync "async iterator return is awaited when a consumer throws" <| fun () -> async {
         let mutable closed = false
