@@ -138,7 +138,7 @@ export class Derived extends Base {
         super();
     }
     @(methodFactory('override'))
-    "NativeDecorators.Base.MessageZ721C83C5"(value: string): string {
+    override "NativeDecorators.Base.MessageZ721C83C5"(value: string): string {
         return value;
     }
 }

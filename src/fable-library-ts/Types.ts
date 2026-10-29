@@ -223,7 +223,7 @@ export class FSharpRef<T> {
 export abstract class FSharpException extends Exception
   implements IEquatable<FSharpException>, IComparable<FSharpException> {
   toJSON() { return recordToJSON(this); }
-  toString() { return recordToString(this); }
+  override toString() { return recordToString(this); }
   GetHashCode() { return recordGetHashCode(this); }
   Equals(other: FSharpException) { return recordEquals(this, other); }
   CompareTo(other: FSharpException) { return recordCompareTo(this, other); }
