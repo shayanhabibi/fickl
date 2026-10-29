@@ -1,8 +1,40 @@
 const payloads = new WeakMap<object, object>();
 
+// A payload that already carries its tag is a valid case value, so the case holds the payload itself.
+function hasTag(value: object, tagName: string, tag: unknown): boolean {
+  return Object.is(Reflect.get(value, tagName), tag);
+}
+
+function isPlainObject(value: object): boolean {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+export function withInlineInterfaceTag<T extends object, K extends string, const V>(value: T, tagName: K, tag: V): T & Record<K, V> {
+  return hasTag(value, tagName, tag) ? value as T & Record<K, V> : taggedView(value, tagName, tag);
+}
+
+export function copyWithInlineInterfaceTag<T extends object, K extends string, const V>(value: T, tagName: K, tag: V): T & Record<K, V> {
+  return hasTag(value, tagName, tag) ? value as T & Record<K, V> : taggedCopy(value, tagName, tag);
+}
+
+export function copyPlainWithInlineInterfaceTag<T extends object, K extends string, const V>(value: T, tagName: K, tag: V): T & Record<K, V> {
+  if (hasTag(value, tagName, tag)) {
+    return value as T & Record<K, V>;
+  }
+  return isPlainObject(value) ? taggedCopy(value, tagName, tag) : taggedView(value, tagName, tag);
+}
+
+// The copy snapshots the payload's own enumerable properties; reading the field still returns the original.
+function taggedCopy<T extends object, K extends string, const V>(value: T, tagName: K, tag: V): T & Record<K, V> {
+  const copy = Object.assign(Object.create(Object.getPrototypeOf(value)), value, { [tagName]: tag }) as T & Record<K, V>;
+  payloads.set(copy, value);
+  return copy;
+}
+
 // The tagged view owns its discriminator and forwards the interface to its payload.
 // A separate target keeps proxy invariants independent of sealed/frozen payloads.
-export function withInlineInterfaceTag<T extends object, K extends string, const V>(value: T, tagName: K, tag: V): T & Record<K, V> {
+function taggedView<T extends object, K extends string, const V>(value: T, tagName: K, tag: V): T & Record<K, V> {
   const target = Object.create(Object.getPrototypeOf(value)) as T;
   Object.defineProperty(target, tagName, { value: tag, enumerable: true, configurable: true, writable: true });
   const methods = new Map<PropertyKey, { original: unknown; bound: unknown }>();

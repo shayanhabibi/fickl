@@ -1019,6 +1019,21 @@ module AST =
             Error
                 $"InlineInterface cannot apply to '%s{uci.Name}': the case must have exactly one field, whose type is an interface"
 
+    /// <summary>The InlineInterfaceRepresentation argument of a case, else of its union, else View (0).</summary>
+    let inlineInterfaceRepresentation (ent: Entity) (uci: UnionCase) =
+        let tryRepresentation (atts: Attribute seq) =
+            atts
+            |> Seq.tryPick (fun att ->
+                match att.ConstructorArgs with
+                | [ :? int as representation ] when att.Entity.FullName = Atts.ficklInlineInterface ->
+                    Some representation
+                | _ -> None
+            )
+
+        tryRepresentation uci.Attributes
+        |> Option.orElseWith (fun () -> tryRepresentation ent.Attributes)
+        |> Option.defaultValue 0
+
     /// <summary>Returns the interface type of a tagged union case with a single unnamed interface field.</summary>
     let tryInlinedTaggedUnionCaseType (com: Compiler) (uci: UnionCase) =
         match uci.UnionCaseFields with

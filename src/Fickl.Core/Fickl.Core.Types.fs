@@ -76,6 +76,28 @@ type CaseTestAttribute(test: string) =
     inherit Attribute()
 
 /// <summary>
+/// How an <c>InlineInterface</c> case holds a field value that does not already carry the case's tag.
+/// A field value that already carries the tag is always held as itself.
+/// </summary>
+type InlineInterfaceRepresentation =
+    /// <summary>
+    /// A tagged view that forwards properties and methods to the field value.
+    /// JavaScript code reading the union value sees the field value's current state.
+    /// The union value cannot be structured-cloned, so it cannot cross a <c>postMessage</c> or RPC boundary, and cannot be frozen.
+    /// </summary>
+    | View = 0
+    /// <summary>
+    /// A copy of the field value's own enumerable properties, with its prototype and the tag.
+    /// The union value is an ordinary object that can be structured-cloned and frozen.
+    /// JavaScript code reading the union value sees the state at construction, and its writes do not reach the field value.
+    /// </summary>
+    | Copy = 1
+    /// <summary>
+    /// <c>Copy</c> for a field value whose prototype is <c>Object.prototype</c> or <c>null</c>, and <c>View</c> otherwise.
+    /// </summary>
+    | CopyPlainObjects = 2
+
+/// <summary>
 /// Compiles a case of a <c>TypeScriptTaggedUnion</c> as its interface field with the tag added,
 /// instead of as an object holding the field.
 /// On the union type, it applies to every case that has fields.
@@ -89,11 +111,15 @@ type CaseTestAttribute(test: string) =
 ///     | Save
 /// </code>
 /// The TypeScript type of the <c>Take</c> case is <c>Take &amp; { type: "take" }</c>.
-/// Constructing the case creates a tagged view that forwards properties and methods to the original field value.
-/// The tag leaves the original value unchanged. Reading the field returns the original object with its identity and state.
+/// When the field value already carries the case's tag, the case holds the field value itself.
+/// Otherwise the tag leaves the field value unchanged, and the <c>InlineInterfaceRepresentation</c>
+/// argument chooses how the case holds it; the default is <c>View</c>. An argument on a case overrides one on the union type.
+/// Reading the field returns the original object with its identity and state.
 /// </remarks>
-type InlineInterfaceAttribute() =
+type InlineInterfaceAttribute(representation: InlineInterfaceRepresentation) =
     inherit Attribute()
+    new() = InlineInterfaceAttribute(InlineInterfaceRepresentation.View)
+    member _.Representation = representation
 
 /// <summary>
 /// Keeps a function parameter curried in JavaScript, so it is passed and called one argument at a time.

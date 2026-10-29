@@ -144,10 +144,16 @@ let private transformNewUnion com ctx r fsType (unionCase: FSharpUnionCase) (arg
             let expr =
                 match inlined, argExprs with
                 | Some _, [ argExpr ] ->
+                    let helper =
+                        match inlineInterfaceRepresentation (FsEnt tdef) (FsUnionCase unionCase) with
+                        | 1 -> "copyWithInlineInterfaceTag"
+                        | 2 -> "copyPlainWithInlineInterfaceTag"
+                        | _ -> "withInlineInterfaceTag"
+
                     Replacements.Util.Helper.LibCall(
                         com,
                         "TaggedUnion",
-                        "withInlineInterfaceTag",
+                        helper,
                         Fable.Any,
                         [ argExpr; makeStrConst tagName; tagExpr ],
                         ?loc = r
