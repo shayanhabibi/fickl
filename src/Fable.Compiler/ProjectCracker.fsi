@@ -76,4 +76,7 @@ type ProjectCrackerResolver =
     abstract member GetProjectOptionsFromProjectFile:
         isMain: bool * options: CrackerOptions * projectFile: string -> ProjectOptionsResponse
 
+/// Whether an assembly sits where a NuGet package keeps it, so its package metadata can be looked for next to it.
+val isPackageAssemblyPath: dllPath: string -> bool
+
 val getFullProjectOpts: resolver: ProjectCrackerResolver -> opts: CrackerOptions -> CrackerResponse
