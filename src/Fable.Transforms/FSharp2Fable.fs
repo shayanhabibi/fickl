@@ -120,18 +120,15 @@ let private transformNewUnion com ctx r fsType (unionCase: FSharpUnionCase) (arg
     | TypeScriptTaggedUnion(tdef, _, tagName, rule) ->
         let inlined = inlinedInterface com ctx r tdef unionCase
 
-        let isCompiledValue, tagExpr =
+        let tagExpr =
             match FsUnionCase.CompiledValue unionCase with
-            | None -> false, transformStringEnum rule unionCase
-            | Some(CompiledValue.Integer i) -> false, makeIntConst i
-            | Some(CompiledValue.Float f) -> false, makeFloatConst f
-            | Some(CompiledValue.Boolean b) -> false, makeBoolConst b
+            | None -> transformStringEnum rule unionCase
+            | Some(CompiledValue.Integer i) -> makeIntConst i
+            | Some(CompiledValue.Float f) -> makeFloatConst f
+            | Some(CompiledValue.Boolean b) -> makeBoolConst b
 
-        match inlined, tryInlinedTaggedUnionCase com unionCase, argExprs, isCompiledValue, com.Options.Language with
-        | None, Some _, [ argExpr ], _, _ -> Fable.TypeCast(argExpr, makeType ctx.GenericArgs fsType)
-        | _, _, _, true, TypeScript ->
-            "CompileValue attribute is not supported in TypeScript"
-            |> addErrorAndReturnNull com ctx.InlinePath r
+        match inlined, tryInlinedTaggedUnionCase com unionCase, argExprs with
+        | None, Some _, [ argExpr ] -> Fable.TypeCast(argExpr, makeType ctx.GenericArgs fsType)
         | _ ->
             let fieldNames, fieldTypes =
                 unionCase.Fields
@@ -873,47 +870,41 @@ let private transformUnionCaseTest
                     |> addErrorAndReturnNull com ctx.InlinePath r
 
         | TypeScriptTaggedUnion(tdef, _, tagName, rule) ->
-            let isCompiledValue, value =
+            let value =
                 match FsUnionCase.CompiledValue unionCase with
-                | None -> false, transformStringEnum rule unionCase
-                | Some(CompiledValue.Integer i) -> true, makeIntConst i
-                | Some(CompiledValue.Float f) -> true, makeFloatConst f
-                | Some(CompiledValue.Boolean b) -> true, makeBoolConst b
+                | None -> transformStringEnum rule unionCase
+                | Some(CompiledValue.Integer i) -> makeIntConst i
+                | Some(CompiledValue.Float f) -> makeFloatConst f
+                | Some(CompiledValue.Boolean b) -> makeBoolConst b
 
-            match isCompiledValue, com.Options.Language with
-            | true, TypeScript ->
-                return
-                    "CompileValue attribute is not supported in TypeScript"
-                    |> addErrorAndReturnNull com ctx.InlinePath r
-            | _ ->
-                let makeTagTest unionExpr =
-                    let getTag = Fable.Get(unionExpr, Fable.FieldInfo.Create(tagName), value.Type, r)
-                    makeEqOp r getTag value BinaryEqual
+            let makeTagTest unionExpr =
+                let getTag = Fable.Get(unionExpr, Fable.FieldInfo.Create(tagName), value.Type, r)
+                makeEqOp r getTag value BinaryEqual
 
-                let caseTests: (Fable.Expr -> Fable.Expr) list =
-                    match FsUnionCase.CaseTest unionCase with
-                    | Some macro -> [ fun unionExpr -> emitExpr r Fable.Boolean [ unionExpr ] macro ]
-                    | None ->
-                        match deriveDerivedCaseTests com tdef rule unionCase with
-                        | Ok tests -> tests |> List.map (fun test unionExpr -> makeDerivedCaseTest r unionExpr test)
-                        | Error(other, reason) ->
-                            let tag = taggedUnionTagDisplay rule unionCase
+            let caseTests: (Fable.Expr -> Fable.Expr) list =
+                match FsUnionCase.CaseTest unionCase with
+                | Some macro -> [ fun unionExpr -> emitExpr r Fable.Boolean [ unionExpr ] macro ]
+                | None ->
+                    match deriveDerivedCaseTests com tdef rule unionCase with
+                    | Ok tests -> tests |> List.map (fun test unionExpr -> makeDerivedCaseTest r unionExpr test)
+                    | Error(other, reason) ->
+                        let tag = taggedUnionTagDisplay rule unionCase
 
-                            $"Cases '%s{unionCase.Name}' and '%s{other.Name}' of '%s{tdef.DisplayName}' share the tag value %s{tag} and %s{reason}. Add a CaseTest attribute to '%s{unionCase.Name}' or '%s{other.Name}'."
-                            |> addError com ctx.InlinePath r
+                        $"Cases '%s{unionCase.Name}' and '%s{other.Name}' of '%s{tdef.DisplayName}' share the tag value %s{tag} and %s{reason}. Add a CaseTest attribute to '%s{unionCase.Name}' or '%s{other.Name}'."
+                        |> addError com ctx.InlinePath r
 
-                            []
+                        []
 
-                let makeTest unionExpr =
-                    (makeTagTest unionExpr, caseTests)
-                    ||> List.fold (fun acc test -> makeLogOp r acc (test unionExpr) LogicalAnd)
+            let makeTest unionExpr =
+                (makeTagTest unionExpr, caseTests)
+                ||> List.fold (fun acc test -> makeLogOp r acc (test unionExpr) LogicalAnd)
 
-                // The union value is read once per test, so bind it first if it is not a plain value
-                if canHaveSideEffects com unionExpr && not (List.isEmpty caseTests) then
-                    let ident = getIdentUniqueName com ctx "unionValue" |> makeTypedIdent unionExpr.Type
-                    return Fable.Let(ident, unionExpr, makeTest (Fable.IdentExpr ident))
-                else
-                    return makeTest unionExpr
+            // The union value is read once per test, so bind it first if it is not a plain value
+            if canHaveSideEffects com unionExpr && not (List.isEmpty caseTests) then
+                let ident = getIdentUniqueName com ctx "unionValue" |> makeTypedIdent unionExpr.Type
+                return Fable.Let(ident, unionExpr, makeTest (Fable.IdentExpr ident))
+            else
+                return makeTest unionExpr
 
         | OptionUnion _ ->
             let kind =
