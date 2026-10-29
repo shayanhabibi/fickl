@@ -54,6 +54,37 @@ What Fickl gets right that Fable 5.25.0 does not, checked by compiling each case
 | `--strictOptions` | `Some null` of a string, array, class, record or function stays `Some`, as on .NET, built the same way at concrete and generic sites. Value options stay erased. | doesn't compile: Unknown argument: --strictoptions | [#32](https://github.com/shayanhabibi/fickl/issues/32) |
 <!-- fickl-differences:end -->
 
+## Added functionality
+
+What Fickl adds on top of Fable. The computation expressions, attributes and functions live in the `Fickl.Core` package and target JavaScript and TypeScript.
+
+| Feature | Kind | What it does |
+| --- | --- | --- |
+| `jsAsync { }` | Computation expression | Compiles to a native `async` function returning a `JS.Promise`: `let!` emits `await`, `for` over a `JS.AsyncIterable` emits `for await`, and it starts running immediately. There is no F# cancellation token. |
+| `[<AsyncFunction>]` | Attribute on a module function | Emits a function returning `jsAsync` as a native `async function` declaration. |
+| `jsGenerator { }` | Computation expression | Compiles to a native generator, a `JsGenerator<'Yield, 'Return, 'Next>` typed by what it yields, returns and receives from `next`. `let!` binds the value sent back by `next`. |
+| `[<GeneratorFunction>]` | Attribute on a module function | Emits a function returning `jsGenerator` as a native `function*` declaration. |
+| `jsAsyncGenerator { }`, `jsYield` | Computation expression | Compiles to a native async generator, a `JsAsyncGenerator<'Yield, 'Return, 'Next>`. `let!` awaits a Promise, `let! reply = jsYield value` yields and receives, and `use` awaits `IAsyncDisposable` or `Symbol.asyncDispose`. |
+| `[<AsyncGeneratorFunction>]` | Attribute on a module function | Emits a function returning `jsAsyncGenerator` as a native `async function*` declaration. |
+| Native disposal | Runtime | F# `use` consumes objects implementing `Symbol.dispose` and `Symbol.asyncDispose`, and compiled `IDisposable` and `IAsyncDisposable` values work with native `using` and `await using`. |
+| `jsFunction`, `[<JsFunction>]` | Function, attribute on a parameter | Compiles a lambda as an ordinary `function` with its own `this` and `arguments`, instead of an arrow function. |
+| `withThis` | Function | Compiles a lambda as a `function` whose first argument is its `this` receiver, typed as a TypeScript `this` parameter. |
+| `[<JsDecorator>]` | Attribute on a class or member | Emits a native decorator, global or imported, on a class, method, property or field. |
+| `[<SymbolKey>]` | Attribute on a member or field | Uses a symbol expression, such as `Symbol.iterator` or an imported symbol, as the JavaScript key of a member, interface slot or record field. |
+| `[<CallableInterface>]` | Attribute on an interface | An object expression implementing the interface compiles to a plain function, and `Invoke` calls compile to direct calls. A generic `Invoke` stays generic. |
+| `[<CaseTest>]` | Attribute on a union case | A JavaScript predicate that identifies an erased union case, or tells apart `TypeScriptTaggedUnion` cases that share a tag. |
+| `[<InlineInterface>]` | Attribute on a union or case | Compiles a `TypeScriptTaggedUnion` case holding one interface as that interface with the tag added, `Take & { type: "take" }`. |
+| `[<Curried>]` | Attribute on a parameter or field | Keeps a function curried, for JavaScript that passes or calls it one argument at a time. |
+| `[<NoOverloadSuffix>]` | Attribute on a member or type | Drops the overload hash from compiled member names, `Counter__Add` instead of `Counter__Add_Z524259A4`. |
+| `--declaration` | CLI flag | Writes a TypeScript declaration file (`.d.ts`) next to each JavaScript file. |
+| `--strictOptions` | CLI flag | Keeps `Some null` apart from `None`, as on .NET. |
+| `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |
+| `--temporal` | CLI flag | Represents dates and times with the JavaScript Temporal API (experimental). |
+| `--server` | CLI flag | Compiles through a background server that keeps check results, so a recompile only rechecks what changed. `FICKL_SERVER=1` turns it on too. |
+| `--timings` | CLI flag | Prints a per-phase timing and allocation report after each compilation. |
+| Package cache | Compiler | Type-checked package sources are cached per user, keyed by their contents and the compiler options, so later compiles skip checking them. `--noPackageCache` turns it off. |
+| `FICKL_COMPILER` | Define | Defined when compiling with Fickl, so code can choose between Fickl.Core and Fable.Core. |
+
 ## Explicit control of expression
 
 When targeting another language, a sensible collection of ergonomic changes are made to faithfully represent F# semantics in the target language. Beyond this, are a collection of attributes and other compiler recognised constructs that inform our transformation pipeline.
