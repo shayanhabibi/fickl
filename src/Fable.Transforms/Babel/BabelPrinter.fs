@@ -209,7 +209,8 @@ module PrinterExtensions =
                 items,
                 (fun p x ->
                     match x with
-                    | ImportMemberSpecifier(local, imported) -> p.PrintImportMemberSpecific(local, imported)
+                    | ImportMemberSpecifier(local, imported, isTypeOnly) ->
+                        p.PrintImportMemberSpecific(local, imported, isTypeOnly)
                     | ImportDefaultSpecifier(local) -> printer.PrintIdent(local)
                     | ImportNamespaceSpecifier(local) -> printer.PrintImportNamespaceSpecifier(local)
                 ),
@@ -1548,8 +1549,11 @@ module PrinterExtensions =
             printer.PrintOptional(typeAnnotation, ": ")
             printer.PrintOptional(value, " = ")
 
-        member printer.PrintImportMemberSpecific(local, imported) =
+        member printer.PrintImportMemberSpecific(local, imported, isTypeOnly) =
             // Don't print the braces, node will be done in the import declaration
+            if isTypeOnly then
+                printer.Print("type ")
+
             printer.PrintIdent(imported)
 
             if imported.Name <> local.Name then
@@ -1565,7 +1569,8 @@ module PrinterExtensions =
                 specifiers
                 |> Array.choose (
                     function
-                    | ImportMemberSpecifier(local, imported) -> Some(ImportMemberSpecifier(local, imported))
+                    | ImportMemberSpecifier(local, imported, isTypeOnly) ->
+                        Some(ImportMemberSpecifier(local, imported, isTypeOnly))
                     | _ -> None
                 )
 
@@ -1585,7 +1590,35 @@ module PrinterExtensions =
                     | _ -> None
                 )
 
-            printer.Print("import ")
+            // `import type { a, b }` when nothing is a value, otherwise `import { a, type b }`
+            let allTypeOnly =
+                Array.isEmpty defaults
+                && Array.isEmpty namespaces
+                && not (Array.isEmpty members)
+                && members
+                   |> Array.forall (
+                       function
+                       | ImportMemberSpecifier(isTypeOnly = isTypeOnly) -> isTypeOnly
+                       | _ -> false
+                   )
+
+            let members =
+                if allTypeOnly then
+                    members
+                    |> Array.map (
+                        function
+                        | ImportMemberSpecifier(local, imported, _) -> ImportMemberSpecifier(local, imported, false)
+                        | specifier -> specifier
+                    )
+                else
+                    members
+
+            printer.Print(
+                if allTypeOnly then
+                    "import type "
+                else
+                    "import "
+            )
 
             if not (Array.isEmpty defaults) then
                 printer.PrintCommaSeparatedArray(defaults)

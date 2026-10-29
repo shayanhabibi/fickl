@@ -1,5 +1,5 @@
 import { FSharpRef } from "./Types.ts";
-import { toInt64, int64 } from "./BigInt.ts";
+import { toInt64, type int64 } from "./BigInt.ts";
 import { Exception, padWithZeros } from "./Util.ts";
 
 export type TimeSpan = Temporal.Duration;

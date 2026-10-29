@@ -1,4 +1,4 @@
-import { FSharpRef, Result } from "./Types.ts";
+import { FSharpRef, type Result } from "./Types.ts";
 import { Exception } from "./Util.ts";
 
 export const UriKind = {

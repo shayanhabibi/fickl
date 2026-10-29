@@ -1,7 +1,7 @@
 
-import { FSharpChoice$2_$union, Choice_tryValueIfChoice1Of2, Choice_tryValueIfChoice2Of2 } from "./Choice.ts";
-import { Option, some, value } from "./Option.ts";
-import { IDisposable, createDisposable } from "./Util.ts";
+import { type FSharpChoice$2_$union, Choice_tryValueIfChoice1Of2, Choice_tryValueIfChoice2Of2 } from "./Choice.ts";
+import { type Option, some, value } from "./Option.ts";
+import { type IDisposable, createDisposable } from "./Util.ts";
 
 export interface IObserver<T> {
   OnNext: (x: T) => void;

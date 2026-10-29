@@ -1,4 +1,4 @@
-import { Exception, Nullable, structuralHash, equals, compare } from "./Util.ts";
+import { Exception, type Nullable, structuralHash, equals, compare } from "./Util.ts";
 import { toString } from "./Types.ts";
 
 // Options are erased in runtime by Fable, but we have

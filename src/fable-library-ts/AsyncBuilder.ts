@@ -1,4 +1,4 @@
-import { Exception, ensureErrorOrException, IDisposable, disposeSafe, disposeSymbol, createDisposable } from "./Util.ts";
+import { Exception, ensureErrorOrException, type IDisposable, disposeSafe, disposeSymbol, createDisposable } from "./Util.ts";
 
 export interface AsyncReplyChannel<Reply> {
   reply(value: Reply): void

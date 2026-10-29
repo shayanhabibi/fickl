@@ -16,14 +16,14 @@
  * value to milliseconds.
  */
 
-import { int64, fromFloat64 } from "./BigInt.ts";
+import { type int64, fromFloat64 } from "./BigInt.ts";
 import { FSharpRef } from "./Types.ts";
 import { Exception, DateTimeKind, padWithZeros } from "./Util.ts";
 import {
-  TimeSpan, fromTicks as TimeSpan_fromTicks, fromUnits as TimeSpan_fromUnits,
+  type TimeSpan, fromTicks as TimeSpan_fromTicks, fromUnits as TimeSpan_fromUnits,
   totalNanoseconds as TimeSpan_totalNanoseconds,
 } from "./TimeSpanTemporal.ts";
-import { DateTime, dateTime, create as createDateTime, getTicks as DateTime_getTicks } from "./DateTimeTemporal.ts";
+import { type DateTime, dateTime, create as createDateTime, getTicks as DateTime_getTicks } from "./DateTimeTemporal.ts";
 import * as Format from "./DateTimeFormat.ts";
 
 export type DateTimeOffset = Temporal.ZonedDateTime;

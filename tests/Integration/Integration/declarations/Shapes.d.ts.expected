@@ -1,7 +1,7 @@
-import { int32, float64 } from "./fable_modules/fable-library-js.5.24.0/Int32.js";
+import type { int32, float64 } from "./fable_modules/fable-library-js.5.24.0/Int32.js";
 import { Record, Union } from "./fable_modules/fable-library-js.5.24.0/Types.js";
-import { TypeInfo } from "./fable_modules/fable-library-js.5.24.0/Reflection.js";
-import { IComparable, IEquatable } from "./fable_modules/fable-library-js.5.24.0/Util.js";
+import type { TypeInfo } from "./fable_modules/fable-library-js.5.24.0/Reflection.js";
+import type { IComparable, IEquatable } from "./fable_modules/fable-library-js.5.24.0/Util.js";
 export type Color = 
     | "red"
     | "dark-blue"

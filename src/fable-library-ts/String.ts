@@ -1,5 +1,5 @@
 import { toString as dateToString } from "./Date.ts";
-import { compare as numericCompare, divide, isNumeric, isIntegral, multiply, Numeric, toExponential, toFixed, toHex, toPrecision, toRadix } from "./Numeric.ts";
+import { compare as numericCompare, divide, isNumeric, isIntegral, multiply, type Numeric, toExponential, toFixed, toHex, toPrecision, toRadix } from "./Numeric.ts";
 import { escape } from "./RegExp.ts";
 import { toString } from "./Types.ts";
 import { Exception } from "./Util.ts";

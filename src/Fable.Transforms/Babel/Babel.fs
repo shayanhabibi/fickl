@@ -553,7 +553,7 @@ type ClassMethodKind =
 /// If it is an aliased import, such as in import {foo as bar} from "mod", the imported field is an Identifier node representing foo, and the local field is an Identifier node representing bar.
 type ImportSpecifier =
     /// e.g., import foo from "mod";.
-    | ImportMemberSpecifier of local: Identifier * imported: Identifier
+    | ImportMemberSpecifier of local: Identifier * imported: Identifier * isTypeOnly: bool
     /// A default import specifier, e.g., foo in import foo from "mod".
     | ImportDefaultSpecifier of local: Identifier
     /// A namespace import specifier, e.g., * as foo in import * as foo from "mod".

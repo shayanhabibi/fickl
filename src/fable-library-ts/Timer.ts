@@ -1,5 +1,5 @@
 import { Event } from "./Event.ts";
-import { IDisposable, disposeSymbol } from "./Util.ts";
+import { type IDisposable, disposeSymbol } from "./Util.ts";
 
 export class Timer implements IDisposable, Disposable {
   public Interval: number;

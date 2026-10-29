@@ -1,6 +1,6 @@
 import { FSharpRef } from "./Types.ts";
-import { toInt64, fromFloat64, int64 } from "./BigInt.ts";
-import { TimeSpan, fromTicks as TimeSpan_fromTicks, totalNanoseconds as TimeSpan_totalNanoseconds } from "./TimeSpanTemporal.ts";
+import { toInt64, fromFloat64, type int64 } from "./BigInt.ts";
+import { type TimeSpan, fromTicks as TimeSpan_fromTicks, totalNanoseconds as TimeSpan_totalNanoseconds } from "./TimeSpanTemporal.ts";
 import { Exception } from "./Util.ts";
 
 export type TimeOnly = Temporal.PlainTime;

@@ -24,6 +24,8 @@ type Import =
         Selector: string
         LocalIdent: string option
         Path: string
+        /// Only requested from type annotations, so TypeScript can print it as `import type`
+        IsTypeOnly: bool
     }
 
 type ITailCallOpportunity =
@@ -75,6 +77,12 @@ type IBabelCompiler =
 
     abstract GetImportExpr:
         Context * selector: string * path: string * range: SourceLocation option * ?noMangle: bool -> Expression
+
+    /// <summary>Runs an annotation builder; imports it requests are type-only unless also requested as values.</summary>
+    abstract InTypePosition: (unit -> 'T) -> 'T
+
+    /// <summary>Marks the import bound to a local name as a value, e.g. when a class extends it.</summary>
+    abstract MarkValueImport: localName: string -> unit
 
     abstract TransformAsExpr: Context * Fable.Expr -> Expression
 
@@ -1086,7 +1094,8 @@ module Annotation =
         Identifier.identifier (typeName) |> makeGenericTypeAnnotation com ctx genArgs
 
     let makeFableLibImportTypeId (com: IBabelCompiler) ctx moduleName typeName =
-        let expr = com.GetImportExpr(ctx, typeName, getLibPath com moduleName, None)
+        let expr =
+            com.InTypePosition(fun () -> com.GetImportExpr(ctx, typeName, getLibPath com moduleName, None))
 
         match expr with
         | Expression.Identifier(id) -> id
@@ -1360,11 +1369,22 @@ module Annotation =
         )
         |> UnionTypeAnnotation
 
+    /// `extends` evaluates its class, so the import behind it cannot be type-only
+    let makeSuperType (com: IBabelCompiler) (annotation: TypeAnnotation) =
+        match annotation with
+        | AliasTypeAnnotation(Identifier(name, _), _) -> com.MarkValueImport(name)
+        | _ -> ()
+
+        SuperType annotation
+
+    let private annotationConstructor (com: IBabelCompiler) ctx ent =
+        com.InTypePosition(fun () -> Lib.tryJsConstructorFor Annotation com ctx ent)
+
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
         match genArgs, ent with
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta
 
-        | _, Patterns.Try (Lib.tryJsConstructorFor Annotation com ctx) entRef ->
+        | _, Patterns.Try (annotationConstructor com ctx) entRef ->
             match entRef with
             | Literal(Literal.StringLiteral(StringLiteral(str, _))) ->
                 match str with
@@ -2648,8 +2668,8 @@ module Util =
         | Some(Fable.Call(baseRef, info, _, _)), _ ->
             let baseExpr =
                 match com.Options.Language, baseType, baseRef with
-                | TypeScript, Some typ, _ -> makeTypeAnnotation com ctx typ |> SuperType
-                | TypeScript, None, Fable.IdentExpr id -> makeTypeAnnotation com ctx id.Type |> SuperType
+                | TypeScript, Some typ, _ -> makeTypeAnnotation com ctx typ |> makeSuperType com
+                | TypeScript, None, Fable.IdentExpr id -> makeTypeAnnotation com ctx id.Type |> makeSuperType com
                 | _ -> transformAsExpr com ctx baseRef |> SuperExpression
 
             let args = transformCallArgs com ctx info
@@ -5775,7 +5795,7 @@ but thanks to the optimisation done below we get
                     |]
 
             TypeAnnotation.aliasTypeAnnotation (id, typeArguments = typeParamInst)
-            |> SuperType
+            |> makeSuperType com
             |> Some
 
         let cases =
@@ -6086,7 +6106,7 @@ but thanks to the optimisation done below we get
                 | Some baseType when com.IsTypeScript ->
                     Fable.DeclaredType(baseType.Entity, baseType.GenericArgs)
                     |> makeTypeAnnotation com ctx
-                    |> SuperType
+                    |> makeSuperType com
                     |> Some
                 | Some baseType ->
                     com.GetEntity(baseType.Entity)
@@ -6794,7 +6814,7 @@ but thanks to the optimisation done below we get
                         else
                             transformClassWithCompilerGeneratedConstructor com ctx ent decl classMembers
 
-    let transformImports (imports: Import seq) : ModuleDeclaration list =
+    let transformImports isTypeScript (imports: Import seq) : ModuleDeclaration list =
         let statefulImports = ResizeArray()
 
         imports
@@ -6807,7 +6827,12 @@ but thanks to the optimisation done below we get
                     match import.Selector with
                     | "*" -> ImportNamespaceSpecifier(localId)
                     | "default" -> ImportDefaultSpecifier(localId)
-                    | memb -> ImportMemberSpecifier(localId, Identifier.identifier (memb))
+                    | memb ->
+                        ImportMemberSpecifier(
+                            localId,
+                            Identifier.identifier (memb),
+                            isTypeScript && import.IsTypeOnly
+                        )
                 )
 
             import.Path, specifier
@@ -6887,6 +6912,7 @@ module Compiler =
     type BabelCompiler(com: Compiler) =
         let onlyOnceWarnings = HashSet<string>()
         let imports = Dictionary<string, Import>()
+        let mutable typePositionDepth = 0
         let symbolKeys = Dictionary<string, Expression>()
         let symbolDeclarations = ResizeArray<ModuleDeclaration>()
         let topDirectivesPrologue = HashSet<string>()
@@ -6905,8 +6931,13 @@ module Compiler =
                 let path = path.Trim()
                 let cachedName = path + "::" + selector
 
+                let isTypeOnly = typePositionDepth > 0
+
                 match imports.TryGetValue(cachedName) with
                 | true, i ->
+                    if i.IsTypeOnly && not isTypeOnly then
+                        imports[cachedName] <- { i with IsTypeOnly = false }
+
                     match i.LocalIdent with
                     | Some localIdent -> Expression.identifier (localIdent)
                     | None -> Expression.nullLiteral ()
@@ -6921,6 +6952,7 @@ module Compiler =
                             Selector = selector
                             Path = path
                             LocalIdent = localId
+                            IsTypeOnly = isTypeOnly
                         }
 
                     imports.Add(cachedName, i)
@@ -6986,6 +7018,19 @@ module Compiler =
 
             member bcom.TransformFunction(ctx, name, args, body) =
                 transformFunction bcom ctx name args body
+
+            member _.InTypePosition(build) =
+                typePositionDepth <- typePositionDepth + 1
+
+                try
+                    build ()
+                finally
+                    typePositionDepth <- typePositionDepth - 1
+
+            member _.MarkValueImport(localName) =
+                imports
+                |> Seq.tryFind (fun kv -> kv.Value.IsTypeOnly && kv.Value.LocalIdent = Some localName)
+                |> Option.iter (fun kv -> imports[kv.Key] <- { kv.Value with IsTypeOnly = false })
 
             member bcom.TransformImport(ctx, selector, path) =
                 transformImport bcom ctx None selector path
@@ -7096,7 +7141,7 @@ module Compiler =
         let topDirectivesPrologue =
             com.GetAllAllTopDirectivesPrologue() |> transformDirectivesPrologue
 
-        let importDecls = com.GetAllImports() |> transformImports
+        let importDecls = com.GetAllImports() |> transformImports com.IsTypeScript
 
         let body =
             topDirectivesPrologue @ importDecls @ com.GetSymbolDeclarations() @ rootDecls

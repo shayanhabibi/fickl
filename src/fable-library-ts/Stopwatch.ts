@@ -1,4 +1,4 @@
-import { int64 } from "./BigInt.ts";
+import { type int64 } from "./BigInt.ts";
 
 // Timestamps are in microseconds, the resolution performance.now() can offer
 const ticksPerMillisecond = 1000;

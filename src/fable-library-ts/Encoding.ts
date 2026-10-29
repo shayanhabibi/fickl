@@ -1,4 +1,4 @@
-import { uint8 } from "./Int32.ts";
+import { type uint8 } from "./Int32.ts";
 
 const littleEndian = true;
 
