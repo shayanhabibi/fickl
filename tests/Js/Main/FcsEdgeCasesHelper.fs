@@ -9,6 +9,13 @@ let internal track x =
     calls <- calls + 1
     x
 
+// Separate from `calls`, which another test reads before and after, as Expecto runs tests in parallel on .NET
+let mutable internal sums = 0
+
+let internal trackSum x =
+    sums <- sums + 1
+    x
+
 let internal wrap<'T> (x: 'T) = [ x; x ]
 
 let inline internal scale x = scaleBy x + 1
@@ -31,7 +38,7 @@ type Meter =
     static member inline internal Create x = { Value = scaleBy x }
 
 let inline internal addAll (xs: ^T list) : ^T =
-    List.fold (fun acc x -> acc + x) LanguagePrimitives.GenericZero xs |> track
+    List.fold (fun acc x -> acc + x) LanguagePrimitives.GenericZero xs |> trackSum
 
 #if FABLE_COMPILER
 // The .NET compiler rejects this (FS1113), but Fable allows it, as precompiled packages rely on it
