@@ -687,6 +687,10 @@ let reflectionTests = [
       t.GetEnumUnderlyingType() |> equal typeof<sbyte>
       System.Enum.GetUnderlyingType(t) |> equal typeof<sbyte>
 
+  testCase "GetEnumUnderlyingType throws for non-enum types" <| fun () ->
+      Fable.Tests.Util.throwsAnyError (fun () -> typeof<int>.GetEnumUnderlyingType())
+      Fable.Tests.Util.throwsAnyError (fun () -> typeof<MyClass<int, string>>.GetEnumUnderlyingType())
+
   testCase "Can create generic classes at runtime" <| fun () ->
     let t = typedefof<MyClass<obj, obj>>
     let t = t.MakeGenericType(typeof<int>, typeof<string>)
