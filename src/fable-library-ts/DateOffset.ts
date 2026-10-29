@@ -13,10 +13,10 @@
  * Basically; invariant: date.getTime() always return UTC time.
  */
 
-import { int64, fromFloat64, toFloat64 } from "./BigInt.ts";
+import { type int64, fromFloat64, toFloat64 } from "./BigInt.ts";
 import DateTime, { create as createDate, dateOffsetToString, daysInMonth, parseRaw, ticksToUnixEpochMilliseconds, unixEpochMillisecondsToTicks } from "./Date.ts";
 import { FSharpRef } from "./Types.ts";
-import { Exception, compareDates, DateTimeKind, IDateTime, IDateTimeOffset, padWithZeros } from "./Util.ts";
+import { Exception, compareDates, DateTimeKind, type IDateTime, type IDateTimeOffset, padWithZeros } from "./Util.ts";
 
 export default function DateTimeOffset(value: number, offset?: number) {
   checkOffsetInRange(offset);

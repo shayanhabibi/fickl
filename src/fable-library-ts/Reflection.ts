@@ -1,5 +1,5 @@
 import { FSharpRef, Record, Union, recordFieldsSymbol } from "./Types.ts";
-import { Exception, MutableArray, combineHashCodes, equalArraysWith, fieldKey, IEquatable, stringHash } from "./Util.ts";
+import { Exception, type MutableArray, combineHashCodes, equalArraysWith, fieldKey, type IEquatable, stringHash } from "./Util.ts";
 import Decimal from "./Decimal.ts";
 import { Some, some } from "./Option.ts";
 

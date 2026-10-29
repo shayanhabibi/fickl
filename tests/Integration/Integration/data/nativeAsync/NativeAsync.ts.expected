@@ -1,8 +1,8 @@
 "use server";
 
-import { MutableArray, ensureResolvedAsyncValue } from "./fable_modules/fable-library-ts.5.24.0/Util.ts";
-import { FSharpList } from "./fable_modules/fable-library-ts.5.24.0/List.ts";
-import { int32 } from "./fable_modules/fable-library-ts.5.24.0/Int32.ts";
+import { type MutableArray, ensureResolvedAsyncValue } from "./fable_modules/fable-library-ts.5.24.0/Util.ts";
+import type { FSharpList } from "./fable_modules/fable-library-ts.5.24.0/List.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.24.0/Int32.ts";
 
 
 export const load = async function (this: any, promise: Promise<string>): Promise<string> {

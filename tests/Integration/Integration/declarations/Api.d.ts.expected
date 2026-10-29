@@ -1,9 +1,9 @@
-import { Shape_$union, NumberOrText, Point } from "./Shapes.js";
-import { float64, int32 } from "./fable_modules/fable-library-js.5.24.0/Int32.js";
-import { FSharpList } from "./fable_modules/fable-library-js.5.24.0/List.js";
-import { Option } from "./fable_modules/fable-library-js.5.24.0/Option.js";
-import { TypeInfo } from "./fable_modules/fable-library-js.5.24.0/Reflection.js";
-import { INamed } from "./Contracts.js";
+import { type Shape_$union, type NumberOrText, Point } from "./Shapes.js";
+import type { float64, int32 } from "./fable_modules/fable-library-js.5.24.0/Int32.js";
+import type { FSharpList } from "./fable_modules/fable-library-js.5.24.0/List.js";
+import type { Option } from "./fable_modules/fable-library-js.5.24.0/Option.js";
+import type { TypeInfo } from "./fable_modules/fable-library-js.5.24.0/Reflection.js";
+import type { INamed } from "./Contracts.js";
 export declare const origin: Point;
 export declare let counter: { (): int32, (value: int32): void };
 export declare function describe(color: string, value: NumberOrText): string;

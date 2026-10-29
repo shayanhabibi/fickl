@@ -624,7 +624,7 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
                 specifiers
                 |> Array.filter (
                     function
-                    | ImportMemberSpecifier(Identifier(local, _), _)
+                    | ImportMemberSpecifier(Identifier(local, _), _, _)
                     | ImportDefaultSpecifier(Identifier(local, _))
                     | ImportNamespaceSpecifier(Identifier(local, _)) -> used.Contains(local)
                 )

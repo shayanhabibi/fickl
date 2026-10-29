@@ -1,11 +1,11 @@
 import { OperationCanceledException, Trampoline } from "./AsyncBuilder.ts";
-import { Continuation, Continuations } from "./AsyncBuilder.ts";
-import { Async, IAsyncContext, CancellationToken } from "./AsyncBuilder.ts";
+import { type Continuation, type Continuations } from "./AsyncBuilder.ts";
+import { type Async, type IAsyncContext, CancellationToken } from "./AsyncBuilder.ts";
 import { protectedCont, protectedBind, protectedReturn } from "./AsyncBuilder.ts";
 import type { IEvent$2 } from "./Event.ts";
-import { FSharpChoice$2_$union, Choice_makeChoice1Of2, Choice_makeChoice2Of2 } from "./Choice.ts";
+import { type FSharpChoice$2_$union, Choice_makeChoice1Of2, Choice_makeChoice2Of2 } from "./Choice.ts";
 import { ArgumentException_$ctor_Z384F8060, InvalidOperationException_$ctor_Z721C83C5, TimeoutException_$ctor } from "./System.ts";
-import { Exception, ensureErrorOrException, IDisposable, createDisposable } from "./Util.ts";
+import { Exception, ensureErrorOrException, type IDisposable, createDisposable } from "./Util.ts";
 import type { Option } from "./Option.ts";
 
 function emptyContinuation<T>(_x: T) {

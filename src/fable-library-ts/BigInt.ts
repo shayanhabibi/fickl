@@ -1,6 +1,6 @@
 import { FSharpRef } from "./Types.ts";
-import { int8, uint8, int16, uint16, int32, uint32, float16, float32, float64 } from "./Int32.ts";
-import { decimal, fromParts, truncate } from "./Decimal.ts";
+import { type int8, type uint8, type int16, type uint16, type int32, type uint32, type float16, type float32, type float64 } from "./Int32.ts";
+import { type decimal, fromParts, truncate } from "./Decimal.ts";
 import { Exception, bigintHash } from "./Util.ts";
 
 const isBigEndian = false;

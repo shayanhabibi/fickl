@@ -1,8 +1,8 @@
 
 import { subclassDecorator, opaqueMethodDecorator, identityDecorator, setterFactory, classFactory as classFactory_1, getterFactory, methodFactory, fieldFactory, accessorFactory, setterRegistry as setterRegistry_1 } from "./decorators.js";
-import { int32 } from "./fable_modules/fable-library-ts.5.24.0/Int32.ts";
-import { class_type, TypeInfo } from "./fable_modules/fable-library-ts.5.24.0/Reflection.ts";
-import { defaultArg, value as value_1, Option } from "./fable_modules/fable-library-ts.5.24.0/Option.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.24.0/Int32.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.24.0/Reflection.ts";
+import { defaultArg, value as value_1, type Option } from "./fable_modules/fable-library-ts.5.24.0/Option.ts";
 import { sum } from "./fable_modules/fable-library-ts.5.24.0/Array.ts";
 import { defaultOf } from "./fable_modules/fable-library-ts.5.24.0/Util.ts";
 

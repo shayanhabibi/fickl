@@ -1,8 +1,8 @@
 import { defaultCancellationToken } from "./Async.ts";
 import { fromContinuations } from "./Async.ts";
 import { startImmediate } from "./Async.ts";
-import { Async, IAsyncContext, OperationCanceledException, protectedCont } from "./AsyncBuilder.ts";
-import { Continuation, Continuations } from "./AsyncBuilder.ts";
+import { type Async, type IAsyncContext, OperationCanceledException, protectedCont } from "./AsyncBuilder.ts";
+import { type Continuation, type Continuations } from "./AsyncBuilder.ts";
 import { CancellationToken } from "./AsyncBuilder.ts";
 import { Exception } from "./Util.ts";
 

@@ -19,11 +19,11 @@
  * strings with no .NET-defined layout and no sub-second component.
  */
 
-import { int64, toInt64 } from "./BigInt.ts";
+import { type int64, toInt64 } from "./BigInt.ts";
 import { FSharpRef } from "./Types.ts";
 import { DateTimeKind } from "./Util.ts";
 import {
-  TimeSpan, fromTicks as TimeSpan_fromTicks, fromUnits as TimeSpan_fromUnits,
+  type TimeSpan, fromTicks as TimeSpan_fromTicks, fromUnits as TimeSpan_fromUnits,
   totalNanoseconds as TimeSpan_totalNanoseconds,
 } from "./TimeSpanTemporal.ts";
 import * as Format from "./DateTimeFormat.ts";

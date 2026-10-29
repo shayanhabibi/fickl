@@ -1,4 +1,4 @@
-import { IDisposable, IAsyncDisposable, disposeSafe, disposeAsyncSafe } from "./Util.ts";
+import { type IDisposable, type IAsyncDisposable, disposeSafe, disposeAsyncSafe } from "./Util.ts";
 import { zero } from "./Task.ts";
 
 export class TaskBuilder {

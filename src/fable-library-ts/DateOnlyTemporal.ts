@@ -1,8 +1,8 @@
 import { FSharpRef } from "./Types.ts";
-import { TimeOnly } from "./TimeOnlyTemporal.ts";
-import { TimeSpan } from "./TimeSpanTemporal.ts";
-import { DateTime, dateTime as DateTime_stamp } from "./DateTimeTemporal.ts";
-import { DateTimeOffset, fromDate as DateTimeOffset_fromDate } from "./DateTimeOffsetTemporal.ts";
+import { type TimeOnly } from "./TimeOnlyTemporal.ts";
+import { type TimeSpan } from "./TimeSpanTemporal.ts";
+import { type DateTime, dateTime as DateTime_stamp } from "./DateTimeTemporal.ts";
+import { type DateTimeOffset, fromDate as DateTimeOffset_fromDate } from "./DateTimeOffsetTemporal.ts";
 import { Exception, DateTimeKind, padWithZeros } from "./Util.ts";
 
 export type DateOnly = Temporal.PlainDate;

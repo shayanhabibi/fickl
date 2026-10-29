@@ -3,7 +3,7 @@
 // functions below still declare their own types for callers to rely on.
 // @ts-ignore
 import { readFileSync, writeFileSync } from "node:fs";
-import { MutableArray } from "./Util.ts";
+import { type MutableArray } from "./Util.ts";
 
 // byte[] is represented as a plain JS/TS array of numbers, not a typed array
 // (see e.g. BitConverter.ts), so convert the Buffer returned by readFileSync.

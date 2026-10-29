@@ -1,6 +1,6 @@
-import { uint8, int16, uint16, int32, uint32, float32, float64 } from "./Int32.ts";
-import { int64, uint64 } from "./BigInt.ts";
-import { char } from "./Char.ts";
+import { type uint8, type int16, type uint16, type int32, type uint32, type float32, type float64 } from "./Int32.ts";
+import { type int64, type uint64 } from "./BigInt.ts";
+import { type char } from "./Char.ts";
 
 const littleEndian = true;
 

@@ -8,7 +8,7 @@
     "module": "es2020",
     "rewriteRelativeImportExtensions": true,
     "erasableSyntaxOnly": true,
-    // "verbatimModuleSyntax": true,
+    "verbatimModuleSyntax": true,
     "sourceMap": false,
     "allowJs": true,
     "esModuleInterop": true,

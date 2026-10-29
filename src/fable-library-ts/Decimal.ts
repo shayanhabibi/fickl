@@ -1,9 +1,9 @@
-import Decimal, { BigSource } from "./lib/big.js";
-import { Numeric, symbol } from "./Numeric.ts";
+import Decimal, { type BigSource } from "./lib/big.js";
+import { type Numeric, symbol } from "./Numeric.ts";
 import { FSharpRef } from "./Types.ts";
 import { Exception, combineHashCodes } from "./Util.ts";
-import { int8, uint8, int16, uint16, int32, uint32, float16, float32, float64 } from "./Int32.ts";
-import { fromDecimal, int64, uint64, int128, uint128, nativeint, unativeint } from "./BigInt.ts";
+import { type int8, type uint8, type int16, type uint16, type int32, type uint32, type float16, type float32, type float64 } from "./Int32.ts";
+import { fromDecimal, type int64, type uint64, type int128, type uint128, type nativeint, type unativeint } from "./BigInt.ts";
 import * as bigInt from "./BigInt.ts";
 
 Decimal.prototype.GetHashCode = function () {
