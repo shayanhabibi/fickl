@@ -6297,7 +6297,22 @@ but thanks to the optimisation done below we get
             else
                 memb.CompiledName
 
-        let key, isComputed = SymbolKeys.memberKey com ctx memb name
+        // EmitMethod and EmitProperty rename the member at call sites, so the declaration uses the same name
+        let emittedName =
+            memb.Attributes
+            |> Seq.tryPick (fun att ->
+                match att.ConstructorArgs with
+                | (:? string as name) :: _ when
+                    att.Entity.FullName = Atts.emitMethod || att.Entity.FullName = Atts.emitProperty
+                    ->
+                    Some name
+                | _ -> None
+            )
+
+        let key, isComputed =
+            match emittedName with
+            | Some name -> memberFromName name
+            | None -> SymbolKeys.memberKey com ctx memb name
 
         let args =
             memb.CurriedParameterGroups
@@ -6358,7 +6373,40 @@ but thanks to the optimisation done below we get
                 ObjectMeth
 
         if isCallable then
-            AbstractCallSignature(args, returnType, typeParams, memb.XmlDoc)
+            AbstractCallSignature(args, returnType, typeParams, memb.XmlDoc) |> Some
+        elif hasAttribute Atts.emitConstructor memb.Attributes then
+            AbstractConstructSignature(args, returnType, typeParams, memb.XmlDoc) |> Some
+        elif hasAttribute Atts.emitIndexer memb.Attributes then
+            // Indexer accessors are not flagged as getters or setters; the macro `$0[$1]{{=$2}}` assigns given a value
+            let keyAndValue =
+                match memb.CurriedParameterGroups |> List.concat with
+                | [ key; value ] -> Some(key, value.Type, false)
+                | [ key ] -> Some(key, memb.ReturnParameter.Type, true)
+                | _ -> None
+
+            // TypeScript index signatures only take string, number or symbol keys
+            let keyType (key: Fable.Parameter) =
+                match key.Type with
+                | Fable.String -> Some StringTypeAnnotation
+                | Fable.Number((Int8 | UInt8 | Int16 | UInt16 | Int32 | UInt32 | Float16 | Float32 | Float64), _) ->
+                    Some NumberTypeAnnotation
+                | _ -> None
+
+            match keyAndValue with
+            | Some(key, valueType, isReadonly) ->
+                match keyType key with
+                | Some keyType ->
+                    let valueType =
+                        valueType |> FableTransforms.uncurryType |> makeTypeAnnotation com ctx
+
+                    AbstractIndexSignature(defaultArg key.Name "key", keyType, valueType, isReadonly, memb.XmlDoc)
+                    |> Some
+                | None ->
+                    $"%s{ent.FullName}.%s{memb.DisplayName} is left out of the TypeScript declaration: an index signature key must be a string or a number"
+                    |> addWarning com [] None
+
+                    None
+            | None -> None
         else
             AbstractMember.abstractMethod (
                 kind,
@@ -6369,6 +6417,31 @@ but thanks to the optimisation done below we get
                 isComputed = isComputed,
                 ?doc = memb.XmlDoc
             )
+            |> Some
+
+    /// The getter and setter of one EmitIndexer property make a single writable index signature
+    let private mergeIndexSignatures (members: AbstractMember seq) =
+        let members = Seq.toArray members
+
+        let writableKeys =
+            members
+            |> Array.choose (
+                function
+                | AbstractIndexSignature(keyType = keyType; isReadonly = false) -> Some keyType
+                | _ -> None
+            )
+
+        members
+        |> Array.filter (
+            function
+            | AbstractIndexSignature(keyType = keyType; isReadonly = true) -> not (Array.contains keyType writableKeys)
+            | _ -> true
+        )
+        |> Array.distinctBy (
+            function
+            | AbstractIndexSignature(keyType = keyType) -> Choice1Of2 keyType
+            | m -> Choice2Of2 m
+        )
 
     let transformAbstractClassMembers com ctx (ent: Fable.Entity) =
         let memberImplNames =
@@ -6382,7 +6455,7 @@ but thanks to the optimisation done below we get
             memb.IsDispatchSlot
             && not (memb.IsProperty)
             && memb.IsInstance
-            // TODO: Deal with other emit attributes like EmitMethod or EmitConstructor
+            // A plain Emit has no shape to declare
             && not (hasAttribute Atts.emitAttr memb.Attributes)
             && not (Set.contains (getMangledMemberName ent memb) memberImplNames)
         )
@@ -6390,7 +6463,7 @@ but thanks to the optimisation done below we get
             let abstractMember = transformAbstractMember com ctx ent memb
 
             match abstractMember with
-            | AbstractMethod(kind, key, parameters, returnType, typeParameters, isComputed, doc) ->
+            | Some(AbstractMethod(kind, key, parameters, returnType, typeParameters, isComputed, doc)) ->
                 let kind =
                     match kind with
                     | ObjectMeth -> ClassFunction(key, isComputed)
@@ -6495,11 +6568,11 @@ but thanks to the optimisation done below we get
                 not (memb.IsProperty)
                 // Static abstract members are not part of an instance's shape, see #78
                 && memb.IsInstance
-                // TODO: Deal with other emit attributes like EmitMethod or EmitConstructor
+                // A plain Emit has no shape to declare
                 && not (hasAttribute Atts.emitAttr memb.Attributes)
             )
-            |> Seq.map (transformAbstractMember com ctx ent)
-            |> Seq.toArray
+            |> Seq.choose (transformAbstractMember com ctx ent)
+            |> mergeIndexSignatures
 
         let extends =
             ent.DeclaredInterfaces
