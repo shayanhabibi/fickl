@@ -1355,9 +1355,15 @@ let (|UniversalFableCoreHelpers|_|) (com: ICompiler) (ctx: Context) r t (i: Call
             if meth = "namesofLambda" then
                 List.map makeStrConst names |> makeArray String |> ValueSome
             else
-                match List.tryHead names |> Option.map makeStrConst with
-                | Some x -> ValueSome x
-                | None -> ValueNone
+                match names with
+                | [ name ] -> makeStrConst name |> ValueSome
+                | [] -> ValueNone
+                | _ ->
+                    // The first segment of `x.a.b` is not the name of `b`, so don't return it
+                    "nameofLambda takes a single member access such as `fun x -> x.name`; use namesofLambda for a path"
+                    |> addError com ctx.InlinePath r
+
+                    makeStrConst Naming.unknown |> ValueSome
 
     | "casenameWithFieldCount"
     | "casenameWithFieldIndex" as meth ->

@@ -23,7 +23,8 @@ module Experimental =
     /// Like nameof but also returns the expression as second element of the tuple
     let inline nameof2 (expr: 'a) : string * 'a = nativeOnly
 
-    /// Reads the name of a property or a type from the lambda body
+    /// Reads the name of a property or a type from the lambda body, which must be a single member access
+    /// such as (fun x -> x.foo). Use namesofLambda for a path such as (fun x -> x.foo.bar).
     let inline nameofLambda (f: 'a -> 'b) : string = nativeOnly
 
     /// Reads the names of an access path from the lambda body. E.g (fun x -> x.foo.bar) gives [|"foo"; "bar"|]
