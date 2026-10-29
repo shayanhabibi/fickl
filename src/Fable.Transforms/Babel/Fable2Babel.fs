@@ -2315,6 +2315,13 @@ module Util =
             |> Option.defaultWith (fun () ->
                 let jsExpr = com.TransformAsExpr(ctx, e)
 
+                // The interface value of an inlined case is not assignable to the literal tag type,
+                // and a constructed case would otherwise narrow the declared union on assignment
+                let toTaggedUnion =
+                    com.IsTypeScript
+                    && com.TryGetEntity(entRef)
+                       |> Option.exists (fun ent -> hasAttribute Atts.tsTaggedUnion ent.Attributes)
+
                 match e.Type with
                 | Fable.DeclaredType(sourceEntRef, _) when com.IsTypeScript ->
                     let sourceEnt = com.GetEntity(sourceEntRef)
@@ -2322,15 +2329,11 @@ module Util =
                     // won't automatically cast them to implementing interfaces
                     let fromUnion = sourceEnt.IsFSharpUnion && List.isMultiple sourceEnt.UnionCases
 
-                    // The interface value of an inlined case is not assignable to the literal tag type
-                    let toTaggedUnion =
-                        com.TryGetEntity(entRef)
-                        |> Option.exists (fun ent -> hasAttribute Atts.tsTaggedUnion ent.Attributes)
-
                     if fromUnion || toTaggedUnion then
                         AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                     else
                         jsExpr
+                | _ when toTaggedUnion -> AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                 | _ -> jsExpr
             )
         | Fable.Unit -> com.TransformAsExpr(ctx, e) |> Some |> undefined e.Range
