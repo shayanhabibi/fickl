@@ -192,6 +192,8 @@ export function ensureResolvedAsyncIterable<T>(source: Iterable<T> | AsyncIterab
         }
       };
 
+      // `return` reads as undefined when the source has none, which iteration treats as absent.
+      // exactOptionalPropertyTypes has no way to type an optional getter, hence the assertion.
       return {
         next: (...args: [] | [unknown]) => invoke(next, args, true),
         get return() {
@@ -216,7 +218,7 @@ export function ensureResolvedAsyncIterable<T>(source: Iterable<T> | AsyncIterab
             throw new TypeError("Iterator does not provide a throw method");
           };
         },
-      };
+      } as AsyncIterator<T, unknown, unknown>;
     },
   };
 }

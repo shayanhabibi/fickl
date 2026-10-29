@@ -56,6 +56,52 @@ let private checkBrowserInlineExprs (precompiledDir: string) =
                         (Fable.BrowserInlineExprs.toString [| name, fromCompact |])
                         $"%s{name} differs between the two copies"
 
+/// fickl: the snapshots end in `.ts.actual`, which tsc does not read, so the case is copied to temp/ with
+/// them renamed to `.ts`, then type-checked under the TypeScript suite's own tsconfig
+let private typeCheckTypeScript (testCaseDir: string) =
+    let root = Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "../../.."))
+    let caseDir = Path.Combine(root, "temp/tests/Integration/typecheck", Path.GetFileName testCaseDir)
+
+    if Directory.Exists caseDir then
+        Directory.Delete(caseDir, true)
+
+    for source in Directory.EnumerateFiles(testCaseDir, "*", SearchOption.AllDirectories) do
+        let relative = Path.GetRelativePath(testCaseDir, source)
+        let topDir = relative.Split([| '/'; '\\' |])[0]
+
+        if topDir <> "bin" && topDir <> "obj" && not (relative.EndsWith ".expected") then
+            let target =
+                Path.Combine(caseDir, Regex.Replace(relative, @"\.ts\.actual$", ".ts"))
+
+            Directory.CreateDirectory(Path.GetDirectoryName target) |> ignore
+            File.Copy(source, target)
+
+    let config = Path.Combine(caseDir, "tsconfig.json")
+
+    let settings =
+        {|
+            extends = Path.Combine(root, "tests/TypeScript/tsconfig.json")
+            compilerOptions = {| rootDir = root; noEmit = true |}
+            ``include`` = [| "*.ts" |]
+        |}
+
+    File.WriteAllText(config, System.Text.Json.JsonSerializer.Serialize settings)
+
+    let info =
+        System.Diagnostics.ProcessStartInfo(
+            "node",
+            [ Path.Combine(root, "node_modules/typescript/lib/tsc.js"); "-p"; config ],
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        )
+
+    use child = System.Diagnostics.Process.Start info
+    let stdout = child.StandardOutput.ReadToEndAsync()
+    let stderr = child.StandardError.ReadToEndAsync()
+    child.WaitForExit()
+    Expect.equal child.ExitCode 0 $"tsc rejected {Path.GetFileName testCaseDir}:\n{stdout.Result}{stderr.Result}"
+
 let tests =
     Directory.EnumerateDirectories(data)
     |> Seq.map (fun testCaseDir -> //
@@ -121,6 +167,9 @@ let tests =
                     let expectedContent = File.ReadAllText expected |> normalize
                     let actualContent = File.ReadAllText actual |> normalize
                     Expect.equal actualContent expectedContent "The expected content differs from the actual content"
+
+                if Array.contains "ts" outputArgs then
+                    typeCheckTypeScript testCaseDir
 
                 return ()
             }))
