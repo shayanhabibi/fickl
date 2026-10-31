@@ -15,6 +15,7 @@ let allTests =
     AbortSignals.tests
     Proxies.tests
     JsEvents.tests
+    Transfers.tests
     WeakReferences.tests
     NativeAsync.tests
     NativeGenerators.tests

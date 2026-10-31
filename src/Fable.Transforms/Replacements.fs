@@ -5955,6 +5955,17 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
         | _ -> None
     | "Fickl.Core.CancellationExtensions" -> cancellationExtensions com r t info thisArg args
     | "Fickl.Core.JsEvent" -> jsEvents com r t info.CompiledName args
+    // fickl: F# values to and from plain data, following the type's reflection info
+    | "Fickl.Core.Transfer" ->
+        let typeInfo () =
+            genArg com ctx r 0 info.GenericArgs
+            |> makeTypeInfo (changeRangeToCallSite ctx.InlinePath r)
+
+        match info.CompiledName, args with
+        | ("toPlain" | "ofPlain" | "clone" as name), [ value ] ->
+            Helper.LibCall(com, "Transfer", name, t, [ value; typeInfo () ], ?loc = r)
+            |> Some
+        | _ -> None
     | "Fickl.Core.KeyOfBuilder"
     | "Fickl.Core.KeyOf" -> keyOf com ctx r t info.CompiledName args
     | "Fickl.Core.RecordModule" -> records com r t info.CompiledName args

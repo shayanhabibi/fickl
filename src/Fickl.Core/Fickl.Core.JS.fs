@@ -424,3 +424,19 @@ module JS =
         static member isExtensible(target: obj) : bool = nativeOnly
         /// <summary>Stops properties from being added, and returns whether that succeeded.</summary>
         static member preventExtensions(target: obj) : bool = nativeOnly
+
+    /// <summary>A deep copy of a value by the structured clone algorithm: <c>structuredClone(value)</c>.</summary>
+    /// <remarks>The copy has the data properties but not the prototypes, so an F# record, union, list, map or set is not
+    /// a working F# value afterwards; an F# map or set, which holds its comparer function, throws a
+    /// <c>DataCloneError</c>. Use <c>Transfer.clone</c> for F# values, and <c>Transfer.toPlain</c> before
+    /// <c>postMessage</c>. A global in browsers, Node.js 17 and later, Deno and Bun.</remarks>
+    /// <param name="value">The value to copy.</param>
+    [<Emit("structuredClone($0)")>]
+    let structuredClone (value: 'T) : 'T = nativeOnly
+
+    /// <summary>A deep copy of a value that moves the given objects, such as an <c>ArrayBuffer</c> or a
+    /// <c>MessagePort</c>, into the copy instead of copying them: <c>structuredClone(value, { transfer })</c>.</summary>
+    /// <param name="transfer">The objects to move; the originals become unusable.</param>
+    /// <param name="value">The value to copy.</param>
+    [<Emit("structuredClone($1, { transfer: $0 })")>]
+    let structuredCloneTransfer (transfer: obj[]) (value: 'T) : 'T = nativeOnly

@@ -61,6 +61,7 @@
     <Compile Include="../Js/Main/AbortSignalTests.fs" />
     <Compile Include="../Js/Main/ProxyTests.fs" />
     <Compile Include="../Js/Main/JsEventTests.fs" />
+    <Compile Include="../Js/Main/TransferTests.fs" />
     <Compile Include="../Js/Main/WeakReferenceTests.fs" />
     <Compile Include="../Js/Main/NativeAsyncTests.fs" />
     <Compile Include="../Js/Main/NativeGeneratorTests.fs" />
