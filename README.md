@@ -81,6 +81,7 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `Partial<'T>`, `Required<'T>`, `Readonly<'T>` | Type | The TypeScript utility types, for binding signatures such as `abstract setState: Partial<State> -> unit`. |
 | Read-only collections in TypeScript | Compiler | `IReadOnlyCollection<T>` and `IReadOnlyList<T>` are annotated `Iterable<T>`, and `IReadOnlyDictionary<K, V>` `IReadOnlyMap<K, V>`, instead of `any`, so TypeScript can pass a `readonly T[]` or `ReadonlyMap`. |
 | `Fickl.Core.JS.ReadonlyArray<'T>` | Type | Binds TypeScript's `ReadonlyArray<T>`, for a parameter that accepts `readonly T[]` and `as const` arrays. `ReadonlyArray.ofArray` and `ofResizeArray` view an F# array without a copy. |
+| `unknown` | Type abbreviation | `Fickl.Core.unknown` is `obj` in F#. A module function or abstract member that takes or returns it has `unknown` in its TypeScript signature, so callers must narrow the value, while its body still sees `any`. `obj` stays `any`. |
 | `--declaration` | CLI flag | Writes a TypeScript declaration file (`.d.ts`) next to each JavaScript file. |
 | `--strictOptions` | CLI flag | Keeps `Some null` apart from `None`, as on .NET. |
 | `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |

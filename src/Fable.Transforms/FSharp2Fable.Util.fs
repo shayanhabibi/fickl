@@ -2175,6 +2175,147 @@ module Util =
     open TypeHelpers
     open Identifiers
 
+    /// fickl: `Fickl.Core.unknown`, an abbreviation of `obj` that TypeScript annotations write as `unknown`.
+    /// The abbreviation survives in FCS signatures, while the Fable type of a value is `Any` like any `obj`.
+    module TsUnknown =
+        [<Literal>]
+        let private fullName = "Fickl.Core.unknown"
+
+        let private isUnknownEntity (ent: FSharpEntity) =
+            ent.IsFSharpAbbreviation
+            && (ent.TryFullName = Some fullName
+                || ent.Attributes
+                   |> Seq.exists (fun att -> att.AttributeType.TryFullName = Some Atts.ficklUnknownType))
+
+        /// The type is `unknown`, or an abbreviation of it.
+        /// FCS reports a definition for some types, such as measure abbreviations, that it then cannot give
+        let private tryTypeDefinition (t: FSharpType) =
+            if t.HasTypeDefinition then
+                try
+                    Some t.TypeDefinition
+                with _ ->
+                    None
+            else
+                None
+
+        /// The type an abbreviation stands for, unless FCS gives the abbreviation back for it, as it does for some
+        let private tryAbbreviated (t: FSharpType) =
+            if t.IsAbbreviation then
+                let abbreviated = t.AbbreviatedType
+
+                match tryTypeDefinition t, tryTypeDefinition abbreviated with
+                | Some def, Some abbreviatedDef when def = abbreviatedDef -> None
+                | _ -> Some abbreviated
+            else
+                None
+
+        let rec isUnknown (t: FSharpType) =
+            t.IsAbbreviation
+            && ((tryTypeDefinition t |> Option.exists isUnknownEntity)
+                || tryAbbreviated t |> Option.exists isUnknown)
+
+        let rec contains (t: FSharpType) =
+            isUnknown t
+            || (not t.IsGenericParameter
+                && not t.IsMeasureType
+                && (try
+                        t.GenericArguments |> Seq.exists contains
+                    with _ ->
+                        false))
+
+        /// Where the F# type says `unknown`, the Fable type for an annotation is a type parameter named
+        /// `unknown`, which the TypeScript printer writes as is. Elsewhere the type is unchanged.
+        let rec markType (fsType: FSharpType) (t: Fable.Type) : Fable.Type =
+            let mark (fsTypes: FSharpType seq) (ts: Fable.Type list) =
+                let fsTypes = List.ofSeq fsTypes
+
+                if List.length fsTypes = List.length ts then
+                    List.map2 markType fsTypes ts |> Some
+                else
+                    None
+
+            let rec curriedArgs n (fsType: FSharpType) =
+                if n = 0 then
+                    Some([], fsType)
+                elif fsType.IsFunctionType then
+                    curriedArgs (n - 1) fsType.GenericArguments[1]
+                    |> Option.map (fun (args, ret) -> fsType.GenericArguments[0] :: args, ret)
+                else
+                    tryAbbreviated fsType |> Option.bind (curriedArgs n)
+
+            if isUnknown fsType then
+                Fable.GenericParam("unknown", false, [])
+            elif not (contains fsType) then
+                t
+            else
+                match t with
+                | Fable.LambdaType(argType, returnType) ->
+                    match curriedArgs 1 fsType with
+                    | Some([ fsArg ], fsReturn) ->
+                        Fable.LambdaType(markType fsArg argType, markType fsReturn returnType)
+                    | _ -> t
+                | Fable.DelegateType(argTypes, returnType) ->
+                    match curriedArgs argTypes.Length fsType with
+                    | Some(fsArgs, fsReturn) ->
+                        match mark fsArgs argTypes with
+                        | Some argTypes -> Fable.DelegateType(argTypes, markType fsReturn returnType)
+                        | None -> t
+                    | None -> t
+                | Fable.Option(genArg, isStruct) ->
+                    mark fsType.GenericArguments [ genArg ]
+                    |> Option.map (fun gs -> Fable.Option(gs.Head, isStruct))
+                    |> Option.defaultValue t
+                | Fable.Array(genArg, kind) ->
+                    mark fsType.GenericArguments [ genArg ]
+                    |> Option.map (fun gs -> Fable.Array(gs.Head, kind))
+                    |> Option.defaultValue t
+                | Fable.List genArg ->
+                    mark fsType.GenericArguments [ genArg ]
+                    |> Option.map (fun gs -> Fable.List gs.Head)
+                    |> Option.defaultValue t
+                | Fable.Tuple(genArgs, isStruct) ->
+                    mark fsType.GenericArguments genArgs
+                    |> Option.map (fun gs -> Fable.Tuple(gs, isStruct))
+                    |> Option.defaultValue t
+                | Fable.DeclaredType(entRef, genArgs) ->
+                    mark fsType.GenericArguments genArgs
+                    |> Option.map (fun gs -> Fable.DeclaredType(entRef, gs))
+                    |> Option.defaultValue t
+                | _ -> t
+
+        /// The F# member behind a Fable member, when it was compiled from F#.
+        let tryFSharpMember (memb: Fable.MemberFunctionOrValue) =
+            match memb with
+            | :? FsMemberFunctionOrValue as m -> Some m.FSharpMemberOrFunctionOrValue
+            | _ -> None
+
+        /// The F# types of a member's parameters, in the order of its Fable arguments without `this`;
+        /// None when they do not line up, as when a tuple parameter is spread.
+        let tryParameterTypes (memb: FSharpMemberOrFunctionOrValue) (argCount: int) =
+            let fsTypes =
+                memb.CurriedParameterGroups
+                |> Seq.concat
+                |> Seq.map (fun p -> p.Type)
+                |> List.ofSeq
+
+            let fsTypes =
+                match fsTypes with
+                | [ t ] when
+                    argCount = 0
+                    && tryTypeDefinition (nonAbbreviatedType t)
+                       |> Option.exists (fun def -> def.TryFullName = Some Types.unit)
+                    ->
+                    []
+                | _ -> fsTypes
+
+            if List.length fsTypes = argCount then
+                Some fsTypes
+            else
+                None
+
+        let returnsUnknown (memb: Fable.MemberFunctionOrValue) =
+            tryFSharpMember memb |> Option.exists (fun m -> contains m.ReturnParameter.Type)
+
     /// fickl: `[<NoOverloadSuffix>]` on an overloaded member would give its overloads one name
     let checkNoOverloadSuffix (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
         match memb.DeclaringEntity with
