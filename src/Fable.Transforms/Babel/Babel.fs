@@ -593,6 +593,8 @@ type TypeAnnotation =
     | TypeofTypeAnnotation of Expression
     | IndexedTypeAnnotation of typ: TypeAnnotation * prop: TypeAnnotation
     | LiteralTypeAnnotation of Literal
+    /// fickl: a TypeScript type written verbatim, where `$0`, `$1`... are the printed arguments
+    | EmitTypeAnnotation of value: string * args: TypeAnnotation array
 
 type TypeParameter = | TypeParameter of name: string * bound: TypeAnnotation option * ``default``: TypeAnnotation option
 

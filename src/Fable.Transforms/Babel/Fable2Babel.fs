@@ -1400,8 +1400,57 @@ module Annotation =
     let private annotationConstructor (com: IBabelCompiler) ctx ent =
         com.InTypePosition(fun () -> Lib.tryJsConstructorFor Annotation com ctx ent)
 
+    /// fickl: the identifier an `EmitType` text starts with, which its module path imports
+    let private emitTypeHead =
+        Regex(@"^\s*((?!\$\d)[A-Za-z_$][\w$]*)", RegexOptions.Compiled)
+
+    /// fickl: `[<EmitType>]` writes the annotation as its text. With a module path, the leading identifier
+    /// becomes one more argument, so the import it names is renamed and tracked like any other type reference.
+    let tryEmitTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        ent.Attributes
+        |> Seq.tryFind (fun att -> att.Entity.FullName = Atts.ficklEmitType)
+        |> Option.map (fun att ->
+            let args = genArgs |> List.mapToArray (makeTypeAnnotation com ctx)
+
+            match att.ConstructorArgs with
+            | (:? string as text) :: (:? string as from) :: _ when not (String.IsNullOrEmpty from) ->
+                let head = emitTypeHead.Match(text)
+
+                if head.Success then
+                    let name = head.Groups[1]
+
+                    let path =
+                        if Path.isRelativePath from then
+                            ent.Ref.SourcePath
+                            |> Option.map (FSharp2Fable.Util.fixImportedRelativePath com from)
+                            |> Option.defaultValue from
+                        else
+                            from
+
+                    let id =
+                        match com.InTypePosition(fun () -> com.GetImportExpr(ctx, name.Value, path, None)) with
+                        | Expression.Identifier id -> id
+                        | _ -> Identifier.identifier name.Value
+
+                    let text =
+                        text.Substring(0, name.Index)
+                        + "$"
+                        + string args.Length
+                        + text.Substring(name.Index + name.Length)
+
+                    EmitTypeAnnotation(text, Array.append args [| AliasTypeAnnotation(id, [||]) |])
+                else
+                    $"EmitType on {ent.FullName} imports from '{from}', but its text does not start with the name to import"
+                    |> addError com [] None
+
+                    EmitTypeAnnotation(text, args)
+            | (:? string as text) :: _ -> EmitTypeAnnotation(text, args)
+            | _ -> AnyTypeAnnotation
+        )
+
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
         match genArgs, ent with
+        | _, Patterns.Try (tryEmitTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta
 
         | _, Patterns.Try (annotationConstructor com ctx) entRef ->
@@ -2400,7 +2449,16 @@ module Util =
                 let toTaggedUnion =
                     com.IsTypeScript
                     && com.TryGetEntity(entRef)
-                       |> Option.exists (fun ent -> hasAttribute Atts.tsTaggedUnion ent.Attributes)
+                       |> Option.exists (fun ent ->
+                           hasAttribute Atts.tsTaggedUnion ent.Attributes
+                           // fickl: an EmitType annotation is usually narrower than the value cast to it
+                           || (hasAttribute Atts.ficklEmitType ent.Attributes
+                               && (
+                                   match e.Type with
+                                   | Fable.DeclaredType(source, _) -> source.FullName <> entRef.FullName
+                                   | _ -> true
+                               ))
+                       )
 
                 match e.Type with
                 | Fable.DeclaredType(sourceEntRef, _) when com.IsTypeScript ->
@@ -6917,6 +6975,12 @@ but thanks to the optimisation done below we get
 
         | Fable.ClassDeclaration decl ->
             match com.GetEntity(decl.Entity) with
+            // fickl: annotations write the EmitType text, so a type with no JS value has nothing to declare
+            | ent when
+                hasAttribute Atts.ficklEmitType ent.Attributes
+                && (ent.IsInterface || FSharp2Fable.Util.isErasedOrStringEnumEntity ent)
+                ->
+                []
             | Patterns.Try (tryFindAnyEntAttribute [ Atts.stringEnum; Atts.erase; Atts.tsTaggedUnion ]) (att, attArgs) as ent ->
                 match com.IsTypeScript, ent.IsFSharpUnion, att with
                 | true, true, Atts.stringEnum -> [ transformStringEnumDeclaration ent attArgs decl ]

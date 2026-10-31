@@ -74,6 +74,25 @@ module TypedArrays =
     let float64s = JS.Constructors.Float64Array.Create [| 1.5; -2.5 |]
     let bigInt64s = JS.Constructors.BigInt64Array.Create 2
     let makeFloat32s () = JS.Constructors.Float32Array.Create [| 0.0; 1.0 |]
+
+// tsc checks the values against the annotations the EmitType texts write
+module EmitTypes =
+    [<Fickl.Core.EmitType("`data-${string}`"); Erase>]
+    type DataAttr = DataAttr of string
+
+    [<Fickl.Core.EmitType("Record<string, $0>")>]
+    type Dict<'T> = interface end
+
+    [<Fickl.Core.EmitType("Parameters<typeof JSON.stringify>[2]")>]
+    type Indent = interface end
+
+    let dataAttr (name: string) = DataAttr("data-" + name)
+    let readAttr (DataAttr value) = value
+    let attrs = [| DataAttr "data-a"; dataAttr "b" |]
+    let dict (key: string) (value: 'T) : Dict<'T> = !!(createObj [ key ==> value ])
+    let get (d: Dict<'T>) (key: string) : 'T = d?(key)
+    let indent (spaces: int) : Indent = unbox spaces
+    let stringify (value: obj) (indent: Indent) : string = emitJsExpr (value, indent) "JSON.stringify($0, null, $1)"
 #endif
 
 let tests =
@@ -161,5 +180,11 @@ let tests =
         TypedArrays.float64s.[1] |> equal -2.5
         TypedArrays.bigInt64s.length |> equal 2
         TypedArrays.makeFloat32s().[1] |> equal 1.0f
+
+    testCase "EmitType changes only the TypeScript annotation" <| fun () ->
+        EmitTypes.dataAttr "x" |> EmitTypes.readAttr |> equal "data-x"
+        EmitTypes.attrs |> Array.map EmitTypes.readAttr |> equal [| "data-a"; "data-b" |]
+        EmitTypes.get (EmitTypes.dict "a" 1) "a" |> equal 1
+        EmitTypes.stringify (box [| 1 |]) (EmitTypes.indent 1) |> equal "[\n 1\n]"
     #endif
   ]

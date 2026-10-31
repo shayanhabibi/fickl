@@ -167,3 +167,31 @@ type CurriedAttribute() =
                  ||| AttributeTargets.Struct)>]
 type NoOverloadSuffixAttribute() =
     inherit Attribute()
+
+/// <summary>
+/// Writes the TypeScript annotation of this type as the given text, for a type F# cannot describe:
+/// conditional, mapped and template literal types, or a library helper type.
+/// </summary>
+/// <remarks>
+/// <c>$0</c>, <c>$1</c>... in the text are the annotations of the type's generic arguments:
+/// <code>
+/// [&lt;EmitType("Parameters&lt;typeof fetch>[1]")>]
+/// type FetchInit = interface end
+///
+/// [&lt;EmitType("`data-${string}`"); Erase>]
+/// type DataAttr = DataAttr of string
+///
+/// [&lt;EmitType("ComponentProps&lt;typeof $0>", "react")>]
+/// type PropsOf&lt;'C> = interface end
+/// </code>
+/// With a module path, the identifier the text starts with is imported from it as a type, and a relative path
+/// is relative to the declaring F# file. The attribute changes only the TypeScript annotations; the JavaScript is the same.
+/// An interface or an erased union keeps no TypeScript declaration of its own, and a class keeps its JavaScript class.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Class
+                 ||| AttributeTargets.Interface
+                 ||| AttributeTargets.Struct)>]
+type EmitTypeAttribute(typeText: string, from: string) =
+    inherit Attribute()
+    /// <summary>Writes the annotation as the given text, with no import.</summary>
+    new(typeText: string) = EmitTypeAttribute(typeText, "")
