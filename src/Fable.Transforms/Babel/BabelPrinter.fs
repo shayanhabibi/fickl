@@ -1446,7 +1446,7 @@ module PrinterExtensions =
                     printer.PrintNewLine()
 
                 printer.PrintClassMember(declaration)
-            | ClassAutoAccessor(key, value, isComputed, isStatic, annotation, loc) ->
+            | ClassAutoAccessor(key, value, isComputed, isStatic, isOverride, annotation, loc) ->
                 printer.PrintClassProperty(
                     key,
                     value,
@@ -1456,7 +1456,8 @@ module PrinterExtensions =
                     annotation,
                     None,
                     loc,
-                    isAccessor = true
+                    isAccessor = true,
+                    isOverride = isOverride
                 )
             | ClassMethod(kind, parameters, body, isStatic, isAbstract, isOverride, returnType, typeParameters, loc, doc) ->
                 printer.PrintJsDoc(doc)
@@ -1545,7 +1546,18 @@ module PrinterExtensions =
             | Some Readonly -> printer.Print("readonly ")
 
         member printer.PrintClassProperty
-            (key, value, isComputed, isStatic, isOptional, typeAnnotation, accessModifier, loc, ?isAccessor: bool)
+            (
+                key,
+                value,
+                isComputed,
+                isStatic,
+                isOptional,
+                typeAnnotation,
+                accessModifier,
+                loc,
+                ?isAccessor: bool,
+                ?isOverride: bool
+            )
             =
             printer.AddLocation(loc)
 
@@ -1553,6 +1565,9 @@ module PrinterExtensions =
                 printer.Print("static ")
 
             printer.PrintAccessModifier(accessModifier)
+
+            if defaultArg isOverride false then
+                printer.Print("override ")
 
             if defaultArg isAccessor false then
                 printer.Print("accessor ")
