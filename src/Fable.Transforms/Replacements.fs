@@ -3549,7 +3549,13 @@ let exceptions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
         | _ ->
             Helper.LibCall(com, "Util", "Exception", Any, args, isConstructor = true)
             |> Some
-    | "get_Message", Some e -> getFieldWith r t e "message" |> Some
+    // fickl: a caught value typed exn can be any thrown value, so a string or undefined reads as String(e)
+    | "get_Message", Some e ->
+        match e.Type with
+        | Any
+        | DeclaredType({ FullName = Types.exception_ }, _) ->
+            Helper.LibCall(com, "Util", "exceptionMessage", t, [ e ], ?loc = r) |> Some
+        | _ -> getFieldWith r t e "message" |> Some
     | "get_StackTrace", Some e -> getFieldWith r t e "stack" |> Some
     | "get_InnerException", Some e -> getFieldWith r t e "innerException" |> Some
     | _ -> None
@@ -5677,6 +5683,17 @@ let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
         |> Some
     | _ -> None
 
+/// fickl: `JS.Thrown` matches a caught value that is neither a JS Error nor a Fable exception
+let private jsErrors (com: ICompiler) r t methodName args =
+    match methodName, args with
+    | "|Thrown|_|", [ value ] ->
+        let isError = Test(value, TypeTest(makeRuntimeType [] Types.exception_), r)
+        let value = TypeCast(value, Any)
+
+        IfThenElse(isError, Value(NewOption(None, Any, false), r), Value(NewOption(Some value, Any, false), r), r)
+        |> Some
+    | _ -> None
+
 let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match info.DeclaringEntityFullName with
     | Patterns.DicContains replacedModules replacement -> replacement com ctx r t info thisArg args
@@ -5685,6 +5702,7 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | Naming.StartsWith Types.printfFormat _ -> fsFormat com ctx r t info thisArg args
     | Naming.StartsWith "Fable.Core." _ -> fableCoreLib com ctx r t info thisArg args
     | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
+    | "Fickl.Core.JS" -> jsErrors com r t info.CompiledName args
     | "Fickl.Core.JsAsyncBuilder"
     | "Fickl.Core.NativeAsync" -> nativeAsync com ctx r t info args
     | Naming.StartsWith "Fickl.Core.JsGeneratorBuilder" _

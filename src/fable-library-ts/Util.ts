@@ -165,6 +165,14 @@ export class ErrorException extends Error {
   }
 }
 
+/** fickl: the Message of a caught value: its `message`, or `String(e)` for a thrown value that is not an object,
+ * such as a string or `undefined`. */
+export function exceptionMessage(e: unknown): string {
+  return (typeof e === "object" && e !== null) || typeof e === "function"
+    ? (e as { message: string }).message
+    : String(e);
+}
+
 export function isException(x: any) {
   return x instanceof Exception || x instanceof Error;
 }
