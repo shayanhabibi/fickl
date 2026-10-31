@@ -1745,6 +1745,12 @@ module PrinterExtensions =
                 printer.Print("]")
             | LiteralTypeAnnotation lit -> printer.PrintLiteral(lit)
             | EmitTypeAnnotation(value, args) -> printer.PrintEmitTypeAnnotation(value, args)
+            | TypePredicateTypeAnnotation(parameterName, typ, asserts) ->
+                if asserts then
+                    printer.Print("asserts ")
+
+                printer.Print(parameterName)
+                printer.PrintOptional(typ, " is ")
 
         member printer.Print((TypeParameter(name, bound, _default)): TypeParameter) =
             printer.Print(name)

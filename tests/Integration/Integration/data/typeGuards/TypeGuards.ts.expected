@@ -1,0 +1,143 @@
+
+import { defaultArg, type Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+import { exceptionMessage, Exception } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { FSharpResult$2_Ok, FSharpResult$2_Error$, type FSharpResult$2_$union } from "./fable_modules/fable-library-ts.5.25.0/Result.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { isUserLike } from "./guards.js";
+import { type FSharpList, choose } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+
+export interface User {
+    get name(): string
+}
+
+export function isText(x: any): x is string {
+    return typeof x === "string";
+}
+
+export function tryUser(x: any): x is User {
+    return ((x == null) ? undefined : (("name" in x) ? x : undefined)) != null;
+}
+
+export function tryUserValue(label: string, x: any): x is User {
+    let matchValue: Option<User> = (undefined as any), user_1: User = (undefined as any);
+    return ((matchValue = (tryUser(x) ? (x as any as User) : undefined), (matchValue != null) ? (((matchValue as User, label !== "")) ? ((user_1 = (matchValue as User), user_1)) : undefined) : undefined)) != null;
+}
+
+export function assertUser(x: any): asserts x is User {
+    if ((tryUser(x) ? (x as any as User) : undefined) == null) {
+        throw new Exception("not a user");
+    }
+}
+
+export function checkUser(x: any): asserts x is User {
+    let result: FSharpResult$2_$union<User, Exception>;
+    const matchValue: Option<User> = tryUser(x) ? (x as any as User) : undefined;
+    result = ((matchValue == null) ? FSharpResult$2_Error$<User, Exception>(new Exception("not a user")) : FSharpResult$2_Ok<User, Exception>(matchValue as User));
+    if ((result.tag as int32) === /* Ok */ 0) {
+    }
+    else {
+        throw result.fields[0] as Exception;
+    }
+}
+
+export function greet(x: any): string {
+    const matchValue: Option<User> = tryUser(x) ? (x as any as User) : undefined;
+    if (matchValue == null) {
+        return "who?";
+    }
+    else {
+        const user = matchValue as User;
+        return "hi " + user.name;
+    }
+}
+
+export function greetLoaded(load: (() => any)): string {
+    let matchValue: Option<User>;
+    const x: any = load();
+    matchValue = (tryUserValue("label", x) ? (x as any as User) : undefined);
+    if (matchValue == null) {
+        return "";
+    }
+    else {
+        const user = matchValue as User;
+        return user.name;
+    }
+}
+
+export function checkedName(x: any): string {
+    let matchValue: FSharpResult$2_$union<User, Exception>;
+    try {
+        checkUser(x);
+        matchValue = FSharpResult$2_Ok<User, Exception>(x as any as User);
+    }
+    catch (error: any) {
+        matchValue = FSharpResult$2_Error$<User, Exception>(error);
+    }
+    if ((matchValue.tag as int32) === /* Error */ 1) {
+        return exceptionMessage(matchValue.fields[0] as Exception);
+    }
+    else {
+        const user = matchValue.fields[0] as User;
+        return user.name;
+    }
+}
+
+export function imported(x: any): Option<string> {
+    let _arg: User = undefined as any;
+    const option_1: Option<User> = isUserLike(x) ? (x as any as User) : undefined;
+    if (option_1 != null) {
+        return (_arg = (option_1 as User), _arg.name);
+    }
+    else {
+        return undefined;
+    }
+}
+
+export function users(values: FSharpList<any>): FSharpList<User> {
+    return choose<any, User>((x: any): Option<User> => {
+        if (tryUser(x)) {
+            return x as any as User;
+        }
+        else {
+            return undefined;
+        }
+    }, values);
+}
+
+export class Validator {
+    readonly prefix: string;
+    constructor(prefix: string) {
+        this.prefix = prefix;
+    }
+}
+
+export function Validator_$reflection(): TypeInfo {
+    return class_type("TypeGuards.Validator", undefined, Validator);
+}
+
+export function Validator_$ctor_Z721C83C5(prefix: string): Validator {
+    return new Validator(prefix);
+}
+
+export function Validator__TryUser_4E60E31B(_: Validator, value: any): value is User {
+    let option_1: Option<User> = (undefined as any), user: User = (undefined as any);
+    return ((option_1 = (tryUser(value) ? (value as any as User) : undefined), (option_1 != null) ? (((user = (option_1 as User), user.name.startsWith(_.prefix))) ? option_1 : undefined) : undefined)) != null;
+}
+
+export function Validator_IsText_4E60E31B(value: any): value is string {
+    let text: string = undefined as any;
+    return ((typeof value === "string") ? ((text = (value as string), text)) : undefined) != null;
+}
+
+export function validatedName(validator: Validator, value: any): string {
+    const matchValue: Option<User> = Validator__TryUser_4E60E31B(validator, value) ? (value as any as User) : undefined;
+    if (matchValue == null) {
+        return defaultArg(Validator_IsText_4E60E31B(value) ? (value as any as string) : undefined, "");
+    }
+    else {
+        const user = matchValue as User;
+        return user.name;
+    }
+}
+
