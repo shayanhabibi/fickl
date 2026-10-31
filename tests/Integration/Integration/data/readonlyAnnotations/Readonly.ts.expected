@@ -1,0 +1,70 @@
+
+import { FSharpRef, Record } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { int32, float64 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { type MutableArray, comparePrimitives, type IReadOnlyMap, type IComparable, type IEquatable } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { record_type, float64_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { count as count_1 } from "./fable_modules/fable-library-ts.5.25.0/CollectionUtil.ts";
+import { sum } from "./fable_modules/fable-library-ts.5.25.0/Seq.ts";
+import { tryGetValue } from "./fable_modules/fable-library-ts.5.25.0/MapUtil.ts";
+import { ofArray } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import { ofSeq } from "./fable_modules/fable-library-ts.5.25.0/Map.ts";
+
+export class Point extends Record implements IEquatable<Point>, IComparable<Point> {
+    readonly x: float64;
+    readonly y: float64;
+    constructor(x: float64, y: float64) {
+        super();
+        this.x = x;
+        this.y = y;
+    }
+}
+
+export function Point_$reflection(): TypeInfo {
+    return record_type("Readonly.Point", [], Point, () => [["x", float64_type], ["y", float64_type]]);
+}
+
+export function count(xs: Iterable<int32>): int32 {
+    return count_1(xs) | 0;
+}
+
+export function total(xs: Iterable<float64>): float64 {
+    return sum<float64>(xs, {
+        GetZero: (): float64 => 0,
+        Add: (x: float64, y: float64): float64 => (x + y),
+    });
+}
+
+export function lookup(d: IReadOnlyMap<string, int32>, key: string): int32 {
+    let matchValue: [boolean, int32];
+    const cell: FSharpRef<int32> = new FSharpRef<int32>(0);
+    matchValue = ([tryGetValue(d, key, cell), cell.contents] as [boolean, int32]);
+    if (matchValue[0]) {
+        return matchValue[1] | 0;
+    }
+    else {
+        return count_1(d) | 0;
+    }
+}
+
+export function draw(points: ReadonlyArray<Point>): float64 {
+    let length = 0;
+    for (let i = 1; i <= (points.length - 1); i++) {
+        length = (length + Math.abs((points[i]).x - (points[(i - 1)]).x));
+    }
+    return length;
+}
+
+export function names(xs: ReadonlyArray<string>): string {
+    return xs.join(", ");
+}
+
+export function callers(): int32 {
+    return ((((((count(new Set<int32>([1, 2])) + count(new Int32Array([1]))) + ~~total(ofArray([1, 2]))) + lookup(ofSeq([["a", 1] as [string, int32]], {
+        Compare: (x: string, y: string): int32 => (comparePrimitives(x, y) | 0),
+    }), "a")) + lookup(new Map<string, int32>([]), "b")) + ~~draw([new Point(0, 0), new Point(2, 0)] as unknown as ReadonlyArray<Point>)) + names(["a"] as unknown as ReadonlyArray<string>).length) | 0;
+}
+
+export function copy(xs: ReadonlyArray<int32>): MutableArray<int32> {
+    return Array.from(xs);
+}
+

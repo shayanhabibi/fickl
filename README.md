@@ -79,6 +79,8 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `[<EmitType>]` | Attribute on a type | Writes the type's TypeScript annotation as the given text, with `$0`, `$1`... for its generic arguments, for conditional, mapped and template literal types: ``[<EmitType("`data-${string}`")>]``. A module path imports the name the text starts with as a type. |
 | `partial`, `full` | Function | `partial (fun s -> s.count <- 1)` builds an object with some of a type's properties, `{ count: 1 } satisfies Partial<State>` in TypeScript; `full` casts it to the complete type. In TypeScript, `jsOptions` also checks a flat object with `satisfies Partial<T>` before its cast. |
 | `Partial<'T>`, `Required<'T>`, `Readonly<'T>` | Type | The TypeScript utility types, for binding signatures such as `abstract setState: Partial<State> -> unit`. |
+| Read-only collections in TypeScript | Compiler | `IReadOnlyCollection<T>` and `IReadOnlyList<T>` are annotated `Iterable<T>`, and `IReadOnlyDictionary<K, V>` `IReadOnlyMap<K, V>`, instead of `any`, so TypeScript can pass a `readonly T[]` or `ReadonlyMap`. |
+| `Fickl.Core.JS.ReadonlyArray<'T>` | Type | Binds TypeScript's `ReadonlyArray<T>`, for a parameter that accepts `readonly T[]` and `as const` arrays. `ReadonlyArray.ofArray` and `ofResizeArray` view an F# array without a copy. |
 | `--declaration` | CLI flag | Writes a TypeScript declaration file (`.d.ts`) next to each JavaScript file. |
 | `--strictOptions` | CLI flag | Keeps `Some null` apart from `None`, as on .NET. |
 | `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |

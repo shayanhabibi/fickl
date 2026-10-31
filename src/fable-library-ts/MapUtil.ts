@@ -1,4 +1,4 @@
-import { Exception, equals, type IMap, type IMapOrWeakMap, type ISet } from "./Util.ts";
+import { Exception, equals, type IMap, type IMapOrWeakMap, type IReadOnlyMap, type ISet } from "./Util.ts";
 import { FSharpRef, Union } from "./Types.ts";
 
 const CaseRules = {
@@ -82,7 +82,7 @@ export function keyValueList(fields: Iterable<any>, caseRule = CaseRules.None) {
 }
 
 // TODO: Move these methods to Map and Set modules
-export function containsValue<K, V>(v: V, map: IMap<K, V>) {
+export function containsValue<K, V>(v: V, map: IReadOnlyMap<K, V>) {
   for (const kv of map) {
     if (equals(v, kv[1])) {
       return true;
@@ -91,7 +91,7 @@ export function containsValue<K, V>(v: V, map: IMap<K, V>) {
   return false;
 }
 
-export function tryGetValue<K, V>(map: IMapOrWeakMap<K, V>, key: K, defaultValue: FSharpRef<V>): boolean {
+export function tryGetValue<K, V>(map: Pick<IMapOrWeakMap<K, V>, "get" | "has">, key: K, defaultValue: FSharpRef<V>): boolean {
   if (map.has(key)) {
     defaultValue.contents = map.get(key) as V;
     return true;
@@ -122,7 +122,7 @@ export function addToDict<K, V>(dict: IMapOrWeakMap<K, V>, k: K, v: V) {
   dict.set(k, v);
 }
 
-export function getItemFromDict<K, V>(map: IMap<K, V>, key: K) {
+export function getItemFromDict<K, V>(map: Pick<IMapOrWeakMap<K, V>, "get" | "has">, key: K) {
   if (map.has(key)) {
     return map.get(key) as V;
   } else {
