@@ -2641,7 +2641,7 @@ module Util =
         // When compiling Fable itself, Fable.Core entities will be part of the code base, but still need to be replaced
         else
             entFullName = "Fickl.Core.JsInterop"
-            || entFullName = "Fickl.Core.JS"
+            || entFullName = "Fickl.Core.JS.ErrorPatterns"
             || entFullName = "Fickl.Core.JS.ReadonlyArrayModule"
             || entFullName = "Fickl.Core.JS.ReadonlyArray"
             || entFullName = "Fickl.Core.JsAsyncBuilder"
