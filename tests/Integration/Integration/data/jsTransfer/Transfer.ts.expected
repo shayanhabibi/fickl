@@ -1,0 +1,84 @@
+
+import { Record, Union } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { int32, float64 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { record_type, class_type, int32_type, list_type, string_type, union_type, float64_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import type { FSharpList } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import type { FSharpMap } from "./fable_modules/fable-library-ts.5.25.0/Map.ts";
+import type { MutableArray, IComparable, IEquatable } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { clone, ofPlain, toPlain } from "./fable_modules/fable-library-ts.5.25.0/Transfer.ts";
+
+export type Shape_$union = 
+    | Shape<0>
+    | Shape<1>
+
+export type Shape_$cases = {
+    0: ["Circle", [float64]],
+    1: ["Empty", []]
+}
+
+export function Shape_Circle(radius: float64) {
+    return new Shape<0>(0, [radius]);
+}
+
+export function Shape_Empty() {
+    return Shape.Empty;
+}
+
+export class Shape<Tag extends keyof Shape_$cases> extends Union<Tag, Shape_$cases[Tag][0]> {
+    constructor(tag: Tag, fields: Shape_$cases[Tag][1]) {
+        super();
+        this.tag = tag;
+        this.fields = fields;
+    }
+    readonly tag: Tag;
+    readonly fields: Shape_$cases[Tag][1];
+    cases() {
+        return ["Circle", "Empty"];
+    }
+    static readonly Empty: any = new Shape<1>(1, []);
+}
+
+export function Shape_$reflection(): TypeInfo {
+    return union_type("Transfer.Shape", [], Shape, () => [[["radius", float64_type]], []]);
+}
+
+export class Model extends Record implements IEquatable<Model>, IComparable<Model> {
+    readonly Name: string;
+    readonly Shapes: FSharpList<Shape_$union>;
+    readonly Scores: FSharpMap<string, int32>;
+    constructor(Name: string, Shapes: FSharpList<Shape_$union>, Scores: FSharpMap<string, int32>) {
+        super();
+        this.Name = Name;
+        this.Shapes = Shapes;
+        this.Scores = Scores;
+    }
+}
+
+export function Model_$reflection(): TypeInfo {
+    return record_type("Transfer.Model", [], Model, () => [["Name", string_type], ["Shapes", list_type(Shape_$reflection())], ["Scores", class_type("Microsoft.FSharp.Collections.FSharpMap`2", [string_type, int32_type])]]);
+}
+
+export function send(model: Model): any {
+    return toPlain(model, Model_$reflection());
+}
+
+export function receive(data: any): Model {
+    return ofPlain(data, Model_$reflection());
+}
+
+export function copy(model: Model): Model {
+    return clone(model, Model_$reflection());
+}
+
+export function sendShapes(shapes: FSharpList<Shape_$union>): any {
+    return toPlain(shapes, list_type(Shape_$reflection()));
+}
+
+export function rawCopy(values: MutableArray<string>): MutableArray<string> {
+    return structuredClone(values);
+}
+
+export function moveBuffer(buffer: any): any {
+    return structuredClone(buffer, { transfer: [buffer] });
+}
+
