@@ -504,7 +504,8 @@ let rec private declarationClassMembers
 let private declarationOf (js: JsSurface) (signed: HashSet<string>) (isValueKnown: string -> bool) (decl: Declaration) =
     match decl with
     | InterfaceDeclaration _
-    | TypeAliasDeclaration _ -> Some decl
+    | TypeAliasDeclaration _
+    | EnumDeclaration(isDeclare = true) -> Some decl
     | EnumDeclaration(name = name)
     | ClassDeclaration(id = Some(Identifier(name, _)))
     | FunctionSignatureDeclaration(id = Identifier(name, _))
@@ -697,7 +698,8 @@ let private printDeclaration (printer: Printer) isDefault (decl: Declaration) =
 
     match decl with
     | InterfaceDeclaration _
-    | TypeAliasDeclaration _ -> printer.PrintDeclaration(decl)
+    | TypeAliasDeclaration _
+    | EnumDeclaration(isDeclare = true) -> printer.PrintDeclaration(decl)
     | EnumDeclaration _ ->
         declare ()
         printer.PrintDeclaration(decl)

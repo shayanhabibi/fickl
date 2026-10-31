@@ -225,7 +225,8 @@ type Declaration =
         extends: TypeAnnotation array *
         typeParameters: TypeParameter array *
         doc: string option
-    | EnumDeclaration of name: string * cases: (string * Expression) array * isConst: bool
+    /// <summary><c>isDeclare</c> makes it ambient, <c>declare enum</c>: a type with no value emitted for it.</summary>
+    | EnumDeclaration of name: string * cases: (string * Expression) array * isConst: bool * isDeclare: bool
     /// fickl: a TypeScript overload signature, `function f(x: unknown): unknown;`, before the implementation of `f`
     | FunctionSignatureDeclaration of
         parameters: Parameter array *
@@ -925,8 +926,8 @@ module Helpers =
         static member interfaceDeclaration(id, members, ?extends, ?typeParameters, ?doc) : Declaration = // ?mixins_,
             InterfaceDeclaration(id, members, defaultArg extends [||], defaultArg typeParameters [||], doc)
 
-        static member enumDeclaration(name, cases, ?isConst) =
-            EnumDeclaration(name, cases, defaultArg isConst false)
+        static member enumDeclaration(name, cases, ?isConst, ?isDeclare) =
+            EnumDeclaration(name, cases, defaultArg isConst false, defaultArg isDeclare false)
 
     type VariableDeclaration with
 

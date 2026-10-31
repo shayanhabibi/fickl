@@ -788,7 +788,10 @@ module PrinterExtensions =
                 printer.Print(returnType)
                 printer.Print(";")
                 printer.PrintNewLine()
-            | EnumDeclaration(name, cases, isConst) ->
+            | EnumDeclaration(name, cases, isConst, isDeclare) ->
+                if isDeclare then
+                    printer.Print("declare ")
+
                 if isConst then
                     printer.Print("const ")
 
