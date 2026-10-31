@@ -72,12 +72,14 @@ export function createDisposable(dispose: () => void): IDisposable & Disposable 
   return { Dispose: dispose, [disposeSymbol]() { this.Dispose(); } };
 }
 
+// As on .NET, Compare and Equals accept null, so F# code compiled with nullable reference types can pass
+// the `T | null` that those signatures give it
 export interface IComparer<T> {
-  Compare(x: T, y: T): number;
+  Compare(x: T | null, y: T | null): number;
 }
 
 export interface IEqualityComparer<T> {
-  Equals(x: T, y: T): boolean;
+  Equals(x: T | null, y: T | null): boolean;
   GetHashCode(x: T): number;
 }
 
@@ -125,7 +127,7 @@ export class Exception {
   // a `defaultOf()` value, which is fine for code that reads `.InnerException`.
   public innerException!: Exception;
 
-  constructor(msg?: string, innerException?: Exception) {
+  constructor(msg?: string, innerException?: Exception | null) {
     this.message = msg ?? "";
     this.innerException = innerException as Exception;
     if (nativeErrors) {
@@ -153,7 +155,7 @@ export function enableNativeErrors(): void {
 export class ErrorException extends Error {
   public innerException!: Exception;
 
-  constructor(msg?: string, innerException?: Exception) {
+  constructor(msg?: string, innerException?: Exception | null) {
     super();
     this.message = msg ?? "";
     this.innerException = innerException as Exception;

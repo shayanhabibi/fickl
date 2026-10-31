@@ -589,6 +589,7 @@ type TypeAnnotation =
     | UnknownTypeAnnotation
     | VoidTypeAnnotation
     | UndefinedTypeAnnotation
+    | NullTypeAnnotation
     | StringTypeAnnotation
     /// <summary>The nominal type of one immutable JavaScript symbol binding.</summary>
     | UniqueSymbolTypeAnnotation

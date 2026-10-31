@@ -56,6 +56,14 @@ module NullChecking =
         | NullOrEmpty -> -1
         | NonEmpty s -> s.Length
 
+    let orDefault (s: string | null) : string =
+        match s with
+        | null -> "default"
+        | s -> s
+
+    let tryFirst (xs: string array) : string | null =
+        if xs.Length = 0 then null else xs[0]
+
 [<AutoOpen>]
 module TypeInference =
 
@@ -140,6 +148,12 @@ let tests =
             testCase "Nullable string to option works" <| fun () ->
                 handleString3 "abc" |> Option.isSome |> equal true
                 handleString3 null |> Option.isSome |> equal false
+
+            testCase "Nullable reference parameters and returns accept null" <| fun () ->
+                orDefault null |> equal "default"
+                orDefault "value" |> equal "value"
+                tryFirst [||] |> isNull |> equal true
+                tryFirst [| "a"; "b" |] |> equal "a"
 
             testCase "Nullable pattern matching works" <| fun () ->
                 getStringLengthSafe "abc" |> equal 3

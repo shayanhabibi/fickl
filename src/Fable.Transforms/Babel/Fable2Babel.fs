@@ -1128,7 +1128,8 @@ module Annotation =
         if isStruct then
             makeFableLibImportTypeAnnotation com ctx [ genArg ] "Util" "Nullable"
         else
-            makeTypeAnnotation com ctx genArg // nullable reference types are erased
+            // fickl: an F# 9 nullable reference type `T | null` keeps its `| null`, which TS checks as F# does
+            UnionTypeAnnotation [| makeTypeAnnotation com ctx genArg; NullTypeAnnotation |]
 
     let makeOptionTypeAnnotation com ctx _isStruct genArg =
         makeFableLibImportTypeAnnotation com ctx [ genArg ] "Option" "Option"

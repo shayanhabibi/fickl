@@ -229,6 +229,7 @@ and private addTypeNames (names: HashSet<string>) (typ: TypeAnnotation) =
     | UnknownTypeAnnotation
     | VoidTypeAnnotation
     | UndefinedTypeAnnotation
+    | NullTypeAnnotation
     | StringTypeAnnotation
     | UniqueSymbolTypeAnnotation
     | NumberTypeAnnotation
