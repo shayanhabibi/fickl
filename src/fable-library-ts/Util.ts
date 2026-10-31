@@ -449,6 +449,19 @@ export interface IMapOrWeakMap<K, V> {
   set(key: K, value: V): IMapOrWeakMap<K, V>;
 }
 
+/** What reading a dictionary needs: a native Map or ReadonlyMap, a Dictionary or an F# Map. */
+export interface IReadOnlyMap<K, V> {
+  get(key: K): V | undefined;
+  has(key: K): boolean;
+  readonly size: number;
+
+  forEach(callbackfn: (value: V, key: K, map: IReadOnlyMap<K, V>) => void, thisArg?: any): void;
+  [Symbol.iterator](): Iterator<[K, V]>;
+  entries(): Iterable<[K, V]>;
+  keys(): Iterable<K>;
+  values(): Iterable<V>;
+}
+
 export interface IMap<K, V> extends IMapOrWeakMap<K, V> {
   clear(): void;
   set(key: K, value: V): IMap<K, V>;

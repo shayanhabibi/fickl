@@ -575,6 +575,7 @@ type ExportSpecifier = | ExportSpecifier of local: Identifier * exported: Identi
 type TypeAnnotation =
     | AliasTypeAnnotation of id: Identifier * typeArguments: TypeAnnotation array
     | AnyTypeAnnotation
+    | UnknownTypeAnnotation
     | VoidTypeAnnotation
     | UndefinedTypeAnnotation
     | StringTypeAnnotation

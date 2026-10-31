@@ -224,6 +224,7 @@ and private addTypeNames (names: HashSet<string>) (typ: TypeAnnotation) =
     | TypeofTypeAnnotation expr -> addExpressionRoot names expr
     | EmitTypeAnnotation(_, args) -> args |> Array.iter add
     | AnyTypeAnnotation
+    | UnknownTypeAnnotation
     | VoidTypeAnnotation
     | UndefinedTypeAnnotation
     | StringTypeAnnotation
