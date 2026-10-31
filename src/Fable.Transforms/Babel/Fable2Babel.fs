@@ -5654,8 +5654,10 @@ but thanks to the optimisation done below we get
             ClassMember.classMethod (ClassPrimaryConstructor consArgsModifiers, consArgs, Some consBody)
 
         let classFields =
-            if com.IsTypeScript && not ent.IsFSharpUnion then
+            if com.IsTypeScript then
                 ent.FSharpFields
+                // fickl: a union keeps its case fields in `fields`, so it declares only its static fields
+                |> List.filter (fun field -> not ent.IsFSharpUnion || field.IsStatic)
                 |> List.filter (fun field -> not (ctx.NativeAutoProperties.ContainsKey field.Name))
                 |> List.mapToArray (fun field ->
                     let prop, isComputed =
@@ -5663,7 +5665,20 @@ but thanks to the optimisation done below we get
                         | Some privateName -> Expression.identifier privateName, false
                         | None -> SymbolKeys.fieldKey com ctx field
 
-                    let ta = makeFieldAnnotationOf com ctx field
+                    // fickl: a static member cannot name the class's type parameters (TS2302), so they become `any`
+                    let ta =
+                        if field.IsStatic then
+                            let rec erase (t: Fable.Type) =
+                                match t with
+                                | Fable.GenericParam _ -> Fable.Any
+                                | t -> t.MapGenerics erase
+
+                            if FSharp2Fable.FsField.IsCurriedField field then
+                                makeTypeAnnotation com ctx (erase field.FieldType)
+                            else
+                                makeFieldAnnotation com ctx (erase field.FieldType)
+                        else
+                            makeFieldAnnotationOf com ctx field
                     // Static fields need to be initialized by static constructor
                     let am =
                         if field.IsMutable || field.IsStatic then
