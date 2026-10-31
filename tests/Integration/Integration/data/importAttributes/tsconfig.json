@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    // Import attributes need an ES module setting newer than the suite's es2020
+    "module": "esnext",
+    "resolveJsonModule": true
+  }
+}

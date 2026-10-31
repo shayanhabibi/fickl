@@ -260,7 +260,11 @@ type ModuleDeclaration =
     | ExportAllDeclaration of source: Literal * loc: SourceLocation option
     /// An export default declaration, e.g., export default function () {}; or export default 1;.
     | ExportDefaultDeclaration of declaration: Choice<Declaration, Expression>
-    | ImportDeclaration of specifiers: ImportSpecifier array * source: StringLiteral
+    /// fickl: attributes are the key/value pairs of a `with { type: "json" }` clause
+    | ImportDeclaration of
+        specifiers: ImportSpecifier array *
+        source: StringLiteral *
+        attributes: (string * string) list
     | ExportNamedReferences of specifiers: ExportSpecifier array * source: StringLiteral option
     | DirectivePrologueDeclaration of directiveText: DirectivePrologue
 

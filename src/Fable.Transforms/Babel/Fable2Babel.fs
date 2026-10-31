@@ -24,6 +24,8 @@ type Import =
         Selector: string
         LocalIdent: string option
         Path: string
+        /// fickl: the `with { type: "json" }` attributes of the import
+        Attributes: (string * string) list
         /// Only requested from type annotations, so TypeScript can print it as `import type`
         IsTypeOnly: bool
     }
@@ -7452,10 +7454,10 @@ but thanks to the optimisation done below we get
                         )
                 )
 
-            import.Path, specifier
+            (import.Path, import.Attributes), specifier
         )
         |> Seq.groupBy fst
-        |> Seq.collect (fun (path, specifiers) ->
+        |> Seq.collect (fun ((path, attributes), specifiers) ->
             let mems, defs, alls =
                 (([], [], []), Seq.choose snd specifiers)
                 ||> Seq.fold (fun (mems, defs, alls) x ->
@@ -7471,14 +7473,29 @@ but thanks to the optimisation done below we get
                 function
                 | [] -> None
                 | specifiers ->
-                    ImportDeclaration(List.toArray specifiers, StringLiteral.stringLiteral (path))
+                    // fickl: TypeScript rejects attributes on `import type`, which needs no module at run time
+                    let attributes =
+                        let isTypeOnly =
+                            specifiers
+                            |> List.forall (
+                                function
+                                | ImportMemberSpecifier(isTypeOnly = isTypeOnly) -> isTypeOnly
+                                | _ -> false
+                            )
+
+                        if isTypeOnly then
+                            []
+                        else
+                            attributes
+
+                    ImportDeclaration(List.toArray specifiers, StringLiteral.stringLiteral (path), attributes)
                     |> Some
             )
             |> function
                 | [] ->
                     // If there are no specifiers, this is just an import for side effects,
                     // put it after the other ones to match standard JS practices, see #2228
-                    ImportDeclaration([||], StringLiteral.stringLiteral (path))
+                    ImportDeclaration([||], StringLiteral.stringLiteral (path), attributes)
                     |> statefulImports.Add
 
                     []
@@ -7547,6 +7564,7 @@ module Compiler =
                 let selector = selector.Trim()
                 let path = path.Trim()
                 let cachedName = path + "::" + selector
+                let path, attributes = ImportAttributes.decode path
 
                 let isTypeOnly = typePositionDepth > 0
 
@@ -7568,6 +7586,7 @@ module Compiler =
                         {
                             Selector = selector
                             Path = path
+                            Attributes = attributes
                             LocalIdent = localId
                             IsTypeOnly = isTypeOnly
                         }
