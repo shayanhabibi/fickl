@@ -59,7 +59,8 @@ module Compiler =
               CompilerOptions = compilerOptions
               Verbosity = Verbosity.Normal }
 
-        let state = State.Create(cliArgs, ?watchDelay = watchDelay, recompileAllFiles = defaultArg recompileAllFiles true)
+        // Kept between compiles, so the project is cracked once rather than once per test.
+        let mutable state = State.Create(cliArgs, ?watchDelay = watchDelay, recompileAllFiles = defaultArg recompileAllFiles true)
         let mutable watchDependencies = Map.empty
 
         member _.ProjDir = projDir
@@ -94,6 +95,10 @@ module Compiler =
             match result with
             | Error(_msg, logs) -> Array.toList logs
             | Ok(newState, logs) ->
+                // A watching state has already started its watcher.
+                if not cliArgs.IsWatch then
+                    state <- newState
+
                 watchDependencies <- newState.WatchDependencies
                 Array.toList logs
 
@@ -123,8 +128,18 @@ module Compiler =
 
     let compile settings source = compileWithLibrary settings emptyLibrary source
 
+    let private projectsByLanguage = Collections.Generic.Dictionary<Language, CachedProject>()
+
     let compileForLanguage language settings source =
-        CachedProject("TestProject", language).Compile [
+        let project =
+            match projectsByLanguage.TryGetValue language with
+            | true, project -> project
+            | false, _ ->
+                let project = CachedProject("TestProject", language)
+                projectsByLanguage[language] <- project
+                project
+
+        project.Compile [
           "Library.fs", emptyLibrary
           "Program.fs", programFile settings source
         ]
