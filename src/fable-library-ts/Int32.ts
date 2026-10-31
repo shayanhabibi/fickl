@@ -45,7 +45,7 @@ function validResponse(regexMatch: RegExpExecArray, radix: number) {
   return {
     sign: sign || "",
     prefix: prefix || "",
-    digits,
+    digits: digits!,
     radix,
   };
 }
@@ -80,7 +80,7 @@ export function getPrefix(radix: number): string {
   }
 }
 
-export function getRadix(prefix: string, style: number) {
+export function getRadix(prefix: string | undefined, style: number) {
   if (style & NumberStyles.AllowHexSpecifier) {
     return 16;
   } else {
@@ -100,7 +100,7 @@ export function isValid(str: string, style: number, radix?: number) {
     const [/*all*/, /*sign*/, prefix, digits] = res;
     radix = radix || getRadix(prefix, style);
     const invalidDigits = getInvalidDigits(radix);
-    if (!invalidDigits.test(digits)) {
+    if (!invalidDigits.test(digits!)) {
       return validResponse(res, radix);
     }
   }

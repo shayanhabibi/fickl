@@ -1,0 +1,23 @@
+
+import { getCharAtIndex } from "./fable_modules/fable-library-ts.5.25.0/String.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { parse } from "./fable_modules/fable-library-ts.5.25.0/Char.ts";
+import { parse as parse_1 } from "./fable_modules/fable-library-ts.5.25.0/Guid.ts";
+import type { Uri } from "./fable_modules/fable-library-ts.5.25.0/Uri.ts";
+
+export function charAt(s: string, i: int32): string {
+    return getCharAtIndex(s, i);
+}
+
+export function parseChar(s: string): string {
+    return parse(s);
+}
+
+export function parseGuid(s: string): string {
+    return parse_1(s);
+}
+
+export function host(uri: Uri): string {
+    return uri.host;
+}
+

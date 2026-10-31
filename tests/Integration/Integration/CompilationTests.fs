@@ -1,6 +1,8 @@
 ﻿module Fable.Tests.CompilationTests
 
 open System.IO
+open System.Text.Json
+open System.Text.Json.Nodes
 open System.Text.RegularExpressions
 open Expecto
 open Fable.Compiler.Util
@@ -78,14 +80,26 @@ let private typeCheckTypeScript (testCaseDir: string) =
 
     let config = Path.Combine(caseDir, "tsconfig.json")
 
-    let settings =
-        {|
-            extends = Path.Combine(root, "tests/TypeScript/tsconfig.json")
-            compilerOptions = {| rootDir = root; noEmit = true |}
-            ``include`` = [| "*.ts" |]
-        |}
+    // A case can add options of its own in a tsconfig.json beside its project, to cover a flag the suite leaves off
+    let compilerOptions =
+        let own = Path.Combine(testCaseDir, "tsconfig.json")
 
-    File.WriteAllText(config, System.Text.Json.JsonSerializer.Serialize settings)
+        if File.Exists own then
+            let options = JsonDocumentOptions(CommentHandling = JsonCommentHandling.Skip)
+            let parsed = JsonNode.Parse(File.ReadAllText own, documentOptions = options)
+            parsed["compilerOptions"].DeepClone().AsObject()
+        else
+            JsonObject()
+
+    compilerOptions["rootDir"] <- JsonValue.Create root
+    compilerOptions["noEmit"] <- JsonValue.Create true
+
+    let settings = JsonObject()
+    settings["extends"] <- JsonValue.Create(Path.Combine(root, "tests/TypeScript/tsconfig.json"))
+    settings["compilerOptions"] <- compilerOptions
+    settings["include"] <- JsonArray(JsonValue.Create "*.ts")
+
+    File.WriteAllText(config, settings.ToJsonString())
 
     let info =
         System.Diagnostics.ProcessStartInfo(

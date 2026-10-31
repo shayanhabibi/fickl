@@ -11,7 +11,7 @@ function getCategoryFunc() {
   const codepoints = new Uint32Array(a1);
   const categories = new Uint8Array(a2);
   for (let i = 1; i < codepoints.length; ++i) {
-    codepoints[i] += codepoints[i - 1];
+    codepoints[i] = codepoints[i]! + codepoints[i - 1]!;
   }
   // binary search in unicode ranges
   return (cp: number) => {
@@ -19,7 +19,7 @@ function getCategoryFunc() {
     let lo = 0;
     while (hi - lo > 1) {
       const mid = Math.floor((hi + lo) / 2);
-      const test = codepoints[mid];
+      const test = codepoints[mid]!;
       if (cp < test) {
         hi = mid;
       } else if (cp === test) {
@@ -29,7 +29,7 @@ function getCategoryFunc() {
         lo = mid;
       }
     }
-    return categories[lo];
+    return categories[lo]!;
   };
 }
 
@@ -218,7 +218,7 @@ export function isSurrogatePair(s: string, index: string | number) {
 
 export function parse(input: string) {
   if (input.length === 1) {
-    return input[0];
+    return input[0]!;
   } else {
     throw new Exception("String must be exactly one character long.");
   }
