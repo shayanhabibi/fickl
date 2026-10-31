@@ -2805,6 +2805,7 @@ module Util =
             entFullName = "Fickl.Core.JsInterop"
             || entFullName = "Fickl.Core.JS"
             || entFullName = "Fickl.Core.CancellationExtensions"
+            || entFullName = "Fickl.Core.JsEvent"
             || entFullName = "Fickl.Core.JS.ReadonlyArrayModule"
             || entFullName = "Fickl.Core.JS.ReadonlyArray"
             || entFullName = "Fickl.Core.JS.ProxyHandlerModule"

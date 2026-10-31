@@ -5922,6 +5922,23 @@ let private records (com: ICompiler) r t methodName args =
     | "keys", [ record ], _ -> Helper.GlobalCall("Object", t, [ record ], memb = "keys", ?loc = r) |> Some
     | _ -> None
 
+/// fickl: EventTarget and event emitter events as F# events
+let private jsEvents (com: ICompiler) r t methodName args =
+    match methodName, args with
+    | "ofTarget", [ target; eventType ] ->
+        Helper.LibCall(com, "Event", "fromEventTarget", t, [ target; eventType ], ?loc = r)
+        |> Some
+    | "ofTargetWith", [ options; target; eventType ] ->
+        Helper.LibCall(com, "Event", "fromEventTarget", t, [ target; eventType; options ], ?loc = r)
+        |> Some
+    | "ofEmitter", [ emitter; eventName ] ->
+        Helper.LibCall(com, "Event", "fromEmitter", t, [ emitter; eventName ], ?loc = r)
+        |> Some
+    | "dispatch", [ target; eventType; detail ] ->
+        Helper.LibCall(com, "Event", "dispatchCustomEvent", t, [ target; eventType; detail ], ?loc = r)
+        |> Some
+    | _ -> None
+
 let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match info.DeclaringEntityFullName with
     | Patterns.DicContains replacedModules replacement -> replacement com ctx r t info thisArg args
@@ -5937,6 +5954,7 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
         | "create", [ setters ] -> makePojoFromLambda com setters |> Some
         | _ -> None
     | "Fickl.Core.CancellationExtensions" -> cancellationExtensions com r t info thisArg args
+    | "Fickl.Core.JsEvent" -> jsEvents com r t info.CompiledName args
     | "Fickl.Core.KeyOfBuilder"
     | "Fickl.Core.KeyOf" -> keyOf com ctx r t info.CompiledName args
     | "Fickl.Core.RecordModule" -> records com r t info.CompiledName args

@@ -74,11 +74,94 @@ module JS =
         /// <summary>The legacy numeric code of the error, <c>0</c> for names that have none.</summary>
         member _.code: int = nativeOnly
 
+    /// <summary>The web <c>EventTarget</c>: an object that dispatches events to the listeners added to it.</summary>
+    /// <remarks>Inherit it to make an F# class an event target that JavaScript code subscribes to with
+    /// <c>addEventListener</c>, and expose its events to F# with <c>JsEvent.ofTarget this "name"</c>. A global in browsers,
+    /// Node.js 15 and later, Deno and Bun.</remarks>
+    /// <example><code lang="fsharp">
+    /// type Store() =
+    ///     inherit JS.EventTarget()
+    ///     member this.Changed: IEvent&lt;JS.CustomEvent&lt;int>> = JsEvent.ofTarget this "change"
+    ///     member this.Set(value: int) = JsEvent.dispatch this "change" value |> ignore
+    /// </code></example>
+    [<Global; AllowNullLiteral>]
+    type EventTarget() =
+        /// <summary>Calls the listener for each event of the type.</summary>
+        member _.addEventListener(``type``: string, listener: Event -> unit, ?options: AddEventListenerOptions) : unit =
+            nativeOnly
+
+        /// <summary>Stops calling a listener; <c>capture</c> must match the one it was added with.</summary>
+        member _.removeEventListener(``type``: string, listener: Event -> unit, ?options: EventListenerOptions) : unit =
+            nativeOnly
+
+        /// <summary>Calls the listeners of the event's type, and returns <c>false</c> if one of them called
+        /// <c>preventDefault</c> on a cancelable event.</summary>
+        member _.dispatchEvent(event: Event) : bool = nativeOnly
+
+    /// <summary>The web <c>Event</c>, which an <c>EventTarget</c> dispatches.</summary>
+    and [<Global; AllowNullLiteral>] Event(``type``: string, ?eventInitDict: EventInit) =
+        /// <summary>The event's type, such as <c>"click"</c>.</summary>
+        member _.``type``: string = nativeOnly
+        /// <summary>The target the event was dispatched to.</summary>
+        member _.target: EventTarget = nativeOnly
+        /// <summary>The target whose listener is running.</summary>
+        member _.currentTarget: EventTarget = nativeOnly
+        /// <summary>Whether the event can be cancelled with <c>preventDefault</c>.</summary>
+        member _.cancelable: bool = nativeOnly
+        /// <summary>Whether <c>preventDefault</c> was called on a cancelable event.</summary>
+        member _.defaultPrevented: bool = nativeOnly
+        /// <summary>The time the event was created, in milliseconds.</summary>
+        member _.timeStamp: float = nativeOnly
+        /// <summary>Cancels the event, if it is cancelable.</summary>
+        member _.preventDefault() : unit = nativeOnly
+        /// <summary>Stops the event from reaching the other listeners.</summary>
+        member _.stopImmediatePropagation() : unit = nativeOnly
+        /// <summary>Stops the event from propagating to other targets.</summary>
+        member _.stopPropagation() : unit = nativeOnly
+
+    /// <summary>The web <c>CustomEvent</c>, an event that carries a value in <c>detail</c>.</summary>
+    /// <remarks>Create and dispatch one with <c>JsEvent.dispatch</c>. A global in browsers, Node.js 19 and later, Deno and Bun.</remarks>
+    and [<Global; AllowNullLiteral>] CustomEvent<'T>(``type``: string, ?eventInitDict: CustomEventInit<'T>) =
+        inherit Event(``type``)
+        /// <summary>The value the event carries.</summary>
+        member _.detail: 'T = nativeOnly
+
+    /// <summary>Options for an <c>Event</c>; build one with <c>jsOptions</c>.</summary>
+    and [<AllowNullLiteral; EmitType("EventInit")>] EventInit =
+        /// <summary>Whether the event bubbles up a DOM tree.</summary>
+        abstract bubbles: bool with get, set
+        /// <summary>Whether <c>preventDefault</c> cancels the event.</summary>
+        abstract cancelable: bool with get, set
+        /// <summary>Whether the event crosses a shadow DOM boundary.</summary>
+        abstract composed: bool with get, set
+
+    /// <summary>Options for a <c>CustomEvent</c>; build one with <c>jsOptions</c>.</summary>
+    and [<AllowNullLiteral; EmitType("CustomEventInit<$0>")>] CustomEventInit<'T> =
+        inherit EventInit
+        /// <summary>The value the event carries.</summary>
+        abstract detail: 'T with get, set
+
+    /// <summary>Options for <c>removeEventListener</c>; build one with <c>jsOptions</c>.</summary>
+    and [<AllowNullLiteral; EmitType("EventListenerOptions")>] EventListenerOptions =
+        /// <summary>Whether the listener runs in the capture phase.</summary>
+        abstract capture: bool with get, set
+
+    /// <summary>Options for <c>addEventListener</c>; build one with <c>jsOptions</c>.</summary>
+    and [<AllowNullLiteral; EmitType("AddEventListenerOptions")>] AddEventListenerOptions =
+        inherit EventListenerOptions
+        /// <summary>Whether the listener is removed after its first call.</summary>
+        abstract once: bool with get, set
+        /// <summary>Whether the listener promises not to call <c>preventDefault</c>.</summary>
+        abstract passive: bool with get, set
+        /// <summary>A signal that removes the listener when it aborts.</summary>
+        abstract signal: AbortSignal with get, set
+
     /// <summary>The web <c>AbortSignal</c>, which cancellable JavaScript APIs such as <c>fetch</c> and <c>addEventListener</c> take.</summary>
     /// <remarks>Convert a <c>CancellationToken</c> to a signal with <c>token.ToAbortSignal()</c>, and back with
-    /// <c>CancellationToken.FromAbortSignal(signal)</c>. A global in browsers, Node.js 15 and later, Deno and Bun.</remarks>
-    [<Global; AllowNullLiteral>]
-    type AbortSignal private () =
+    /// <c>CancellationToken.FromAbortSignal(signal)</c>. A global in browsers, Node.js 15 and later, Deno and Bun.
+    /// It is an <c>EventTarget</c>, so <c>JsEvent.ofTarget signal "abort"</c> is its abort event.</remarks>
+    and [<Global; AllowNullLiteral>] AbortSignal private () =
+        inherit EventTarget()
         /// <summary>Whether the signal has aborted.</summary>
         member _.aborted: bool = nativeOnly
         /// <summary>Why the signal aborted: by default a <c>DOMException</c> named <c>"AbortError"</c>, or <c>"TimeoutError"</c> for <c>AbortSignal.timeout</c>.</summary>

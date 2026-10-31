@@ -70,6 +70,7 @@
     <Compile Include="NativeErrorTests.fs" />
     <Compile Include="AbortSignalTests.fs" />
     <Compile Include="ProxyTests.fs" />
+    <Compile Include="JsEventTests.fs" />
     <Compile Include="WeakReferenceTests.fs" />
     <Compile Include="NativeAsyncTests.fs" />
     <Compile Include="NativeGeneratorTests.fs" />

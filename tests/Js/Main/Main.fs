@@ -12,6 +12,7 @@ let allTests =
     NativeErrors.tests
     AbortSignals.tests
     Proxies.tests
+    JsEvents.tests
     WeakReferences.tests
     NativeAsync.tests
     NativeGenerators.tests
