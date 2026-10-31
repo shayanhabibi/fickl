@@ -77,6 +77,8 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `[<Curried>]` | Attribute on a parameter or field | Keeps a function curried, for JavaScript that passes or calls it one argument at a time. |
 | `[<NoOverloadSuffix>]` | Attribute on a member or type | Drops the overload hash from compiled member names, `Counter__Add` instead of `Counter__Add_Z524259A4`. |
 | `[<TypePredicate>]`, `[<TypeAssertion>]` | Attribute on a function or method | Emits a TypeScript type guard, `x is User` or `asserts x is User`. F# can see the guard as returning `User option`, `User voption` or `Result<User, exn>`: the compiled function still returns a boolean or throws, and F# calls get `Some x` or `Ok x`. Works on imported guards too. |
+| `[<TsEnum>]` | Attribute on an enum | Emits an F# enum as the frozen object a TypeScript enum compiles to, `Color.Red` and `Color[0]`. TypeScript types it with an ambient `declare enum`, so the output stays erasable, and values of the enum are annotated `Color` instead of `int32`. |
+| Imported string enums | Compiler | A case of an imported or global `[<StringEnum>]` union compiles to the member of the enum object, `Dir.Up`, so it type-checks against a TypeScript string enum. |
 | `--declaration` | CLI flag | Writes a TypeScript declaration file (`.d.ts`) next to each JavaScript file. |
 | `--strictOptions` | CLI flag | Keeps `Some null` apart from `None`, as on .NET. |
 | `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |
@@ -101,6 +103,8 @@ The capacity to explicitly control transformation via attributes does not have t
 | `[<Fickl.Core.Curried>]` on a parameter or record field | Keeps a function parameter, or a function stored in a record field, curried, for JavaScript that calls it one argument at a time. |
 | `--strictOptions` | An `option` of a type that can be null (string, array, class, record, function, `Nullable`) keeps `Some null` apart from `None`, as on .NET: it is built with `some` and read with `value`. Without it, such an option is erased, which is faster and reads as `T \| undefined` in TypeScript, but `Some null` is `None`. A `voption` stays erased either way, so it is the type to use for interop. |
 | `[<Fickl.Core.NoOverloadSuffix>]` on a member or type | Drops the overload hash from a method's compiled name, `Counter__Add` instead of `Counter__Add_Z524259A4`, so JavaScript can call it by name. On a type it applies to every member that is not overloaded; on an overloaded member it is an error. |
+| `[<Fickl.Core.TsEnum>]` on an enum | Emits the enum's object and TypeScript type. Without it, an enum emits nothing and is typed as its underlying number. |
+| `[<Import>]` or `[<Global>]` on a `[<StringEnum>]` union | Its cases compile to members of the imported object, `Dir.Up`. Without the attribute, they compile to their string literals. |
 | `--clampByteArrays` | Compiles byte arrays as `Uint8ClampedArray`, the type canvas pixel data uses. Out-of-range values clamp instead of wrapping as on .NET. |
 | `--temporal` | Represents `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly` and `TimeSpan` with the JavaScript Temporal API (experimental). |
 

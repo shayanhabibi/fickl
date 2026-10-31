@@ -3645,6 +3645,12 @@ module Util =
     let hasAttribute fullName (ent: Fable.Entity) =
         ent.Attributes |> Seq.exists (fun att -> att.Entity.FullName = fullName)
 
+    /// fickl: an F# enum with `[<TsEnum>]`, emitted on JavaScript and TypeScript as an object of its members
+    let isTsEnumEntity (com: Compiler) (ent: Fable.Entity) =
+        (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+        && ent.IsEnum
+        && hasAttribute Atts.ficklTsEnum ent
+
     let hasStructuralEquality (ent: Fable.Entity) =
         (ent |> hasAttribute Atts.structuralEquality)
         || not (ent |> hasAttribute Atts.noEquality)

@@ -14,6 +14,7 @@ let allTests =
     NativeAsyncGenerators.tests
     SymbolKeys.tests
     TypeGuards.tests
+    TsEnums.tests
     JsNamespaceLibrary.tests
     Currying.tests
     FcsEdgeCases.tests

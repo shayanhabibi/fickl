@@ -90,9 +90,23 @@ let private transformStringEnumAsAtom (rule: Fable.Core.CaseRules) (unionCase: F
         | None -> Naming.applyCaseRule rule unionCase.Name |> atom
 
 /// The value a `[<StringEnum>]` case compiles to: an atom on Beam, a string literal everywhere else.
-let private transformStringEnumCase (com: Compiler) (rule: Fable.Core.CaseRules) (unionCase: FSharpUnionCase) =
+/// fickl: on JavaScript and TypeScript, a case of an imported or global `[<StringEnum>]` is the member of the
+/// enum object named after the case, `Dir.Up`, since TypeScript string enum members are not their literals.
+let private transformStringEnumCase
+    (com: Compiler)
+    (tdef: FSharpEntity)
+    (rule: Fable.Core.CaseRules)
+    (unionCase: FSharpUnionCase)
+    =
     match com.Options.Language with
     | Beam -> transformStringEnumAsAtom rule unionCase
+    | JavaScript
+    | TypeScript ->
+        match tryGlobalOrImportedFSharpEntity com tdef with
+        | Some enumExpr ->
+            let typ = Fable.DeclaredType(FsEnt.Ref tdef, [])
+            Fable.Get(enumExpr, Fable.FieldInfo.Create(unionCase.Name), typ, None)
+        | None -> transformStringEnum rule unionCase
     | _ -> transformStringEnum rule unionCase
 
 /// The interface type a TypeScriptTaggedUnion case compiles as; reports an error when InlineInterface cannot apply.
@@ -168,7 +182,7 @@ let private transformNewUnion com ctx r fsType (unionCase: FSharpUnionCase) (arg
 
     | StringEnum(tdef, rule) ->
         match argExprs with
-        | [] -> transformStringEnumCase com rule unionCase
+        | [] -> transformStringEnumCase com tdef rule unionCase
         | _ ->
             $"StringEnum types cannot have fields: %O{tdef.TryFullName}"
             |> addErrorAndReturnNull com ctx.InlinePath r
@@ -916,7 +930,8 @@ let private transformUnionCaseTest
             let kind = Fable.ListTest(unionCase.CompiledName <> "Empty")
             return Fable.Test(unionExpr, kind, r)
 
-        | StringEnum(_, rule) -> return makeEqOp r unionExpr (transformStringEnumCase com rule unionCase) BinaryEqual
+        | StringEnum(tdef, rule) ->
+            return makeEqOp r unionExpr (transformStringEnumCase com tdef rule unionCase) BinaryEqual
 
         | DiscriminatedUnion(tdef, _) ->
             let tag = unionCaseTag com tdef unionCase
@@ -2651,8 +2666,12 @@ let private addUsedRootName (com: Compiler) name (usedRootNames: Set<string>) =
     Set.add name usedRootNames
 
 // Entities that are not output to other languages
-let private isIgnoredLeafEntity (ent: FSharpEntity) =
-    ent.IsEnum
+let private isIgnoredLeafEntity (com: Compiler) (ent: FSharpEntity) =
+    (ent.IsEnum
+     && not (
+         (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+         && hasAttrib Atts.ficklTsEnum ent.Attributes
+     ))
     || ent.IsMeasure
     || ent.IsFSharpAbbreviation
     || ent.IsDelegate
@@ -2667,7 +2686,7 @@ let rec private getUsedRootNames (com: Compiler) (usedNames: Set<string>) decls 
         match decl with
         | FSharpImplementationFileDeclaration.Entity(ent, sub) ->
             match sub with
-            | [] when isIgnoredLeafEntity ent -> usedNames
+            | [] when isIgnoredLeafEntity com ent -> usedNames
             | [] ->
                 let entRef = FsEnt.Ref ent
                 let ent = com.GetEntity(entRef)
@@ -3040,7 +3059,7 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
                 |> addError com ctx.InlinePath (Some(makeRange fsEnt.DeclarationLocation))
 
             match sub with
-            | [] when isIgnoredLeafEntity fsEnt -> []
+            | [] when isIgnoredLeafEntity (com :> Compiler) fsEnt -> []
             | [] ->
                 let entRef = FsEnt.Ref fsEnt
                 let ent = (com :> Compiler).GetEntity(entRef)

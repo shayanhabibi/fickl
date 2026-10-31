@@ -77,6 +77,23 @@ type TypeAssertionAttribute(parameter: string, assertedType: Type) =
     member _.Parameter = parameter
     member _.AssertedType = assertedType
 
+/// <summary>Emits an F# enum as a frozen JavaScript object of its members, typed in TypeScript by the enum's name.</summary>
+/// <remarks>
+/// <code>
+/// [&lt;TsEnum>]
+/// type Color = Red = 0 | Green = 1
+/// </code>
+/// compiles to <c>export const Color = Object.freeze({ Red: 0, Green: 1 })</c> and, in TypeScript,
+/// <c>export type Color = 0 | 1</c>, which annotates values of the enum. JavaScript and TypeScript code can read
+/// <c>Color.Red</c>, and TypeScript rejects numbers outside the enum. Values stay plain numbers, so F# code is unchanged.
+/// A <c>[&lt;Flags>]</c> enum is typed <c>number</c>, since its values combine members.
+/// The object is used instead of a TypeScript <c>enum</c>, which cannot be erased (<c>erasableSyntaxOnly</c>, Node type stripping).
+/// Applies to JavaScript and TypeScript; enums with a 64-bit underlying type are not supported.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Enum)>]
+type TsEnumAttribute() =
+    inherit Attribute()
+
 /// <summary>
 /// Represents a JavaScript callable with a single generic or non-generic Invoke method.
 /// </summary>

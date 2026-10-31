@@ -127,6 +127,12 @@ module Atts =
     let ficklTypeAssertion = "Fickl.Core.TypeAssertionAttribute" // typeof<Fickl.Core.TypeAssertionAttribute>.FullName
 
     [<Literal>]
+    let ficklTsEnum = "Fickl.Core.TsEnumAttribute" // typeof<Fickl.Core.TsEnumAttribute>.FullName
+
+    [<Literal>]
+    let flags = "System.FlagsAttribute" // typeof<System.FlagsAttribute>.FullName
+
+    [<Literal>]
     let ficklAsyncFunction = "Fickl.Core.AsyncFunctionAttribute"
 
     [<Literal>]

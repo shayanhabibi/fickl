@@ -772,7 +772,10 @@ module PrinterExtensions =
                 printer.PrintNewLine()
             | InterfaceDeclaration(id, body, extends, typeParameters, _doc) ->
                 printer.PrintInterfaceDeclaration(id, body, extends, typeParameters)
-            | EnumDeclaration(name, cases, isConst) ->
+            | EnumDeclaration(name, cases, isConst, isDeclare) ->
+                if isDeclare then
+                    printer.Print("declare ")
+
                 if isConst then
                     printer.Print("const ")
 
