@@ -982,6 +982,7 @@ let tryEntityIdent (com: Compiler) entFullName =
     | BuiltinSystemException entName -> makeImportLib com Any entName "System" |> Some
     // | Naming.EndsWith "Exception" _ -> makeImportLib com Any "Exception" "Util" |> Some
     | Types.attribute -> makeImportLib com Any "Attribute" "Types" |> Some
+    | "System.WeakReference`1" -> makeIdentExpr "WeakRef" |> Some
     | "System.Uri" -> makeImportLib com Any "Uri" "Uri" |> Some
     | "System.Diagnostics.Stopwatch" -> makeImportLib com Any "Stopwatch" "Stopwatch" |> Some
     | "Microsoft.FSharp.Control.FSharpAsyncReplyChannel`1" ->
@@ -3439,6 +3440,35 @@ let collections (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisA
     | "GetEnumerator", Some callee -> getEnumerator com r t callee |> Some
     | _ -> None
 
+/// fickl: `WeakReference<'T>` is a native `WeakRef`
+let weakReferences (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    match i.CompiledName, thisArg, args with
+    | ".ctor", _, target :: _ ->
+        match i.GenericArgs with
+        | [ Boolean ]
+        | [ String ]
+        | [ Char ]
+        | [ Number _ ] ->
+            "WeakReference does not support primitive targets in JS"
+            |> addError com ctx.InlinePath r
+        | _ -> ()
+
+        // decision: trackResurrection has no JS counterpart and is ignored
+        match i.GenericArgs with
+        // TypeScript's WeakRef takes only objects, which a type parameter may not be
+        | [ GenericParam _ ] -> Helper.LibCall(com, "WeakRef", "create", t, [ target ], ?loc = r) |> Some
+        | _ ->
+            Helper.GlobalCall("WeakRef", t, [ target ], isConstructor = true, ?loc = r)
+            |> Some
+    | "TryGetTarget", Some ref, [ target ] ->
+        Helper.LibCall(com, "WeakRef", "tryGetTarget", t, [ ref; target ], ?loc = r)
+        |> Some
+    | "SetTarget", _, _ ->
+        "WeakReference.SetTarget is not supported in JS, as a WeakRef cannot be retargeted: create a new WeakReference"
+        |> addErrorAndReturnNull com ctx.InlinePath r
+        |> Some
+    | _ -> None
+
 let conditionalWeakTable (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg with
     | ".ctor", _ ->
@@ -5212,6 +5242,7 @@ let private replacedModules =
             Types.idictionary, dictionaries
             Types.ireadonlydictionary, dictionaries
             Types.conditionalWeakTable, conditionalWeakTable
+            "System.WeakReference`1", weakReferences
             Types.ienumerableGeneric, enumerables
             Types.ienumerable, enumerables
             "System.Collections.Generic.Dictionary`2.Enumerator", enumerators
