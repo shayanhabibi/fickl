@@ -124,3 +124,66 @@ export function createEvent<Del extends Function, T>(addHandler: (h: Del) => voi
     }
   };
 }
+
+// fickl: web EventTarget and Node.js emitter events as F# events
+type Listener<T> = (x: T) => void;
+
+// invariant: per source object and event key, each handler maps to one listener per AddHandler call, removed
+// last-in first-out. Shared across IEvent values, as a getter may build a new one for each access.
+const addedListeners = new WeakMap<object, Map<string, Map<Function, Listener<any>[]>>>();
+
+function listenersOf(source: object, key: string): Map<Function, Listener<any>[]> {
+  let byKey = addedListeners.get(source);
+  if (byKey === undefined) { byKey = new Map(); addedListeners.set(source, byKey); }
+  let byHandler = byKey.get(key);
+  if (byHandler === undefined) { byHandler = new Map(); byKey.set(key, byHandler); }
+  return byHandler;
+}
+
+function listenerEvent<T>(source: object, key: string, listen: (l: Listener<T>) => void, unlisten: (l: Listener<T>) => void): IEvent<T> {
+  return createEvent<Handler<T>, T>(
+    (h) => {
+      const listener: Listener<T> = (x) => h(source, x);
+      const listeners = listenersOf(source, key);
+      const added = listeners.get(h);
+      if (added === undefined) { listeners.set(h, [listener]); } else { added.push(listener); }
+      listen(listener);
+    },
+    (h) => {
+      const listeners = listenersOf(source, key);
+      const added = listeners.get(h);
+      const listener = added?.pop();
+      if (added === undefined || listener === undefined) { return; }
+      if (added.length === 0) { listeners.delete(h); }
+      unlisten(listener);
+    });
+}
+
+/** The events of a type an EventTarget dispatches, through addEventListener and removeEventListener. */
+export function fromEventTarget<T>(target: EventTarget, type: string, options?: AddEventListenerOptions): IEvent<T> {
+  const capture = typeof options === "object" && options.capture === true;
+  return listenerEvent<T>(target, (capture ? "capture:" : "bubble:") + type,
+    (l) => target.addEventListener(type, l as unknown as EventListener, options),
+    (l) => target.removeEventListener(type, l as unknown as EventListener, options));
+}
+
+/** An object with Node.js-style `on` and `off` or `removeListener` methods. */
+export interface EventEmitter {
+  on(eventName: string, listener: (...args: any[]) => void): unknown;
+  off?(eventName: string, listener: (...args: any[]) => void): unknown;
+  removeListener?(eventName: string, listener: (...args: any[]) => void): unknown;
+}
+
+/** The events of a name an emitter emits, with the first argument as the value. */
+export function fromEmitter<T>(emitter: EventEmitter, eventName: string): IEvent<T> {
+  return listenerEvent<T>(emitter, eventName,
+    (l) => emitter.on(eventName, l),
+    (l) => {
+      if (emitter.off !== undefined) { emitter.off(eventName, l); } else { emitter.removeListener?.(eventName, l); }
+    });
+}
+
+/** Dispatches a CustomEvent carrying a value, and returns false if a listener cancelled it. */
+export function dispatchCustomEvent<T>(target: EventTarget, type: string, detail: T): boolean {
+  return target.dispatchEvent(new CustomEvent<T>(type, { detail }));
+}
