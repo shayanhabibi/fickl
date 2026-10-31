@@ -59,6 +59,8 @@ type Context =
         SymbolAccessCache: Dictionary<string, Expression option>
         /// <summary>Native fields replacing decorated auto-property backing storage in the current class.</summary>
         NativeAutoProperties: Map<string, ClassMember>
+        /// <summary>Directly in a primary constructor, where <c>new.target</c> is the class being constructed.</summary>
+        IsClassConstructor: bool
     }
 
 type ModuleDecl(name, ?isPublic, ?isMutable, ?typ, ?doc) =
@@ -1677,6 +1679,7 @@ module Annotation =
             { ctx with
                 IsNativeAsync = false
                 NativeGeneratorType = None
+                IsClassConstructor = false
             }
             name
             typeParams
@@ -2257,6 +2260,10 @@ module Util =
                         Some info.ReturnParameter.Type
                     else
                         None
+                IsClassConstructor =
+                    match kind with
+                    | ClassConstructor -> true
+                    | _ -> false
             }
 
         let funcName, args, body =
@@ -3420,6 +3427,11 @@ module Util =
             addErrorAndReturnNull com range "Native yields and returns must be inside a jsGenerator computation"
         | Fable.Tags.Contains "fickl-native-await" when not ctx.IsNativeAsync ->
             addErrorAndReturnNull com range "Native promise bindings must be inside a jsAsync computation"
+        | Fable.Tags.Contains "fickl-new-target" when not ctx.IsClassConstructor ->
+            addErrorAndReturnNull
+                com
+                range
+                "JS.newTarget and JS.isNewTarget are only allowed in a primary constructor, outside lambdas"
         | Fable.Tags.Contains "fickl-top-level-await" ->
             addErrorAndReturnNull
                 com
@@ -7196,7 +7208,7 @@ but thanks to the optimisation done below we get
 
         let baseExpr, consBody =
             classDecl.BaseCall
-            |> extractSuperClassFromBaseCall com ctx baseType
+            |> extractSuperClassFromBaseCall com { ctx with IsClassConstructor = true } baseType
             |> Option.orElseWith (fun () ->
                 if ent.IsValueType then
                     Some(libValue com ctx "Types" "Record" |> SuperExpression, [])
@@ -7872,6 +7884,7 @@ module Compiler =
                 NativeGeneratorType = None
                 SymbolAccessCache = Dictionary()
                 NativeAutoProperties = Map.empty
+                IsClassConstructor = false
             }
 
         let registerSymbolKey (att: Fable.Attribute) =

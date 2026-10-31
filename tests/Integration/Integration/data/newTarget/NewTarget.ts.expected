@@ -1,0 +1,86 @@
+
+import { Exception } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+
+export class Shape {
+    constructor() {
+        if ((new.target) === Shape) {
+            throw new Exception("Shape is abstract");
+        }
+    }
+}
+
+export function Shape_$reflection(): TypeInfo {
+    return class_type("NewTarget.Shape", undefined, Shape);
+}
+
+export function Shape_$ctor(): Shape {
+    return new Shape();
+}
+
+export class Square extends Shape {
+    constructor() {
+        super();
+    }
+}
+
+export function Square_$reflection(): TypeInfo {
+    return class_type("NewTarget.Square", undefined, Square, Shape_$reflection());
+}
+
+export function Square_$ctor(): Square {
+    return new Square();
+}
+
+export class Base {
+    readonly created: any;
+    constructor() {
+        this.created = (new.target);
+    }
+}
+
+export function Base_$reflection(): TypeInfo {
+    return class_type("NewTarget.Base", undefined, Base);
+}
+
+export function Base_$ctor(): Base {
+    return new Base();
+}
+
+export function Base__get_Created(_: Base): any {
+    return _.created;
+}
+
+export class Tagged {
+    readonly target: any;
+    constructor(target: any) {
+        this.target = target;
+    }
+}
+
+export function Tagged_$reflection(): TypeInfo {
+    return class_type("NewTarget.Tagged", undefined, Tagged);
+}
+
+export function Tagged_$ctor_4E60E31B(target: any): Tagged {
+    return new Tagged(target);
+}
+
+export function Tagged__get_Target(_: Tagged): any {
+    return _.target;
+}
+
+export class TaggedChild extends Tagged {
+    constructor() {
+        super(new.target);
+    }
+}
+
+export function TaggedChild_$reflection(): TypeInfo {
+    return class_type("NewTarget.TaggedChild", undefined, TaggedChild, Tagged_$reflection());
+}
+
+export function TaggedChild_$ctor(): TaggedChild {
+    return new TaggedChild();
+}
+

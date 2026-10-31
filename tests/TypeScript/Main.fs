@@ -23,6 +23,7 @@ let allTests =
     SymbolKeys.tests
     TypeGuards.tests
     TaggedTemplates.tests
+    NewTarget.tests
     TsEnums.tests
     JsNamespaceLibrary.tests
     Arithmetic.tests

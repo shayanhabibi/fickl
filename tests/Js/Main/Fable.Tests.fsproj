@@ -82,6 +82,7 @@
     <Compile Include="TaggedTemplateTests.fs" />
     <Compile Include="ImportAttributeTests.fs" />
     <Compile Include="TopLevelAwaitTests.fs" />
+    <Compile Include="NewTargetTests.fs" />
     <Compile Include="TsEnumTests.fs" />
     <Compile Include="JsNamespaceLibraryBindings.fs" />
     <Compile Include="JsNamespaceLibraryTests.fs" />
