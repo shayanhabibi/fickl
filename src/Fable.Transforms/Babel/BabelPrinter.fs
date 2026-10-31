@@ -385,7 +385,8 @@ module PrinterExtensions =
             | FunctionExpression _
             | AsyncFunctionExpression _
             | GeneratorFunctionExpression _ -> true
-            | AsExpression(e, _) -> printer.NeedsParensAsExpressionStatement(e)
+            | AsExpression(e, _)
+            | SatisfiesExpression(e, _) -> printer.NeedsParensAsExpressionStatement(e)
             | BinaryExpression(left, _, _, _)
             | LogicalExpression(left, _, _, _)
             | AssignmentExpression(left, _, _, _) -> recurseUnlessAutoWrapped left
@@ -639,6 +640,10 @@ module PrinterExtensions =
             | AsExpression(expression, typeAnnotation) ->
                 printer.Print(expression)
                 printer.Print(" as ")
+                printer.Print(typeAnnotation)
+            | SatisfiesExpression(expression, typeAnnotation) ->
+                printer.Print(expression)
+                printer.Print(" satisfies ")
                 printer.Print(typeAnnotation)
 
         member printer.PrintDirectivePrologue(DirectivePrologue text: DirectivePrologue) = printer.Print(text)

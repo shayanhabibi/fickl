@@ -101,6 +101,8 @@ type Expression =
         typeParameters: TypeParameter array *
         loc: SourceLocation option
     | AsExpression of expression: Expression * typeAnnotation: TypeAnnotation
+    /// fickl: `expression satisfies typeAnnotation`, checked against the type without changing its own
+    | SatisfiesExpression of expression: Expression * typeAnnotation: TypeAnnotation
 
     member this.Location =
         match this with

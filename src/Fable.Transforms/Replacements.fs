@@ -5662,6 +5662,18 @@ let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
         | _ -> None
 
     match methodName, literal with
+    | "partial", _ ->
+        match args with
+        | [ arg ] ->
+            match makePojoFromLambda com arg with
+            | ObjectExpr(members, _, baseCall) -> ObjectExpr(members, t, baseCall)
+            | runtime -> TypeCast(runtime, t)
+            |> Some
+        | _ -> None
+    | "full", _ ->
+        match args with
+        | [ arg ] -> TypeCast(arg, t) |> Some
+        | _ -> None
     | "jsFunction", Some(args, body, name) ->
         Delegate(args, body, name, [ "not-arrow"; "fickl-js-function" ])
         |> expose args.Length

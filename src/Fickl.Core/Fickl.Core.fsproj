@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Fickl.Core.Types.fs" />
+    <Compile Include="Fickl.Core.TypeScript.fs" />
     <Compile Include="Fickl.Core.Decorators.fs" />
     <Compile Include="Fickl.Core.JsInterop.fs" />
     <Compile Include="Fickl.Core.NativeAsync.fs" />
