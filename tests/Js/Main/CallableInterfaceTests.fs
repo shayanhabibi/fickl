@@ -73,8 +73,78 @@ type Rest =
 type BodyGeneric =
     abstract Invoke<'T>: unit -> int
 
+[<CallableInterface>]
+type Logger =
+    abstract Invoke: message: string -> string
+    abstract enabled: bool with get, set
+    abstract ns: string
+
+[<CallableInterface>]
+type Component =
+    abstract Invoke: props: int -> int
+    abstract displayName: string
+    abstract name: string
+    abstract twice: int -> int
+
+[<CallableInterface>]
+type Labelled =
+    inherit Recursive
+    abstract label: string
+
+let makeLogger ns =
+    let mutable enabled = true
+    { new Logger with
+        member this.Invoke message = if this.enabled then this.ns + ": " + message else ""
+        member _.enabled with get () = enabled and set value = enabled <- value
+        member _.ns = ns }
+
 let tests =
     testList "Callable interfaces" [
+        testCase "Callable objects carry properties with getters and setters" <| fun () ->
+            let log = makeLogger "app"
+            log.Invoke "started" |> equal "app: started"
+            log.ns |> equal "app"
+            log.enabled <- false
+            log.enabled |> equal false
+            log.Invoke "hidden" |> equal ""
+#if FABLE_COMPILER
+            jsTypeof log |> equal "function"
+            emitJsExpr log "$0('direct')" |> equal ""
+            emitJsExpr log "$0.enabled = true" |> ignore
+            emitJsExpr log "$0('direct')" |> equal "app: direct"
+#endif
+
+        testCase "Callable objects carry methods and keys a function already owns" <| fun () ->
+            let comp =
+                { new Component with
+                    member _.Invoke props = props + 1
+                    member _.displayName = "Counter"
+                    member _.name = "counter"
+                    member this.twice value = this.Invoke(this.Invoke value) }
+            comp.Invoke 1 |> equal 2
+            comp.displayName |> equal "Counter"
+            comp.name |> equal "counter"
+            comp.twice 1 |> equal 3
+#if FABLE_COMPILER
+            jsTypeof comp |> equal "function"
+            emitJsExpr comp "$0.name" |> equal "counter"
+            emitJsExpr comp "$0.twice(5)" |> equal 7
+#endif
+
+        testCase "Inheriting callable interfaces can add properties" <| fun () ->
+            let callback =
+                { new Labelled with
+                    member _.Invoke value = value * 2
+                    member _.label = "double" }
+            let parent: Recursive = callback
+            callback.Invoke 2 |> equal 4
+            parent.Invoke 3 |> equal 6
+            callback.label |> equal "double"
+#if FABLE_COMPILER
+            jsTypeof callback |> equal "function"
+            emitJsExpr (callback, parent) "$0 === $1" |> equal true
+#endif
+
         testCase "A generic callable diamond retains instantiated outer and method binders" <| fun () ->
             let callback =
                 { new DiamondOuter with

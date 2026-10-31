@@ -295,6 +295,11 @@ export function ensureErrorOrException(e: any): any {
   return (isException(e) || isPromise(e)) ? e : new Exception(String(e));
 }
 
+/** fickl: a callable interface's function, with the properties, accessors and methods of an object literal */
+export function callableObject<F extends Function, P extends object>(f: F, properties: P & ThisType<F & P>): F & P {
+  return Object.defineProperties(f, Object.getOwnPropertyDescriptors(properties)) as F & P;
+}
+
 export function isArrayLike<T>(x: T | ArrayLike<T> | Iterable<T>): x is T[] {
   return Array.isArray(x) || ArrayBuffer.isView(x);
 }

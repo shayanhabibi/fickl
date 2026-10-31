@@ -572,7 +572,7 @@ let addGeneric<'T when 'T :> IAdd<'T>> (a: 'T) (b: 'T) = 'T.Add(a, b)
       |> Assert.Exists.errorWith "Static abstract member Add of IAdd can only be called where the type is known"
       |> ignore
 
-    testCase "CallableInterface rejects added members on a callable base" <| fun _ ->
+    testCase "CallableInterface accepts added members on a callable base" <| fun _ ->
       compile """
 open Fickl.Core
 [<CallableInterface>]
@@ -581,8 +581,24 @@ type Parent = abstract Invoke<'T>: 'T -> 'T
 type Child =
     inherit Parent
     abstract Name: string
+let child = { new Child with
+                member _.Invoke value = value
+                member _.Name = "child" }
 """
-      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> Assert.Is.success
+      |> ignore
+
+    testCase "CallableInterface rejects Invoke on an inheriting interface" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Parent = abstract Invoke: int -> int
+[<CallableInterface>]
+type Child =
+    inherit Parent
+    abstract Invoke: string -> string
+"""
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base"
       |> ignore
 
     testCase "CallableInterface rejects unrelated identical callable slots" <| fun _ ->
@@ -597,7 +613,7 @@ type Child =
     inherit First
     inherit Second
 """
-      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base"
       |> ignore
 
     testCase "CallableInterface rejects distinct instantiations of one callable slot" <| fun _ ->
@@ -614,7 +630,7 @@ type Child =
     inherit First
     inherit Second
 """
-      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base"
       |> ignore
 
     testCase "CallableInterface rejects multiple callable bases" <| fun _ ->
@@ -629,7 +645,7 @@ type Child =
     inherit First
     inherit Second
 """
-      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base"
       |> ignore
 
     testCase "CallableInterface rejects unsupported targets" <| fun _ ->
@@ -674,13 +690,32 @@ type Callback =
       |> Assert.Exists.errorWith "CallableInterface requires exactly one instance Invoke method"
       |> ignore
 
-    testCase "CallableInterface rejects extra properties" <| fun _ ->
+    testCase "CallableInterface accepts properties and methods beside Invoke" <| fun _ ->
       compile """
 open Fickl.Core
 [<CallableInterface>]
 type Callback =
     abstract Invoke: int -> int
     abstract Name: string
+    abstract Enabled: bool with get, set
+    abstract Reset: unit -> unit
+let callback =
+    let mutable enabled = true
+    { new Callback with
+        member _.Invoke value = value
+        member _.Name = "callback"
+        member _.Enabled with get () = enabled and set value = enabled <- value
+        member _.Reset() = enabled <- true }
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
+    testCase "CallableInterface rejects a property named Invoke without a method" <| fun _ ->
+      compile """
+open Fickl.Core
+[<CallableInterface>]
+type Callback =
+    abstract Invoke: int
 """
       |> Assert.Exists.errorWith "CallableInterface requires exactly one instance Invoke method"
       |> ignore
@@ -694,7 +729,7 @@ type Callback =
     inherit Parent
     abstract Invoke: int -> int
 """
-      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base and no additional members"
+      |> Assert.Exists.errorWith "CallableInterface inheritance requires a single callable base"
       |> ignore
 
     testCase "CallableInterface rejects class implementations" <| fun _ ->
