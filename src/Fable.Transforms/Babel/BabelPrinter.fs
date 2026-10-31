@@ -385,7 +385,8 @@ module PrinterExtensions =
             | FunctionExpression _
             | AsyncFunctionExpression _
             | GeneratorFunctionExpression _ -> true
-            | AsExpression(e, _) -> printer.NeedsParensAsExpressionStatement(e)
+            | AsExpression(e, _)
+            | SatisfiesExpression(e, _) -> printer.NeedsParensAsExpressionStatement(e)
             | BinaryExpression(left, _, _, _)
             | LogicalExpression(left, _, _, _)
             | AssignmentExpression(left, _, _, _) -> recurseUnlessAutoWrapped left
@@ -432,7 +433,8 @@ module PrinterExtensions =
             | UnionTypeAnnotation _
             | IntersectionTypeAnnotation _
             | KeyofTypeAnnotation _
-            | TypeofTypeAnnotation _ ->
+            | TypeofTypeAnnotation _
+            | EmitTypeAnnotation _ ->
                 printer.Print("(")
                 printer.Print(t)
                 printer.Print(")")
@@ -639,6 +641,10 @@ module PrinterExtensions =
                 printer.Print(expression)
                 printer.Print(" as ")
                 printer.Print(typeAnnotation)
+            | SatisfiesExpression(expression, typeAnnotation) ->
+                printer.Print(expression)
+                printer.Print(" satisfies ")
+                printer.Print(typeAnnotation)
 
         member printer.PrintDirectivePrologue(DirectivePrologue text: DirectivePrologue) = printer.Print(text)
 
@@ -772,6 +778,16 @@ module PrinterExtensions =
                 printer.PrintNewLine()
             | InterfaceDeclaration(id, body, extends, typeParameters, _doc) ->
                 printer.PrintInterfaceDeclaration(id, body, extends, typeParameters)
+            | FunctionSignatureDeclaration(parameters, id, returnType, typeParameters, _doc) ->
+                printer.Print("function ")
+                printer.PrintIdent(id)
+                printer.Print(typeParameters)
+                printer.Print("(")
+                printer.PrintParameters(parameters)
+                printer.Print("): ")
+                printer.Print(returnType)
+                printer.Print(";")
+                printer.PrintNewLine()
             | EnumDeclaration(name, cases, isConst) ->
                 if isConst then
                     printer.Print("const ")
@@ -950,6 +966,20 @@ module PrinterExtensions =
                 printSegment printer value (lastMatch.Index + lastMatch.Length) value.Length
             else
                 printSegment printer value 0 value.Length
+
+        /// fickl: a placeholder with no argument is left as written, so a `$` in the type text survives
+        member printer.PrintEmitTypeAnnotation(value: string, args: TypeAnnotation array) =
+            let mutable last = 0
+
+            for m in Regex.Matches(value, @"\$(\d+)") do
+                match Array.tryItem (int m.Groups[1].Value) args with
+                | Some arg ->
+                    printer.Print(value.Substring(last, m.Index - last))
+                    printer.Print(arg)
+                    last <- m.Index + m.Length
+                | None -> ()
+
+            printer.Print(value.Substring(last))
 
         member printer.PrintIdent(identifier: Identifier) =
             let (Identifier(name, loc)) = identifier
@@ -1431,7 +1461,7 @@ module PrinterExtensions =
                     printer.PrintNewLine()
 
                 printer.PrintClassMember(declaration)
-            | ClassAutoAccessor(key, value, isComputed, isStatic, annotation, loc) ->
+            | ClassAutoAccessor(key, value, isComputed, isStatic, isOverride, annotation, loc) ->
                 printer.PrintClassProperty(
                     key,
                     value,
@@ -1441,7 +1471,8 @@ module PrinterExtensions =
                     annotation,
                     None,
                     loc,
-                    isAccessor = true
+                    isAccessor = true,
+                    isOverride = isOverride
                 )
             | ClassMethod(kind, parameters, body, isStatic, isAbstract, isOverride, returnType, typeParameters, loc, doc) ->
                 printer.PrintJsDoc(doc)
@@ -1530,7 +1561,18 @@ module PrinterExtensions =
             | Some Readonly -> printer.Print("readonly ")
 
         member printer.PrintClassProperty
-            (key, value, isComputed, isStatic, isOptional, typeAnnotation, accessModifier, loc, ?isAccessor: bool)
+            (
+                key,
+                value,
+                isComputed,
+                isStatic,
+                isOptional,
+                typeAnnotation,
+                accessModifier,
+                loc,
+                ?isAccessor: bool,
+                ?isOverride: bool
+            )
             =
             printer.AddLocation(loc)
 
@@ -1538,6 +1580,9 @@ module PrinterExtensions =
                 printer.Print("static ")
 
             printer.PrintAccessModifier(accessModifier)
+
+            if defaultArg isOverride false then
+                printer.Print("override ")
 
             if defaultArg isAccessor false then
                 printer.Print("accessor ")
@@ -1670,6 +1715,7 @@ module PrinterExtensions =
             | NumberTypeAnnotation -> printer.Print("number")
             | BooleanTypeAnnotation -> printer.Print("boolean")
             | AnyTypeAnnotation -> printer.Print("any")
+            | UnknownTypeAnnotation -> printer.Print("unknown")
             | VoidTypeAnnotation -> printer.Print("void")
             | UndefinedTypeAnnotation -> printer.Print("undefined")
             | ArrayTypeAnnotation(t) ->
@@ -1698,6 +1744,7 @@ module PrinterExtensions =
                 printer.Print(prop)
                 printer.Print("]")
             | LiteralTypeAnnotation lit -> printer.PrintLiteral(lit)
+            | EmitTypeAnnotation(value, args) -> printer.PrintEmitTypeAnnotation(value, args)
             | TypePredicateTypeAnnotation(parameterName, typ, asserts) ->
                 if asserts then
                     printer.Print("asserts ")

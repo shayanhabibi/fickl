@@ -116,6 +116,12 @@ module Atts =
     let callableInterface = "Fickl.Core.CallableInterfaceAttribute"
 
     [<Literal>]
+    let ficklUnknownType = "Fickl.Core.UnknownTypeAttribute" // internal to Fickl.Core, on its `unknown` abbreviation
+
+    [<Literal>]
+    let ficklEmitType = "Fickl.Core.EmitTypeAttribute" // typeof<Fickl.Core.EmitTypeAttribute>.FullName
+
+    [<Literal>]
     let ficklCurried = "Fickl.Core.CurriedAttribute" // typeof<Fickl.Core.CurriedAttribute>.FullName
 
     let ficklJsFunction = "Fickl.Core.JsFunctionAttribute"
@@ -140,6 +146,9 @@ module Atts =
 
     [<Literal>]
     let ficklNoOverloadSuffix = "Fickl.Core.NoOverloadSuffixAttribute" // typeof<Fickl.Core.NoOverloadSuffixAttribute>.FullName
+
+    [<Literal>]
+    let ficklJsError = "Fickl.Core.JsErrorAttribute" // typeof<Fickl.Core.JsErrorAttribute>.FullName
 
     [<Literal>]
     let stringEnum = "Fable.Core.StringEnumAttribute" // typeof<Fable.Core.StringEnumAttribute>.FullName
