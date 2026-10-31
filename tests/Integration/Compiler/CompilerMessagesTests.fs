@@ -1660,4 +1660,47 @@ let fromIndex (c: Command) = match c with Take t -> t.fromIndex | Save -> 0
       compile source
       |> Assert.Is.strictSuccess
       |> ignore
+
+    testCase "Emit $N! reports an argument that is not a string literal" <| fun _ ->
+      compile """
+open Fable.Core
+[<Emit("$0!.length")>]
+let length (s: string) : int = jsNative
+let measure (s: string) = length s
+"""
+      |> Assert.Is.Single.error
+      |> Assert.Exists.errorWith "Emit placeholder $0! splices a string literal as raw code, but argument 0 is not a string literal. For a TypeScript non-null assertion, write ($0)! instead"
+      |> ignore
+
+    testCase "Emit $N! accepts a string literal, ($N)! and an omitted argument" <| fun _ ->
+      compile """
+open Fable.Core
+open Fable.Core.JsInterop
+[<Emit("let $0! = $1")>]
+let declare (name: string) (value: int) : unit = jsNative
+[<Emit("($0)!.length")>]
+let length (s: string) : int = jsNative
+type Calls =
+    [<Emit("f($0{{, $1!}})")>]
+    static member Trailing(x: int, ?raw: string) : unit = jsNative
+    [<Emit("f($0, $1!, $2)")>]
+    static member Middle(x: int, ?raw: string, ?y: int) : unit = jsNative
+let run (s: string) =
+    declare "answer" 42
+    Calls.Trailing 1
+    Calls.Middle(1, y = 2)
+    length s + emitJsExpr s "($0)!.length"
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
+    testCase "Emit $N! is checked only in the branch a template keeps" <| fun _ ->
+      compile """
+open Fable.Core
+[<Emit("{{$1 ? $0! : ($0)}}")>]
+let pick (s: string) (raw: bool) : string = jsNative
+let run (s: string) = pick s false
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
   ]

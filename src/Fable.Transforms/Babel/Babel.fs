@@ -1083,3 +1083,122 @@ module Helpers =
     type TypeParameter with
 
         static member typeParameter(name, ?bound, ?``default``) = TypeParameter(name, bound, ``default``)
+
+module Patterns =
+    let rec hasSideEffects (e: Expression) =
+        match e with
+        | Undefined(_)
+        | Literal(NullLiteral(_))
+        | Literal(Literal.StringLiteral(_))
+        | Literal(BooleanLiteral(_))
+        | Literal(NumericLiteral(_)) -> false
+        // Constructors of classes deriving from System.Object add an empty object at the end
+        | ObjectExpression(properties, _loc) -> properties.Length > 0
+        | UnaryExpression(argument, "void", false, _loc) -> hasSideEffects (argument)
+        // Some identifiers may be stranded as the result of imports
+        // intended only for side effects, see #2228
+        | Expression.Identifier(_) -> false
+        // Sometimes empty IIFE remain in the AST
+        | CallExpression(ArrowFunctionExpression(_, (BlockStatement body), _, _, _), _, _, _) ->
+            body |> Array.exists isProductiveStatement
+        | CommentedExpression(_, e) -> hasSideEffects e
+        | _ -> true
+
+    and isProductiveStatement (s: Statement) =
+        match s with
+        | ExpressionStatement(expr) -> hasSideEffects (expr)
+        | _ -> true
+
+    [<return: Struct>]
+    let (|UndefinedOrVoid|_|) =
+        function
+        | Undefined _ -> ValueSome()
+        | UnaryExpression(argument, "void", false, _loc) when not (hasSideEffects (argument)) -> ValueSome()
+        | _ -> ValueNone
+
+    [<return: Struct>]
+    let (|NullOrUndefinedOrVoid|_|) =
+        function
+        | Literal(NullLiteral _)
+        | UndefinedOrVoid _ -> ValueSome()
+        | _ -> ValueNone
+
+    [<return: Struct>]
+    let (|StringConstant|_|) =
+        function
+        | Literal(Literal.StringLiteral(StringLiteral(value = value))) -> ValueSome value
+        | _ -> ValueNone
+
+/// fickl: the text rewrites an Emit template goes through before its `$N` placeholders are printed.
+/// Shared by the printer and by Fable2Babel, which checks the rewritten template for errors.
+module EmitMacro =
+    open System.Text.RegularExpressions
+    open Patterns
+
+    let inline private replace pattern (f: Match -> string) input = Regex.Replace(input, pattern, f)
+
+    /// Expands `$N...`, `{{$N ? a : b}}` and `{{ … $N … }}`
+    let expandGroups (args: Expression array) (value: string) =
+        value
+        |> replace
+            @"\$(\d+)\.\.\."
+            (fun m ->
+                let rep = ResizeArray()
+                let i = int m.Groups[1].Value
+
+                for j = i to args.Length - 1 do
+                    rep.Add("$" + string<int> j)
+
+                String.concat ", " rep
+            )
+
+        |> replace
+            @"\{\{\s*\$(\d+)\s*\?\s*(.*?)\s*:\s*(.*?)\s*\}\}"
+            (fun m ->
+                let i = int m.Groups[1].Value
+
+                match Array.tryItem i args with
+                | Some expr ->
+                    match expr with
+                    | Literal(BooleanLiteral(value = false))
+                    | NullOrUndefinedOrVoid -> m.Groups[3].Value
+                    | _ -> m.Groups[2].Value
+                | None -> m.Groups[3].Value
+            )
+
+        |> replace
+            @"\{\{([^\}]*\$(\d+).*?)\}\}"
+            (fun m ->
+                let i = int m.Groups[2].Value
+
+                match Array.tryItem i args with
+                | Some _ -> m.Groups[1].Value
+                | None -> ""
+            )
+
+    /// If placeholder is followed by !, emit string literals as JS: "let $0! = $1"
+    let expandRawArgs (args: Expression array) (value: string) =
+        value
+        |> replace
+            @"\$(\d+)!"
+            (fun m ->
+                let i = int m.Groups[1].Value
+
+                match Array.tryItem i args with
+                | Some(StringConstant value) -> value
+                | _ -> ""
+            )
+
+    /// The index of the first `$N!` whose argument is passed but is not a string literal. `expandRawArgs` prints
+    /// nothing for it, which loses the argument silently. An omitted optional argument before a passed one arrives
+    /// as `undefined`, and counts as not passed.
+    let tryFindNonLiteralRawArg (args: Expression array) (value: string) =
+        Regex.Matches(expandGroups args value, @"\$(\d+)!")
+        |> Seq.map (fun m -> int m.Groups[1].Value)
+        |> Seq.tryFind (fun i ->
+            match Array.tryItem i args with
+            | None
+            | Some(StringConstant _)
+            | Some(NullOrUndefinedOrVoid) -> false
+            | Some _ -> true
+        )

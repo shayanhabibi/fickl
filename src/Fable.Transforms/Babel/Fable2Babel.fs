@@ -3623,9 +3623,15 @@ module Util =
                 |> Option.map (fun e -> com.TransformAsExpr(ctx, e))
                 |> Option.toList
 
-            transformCallArgs com ctx info
-            |> List.append thisArg
-            |> emitExpression range macro
+            let args = transformCallArgs com ctx info |> List.append thisArg
+
+            EmitMacro.tryFindNonLiteralRawArg (List.toArray args) macro
+            |> Option.iter (fun i ->
+                $"Emit placeholder $%d{i}! splices a string literal as raw code, but argument %d{i} is not a string literal. For a TypeScript non-null assertion, write ($%d{i})! instead"
+                |> addError com [] range
+            )
+
+            emitExpression range macro args
 
     [<RequireQualifiedAccess>]
     type JsxPropExpr =
