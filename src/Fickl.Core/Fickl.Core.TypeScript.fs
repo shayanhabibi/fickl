@@ -34,3 +34,14 @@ type internal UnknownTypeAttribute() =
 /// </remarks>
 [<UnknownType>]
 type unknown = obj
+
+/// <summary>Calls of fluent members marked <c>[&lt;ReturnsThis>]</c>.</summary>
+[<RequireQualifiedAccess>]
+module Fluent =
+    /// <summary>Calls a member that returns its receiver, and types the result as the receiver.</summary>
+    /// <remarks>
+    /// F# types <c>select.where "x"</c> as the interface declaring <c>where</c>, even when <c>select</c> is a subinterface.
+    /// <c>select |> Fluent.chain (fun s -> s.where "x")</c> is the same call typed as <c>select</c>'s own type, so the
+    /// subinterface's members stay in reach. The result is cast, which fails on .NET if the member returned another type.
+    /// </remarks>
+    let inline chain (call: 'T -> 'R) (receiver: 'T) : 'T = call receiver |> unbox<'T>

@@ -1,0 +1,122 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { int32ToString, type MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { type FSharpList, empty, reverse, cons } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import { join } from "./fable_modules/fable-library-ts.5.25.0/String.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+
+export interface IQuery {
+    limit(arg0: int32): this,
+    text(): string,
+    where(arg0: string): this
+}
+
+export interface ISelect extends IQuery {
+    columns(arg0: MutableArray<string>): this
+}
+
+export class Select implements ISelect, IQuery {
+    parts: FSharpList<string>;
+    constructor() {
+        this.parts = empty<string>();
+    }
+    where(condition: string): this {
+        const this$: Select = this;
+        this$.parts = cons("where " + condition, this$.parts);
+        return this$ as this;
+    }
+    limit(count: int32): this {
+        const this$: Select = this;
+        if (count === 0) {
+            return this$ as this;
+        }
+        else {
+            this$.parts = cons("limit " + int32ToString(count), this$.parts);
+            return this$ as this;
+        }
+    }
+    columns(names: MutableArray<string>): this {
+        const this$: Select = this;
+        this$.parts = cons("select " + join(", ", names), this$.parts);
+        return this$ as this;
+    }
+    text(): string {
+        const _: Select = this;
+        return join(" ", reverse<string>(_.parts));
+    }
+}
+
+export function Select_$reflection(): TypeInfo {
+    return class_type("ReturnsThis.Select", undefined, Select);
+}
+
+export function Select_$ctor(): Select {
+    return new Select();
+}
+
+export abstract class Counter {
+    constructor() {
+    }
+    abstract "ReturnsThis.Counter.addZ524259A4"(arg0: int32): this;
+}
+
+export function Counter_$reflection(): TypeInfo {
+    return class_type("ReturnsThis.Counter", undefined, undefined);
+}
+
+export class StepCounter extends Counter {
+    constructor() {
+        super();
+    }
+    override "ReturnsThis.Counter.addZ524259A4"(_arg: int32): this {
+        const this$: StepCounter = this;
+        return this$ as this;
+    }
+}
+
+export function StepCounter_$reflection(): TypeInfo {
+    return class_type("ReturnsThis.StepCounter", undefined, StepCounter, Counter_$reflection());
+}
+
+export function StepCounter_$ctor(): StepCounter {
+    return new StepCounter();
+}
+
+export const literal: ISelect = {
+    where(_arg: string): ISelect {
+        const this$: ISelect = this;
+        return this$ as ISelect;
+    },
+    limit(_arg_1: int32): ISelect {
+        const this$_1: ISelect = this;
+        return this$_1 as ISelect;
+    },
+    columns(_arg_2: MutableArray<string>): ISelect {
+        const this$_2: ISelect = this;
+        return this$_2;
+    },
+    text(): string {
+        return "";
+    },
+};
+
+export const counter: Counter = new (class extends Counter {
+    constructor() {
+        super();
+    }
+    override "ReturnsThis.Counter.addZ524259A4"(_arg: int32): this {
+        const this$: Counter = this;
+        return this$ as this;
+    }
+}
+)();
+
+export function select(): ISelect {
+    return Select_$ctor();
+}
+
+export function chained(query: ISelect): ISelect {
+    const receiver_1: ISelect = query.where("x");
+    return receiver_1.columns(["a"]);
+}
+

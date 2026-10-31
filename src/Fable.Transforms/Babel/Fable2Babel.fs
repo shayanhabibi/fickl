@@ -2904,11 +2904,53 @@ module Util =
             None
         | None, _ -> None
 
+    /// fickl: casts each value the method body returns to `ta`, for a method implementing a `[<ReturnsThis>]`
+    /// slot; returns of nested functions are expressions, so they are left alone
+    let private castReturns (ta: TypeAnnotation) (body: BlockStatement) : BlockStatement =
+        let rec block (b: BlockStatement) : BlockStatement =
+            BlockStatement(Array.map statement b.Body)
+
+        and statement s =
+            match s with
+            | ReturnStatement(argument, loc) -> ReturnStatement(AsExpression(argument, ta), loc)
+            | Statement.BlockStatement b -> Statement.BlockStatement(block b)
+            | LabeledStatement(body, label) -> LabeledStatement(statement body, label)
+            | WhileStatement(test, body, loc) -> WhileStatement(test, block body, loc)
+            | SwitchStatement(discriminant, cases, loc) ->
+                let cases =
+                    cases
+                    |> Array.map (fun (SwitchCase(test, consequent, loc)) ->
+                        SwitchCase(test, Array.map statement consequent, loc)
+                    )
+
+                SwitchStatement(discriminant, cases, loc)
+            | IfStatement(test, consequent, alternate, loc) ->
+                IfStatement(test, block consequent, Option.map statement alternate, loc)
+            | TryStatement(body, handler, finalizer, loc) ->
+                let handler =
+                    handler
+                    |> Option.map (fun (CatchClause(param, annotation, body, loc)) ->
+                        CatchClause(param, annotation, block body, loc)
+                    )
+
+                TryStatement(block body, handler, Option.map block finalizer, loc)
+            | ForOfStatement(name, right, body, isAwait, loc) -> ForOfStatement(name, right, block body, isAwait, loc)
+            | ForStatement(body, init, test, update, loc) -> ForStatement(block body, init, test, update, loc)
+            | Declaration _
+            | ExpressionStatement _
+            | DebuggerStatement _
+            | ThrowStatement _
+            | BreakStatement _
+            | ContinueStatement _ -> s
+
+        block body
+
     /// The members of an object expression as object-literal members, whether getters and setters need a class,
     /// and the members of a base class it overrides
     let private transformObjectExprMembers
         (com: IBabelCompiler)
         ctx
+        (selfType: TypeAnnotation option)
         baseCall
         (members: (Fable.ObjectExprMember * Fable.MemberFunctionOrValue) list)
         =
@@ -2973,6 +3015,18 @@ module Util =
                             |> Option.map (fun t -> UnionTypeAnnotation [| t; UndefinedTypeAnnotation |])
                         else
                             returnType
+
+                    // fickl: a `[<ReturnsThis>]` slot returns `this` in a class; an object literal cannot say `this`,
+                    // so it returns the type of the object expression, which its `this` is checked as
+                    let returnType, body =
+                        if com.IsTypeScript && hasAttribute Atts.ficklReturnsThis info.Attributes then
+                            match compileAsClass, selfType with
+                            | true, _ -> Some ThisTypeAnnotation, castReturns ThisTypeAnnotation body
+                            | false, Some selfType when returnType <> Some selfType ->
+                                Some selfType, castReturns selfType body
+                            | false, _ -> returnType, body
+                        else
+                            returnType, body
 
                     ObjectMember.objectMethod (
                         kind,
@@ -3073,7 +3127,13 @@ module Util =
 
 
         let compileAsClass, overrideNames, members =
-            transformObjectExprMembers com ctx baseCall members
+            let selfType =
+                if com.IsTypeScript then
+                    Some(makeTypeAnnotation com ctx typ)
+                else
+                    None
+
+            transformObjectExprMembers com ctx selfType baseCall members
 
         if not compileAsClass then
             let expr = Expression.objectExpression (List.toArray members)
@@ -3155,7 +3215,7 @@ module Util =
         let _, _, members =
             members
             |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
-            |> transformObjectExprMembers com ctx None
+            |> transformObjectExprMembers com ctx None None
 
         let functionOwnKeys = set [ "name"; "length"; "prototype"; "arguments"; "caller" ]
 
@@ -6300,6 +6360,17 @@ but thanks to the optimisation done below we get
         let args, body, returnType, typeParamDecl =
             getMemberArgsAndBody com ctx (Attached isStatic) (Some ent) info memb.Args memb.Body
 
+        // fickl: `info` is the implemented or overridden slot, so a TypeScript class keeps its `this` return
+        let returnType, body =
+            if
+                com.IsTypeScript
+                && not isStatic
+                && hasAttribute Atts.ficklReturnsThis info.Attributes
+            then
+                Some ThisTypeAnnotation, castReturns ThisTypeAnnotation body
+            else
+                returnType, body
+
         [|
             yield makeMethod memb.Name args body returnType typeParamDecl
             if info.FullName = "System.Collections.Generic.IEnumerable.GetEnumerator" then
@@ -7025,6 +7096,32 @@ but thanks to the optimisation done below we get
             | None -> memb.ReturnParameter.Type
             |> FableTransforms.uncurryType
             |> makeTypeAnnotation com ctx
+
+        // fickl: `[<ReturnsThis>]` annotates the polymorphic `this`, which only stands for the declaring type
+        let returnType =
+            if hasAttribute Atts.ficklReturnsThis memb.Attributes then
+                let returnsOwnType =
+                    match memb.ReturnParameter.Type with
+                    | Fable.DeclaredType(returned, _) ->
+                        let rec isOwnOrBase (e: Fable.Entity) =
+                            e.FullName = returned.FullName
+                            || e.AllInterfaces |> Seq.exists (fun i -> i.Entity.FullName = returned.FullName)
+                            || e.BaseType
+                               |> Option.bind (fun b -> com.TryGetEntity b.Entity)
+                               |> Option.exists isOwnOrBase
+
+                        isOwnOrBase ent
+                    | _ -> false
+
+                if returnsOwnType then
+                    ThisTypeAnnotation
+                else
+                    $"%s{ent.FullName}.%s{memb.DisplayName} has [<ReturnsThis>] but does not return %s{ent.DisplayName} or one of its bases"
+                    |> addError com [] None
+
+                    returnType
+            else
+                returnType
 
         let kind =
             if not isMangled && isGetter then

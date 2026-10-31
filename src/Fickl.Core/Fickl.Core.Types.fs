@@ -119,6 +119,27 @@ type TypeAssertionAttribute(parameter: string, assertedType: Type) =
     member _.Parameter = parameter
     member _.AssertedType = assertedType
 
+/// <summary>Annotates an abstract method's TypeScript return type as the polymorphic <c>this</c>, for fluent interfaces.</summary>
+/// <remarks>
+/// The method must return its declaring interface or abstract class, or one of its bases:
+/// <code>
+/// type IQuery =
+///     [&lt;ReturnsThis>] abstract where: string -> IQuery
+///
+/// type ISelect =
+///     inherit IQuery
+///     abstract columns: string[] -> ISelect
+/// </code>
+/// TypeScript declares <c>where(arg0: string): this</c>, so <c>select.where("x").columns(...)</c> type-checks there.
+/// A TypeScript class implementing or overriding the method returns <c>this</c> too, and its returned value is cast
+/// <c>as this</c>: the attribute promises the method returns its receiver, or an object of the receiver's type.
+/// F# still types the call as returning <c>IQuery</c>; <c>Fluent.chain (fun q -> q.where "x") select</c> gives back an
+/// <c>ISelect</c>. The JavaScript is unchanged, and other targets ignore the attribute.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method)>]
+type ReturnsThisAttribute() =
+    inherit Attribute()
+
 /// <summary>Emits an F# enum as a frozen JavaScript object of its members, typed in TypeScript by the enum's name.</summary>
 /// <remarks>
 /// <code>

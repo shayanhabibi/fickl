@@ -227,6 +227,7 @@ and private addTypeNames (names: HashSet<string>) (typ: TypeAnnotation) =
     | TypePredicateTypeAnnotation(_, t, _) -> t |> Option.iter add
     | AnyTypeAnnotation
     | UnknownTypeAnnotation
+    | ThisTypeAnnotation
     | VoidTypeAnnotation
     | UndefinedTypeAnnotation
     | NullTypeAnnotation

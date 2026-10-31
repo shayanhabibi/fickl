@@ -2864,6 +2864,7 @@ module Util =
             || entFullName = "Fickl.Core.RecordModule"
             || entFullName = "Fickl.Core.ValueOf"
             || entFullName = "Fickl.Core.Brand"
+            || entFullName = "Fickl.Core.Fluent"
             || entFullName = "Fickl.Core.JsAsyncBuilder"
             || entFullName = "Fickl.Core.NativeAsync"
             || entFullName.StartsWith("Fickl.Core.JsGeneratorBuilder", StringComparison.Ordinal)

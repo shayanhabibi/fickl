@@ -5974,6 +5974,17 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
         match args with
         | [ arg ] -> TypeCast(arg, t) |> Some
         | _ -> None
+    // fickl: the call, typed as its receiver
+    | "Fickl.Core.Fluent" ->
+        match args with
+        | [ call; receiver ] ->
+            let returned =
+                match call.Type with
+                | LambdaType(_, returned) -> returned
+                | _ -> Any
+
+            TypeCast(curriedApply r returned call [ receiver ], t) |> Some
+        | _ -> None
     | "Fickl.Core.ValueOf" ->
         match info.CompiledName, args with
         | "ofKey", [ key; target ] -> TypeCast(Get(target, ExprGet key, Any, r), t) |> Some
