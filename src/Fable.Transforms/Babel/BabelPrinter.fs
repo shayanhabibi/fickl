@@ -4,53 +4,10 @@ open System.Text.RegularExpressions
 open Fable
 open Fable.AST
 open Fable.AST.Babel
+open Fable.AST.Babel.Patterns
 open Fable.Transforms.Printer
 
 module PrinterExtensions =
-    let rec hasSideEffects (e: Expression) =
-        match e with
-        | Undefined(_)
-        | Literal(NullLiteral(_))
-        | Literal(Literal.StringLiteral(_))
-        | Literal(BooleanLiteral(_))
-        | Literal(NumericLiteral(_)) -> false
-        // Constructors of classes deriving from System.Object add an empty object at the end
-        | ObjectExpression(properties, _loc) -> properties.Length > 0
-        | UnaryExpression(argument, "void", false, _loc) -> hasSideEffects (argument)
-        // Some identifiers may be stranded as the result of imports
-        // intended only for side effects, see #2228
-        | Expression.Identifier(_) -> false
-        // Sometimes empty IIFE remain in the AST
-        | CallExpression(ArrowFunctionExpression(_, (BlockStatement body), _, _, _), _, _, _) ->
-            body |> Array.exists isProductiveStatement
-        | CommentedExpression(_, e) -> hasSideEffects e
-        | _ -> true
-
-    and isProductiveStatement (s: Statement) =
-        match s with
-        | ExpressionStatement(expr) -> hasSideEffects (expr)
-        | _ -> true
-
-    [<return: Struct>]
-    let (|UndefinedOrVoid|_|) =
-        function
-        | Undefined _ -> ValueSome()
-        | UnaryExpression(argument, "void", false, _loc) when not (hasSideEffects (argument)) -> ValueSome()
-        | _ -> ValueNone
-
-    [<return: Struct>]
-    let (|NullOrUndefinedOrVoid|_|) =
-        function
-        | Literal(NullLiteral _)
-        | UndefinedOrVoid _ -> ValueSome()
-        | _ -> ValueNone
-
-    [<return: Struct>]
-    let (|StringConstant|_|) =
-        function
-        | Literal(Literal.StringLiteral(StringLiteral(value = value))) -> ValueSome value
-        | _ -> ValueNone
-
     type Printer with
 
         member printer.PrintBlock
@@ -900,8 +857,6 @@ module PrinterExtensions =
         member printer.PrintEmitExpression(value, args, loc) =
             printer.AddLocation(loc)
 
-            let inline replace pattern (f: Match -> string) input = Regex.Replace(input, pattern, f)
-
             let printSegment (printer: Printer) (value: string) segmentStart segmentEnd =
                 let segmentLength = segmentEnd - segmentStart
 
@@ -911,54 +866,8 @@ module PrinterExtensions =
 
             // Macro transformations
             // https://fable.io/docs/communicate/js-from-fable.html#Emit-when-F-is-not-enough
-            let value =
-                value
-                |> replace
-                    @"\$(\d+)\.\.\."
-                    (fun m ->
-                        let rep = ResizeArray()
-                        let i = int m.Groups[1].Value
+            let value = value |> EmitMacro.expandGroups args |> EmitMacro.expandRawArgs args
 
-                        for j = i to args.Length - 1 do
-                            rep.Add("$" + string<int> j)
-
-                        String.concat ", " rep
-                    )
-
-                |> replace
-                    @"\{\{\s*\$(\d+)\s*\?\s*(.*?)\s*:\s*(.*?)\s*\}\}"
-                    (fun m ->
-                        let i = int m.Groups[1].Value
-
-                        match Array.tryItem i args with
-                        | Some expr ->
-                            match expr with
-                            | Literal(BooleanLiteral(value = false))
-                            | NullOrUndefinedOrVoid -> m.Groups[3].Value
-                            | _ -> m.Groups[2].Value
-                        | None -> m.Groups[3].Value
-                    )
-
-                |> replace
-                    @"\{\{([^\}]*\$(\d+).*?)\}\}"
-                    (fun m ->
-                        let i = int m.Groups[2].Value
-
-                        match Array.tryItem i args with
-                        | Some _ -> m.Groups[1].Value
-                        | None -> ""
-                    )
-
-                // If placeholder is followed by !, emit string literals as JS: "let $0! = $1"
-                |> replace
-                    @"\$(\d+)!"
-                    (fun m ->
-                        let i = int m.Groups[1].Value
-
-                        match Array.tryItem i args with
-                        | Some(StringConstant value) -> value
-                        | _ -> ""
-                    )
 
             let matches = Regex.Matches(value, @"\$\d+")
 
