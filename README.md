@@ -77,6 +77,8 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `[<Curried>]` | Attribute on a parameter or field | Keeps a function curried, for JavaScript that passes or calls it one argument at a time. |
 | `[<NoOverloadSuffix>]` | Attribute on a member or type | Drops the overload hash from compiled member names, `Counter__Add` instead of `Counter__Add_Z524259A4`. |
 | `[<EmitType>]` | Attribute on a type | Writes the type's TypeScript annotation as the given text, with `$0`, `$1`... for its generic arguments, for conditional, mapped and template literal types: ``[<EmitType("`data-${string}`")>]``. A module path imports the name the text starts with as a type. |
+| `partial`, `full` | Function | `partial (fun s -> s.count <- 1)` builds an object with some of a type's properties, `{ count: 1 } satisfies Partial<State>` in TypeScript; `full` casts it to the complete type. In TypeScript, `jsOptions` also checks a flat object with `satisfies Partial<T>` before its cast. |
+| `Partial<'T>`, `Required<'T>`, `Readonly<'T>` | Type | The TypeScript utility types, for binding signatures such as `abstract setState: Partial<State> -> unit`. |
 | `--declaration` | CLI flag | Writes a TypeScript declaration file (`.d.ts`) next to each JavaScript file. |
 | `--strictOptions` | CLI flag | Keeps `Some null` apart from `None`, as on .NET. |
 | `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |

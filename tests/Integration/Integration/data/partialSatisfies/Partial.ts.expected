@@ -1,0 +1,84 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+
+export interface State {
+    get count(): int32,
+    get name(): string,
+    set count(arg0: int32),
+    set name(arg0: string)
+}
+
+export interface Settings {
+    get label(): string,
+    get state(): State,
+    set label(arg0: string),
+    set state(arg0: State)
+}
+
+export class Store {
+    state: State;
+    constructor() {
+        this.state = ({
+            count: 0,
+            name: "",
+        } satisfies Partial<State> as State);
+    }
+}
+
+export function Store_$reflection(): TypeInfo {
+    return class_type("Partial.Store", undefined, Store);
+}
+
+export function Store_$ctor(): Store {
+    return new Store();
+}
+
+export function Store__get_State(_: Store): State {
+    return _.state;
+}
+
+export function Store__SetState_Z4FAF2805(_: Store, patch: Partial<State>): void {
+    _.state = Object.assign({}, _.state, patch);
+}
+
+export function bump(store: Store): void {
+    Store__SetState_Z4FAF2805(store, {
+        count: Store__get_State(store).count + 1,
+    } satisfies Partial<State>);
+}
+
+export function rename(name: string): Partial<State> {
+    return {
+        name: name,
+    } satisfies Partial<State>;
+}
+
+export function options(): State {
+    return {
+        count: 1,
+        name: "one",
+    } satisfies Partial<State> as State;
+}
+
+export function nestedOptions(): Settings {
+    return {
+        state: {
+            count: 2,
+        },
+        label: "two",
+    } as Settings;
+}
+
+export function complete(patch: Partial<State>): State {
+    return patch as State;
+}
+
+export function freeze(state: State): Readonly<State> {
+    return Object.freeze<State>(state) as Readonly<State>;
+}
+
+export function filled(state: Required<State>): Required<State> {
+    return state;
+}
+

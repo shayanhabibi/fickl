@@ -93,6 +93,20 @@ module EmitTypes =
     let get (d: Dict<'T>) (key: string) : 'T = d?(key)
     let indent (spaces: int) : Indent = unbox spaces
     let stringify (value: obj) (indent: Indent) : string = emitJsExpr (value, indent) "JSON.stringify($0, null, $1)"
+
+module Partials =
+    open Fickl.Core
+    open Fickl.Core.JsInterop
+
+    type Counter =
+        abstract count: int with get, set
+        abstract label: string with get, set
+
+    let mutable current = jsOptions<Counter> (fun c -> c.count <- 0; c.label <- "start")
+    let patch (changes: Partial<Counter>) = current <- !!(JS.Constructors.Object.assign (createEmpty, current, changes))
+    let bump () = patch (partial (fun c -> c.count <- current.count + 1))
+    let relabel (label: string) : Partial<Counter> = partial (fun c -> c.label <- label)
+    let freeze (counter: Counter) : Readonly<Counter> = !!(JS.Constructors.Object.freeze counter)
 #endif
 
 type HidingBase() =
@@ -199,5 +213,16 @@ let tests =
         EmitTypes.attrs |> Array.map EmitTypes.readAttr |> equal [| "data-a"; "data-b" |]
         EmitTypes.get (EmitTypes.dict "a" 1) "a" |> equal 1
         EmitTypes.stringify (box [| 1 |]) (EmitTypes.indent 1) |> equal "[\n 1\n]"
+
+    testCase "partial builds a Partial<T> that TypeScript checks with satisfies" <| fun () ->
+        Partials.bump ()
+        Partials.bump ()
+        Partials.patch (Partials.relabel "two")
+        Partials.current.count |> equal 2
+        Partials.current.label |> equal "two"
+        let full = Fickl.Core.JsInterop.full (Partials.relabel "only")
+        full.label |> equal "only"
+        let frozen = Partials.freeze Partials.current
+        JS.Constructors.Object.isFrozen frozen |> equal true
     #endif
   ]
