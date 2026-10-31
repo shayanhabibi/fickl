@@ -119,6 +119,11 @@ let knownCliArgs () =
             "Make every exception a JS Error with a stack trace and a cause, at the cost of capturing"
             "a stack trace whenever one is created (JavaScript and TypeScript)"
         ]
+        [ "--privateFields" ],
+        [
+            "Compile the let fields of classes with attached members to ES #private fields,"
+            "so they cannot collide with properties of a base class (JavaScript and TypeScript)"
+        ]
         [ "--server" ],
         [
             "Compile through a background compile server that keeps check results between compilations,"
@@ -375,6 +380,8 @@ type Runner =
                             Fickl.Options.strictOptionsDefine
                         if args.FlagEnabled "--nativeErrors" then
                             Fickl.Options.nativeErrorsDefine
+                        if args.FlagEnabled "--privateFields" then
+                            Fickl.Options.privateFieldsDefine
                         match language with
                         | Php -> "FABLE_COMPILER_PHP"
                         | Rust -> "FABLE_COMPILER_RUST"

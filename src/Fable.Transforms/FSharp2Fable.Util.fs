@@ -85,6 +85,16 @@ type FsField(fi: FSharpField) =
         fi.PropertyAttributes |> Helpers.hasAttrib Atts.ficklCurried
         || fi.FieldAttributes |> Helpers.hasAttrib Atts.ficklCurried
 
+    /// fickl: the field holds a `let` binding of a class, which F# keeps private to the class
+    static member IsLetBinding(field: Fable.Field) =
+        match field with
+        | :? FsField as field ->
+            field.FSharpField.IsCompilerGenerated
+            && not (field.FSharpField.Name.EndsWith("@", System.StringComparison.Ordinal))
+        | _ -> false
+
+    member _.FSharpField: FSharpField = fi
+
     /// fickl: whether a field keeps its function value curried, see FsField.IsCurried
     static member IsCurriedField(field: Fable.Field) =
         match field with
@@ -2751,6 +2761,18 @@ module Util =
             | _ -> None
         )
 
+    /// fickl: the argument of [<Fickl.Core.PrivateFields>] on the entity, true when it has none
+    let tryPrivateFieldsAttribute (ent: FSharpEntity) =
+        ent.Attributes
+        |> Seq.tryPick (fun att ->
+            match att.AttributeType.TryFullName with
+            | Some Atts.ficklPrivateFields ->
+                match Seq.tryHead att.ConstructorArguments with
+                | Some(_, (:? bool as value)) -> Some value
+                | _ -> Some true
+            | _ -> None
+        )
+
     /// fickl: whether a base class, transitively, is a global, imported or [<AttachMembers>] class
     let rec private inheritsJsClass (ent: FSharpEntity) =
         match ent.BaseType |> Option.bind tryDefinition with
@@ -2770,12 +2792,13 @@ module Util =
 
          explicitAttach = Some true
          || Seq.exists isPyClassAttribute ent.Attributes
-         // fickl: the platform or framework calls the members of a JavaScript subclass on the instance and the class
+         // fickl: the platform or framework calls the members of a JavaScript subclass on the instance and the class,
+         // and #private fields can only be read inside the class body
          || (explicitAttach.IsNone
              && (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
              && ent.IsClass
              && not (isGlobalOrImportedFSharpEntity ent)
-             && inheritsJsClass ent)))
+             && (inheritsJsClass ent || tryPrivateFieldsAttribute ent = Some true))))
 
     let isPojoDefinedByConsArgsEntity (entity: Fable.Entity) =
         entity |> hasAttribute Atts.pojoDefinedByConsArgs
@@ -3192,23 +3215,60 @@ module Util =
                 None
         )
 
-    /// fickl: isAttachMembersEntity for a Fable entity, for JavaScript and TypeScript
-    let isAttachMembersFableEntity (com: Compiler) (ent: Fable.Entity) =
-        let rec inheritsJsClass (ent: Fable.Entity) =
+    /// fickl: the argument of [<Fickl.Core.PrivateFields>] on a Fable entity, true when it has none
+    let tryPrivateFieldsFableAttribute (ent: Fable.Entity) =
+        ent.Attributes
+        |> Seq.tryPick (fun att ->
+            if att.Entity.FullName = Atts.ficklPrivateFields then
+                match att.ConstructorArgs with
+                | (:? bool as value) :: _ -> Some value
+                | _ -> Some true
+            else
+                None
+        )
+
+    /// fickl: whether a base class of a Fable entity, transitively, is global or imported, or, with
+    /// `includeAttached`, has [<AttachMembers>]
+    let private inheritsJsFableClass (com: Compiler) includeAttached (ent: Fable.Entity) =
+        let rec loop (ent: Fable.Entity) =
             match ent.BaseType |> Option.bind (fun baseType -> com.TryGetEntity baseType.Entity) with
             | Some baseEnt ->
                 isGlobalOrImportedEntity baseEnt
-                || tryAttachMembersFableAttribute baseEnt = Some true
-                || inheritsJsClass baseEnt
+                || (includeAttached && tryAttachMembersFableAttribute baseEnt = Some true)
+                || loop baseEnt
             | None -> false
 
+        loop ent
+
+    /// fickl: isAttachMembersEntity for a Fable entity, for JavaScript and TypeScript
+    let isAttachMembersFableEntity (com: Compiler) (ent: Fable.Entity) =
         match tryAttachMembersFableAttribute ent with
         | Some value -> value
         | None ->
             (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
             && not (ent.IsInterface || ent.IsFSharpModule)
             && not (isGlobalOrImportedEntity ent)
-            && inheritsJsClass ent
+            && (inheritsJsFableClass com true ent
+                || tryPrivateFieldsFableAttribute ent = Some true)
+
+    /// fickl: whether the `let` fields of a class compile to ES #private fields: with [<PrivateFields>],
+    /// `--privateFields`, or when it inherits a JavaScript class, and only when its members are attached
+    let usesPrivateFields (com: Compiler) (ent: Fable.Entity) =
+        (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+        && not (
+            ent.IsFSharpUnion
+            || ent.IsFSharpRecord
+            || ent.IsValueType
+            || ent.IsFSharpExceptionDeclaration
+        )
+        && isAttachMembersFableEntity com ent
+        && (
+            match tryPrivateFieldsFableAttribute ent with
+            | Some value -> value
+            | None ->
+                List.contains Fickl.Options.privateFieldsDefine com.Options.Define
+                || inheritsJsFableClass com false ent
+        )
 
     let isMangledAbstractFableEntity (com: Compiler) (ent: Fable.Entity) =
         match ent.FullName with

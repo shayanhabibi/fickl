@@ -103,6 +103,33 @@ type GlobalSubclassGrandchild() =
         this.Increment()
         this.Increment()
 
+type GlobalSubclassWithPrivateField(v: int) =
+    inherit GlobalClasses.MyHTMLElement(2)
+    let mutable value = v
+    member _.Value = value
+    member _.Bump() = value <- value + 10
+
+[<Global("Map")>]
+type GlobalMap() =
+    class
+    end
+
+type MapSubclassWithPrivateField(n: int) =
+    inherit GlobalMap()
+    let size = n
+    member _.Count = size
+
+[<Fickl.Core.PrivateFields>]
+type ClassWithPrivateFields(v: int) =
+    let value = v
+    member _.Value = value
+
+[<Fickl.Core.PrivateFields(false)>]
+type GlobalSubclassWithPublicField(v: int) =
+    inherit GlobalClasses.MyHTMLElement(1)
+    let label = v
+    member _.Label = label
+
 [<AttachMembers(false)>]
 type GlobalSubclassDetached() =
     inherit GlobalClasses.MyHTMLElement(1)
@@ -1371,6 +1398,30 @@ let tests =
         GlobalSubclassDetached.Kind |> equal "detached"
         isNull (box x?Value) |> equal true
         isNull (jsConstructor<GlobalSubclassDetached>?Kind) |> equal true
+
+    testCase "Let fields of a JS subclass do not collide with fields of the base" <| fun () ->
+        let x = GlobalSubclassWithPrivateField(5)
+        x.Value |> equal 5
+        x.Bump()
+        x.Value |> equal 15
+        x.getMotivated() |> equal "I can do it! I can do it!"
+        (box x)?value |> equal 2
+
+    testCase "Let fields of a JS subclass do not set accessors of the base" <| fun () ->
+        let x = MapSubclassWithPrivateField(3)
+        x.Count |> equal 3
+        (box x)?size |> equal 0
+
+    testCase "PrivateFields compiles let fields to #private fields" <| fun () ->
+        let x = ClassWithPrivateFields(4)
+        x.Value |> equal 4
+        x?Value |> equal 4
+        emitJsExpr x "Object.keys($0).length" |> equal 0
+
+    testCase "PrivateFields(false) keeps let fields of a JS subclass as properties" <| fun () ->
+        let x = GlobalSubclassWithPublicField(7)
+        x.Label |> equal 7
+        (box x)?label |> equal 7
 
     testCase "Local import with curried signatures works" <| fun () ->
         let add (x:int) (y:int): int = importMember "./js/1foo.js"

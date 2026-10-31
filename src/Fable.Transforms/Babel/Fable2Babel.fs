@@ -544,10 +544,36 @@ module private SymbolKeys =
                 key
         | _ -> loop Set.empty typ
 
+    /// fickl: the ES #private name of a class `let` field, see FSharp2Fable.Util.usesPrivateFields
+    let tryPrivateFieldName (com: IBabelCompiler) (ent: Fable.Entity) (field: Fable.Field) =
+        if
+            not field.IsStatic
+            && FSharp2Fable.FsField.IsLetBinding field
+            && FSharp2Fable.Util.usesPrivateFields com ent
+        then
+            // F# names a `let` that shadows a constructor argument `balance@20`
+            Some("#" + Naming.sanitizeJsIdentForbiddenChars (field.Name.Replace("@", "$")))
+        else
+            None
+
+    let private tryPrivateFieldAccess (com: IBabelCompiler) typ name =
+        match typ with
+        | Fable.DeclaredType(entRef, _) ->
+            com.TryGetEntity entRef
+            |> Option.bind (fun ent ->
+                ent.FSharpFields
+                |> List.tryFind (fun field -> field.Name = name)
+                |> Option.bind (tryPrivateFieldName com ent)
+            )
+        | _ -> None
+
     let access com ctx range typ target name =
-        match tryAccessKey com ctx typ name with
-        | Some key -> Expression.memberExpression (target, key, true, ?loc = range)
-        | None -> Util.get range target name
+        match tryPrivateFieldAccess com typ name with
+        | Some privateName -> Expression.memberExpression (target, Expression.identifier privateName, ?loc = range)
+        | None ->
+            match tryAccessKey com ctx typ name with
+            | Some key -> Expression.memberExpression (target, key, true, ?loc = range)
+            | None -> Util.get range target name
 
 module Reflection =
     open Lib
@@ -5538,7 +5564,11 @@ but thanks to the optimisation done below we get
                 ent.FSharpFields
                 |> List.filter (fun field -> not (ctx.NativeAutoProperties.ContainsKey field.Name))
                 |> List.mapToArray (fun field ->
-                    let prop, isComputed = SymbolKeys.fieldKey com ctx field
+                    let prop, isComputed =
+                        match SymbolKeys.tryPrivateFieldName com ent field with
+                        | Some privateName -> Expression.identifier privateName, false
+                        | None -> SymbolKeys.fieldKey com ctx field
+
                     let ta = makeFieldAnnotationOf com ctx field
                     // Static fields need to be initialized by static constructor
                     let am =
@@ -5555,6 +5585,11 @@ but thanks to the optimisation done below we get
                         ?accessModifier = am
                     )
                 )
+            // fickl: JavaScript declares #private fields too, as a class can only use the ones it declares
+            elif not ent.IsFSharpUnion then
+                ent.FSharpFields
+                |> List.choose (SymbolKeys.tryPrivateFieldName com ent)
+                |> List.mapToArray (fun privateName -> ClassMember.classProperty (Expression.identifier privateName))
             else
                 Array.empty
 

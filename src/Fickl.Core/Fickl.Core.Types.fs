@@ -94,6 +94,19 @@ type TypeAssertionAttribute(parameter: string, assertedType: Type) =
 type TsEnumAttribute() =
     inherit Attribute()
 
+/// <summary>Compiles the private <c>let</c> fields of a class to ES <c>#private</c> fields.</summary>
+/// <remarks>
+/// A <c>#private</c> field cannot collide with a property or accessor of a base class, such as
+/// <c>title</c> or <c>hidden</c> of <c>HTMLElement</c>. The members of the class are attached, as
+/// <c>#private</c> fields can only be read inside the class body.
+/// Classes inheriting a global or imported JavaScript class use private fields without this attribute;
+/// <c>[&lt;PrivateFields(false)>]</c> turns them off. Applies to JavaScript and TypeScript.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Class)>]
+type PrivateFieldsAttribute(enabled: bool) =
+    inherit Attribute()
+    new() = PrivateFieldsAttribute(true)
+
 /// <summary>
 /// Represents a JavaScript callable with a single generic or non-generic Invoke method.
 /// </summary>
