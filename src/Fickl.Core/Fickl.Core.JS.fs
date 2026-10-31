@@ -117,6 +117,22 @@ module JS =
         else
             Some value
 
+    /// <summary>Awaits a promise at the top level of the module, <c>export const config = await loadConfig();</c>,
+    /// so the value has the resolved type.</summary>
+    /// <remarks>
+    /// Allowed only as the whole initializer of a module-level value, and only on JavaScript and TypeScript, whose
+    /// output is an ES module; anywhere else it is a compile error:
+    /// <code>
+    /// let config: Config = JS.awaitTopLevel (importDynamic&lt;Config> "./config.js")
+    /// </code>
+    /// This changes the order modules run in. A module that imports this one, directly or through others, does not
+    /// start until the promise settles, and fails to load if it rejects, so a slow promise delays the whole program
+    /// and a watch-mode reload waits for it too. In an import cycle, a module of the cycle can run before the value
+    /// is set and read it uninitialized. TypeScript needs <c>module</c> set to <c>es2022</c>, <c>esnext</c>,
+    /// <c>preserve</c> or <c>nodenext</c>, and a target of <c>es2017</c> or later. On .NET it throws.
+    /// </remarks>
+    let awaitTopLevel (promise: Fable.Core.JS.Promise<'T>) : 'T = nativeOnly
+
     /// <summary>A JavaScript array that is only read: the TypeScript <c>ReadonlyArray&lt;T></c>, also written <c>readonly T[]</c>.</summary>
     /// <remarks>A parameter of this type accepts a TypeScript <c>readonly T[]</c> or <c>as const</c> array, which a
     /// <c>'T[]</c> parameter rejects. Build one from an F# array or <c>ResizeArray</c> with <c>ReadonlyArray.ofArray</c> or

@@ -17,6 +17,7 @@ let allTests =
     NativeAsyncGenerators.tests
     SymbolKeys.tests
     TypeGuards.tests
+    TopLevelAwait.tests
     TsEnums.tests
     JsNamespaceLibrary.tests
     Currying.tests
