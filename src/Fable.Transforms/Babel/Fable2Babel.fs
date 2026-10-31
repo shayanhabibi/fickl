@@ -3790,6 +3790,15 @@ but thanks to the optimisation done below we get
         )
         |> fst
 
+    /// fickl: a call to a member declared to return `unknown` is `any` inside Fickl's own output, as `obj` is
+    let anyIfReturnsUnknown (com: IBabelCompiler) (info: Fable.CallInfo) (expr: Expression) =
+        match info.MemberRef with
+        | Some memberRef when com.IsTypeScript ->
+            match com.TryGetMember(memberRef) with
+            | Some memb when FSharp2Fable.Util.TsUnknown.returnsUnknown memb -> AsExpression(expr, AnyTypeAnnotation)
+            | _ -> expr
+        | _ -> expr
+
     let transformCallAsStatements com ctx range typ returnStrategy callee callInfo =
         let argsLen (i: Fable.CallInfo) =
             List.length i.Args
@@ -3809,6 +3818,7 @@ but thanks to the optimisation done below we get
         | _ ->
             [|
                 transformCall com ctx range typ callee callInfo
+                |> anyIfReturnsUnknown com callInfo
                 |> resolveExpr typ returnStrategy
             |]
 
@@ -4595,7 +4605,8 @@ but thanks to the optimisation done below we get
 
         | Fable.ObjectExpr(members, typ, baseCall) -> transformObjectExpr com ctx typ members baseCall
 
-        | Fable.Call(callee, info, typ, range) -> transformCall com ctx range typ callee info
+        | Fable.Call(callee, info, typ, range) ->
+            transformCall com ctx range typ callee info |> anyIfReturnsUnknown com info
 
         | Fable.CurriedApply(callee, args, _, range) -> transformCurriedApply com ctx range callee args
 
@@ -5744,6 +5755,65 @@ but thanks to the optimisation done below we get
             | _ -> None
         | _ -> None
 
+    /// fickl: the TypeScript signature of a module function that takes or returns `unknown`. It is declared before
+    /// the implementation, which keeps `any`, so callers see `unknown` while the body type-checks as before.
+    let tryUnknownSignature
+        (com: IBabelCompiler)
+        ctx
+        (memb: Fable.MemberFunctionOrValue)
+        (args: Fable.Ident list)
+        (expr: Expression)
+        =
+        let unknown = FSharp2Fable.Util.TsUnknown.tryFSharpMember memb
+
+        // A unit argument has no parameter
+        let args =
+            match args, expr with
+            | [ arg ], FunctionExpression(_, [||], _, _, _, _) when arg.Type = Fable.Unit -> []
+            | _ -> args
+
+        match unknown, expr with
+        | Some fsMemb, FunctionExpression(_, parameters, _, returnType, typeParameters, _) when
+            com.IsTypeScript && parameters.Length = List.length args
+            ->
+            let argsWithoutThis = args |> List.filter (fun arg -> not arg.IsThisArgument)
+
+            FSharp2Fable.Util.TsUnknown.tryParameterTypes fsMemb argsWithoutThis.Length
+            |> Option.bind (fun fsTypes ->
+                let fsTypes =
+                    Dictionary<Fable.Ident, FSharp.Compiler.Symbols.FSharpType>(HashIdentity.Reference)
+                    |> fun d ->
+                        List.iter2 (fun arg t -> d[arg] <- t) argsWithoutThis fsTypes
+                        d
+
+                let mark fsType typ =
+                    FSharp2Fable.Util.TsUnknown.markType fsType typ |> makeTypeAnnotation com ctx
+
+                let parameters =
+                    Array.zip parameters (List.toArray args)
+                    |> Array.map (fun (Parameter.Parameter(name, annotation, flags), arg) ->
+                        match fsTypes.TryGetValue(arg) with
+                        | true, fsType when FSharp2Fable.Util.TsUnknown.contains fsType ->
+                            Parameter.Parameter(name, Some(mark fsType arg.Type), flags), true
+                        | _ -> Parameter.Parameter(name, annotation, flags), false
+                    )
+
+                let fsReturn = fsMemb.ReturnParameter.Type
+                let returnsUnknown = FSharp2Fable.Util.TsUnknown.contains fsReturn
+
+                if returnsUnknown || parameters |> Array.exists snd then
+                    let returnType =
+                        if returnsUnknown then
+                            mark fsReturn memb.ReturnParameter.Type
+                        else
+                            defaultArg returnType AnyTypeAnnotation
+
+                    Some(Array.map fst parameters, returnType, typeParameters)
+                else
+                    None
+            )
+        | _ -> None
+
     let transformModuleFunction com ctx (info: Fable.MemberFunctionOrValue) membName (args: Fable.Ident list) body =
         let args, body =
             if info.Attributes |> hasAttribute Atts.jsxComponent then
@@ -6626,6 +6696,25 @@ but thanks to the optimisation done below we get
 
         let argsLen = Array.length args
 
+        // fickl: the F# types of the parameters, where `unknown` is written; accessors keep `any`, as reads of
+        // a property are not calls that Fickl's output can cast back to `any`
+        let fsMemb =
+            if isGetter || isSetter then
+                None
+            else
+                FSharp2Fable.Util.TsUnknown.tryFSharpMember memb
+
+        let markUnknown =
+            let fsTypes =
+                fsMemb
+                |> Option.bind (fun m -> FSharp2Fable.Util.TsUnknown.tryParameterTypes m argsLen)
+                |> Option.map List.toArray
+
+            fun index (argType: Fable.Type) ->
+                match fsTypes with
+                | Some fsTypes -> FSharp2Fable.Util.TsUnknown.markType fsTypes[index] argType
+                | None -> argType
+
         let args =
             args
             |> Array.mapi (fun index arg ->
@@ -6633,11 +6722,11 @@ but thanks to the optimisation done below we get
                 let argIsSpread = (index = argsLen - 1 && memb.HasSpread)
 
                 let argType =
-                    match arg.Type with
+                    match markUnknown index arg.Type with
                     | Fable.Array(genArg, Fable.MutableArray) when argIsSpread ->
                         // modify the last argument's type if it's a spread parameter
                         Fable.Array(genArg, Fable.ResizeArray)
-                    | _ -> arg.Type
+                    | argType -> argType
 
                 let ta =
                     if arg.IsOptional then
@@ -6660,7 +6749,9 @@ but thanks to the optimisation done below we get
             |> makeTypeParamDecl com ctx
 
         let returnType =
-            memb.ReturnParameter.Type
+            match fsMemb with
+            | Some m -> FSharp2Fable.Util.TsUnknown.markType m.ReturnParameter.Type memb.ReturnParameter.Type
+            | None -> memb.ReturnParameter.Type
             |> FableTransforms.uncurryType
             |> makeTypeAnnotation com ctx
 
@@ -6995,10 +7086,25 @@ but thanks to the optimisation done below we get
                         if hasAttribute Atts.entryPoint memb.Attributes then
                             [ declareEntryPoint com ctx expr ]
                         else
-                            [
-                                ModuleDecl(decl.Name, isPublic = memb.IsPublic, ?doc = decl.XmlDoc)
-                                |> declareModuleMember com ctx expr
-                            ]
+                            match tryUnknownSignature com ctx memb decl.Args expr with
+                            | Some(parameters, returnType, typeParameters) ->
+                                [
+                                    FunctionSignatureDeclaration(
+                                        parameters,
+                                        Identifier.identifier decl.Name,
+                                        returnType,
+                                        typeParameters,
+                                        decl.XmlDoc
+                                    )
+                                    |> asModuleDeclaration memb.IsPublic
+                                    ModuleDecl(decl.Name, isPublic = memb.IsPublic)
+                                    |> declareModuleMember com ctx expr
+                                ]
+                            | None ->
+                                [
+                                    ModuleDecl(decl.Name, isPublic = memb.IsPublic, ?doc = decl.XmlDoc)
+                                    |> declareModuleMember com ctx expr
+                                ]
 
                 let isDefaultExport =
                     List.contains "export-default" decl.Tags

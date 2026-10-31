@@ -127,6 +127,23 @@ module Readonlys =
         match d.TryGetValue key with
         | true, v -> v
         | _ -> -1
+
+// The signatures say unknown; the bodies and the callers here still use the values as any
+module Unknowns =
+    open Fickl.Core
+
+    let parse (text: string) : unknown = JS.JSON.parse text
+    let field (value: unknown) (name: string) : unknown = value?(name)
+    let lengthOf (value: unknown) = (unbox<string> value).Length
+    let describe (value: unknown) =
+        match value with
+        | :? string as s -> "string " + s
+        | _ -> "other"
+
+    type IBox =
+        abstract Get: unit -> unknown
+
+    let box' (value: obj) = { new IBox with member _.Get() = value }
 #endif
 
 let tests =
@@ -245,5 +262,13 @@ let tests =
         Readonlys.find (Readonlys.nativeMap ()) "a" |> equal 1
         Readonlys.find (Map [ ("b", 2) ]) "b" |> equal 2
         Readonlys.find (dict [ ("c", 3) ] |> System.Collections.Generic.Dictionary) "z" |> equal -1
+
+    testCase "unknown is obj in F# and unknown in TypeScript signatures" <| fun () ->
+        let parsed = Unknowns.parse "{\"name\":\"fickl\"}"
+        Unknowns.field parsed "name" |> Unknowns.lengthOf |> equal 5
+        Unknowns.field parsed "name" |> Unknowns.describe |> equal "string fickl"
+        Unknowns.describe (box 1) |> equal "other"
+        (Unknowns.box' "abc").Get() |> Unknowns.lengthOf |> equal 3
+        (Unknowns.parse "[1,2]")?length |> equal 2
     #endif
   ]

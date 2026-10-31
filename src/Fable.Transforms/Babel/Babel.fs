@@ -226,12 +226,20 @@ type Declaration =
         typeParameters: TypeParameter array *
         doc: string option
     | EnumDeclaration of name: string * cases: (string * Expression) array * isConst: bool
+    /// fickl: a TypeScript overload signature, `function f(x: unknown): unknown;`, before the implementation of `f`
+    | FunctionSignatureDeclaration of
+        parameters: Parameter array *
+        id: Identifier *
+        returnType: TypeAnnotation *
+        typeParameters: TypeParameter array *
+        doc: string option
     | TypeAliasDeclaration of name: string * typeParameters: TypeParameter array * alias: TypeAnnotation
 
     member this.JsDoc =
         match this with
         | ClassDeclaration(_, _, _, _, _, _, _, doc)
         | FunctionDeclaration(_, _, _, _, _, _, doc)
+        | FunctionSignatureDeclaration(_, _, _, _, doc)
         | InterfaceDeclaration(_, _, _, _, doc) -> doc
         | _ -> None
 

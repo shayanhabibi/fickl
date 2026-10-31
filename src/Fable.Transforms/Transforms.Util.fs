@@ -116,6 +116,9 @@ module Atts =
     let callableInterface = "Fickl.Core.CallableInterfaceAttribute"
 
     [<Literal>]
+    let ficklUnknownType = "Fickl.Core.UnknownTypeAttribute" // internal to Fickl.Core, on its `unknown` abbreviation
+
+    [<Literal>]
     let ficklEmitType = "Fickl.Core.EmitTypeAttribute" // typeof<Fickl.Core.EmitTypeAttribute>.FullName
 
     [<Literal>]

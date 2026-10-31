@@ -15,3 +15,22 @@ type Required<'T> = interface end
 /// <remarks>Changes only TypeScript annotations; the JavaScript value is the object itself.</remarks>
 [<EmitType("Readonly<$0>")>]
 type Readonly<'T> = interface end
+
+/// <summary>Marks the <c>unknown</c> abbreviation for the compiler.</summary>
+[<System.AttributeUsage(System.AttributeTargets.All)>]
+type internal UnknownTypeAttribute() =
+    inherit System.Attribute()
+
+/// <summary>An <c>obj</c> that TypeScript annotations write as <c>unknown</c> instead of <c>any</c>.</summary>
+/// <remarks>
+/// <c>unknown</c> is <c>obj</c> in F#, so the two convert freely. Where a module function, or an abstract member,
+/// takes or returns <c>unknown</c>, its TypeScript signature says <c>unknown</c>, so TypeScript callers must narrow
+/// the value before using it. <c>obj</c> stays <c>any</c>:
+/// <code>
+/// let parse (text: string) : unknown = JS.JSON.parse text   // parse(text: string): unknown
+/// </code>
+/// A function body still sees <c>any</c>, through an implementation signature after the declared one.
+/// Values, fields and properties typed <c>unknown</c> are annotated <c>any</c>. The JavaScript is unchanged.
+/// </remarks>
+[<UnknownType>]
+type unknown = obj
