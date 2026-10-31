@@ -3,8 +3,11 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -49,6 +52,43 @@ jobs:
       - name: Check Python formatting
         run: uv run --frozen ruff format --check src/fable-library-py
 
+  # fickl: decides which of the jobs below run. A draft PR runs only verify-linting and
+  # restore-project; marking it ready for review runs the JavaScript, TypeScript, integration and
+  # analyzer jobs. The Python, Rust, Dart and BEAM jobs run only for a release: a PR that bumps
+  # src/Fickl.Branding.targets, comes from a release branch or has the `release` label, a v* tag,
+  # or a run started by hand.
+  changes:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      other-targets: ${{ steps.release.outputs.other-targets }}
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 2 # a PR checks out its merge commit, whose first parent is the base
+
+      - id: release
+        name: Decide whether this is a release
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+        run: |
+          other=false
+          case "$EVENT" in
+            workflow_dispatch) other=true ;;
+            push) [[ "$REF" == refs/tags/v* ]] && other=true ;;
+            pull_request)
+              if [[ "$HEAD_REF" =~ (^|/)release[/-] ]] || [[ " $LABELS " == *" release "* ]] \
+                || git diff --name-only HEAD^1 HEAD | grep -qx 'src/Fickl.Branding.targets'; then
+                other=true
+              fi ;;
+          esac
+          echo "other-targets=$other" | tee -a "$GITHUB_OUTPUT"
+
   # Verify that Fable.sln can be restored
   # See: https://github.com/fable-compiler/Fable/issues/3687
   restore-project:
@@ -67,6 +107,7 @@ jobs:
 
   # Separate build job for JavaScript
   build-javascript:
+    needs: changes
     # Expecto has been hanging randomly (started a few days ago, cause unknown) - keep this
     # tight so a hang fails fast instead of burning the full hour. See:
     # https://github.com/fable-compiler/Fable/actions/runs/28803363016/job/85412364876
@@ -95,6 +136,7 @@ jobs:
 
   # Separate build job for TypeScript
   build-typescript:
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -115,6 +157,7 @@ jobs:
 
   # Separate build job for Integration
   build-integration:
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -134,6 +177,8 @@ jobs:
 
   # Separate build job for Python since we use a test matrix (will run in parallell)
   build-python:
+    needs: changes
+    if: needs.changes.outputs.other-targets == 'true'
     timeout-minutes: 75
     strategy:
       matrix:
@@ -193,6 +238,8 @@ jobs:
   # Previously this ran in publish-pypi.yml, where a failure was only visible
   # at release time and did not actually gate the publish.
   test-fable-library-py:
+    needs: changes
+    if: needs.changes.outputs.other-targets == 'true'
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -230,6 +277,8 @@ jobs:
   # separate job rather than a step in test-fable-library-py, so it runs once
   # instead of once per cell of that job's 3x3 platform/Python matrix.
   lint-fable-library-py:
+    needs: changes
+    if: needs.changes.outputs.other-targets == 'true'
     timeout-minutes: 10
     runs-on: ubuntu-latest
 
@@ -247,6 +296,8 @@ jobs:
 
   # Separate build job for Rust (will run in parallel)
   build-rust:
+    needs: changes
+    if: needs.changes.outputs.other-targets == 'true'
     timeout-minutes: 75
     runs-on: ubuntu-latest
     strategy:
@@ -275,6 +326,8 @@ jobs:
 
   # Separate build job for Dart
   build-dart:
+    needs: changes
+    if: needs.changes.outputs.other-targets == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # Without id-token, setup-dart skips the pub.dev token, so packages are
@@ -296,6 +349,8 @@ jobs:
 
   # Separate build job for Beam (Erlang)
   build-beam:
+    needs: changes
+    if: needs.changes.outputs.other-targets == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -316,6 +371,7 @@ jobs:
 
   # Separate job to run F# analyzers
   analyzers:
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
