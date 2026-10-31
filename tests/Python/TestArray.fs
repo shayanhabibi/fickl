@@ -249,6 +249,22 @@ let ``test Array slice with non-numeric arrays work`` () =
     equal xs.[3] "D"
 
 [<Fact>]
+let ``test Array slices clamp the bounds like .NET`` () =
+    let xs = [| 1; 2; 3 |]
+    xs.[-1..1] |> equal [| 1; 2 |]
+    xs.[-5..] |> equal [| 1; 2; 3 |]
+    xs.[1..5] |> equal [| 2; 3 |]
+    xs.[..5] |> equal [| 1; 2; 3 |]
+    xs.[.. -2] |> equal [||]
+    xs.[-5.. -1] |> equal [||]
+    xs.[5..6] |> equal [||]
+    xs.[2..1] |> equal [||]
+    let lower, upper = -1, 1
+    xs.[lower..upper] |> equal [| 1; 2 |]
+    let strings = [| "a"; "b"; "c" |]
+    strings.[-1..1] |> equal [| "a"; "b" |]
+
+[<Fact>]
 let ``test Array literals work`` () =
     let x = [| 1; 2; 3; 4; 5 |]
     equal 5 x.Length
@@ -1602,6 +1618,59 @@ let ``test Array.randomSampleBy works`` () =
     Array.distinct sample |> Array.length |> equal 3
     throwsAnyError (fun () -> Array.randomSampleBy (fun () -> 1.0) 1 [|1; 2|] |> ignore)
     throwsAnyError (fun () -> Array.randomSampleBy (fun () -> -0.1) 1 [|1; 2|] |> ignore)
+
+[<Fact>]
+let ``test Array.randomShuffleBy matches FSharp.Core`` () =
+    Array.randomShuffleBy (fun () -> 0.0) [|0 .. 4|] |> equal [|0; 1; 2; 3; 4|]
+    Array.randomShuffleBy (fun () -> 0.999) [|0 .. 4|] |> equal [|4; 0; 1; 2; 3|]
+    let xs = [|0 .. 4|]
+    Array.randomShuffleInPlaceBy (fun () -> 0.999) xs
+    xs |> equal [|4; 0; 1; 2; 3|]
+    let mutable calls = 0
+    let next () =
+        calls <- calls + 1
+        float ((calls * 37) % 100) / 100.0
+    Array.randomShuffleBy next [|0 .. 9|] |> equal [|3; 7; 2; 6; 9; 0; 8; 4; 5; 1|]
+    calls |> equal 9
+
+[<Fact>]
+let ``test Array.randomSampleBy matches FSharp.Core`` () =
+    Array.randomSampleBy (fun () -> 0.0) 3 [|0 .. 4|] |> equal [|0; 4; 3|]
+    Array.randomSampleBy (fun () -> 0.999) 3 [|0 .. 4|] |> equal [|4; 3; 2|]
+    Array.randomSampleBy (fun () -> 0.0) 0 ([||]: int[]) |> equal [||]
+    // Above the max set size it draws again on a repeated index
+    let values = [|0.0; 0.0; 0.5|]
+    let mutable calls = 0
+    let next () =
+        calls <- calls + 1
+        values[calls - 1]
+    Array.randomSampleBy next 2 [|0 .. 21|] |> equal [|0; 11|]
+    calls |> equal 3
+
+[<Fact>]
+let ``test Array random functions draw from the given Random`` () =
+    let rng = System.Random(42)
+    let shuffled = Array.randomShuffleWith rng [|0 .. 9|]
+    Array.randomShuffleWith (System.Random(42)) [|0 .. 9|] |> equal shuffled
+    let reference = System.Random(42)
+    for _ in 1 .. 9 do reference.NextDouble() |> ignore
+    rng.Next() |> equal (reference.Next())
+    let rng = System.Random(42)
+    let sample = Array.randomSampleWith rng 3 [|0 .. 9|]
+    Array.randomSampleWith (System.Random(42)) 3 [|0 .. 9|] |> equal sample
+    let reference = System.Random(42)
+    for _ in 1 .. 3 do reference.NextDouble() |> ignore
+    rng.Next() |> equal (reference.Next())
+
+[<Fact>]
+let ``test Array random functions give FSharp.Core's error messages`` () =
+    let message = "randomizer returned NaN, should be in range [0.0, 1.0)."
+    throwsErrorContaining message (fun () -> Array.randomShuffleBy (fun () -> nan) [|1; 2|])
+    throwsErrorContaining message (fun () -> Array.randomChoiceBy (fun () -> nan) [|1; 2|])
+    throwsErrorContaining message (fun () -> Array.randomChoicesBy (fun () -> nan) 2 [|1; 2|])
+    throwsErrorContaining message (fun () -> Array.randomSampleBy (fun () -> nan) 1 [|1; 2|])
+    throwsErrorContaining "The input array was empty." (fun () -> Array.randomChoiceWith (System.Random(1)) ([||]: int[]))
+    throwsErrorContaining "The input must be non-negative.\ncount = -1" (fun () -> Array.randomSampleBy (fun () -> 0.0) -1 [|1|])
 
 [<Fact>]
 let ``test Int64 arrays roundtrip through their backing storage`` () =

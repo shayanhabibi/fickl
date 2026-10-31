@@ -2680,10 +2680,26 @@ let intrinsicFunctions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisAr
     | "GetArray", _, [ ar; idx ] -> getExpr r t ar idx |> Some
     | "SetArray", _, [ ar; idx; value ] -> setExpr r ar idx value |> Some
     | ("GetArraySlice" | "GetStringSlice"), None, [ ar; lower; upper ] ->
+        // Python slicing counts a negative index from the end, .NET clamps it to 0
+        let clampToZero (index: Expr) =
+            match index with
+            | Value(NumberConstant(NumberValue.Int32 n, _), _) when n >= 0 -> index
+            | _ -> Helper.LibCall(com, "util", "slice_index", Int32.Number, [ index ], ?loc = r)
+
+        let lower =
+            match lower with
+            | Value(NewOption(None, _, _), _) -> makeIntConst 0
+            | Value(NewOption(Some lower, _, _), _)
+            | lower -> clampToZero lower
+
         let upper =
             match upper with
             | Value(NewOption(None, _, _), _) -> Helper.GlobalCall("len", t, [ ar ], [ t ], ?loc = r)
-            | _ -> add upper (makeIntConst 1)
+            | Value(NewOption(Some upper, _, _), _)
+            | upper ->
+                match upper with
+                | Value(NumberConstant(NumberValue.Int32 n, _), _) when n >= 0 -> makeIntConst (n + 1)
+                | upper -> add upper (makeIntConst 1) |> clampToZero
 
         Helper.InstanceCall(ar, "slice", t, [ lower; upper ], ?loc = r) |> Some
     | "SetArraySlice", None, args ->
@@ -2926,6 +2942,7 @@ let exceptions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
         // Caught exceptions are typed as Python's built-in Exception, which lacks this attribute.
         Helper.GlobalCall("getattr", t, [ e; makeStrConst "inner_exception" ], ?loc = r)
         |> Some
+    | "get_ParamName", Some _ -> bclType com ctx r t i thisArg args
     | _ -> None
 
 let unchecked (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (args: Expr list) =
@@ -3028,6 +3045,13 @@ let convert (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (
             WarningCodes.base64ArgumentsIgnored |> addWarningWithCode com ctx.InlinePath r
 
         Helper.LibCall(com, "String", (Naming.lowerFirst i.CompiledName), t, args, i.SignatureArgTypes, ?loc = r)
+        |> Some
+    | "ToHexString"
+    | "ToHexStringLower" ->
+        Helper.LibCall(com, "Convert", Naming.lowerFirst i.CompiledName, t, args, i.SignatureArgTypes, ?loc = r)
+        |> Some
+    | "FromHexString" when List.isSingle args ->
+        Helper.LibCall(com, "Convert", "fromHexString", t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
     | _ -> None
 
@@ -3477,17 +3501,18 @@ let random (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opti
     | ".ctor", _ ->
         Helper.LibCall(com, "util", "create_random", t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
+    | "get_Shared", None -> Helper.LibCall(com, "util", "random_shared", t, [], ?loc = r) |> Some
     | "Next", Some thisArg ->
-        let min, max =
+        let moduleName, meth, args =
             match args with
-            | [] -> makeIntConst 0, makeIntConst System.Int32.MaxValue
-            | [ max ] -> makeIntConst 0, max
-            | [ min; max ] -> min, max
+            | [] -> "util", "random_int", [ thisArg; makeIntConst 0; makeIntConst System.Int32.MaxValue ]
+            // These check the arguments like .NET
+            | [ _ ] -> "random_", "next_max", thisArg :: args
+            | [ _; _ ] -> "random_", "next_range", thisArg :: args
             | _ -> FableError "Unexpected arg count for Random.Next" |> raise
 
-        let args = [ thisArg; min; max ]
-        let argTypes = [ thisArg.Type; min.Type; max.Type ]
-        Helper.LibCall(com, "util", "random_int", t, args, argTypes, ?loc = r) |> Some
+        let argTypes = args |> List.map (fun a -> a.Type)
+        Helper.LibCall(com, moduleName, meth, t, args, argTypes, ?loc = r) |> Some
     | "NextDouble", Some thisArg ->
         let args = [ thisArg ]
         let argTypes = [ thisArg.Type ]

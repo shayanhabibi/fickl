@@ -2721,6 +2721,7 @@ let exceptions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
     | "get_Message", Some e -> Helper.InstanceCall(e, "toString", t, [], ?loc = r) |> Some
     // | "get_StackTrace", Some e -> getFieldWith r t e "stack" |> Some
     | "get_InnerException", Some e -> getFieldWith r t e "innerException" |> Some
+    | "get_ParamName", Some _ -> bclType com ctx r t i thisArg args
     | _ -> None
 
 let unchecked (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (args: Expr list) =
@@ -2826,6 +2827,13 @@ let convert (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (
             genArgs = i.GenericArgs,
             ?loc = r
         )
+        |> Some
+    | "ToHexString"
+    | "ToHexStringLower" ->
+        Helper.LibCall(com, "String", Naming.lowerFirst i.CompiledName, t, args, i.SignatureArgTypes, ?loc = r)
+        |> Some
+    | "FromHexString" when List.isSingle args ->
+        Helper.LibCall(com, "String", "fromHexString", t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
     | _ -> None
 
@@ -3289,6 +3297,7 @@ let random (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opti
             ?loc = r
         )
         |> Some
+    | "get_Shared", None -> Helper.LibCall(com, "Random", "shared", t, [], ?loc = r) |> Some
     // Not yet supported
     | ("NextInt64" | "NextSingle"), _ -> None
     | meth, Some thisArg ->

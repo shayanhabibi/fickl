@@ -1,6 +1,7 @@
 import { toString as dateToString } from "./Date.ts";
 import { compare as numericCompare, divide, isNumeric, isIntegral, multiply, type Numeric, toExponential, toFixed, toHex, toPrecision, toRadix } from "./Numeric.ts";
 import { escape } from "./RegExp.ts";
+import { ArgumentNullException_$ctor_Z721C83C5, ArgumentOutOfRangeException_$ctor_Z384F8060, ArgumentOutOfRangeException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5 } from "./System.ts";
 import { toString } from "./Types.ts";
 import { Exception } from "./Util.ts";
 
@@ -381,6 +382,56 @@ function thousandSeparate(value: string) {
   return value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+function splitExponential(s: string): [string, number] {
+  const eIdx = s.indexOf("e");
+  return [s.slice(0, eIdx).replace(".", ""), Number(s.slice(eIdx + 1))];
+}
+
+function shortestSingle(x: number): [string, number] {
+  // 100 digits tell where a float32 lies between two candidates, and 9 digits always round-trip
+  const [digits, exponent] = splitExponential(x.toExponential(99));
+  for (let p = 1; ; p++) {
+    const down = Number(digits.slice(0, p));
+    const rest = digits.slice(p);
+    const half = "5".padEnd(rest.length, "0");
+    const roundUp = rest > half || rest === half && down % 2 === 1;
+    for (const n of roundUp ? [down + 1, down] : [down, down + 1]) {
+      if (Math.fround(Number(n + "e" + (exponent - p + 1))) === x) {
+        return [String(n), exponent + String(n).length - p];
+      }
+    }
+  }
+}
+
+// .NET "G" and "R": fixed notation unless the exponent is below -4 or reaches the precision (17 for the shortest digits, 9 for a float32)
+function formatGeneral(x: number, format: string, precision: number | null, isSingle = false) {
+  if (!Number.isFinite(x)) {
+    return String(x);
+  }
+  const sign = x < 0 || Object.is(x, -0) ? "-" : "";
+  x = Math.abs(x);
+  // R ignores the precision and G0 is G
+  const p = format === "r" || format === "R" ? 0 : precision ?? 0;
+  const [significand, exponent] =
+    p > 0 ? splitExponential(x.toExponential(p - 1)) : isSingle ? shortestSingle(x) : splitExponential(x.toExponential());
+  const digits = trimEnd(significand, "0") || "0";
+  if (exponent < -4 || exponent >= (p > 0 ? p : isSingle ? 9 : 17)) {
+    const mantissa = digits.length > 1 ? digits[0] + "." + digits.slice(1) : digits;
+    const eChar = format === "G" || format === "R" ? "E" : "e";
+    return sign + mantissa + eChar + (exponent < 0 ? "-" : "+") + padLeft(String(Math.abs(exponent)), 2, "0");
+  } else if (exponent < 0) {
+    return sign + "0." + "0".repeat(-exponent - 1) + digits;
+  } else {
+    const decimals = digits.slice(exponent + 1);
+    return sign + digits.slice(0, exponent + 1).padEnd(exponent + 1, "0") + (decimals ? "." + decimals : "");
+  }
+}
+
+export function formatSingle(str: string, x: number) {
+  const m = /^\{0:([GgRr])(\d{0,2})\}$/.exec(str);
+  return m != null ? formatGeneral(Math.fround(x), m[1]!, m[2] ? parseInt(m[2], 10) : null, true) : format(str, x);
+}
+
 export function format(str: string | object, ...args: any[]) {
   let str2: string;
   if (typeof str === "object") {
@@ -391,9 +442,10 @@ export function format(str: string | object, ...args: any[]) {
     str2 = str;
   }
 
-  return str2.replace(formatRegExp, (match: string, idx: number, padLength, format, precision, pattern) => {
-    if (match === "{{") { return "{"; }
-    if (match === "}}") { return "}"; }
+  return str2.replace(formatRegExp, (match, idx: number, padLength, format, precision, pattern) => {
+    if (match === "{{" || match === "}}") {
+      return match[0];
+    }
     if (idx < 0 || idx >= args.length) {
       throw new Exception("Index must be greater or equal to zero and less than the arguments' length.")
     }
@@ -454,12 +506,17 @@ export function format(str: string | object, ...args: any[]) {
             rep = parts.integral + "." + padRight(parts.decimal, precision, "0");
           }
           break;
-        case "g": case "G": {
-          if (precision == null && typeof rep !== "number" && typeof rep !== "bigint") {
+        case "g": case "G":
+        case "r": case "R": {
+          if (typeof rep === "number") {
+            rep = formatGeneral(rep, format, precision);
+            break;
+          }
+          if (precision == null) {
             rep = String(rep);
             break;
           }
-          rep = precision != null ? toPrecision(rep, precision) : toPrecision(rep);
+          rep = toPrecision(rep, precision);
           // Handle exponential notation: only trim trailing zeros from mantissa, not from exponent.
           // .NET G format guarantees an exponent of at least 2 digits with an explicit sign (e.g. "E-07").
           const eIdx = rep.indexOf("e");
@@ -468,7 +525,7 @@ export function format(str: string | object, ...args: any[]) {
             const expSign = rep[eIdx + 1]; // toPrecision always emits "+" or "-"
             const expDigits = rep.slice(eIdx + 2);
             const paddedExpDigits = expDigits.length < 2 ? "0" + expDigits : expDigits;
-            const eChar = format === "G" ? "E" : "e";
+            const eChar = format === "G" || format === "R" ? "E" : "e";
             rep = mantissa + eChar + expSign + paddedExpDigits;
           } else if (rep.indexOf(".") >= 0) {
             rep = trimEnd(trimEnd(rep, "0"), ".");
@@ -495,8 +552,6 @@ export function format(str: string | object, ...args: any[]) {
             rep = thousandSeparate(parts.integral) + " %";
           }
           break;
-        case "r": case "R":
-          throw new Exception("The round-trip format is not supported by Fable");
         case "x": case "X":
           if (!isIntegral(rep)) {
             throw new Exception("Format specifier was invalid.");
@@ -611,15 +666,15 @@ export function isNullOrWhiteSpace(str: string | any) {
 
 // As in .NET, a null argument, separator or element is empty (JS's String(null) and join(null) write "null")
 export function concat(...xs: any[]): string {
-  return xs.map((x) => x == null ? "" : String(x)).join("");
+  return xs.map((x) => (x == null ? "" : String(x))).join("");
 }
 
 export function join<T>(delimiter: string, xs: Iterable<T>): string {
   delimiter = delimiter ?? "";
   if (Array.isArray(xs)) {
-    return xs.join(delimiter);
+    return xs.join(delimiter ?? "");
   } else {
-    return Array.from(xs).join(delimiter);
+    return Array.from(xs).join(delimiter ?? "");
   }
 }
 
@@ -648,6 +703,49 @@ export function fromBase64String(b64Encoded: string): number[] {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes as any as number[];
+}
+
+export function toHexString(inArray: ArrayLike<number>, offset?: number, length?: number): string {
+  if (inArray == null) {
+    throw ArgumentNullException_$ctor_Z721C83C5("inArray");
+  }
+  const start = offset ?? 0;
+  const count = length ?? inArray.length - start;
+  if (count < 0) {
+    throw ArgumentOutOfRangeException_$ctor_Z384F8060("length", "Non-negative number required.");
+  }
+  if (start < 0) {
+    throw ArgumentOutOfRangeException_$ctor_Z384F8060("offset", "Non-negative number required.");
+  }
+  if (start > inArray.length - count) {
+    throw ArgumentOutOfRangeException_$ctor_Z721C83C5("offset");
+  }
+  let str = "";
+  for (let i = start; i < start + count; i++) {
+    str += inArray[i]!.toString(16).padStart(2, "0");
+  }
+  return str.toUpperCase();
+}
+
+export function toHexStringLower(inArray: ArrayLike<number>, offset?: number, length?: number): string {
+  return toHexString(inArray, offset, length).toLowerCase();
+}
+
+export function fromHexString(s: string): number[] {
+  if (s == null) {
+    throw ArgumentNullException_$ctor_Z721C83C5("s");
+  }
+  if (s.length % 2 !== 0) {
+    throw FormatException_$ctor_Z721C83C5("The input is not a valid hex string as its length is not a multiple of 2.");
+  }
+  if (!/^[0-9A-Fa-f]*$/.test(s)) {
+    throw FormatException_$ctor_Z721C83C5("The input is not a valid hex string as it contains a non-hex character.");
+  }
+  const bytes = new Uint8Array(s.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(s.substring(2 * i, 2 * i + 2), 16);
   }
   return bytes as any as number[];
 }
