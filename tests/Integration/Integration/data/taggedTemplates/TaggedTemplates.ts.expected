@@ -1,11 +1,10 @@
 
-import type { MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
 import { html } from "./tags.js";
 import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
 
 export interface Template {
     get strings(): ReadonlyArray<string>,
-    get values(): MutableArray<any>
+    get values(): any[]
 }
 
 export function view(name: string, count: int32): Template {

@@ -5,7 +5,8 @@ export type Nullable<T> = T | null | undefined;
 /** The string keys of `T` whose property type is assignable to `R`: `Fickl.Core.keyof<'T, 'R>`. */
 export type KeysOfType<T, R> = { [K in keyof T]-?: T[K] extends R ? K : never }[keyof T] & string;
 
-export interface MutableArray<T> extends Iterable<T> {
+/** The members a typed array shares with `Array`, which is all an F# array of numbers can rely on. */
+export interface NumericArray<T> extends Iterable<T> {
   readonly length: number;
   [index: number]: T;
   every(predicate: (value: T, index: number, array: this) => unknown, thisArg?: any): boolean;
@@ -28,6 +29,14 @@ export interface MutableArray<T> extends Iterable<T> {
   some(predicate: (value: T, index: number, array: this) => unknown, thisArg?: any): boolean;
   sort(compareFn?: (a: T, b: T) => number): this;
 }
+
+/**
+ * An F# array. Only numbers and bigints can be stored in a typed array, so an array of any other
+ * element type is also a plain `T[]`, which TS functions and properties declared `T[]` accept.
+ * `MutableArray<any>` is `any`, as its elements may be numbers or not. The intersection keeps a
+ * generic `MutableArray<T>` usable as a `NumericArray<T>`.
+ */
+export type MutableArray<T> = NumericArray<T> & (0 extends (1 & T) ? any : [T] extends [number | bigint] ? unknown : T[]);
 
 // Don't change, this corresponds to DateTimeKind.Kind enum values in .NET
 export const DateTimeKind = {
