@@ -22,6 +22,7 @@ let allTests =
     NativeAsyncGenerators.tests
     SymbolKeys.tests
     TypeGuards.tests
+    ErasedTuples.tests
     TaggedTemplates.tests
     TsEnums.tests
     JsNamespaceLibrary.tests

@@ -20,6 +20,7 @@ let allTests =
     NativeAsyncGenerators.tests
     SymbolKeys.tests
     TypeGuards.tests
+    ErasedTuples.tests
     TaggedTemplates.tests
     ImportAttributes.tests
     TopLevelAwait.tests

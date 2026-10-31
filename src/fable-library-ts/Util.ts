@@ -300,6 +300,17 @@ export function callableObject<F extends Function, P extends object>(f: F, prope
   return Object.defineProperties(f, Object.getOwnPropertyDescriptors(properties)) as F & P;
 }
 
+/** fickl: an erased union's tuple without the None values ending it, which are its optional elements */
+export function trimOptionalElements<T extends unknown[]>(values: T, required: number): T {
+  const elements: unknown[] = values;
+  let length = elements.length;
+  while (length > required && elements[length - 1] === undefined) {
+    length--;
+  }
+  elements.length = length;
+  return values;
+}
+
 export function isArrayLike<T>(x: T | ArrayLike<T> | Iterable<T>): x is T[] {
   return Array.isArray(x) || ArrayBuffer.isView(x);
 }
