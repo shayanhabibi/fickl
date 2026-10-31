@@ -75,9 +75,18 @@ export class CancellationToken implements IDisposable, Disposable {
 }
 
 export class OperationCanceledException extends Exception {
-  constructor(msg?: string) {
-    super(msg ?? "The operation was canceled");
+  constructor(msg?: string, innerException?: Exception) {
+    super(msg ?? "The operation was canceled", innerException);
     // Object.setPrototypeOf(this, OperationCanceledException.prototype);
+  }
+  // fickl: JS code tells an abort apart by its name, so a cancellation reads as one
+  get name(): string {
+    return "AbortError";
+  }
+  // fickl: an Error named AbortError, such as the DOMException an aborted fetch rejects with, is a cancellation
+  static override [Symbol.hasInstance](value: unknown): boolean {
+    return Function.prototype[Symbol.hasInstance].call(this, value)
+      || (value instanceof Error && value.name === "AbortError");
   }
 }
 

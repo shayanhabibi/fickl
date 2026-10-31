@@ -10,6 +10,7 @@ let allTests =
     NativeFunctions.tests
     NativeDisposal.tests
     NativeErrors.tests
+    AbortSignals.tests
     NativeAsync.tests
     NativeGenerators.tests
     NativeAsyncGenerators.tests

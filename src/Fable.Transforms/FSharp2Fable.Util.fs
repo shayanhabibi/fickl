@@ -2783,6 +2783,7 @@ module Util =
         else
             entFullName = "Fickl.Core.JsInterop"
             || entFullName = "Fickl.Core.JS"
+            || entFullName = "Fickl.Core.CancellationExtensions"
             || entFullName = "Fickl.Core.JS.ReadonlyArrayModule"
             || entFullName = "Fickl.Core.JS.ReadonlyArray"
             || entFullName = "Fickl.Core.JsAsyncBuilder"

@@ -1,0 +1,36 @@
+
+import { awaitPromiseWithToken, fromAbortSignal, toAbortSignal } from "./fable_modules/fable-library-ts.5.25.0/Cancellation.ts";
+import type { Async, CancellationToken } from "./fable_modules/fable-library-ts.5.25.0/AsyncBuilder.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { startAsPromise } from "./fable_modules/fable-library-ts.5.25.0/Async.ts";
+
+export function signalOf(cts: CancellationToken): AbortSignal {
+    return toAbortSignal(cts);
+}
+
+export function tokenOf(signal: AbortSignal): CancellationToken {
+    return fromAbortSignal(signal);
+}
+
+export function timeoutToken(milliseconds: int32): CancellationToken {
+    return fromAbortSignal(AbortSignal.timeout(milliseconds));
+}
+
+export function either(a: AbortSignal, b: AbortSignal): AbortSignal {
+    return AbortSignal.any([a, b]);
+}
+
+export function awaitUntilCancelled(promise: Promise<int32>, token: CancellationToken): Async<int32> {
+    return awaitPromiseWithToken(promise, token);
+}
+
+export function startWithSignal(work: Async<int32>, signal: AbortSignal): Promise<int32> {
+    return startAsPromise(work, fromAbortSignal(signal));
+}
+
+export function abortNow(): boolean {
+    const controller: AbortController = new AbortController();
+    controller.abort();
+    return controller.signal.aborted;
+}
+

@@ -3555,6 +3555,21 @@ let exceptions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
         match i.DeclaringEntityFullName with
         | "System.Collections.Generic.KeyNotFoundException"
         | BuiltinSystemException _ -> bclType com ctx r t i thisArg args
+        // fickl: a real OperationCanceledException, so `:?` matches it and JS code sees an AbortError
+        | "System.OperationCanceledException" ->
+            let args =
+                Seq.zip args i.SignatureArgTypes
+                |> Seq.takeWhile (fun (_, t) ->
+                    match t with
+                    | String
+                    | DeclaredType({ FullName = Types.exception_ }, _) -> true
+                    | _ -> false
+                )
+                |> Seq.map fst
+                |> Seq.toList
+
+            Helper.LibCall(com, "AsyncBuilder", "OperationCanceledException", t, args, isConstructor = true, ?loc = r)
+            |> Some
         | _ ->
             Helper.LibCall(com, "Util", "Exception", Any, args, isConstructor = true)
             |> Some
@@ -5715,6 +5730,28 @@ let private jsErrors (com: ICompiler) r t methodName args =
         |> Some
     | _ -> None
 
+/// fickl: conversions between CancellationToken and AbortSignal, and promise interop that follows either
+let private cancellationExtensions (com: ICompiler) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    let args = Option.toList thisArg @ args
+
+    match info.CompiledName, args with
+    | "CancellationToken.ToAbortSignal", token :: _ ->
+        Helper.LibCall(com, "Cancellation", "toAbortSignal", t, [ token ], ?loc = r)
+        |> Some
+    | "CancellationToken.FromAbortSignal.Static", [ signal ] ->
+        Helper.LibCall(com, "Cancellation", "fromAbortSignal", t, [ signal ], ?loc = r)
+        |> Some
+    | "Async.AwaitPromise.Static", [ promise; token ] ->
+        Helper.LibCall(com, "Cancellation", "awaitPromiseWithToken", t, [ promise; token ], ?loc = r)
+        |> Some
+    | "Async.StartAsPromise.Static", [ workflow; signal ] ->
+        let token =
+            Helper.LibCall(com, "Cancellation", "fromAbortSignal", Any, [ signal ], ?loc = r)
+
+        Helper.LibCall(com, "Async", "startAsPromise", t, [ workflow; token ], ?loc = r)
+        |> Some
+    | _ -> None
+
 let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match info.DeclaringEntityFullName with
     | Patterns.DicContains replacedModules replacement -> replacement com ctx r t info thisArg args
@@ -5724,6 +5761,7 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | Naming.StartsWith "Fable.Core." _ -> fableCoreLib com ctx r t info thisArg args
     | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
     | "Fickl.Core.JS" -> jsErrors com r t info.CompiledName args
+    | "Fickl.Core.CancellationExtensions" -> cancellationExtensions com r t info thisArg args
     | "Fickl.Core.JS.ReadonlyArrayModule"
     | "Fickl.Core.JS.ReadonlyArray" ->
         match info.CompiledName, args with

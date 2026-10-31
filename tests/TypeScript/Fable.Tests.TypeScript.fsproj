@@ -58,6 +58,7 @@
     <Compile Include="../Js/Main/NativeFunctionTests.fs" />
     <Compile Include="../Js/Main/NativeDisposalTests.fs" />
     <Compile Include="../Js/Main/NativeErrorTests.fs" />
+    <Compile Include="../Js/Main/AbortSignalTests.fs" />
     <Compile Include="../Js/Main/NativeAsyncTests.fs" />
     <Compile Include="../Js/Main/NativeGeneratorTests.fs" />
     <Compile Include="../Js/Main/NativeAsyncGeneratorTests.fs" />
