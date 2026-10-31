@@ -1,12 +1,20 @@
 
-import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
 import { fromEmitter, dispatchCustomEvent, type IEvent$2, fromEventTarget } from "./fable_modules/fable-library-ts.5.25.0/Event.ts";
 import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
 import { type IObservable, map } from "./fable_modules/fable-library-ts.5.25.0/Observable.ts";
 
 export class Store extends EventTarget {
     constructor() {
         super();
+    }
+    get Changed(): IEvent$2<((arg0: any, arg1: CustomEvent<int32>) => void), CustomEvent<int32>> {
+        const this$: Store = this;
+        return fromEventTarget(this$, "change");
+    }
+    Set(value: int32): boolean {
+        const this$: Store = this;
+        return dispatchCustomEvent(this$, "change", value);
     }
 }
 
@@ -18,16 +26,8 @@ export function Store_$ctor(): Store {
     return new Store();
 }
 
-export function Store__get_Changed(this$: Store): IEvent$2<((arg0: any, arg1: CustomEvent<int32>) => void), CustomEvent<int32>> {
-    return fromEventTarget(this$, "change");
-}
-
-export function Store__Set_Z524259A4(this$: Store, value: int32): boolean {
-    return dispatchCustomEvent(this$, "change", value);
-}
-
 export function details(store: Store): IObservable<int32> {
-    return map<CustomEvent<int32>, int32>((e: CustomEvent<int32>): int32 => (e.detail | 0), Store__get_Changed(store));
+    return map<CustomEvent<int32>, int32>((e: CustomEvent<int32>): int32 => (e.detail | 0), store.Changed);
 }
 
 export function aborts(signal: AbortSignal): IEvent$2<((arg0: any, arg1: Event) => void), Event> {
