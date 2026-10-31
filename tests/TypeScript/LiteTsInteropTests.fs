@@ -129,8 +129,21 @@ module Readonlys =
         | _ -> -1
 #endif
 
+type HidingBase() =
+    member _.Read() = 1
+    member _.Name = "base"
+
+type HidingDerived() =
+    inherit HidingBase()
+    member _.Read() = 2
+    member _.Name = "derived"
+
 let tests =
   testList "LiteTsInterop" [
+    testCase "Members hiding base class members compile under noImplicitOverride" <| fun () ->
+        let value = HidingDerived()
+        (value.Read(), value.Name) |> equal (2, "derived")
+        ((value :> HidingBase).Read(), (value :> HidingBase).Name) |> equal (1, "base")
     #if FABLE_COMPILER
     testCase "jsOptions works" <| fun _ ->
         let opts = jsOptions<JsOptions>(fun o ->
