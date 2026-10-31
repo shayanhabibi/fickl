@@ -5714,10 +5714,19 @@ let private nativeAsync (com: ICompiler) (ctx: Context) r t (info: CallInfo) arg
     let unitValue = Value(UnitConstant, r)
 
     match info.CompiledName, args with
-    | ("jsAsync" | "get_jsAsync" | ".ctor"), [] -> Value(Null t, r) |> Some
+    | ("jsAsync" | "get_jsAsync" | "promise" | "get_promise" | ".ctor"), [] -> Value(Null t, r) |> Some
     | "Return", [ value ] -> resolvedAsyncPayload com r value |> Some
     | "ReturnFrom", [ promise ] -> awaitPromise (genArg com ctx r 0 info.GenericArgs) promise |> Some
     | "Bind", [ promise; Body(arg, body) ] -> Let(arg, awaitPromise arg.Type promise, body) |> Some
+    | ("MergeSources" | "MergeSources3" | "MergeSources4" | "MergeSources5" | "MergeSources6"), promises ->
+        let promises = Value(NewTuple(promises, false), r)
+        Helper.GlobalCall("Promise", t, [ promises ], memb = "all", ?loc = r) |> Some
+    | "For", [ promise; Body(arg, body) ] when
+        (match info.SignatureArgTypes with
+         | DeclaredType(ent, _) :: _ -> ent.FullName = "Fable.Core.JS.Promise`1"
+         | _ -> false)
+        ->
+        Let(arg, awaitPromise arg.Type promise, body) |> Some
     | "Zero", ([] | [ Value(UnitConstant, _) ]) -> Some unitValue
     | "Delay", [ Body(_, body) ] -> Delegate([], body, None, [ "fickl-async-code" ]) |> Some
     | "Run", [ body ] ->
