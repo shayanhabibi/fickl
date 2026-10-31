@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {
+    // fable-library is read under the consumer's options, so its index reads must type-check under this flag
+    "noUncheckedIndexedAccess": true
+  }
+}

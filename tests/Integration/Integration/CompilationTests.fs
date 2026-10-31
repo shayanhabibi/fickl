@@ -1,6 +1,8 @@
 ﻿module Fable.Tests.CompilationTests
 
 open System.IO
+open System.Text.Json
+open System.Text.Json.Nodes
 open System.Text.RegularExpressions
 open Expecto
 open Fable.Compiler.Util
@@ -78,14 +80,26 @@ let private typeCheckTypeScript (testCaseDir: string) =
 
     let config = Path.Combine(caseDir, "tsconfig.json")
 
-    let settings =
-        {|
-            extends = Path.Combine(root, "tests/TypeScript/tsconfig.json")
-            compilerOptions = {| rootDir = root; noEmit = true |}
-            ``include`` = [| "*.ts" |]
-        |}
+    // A case can add options of its own in a tsconfig.json beside its project, to cover a flag the suite leaves off
+    let compilerOptions =
+        let own = Path.Combine(testCaseDir, "tsconfig.json")
 
-    File.WriteAllText(config, System.Text.Json.JsonSerializer.Serialize settings)
+        if File.Exists own then
+            let options = JsonDocumentOptions(CommentHandling = JsonCommentHandling.Skip)
+            let parsed = JsonNode.Parse(File.ReadAllText own, documentOptions = options)
+            parsed["compilerOptions"].DeepClone().AsObject()
+        else
+            JsonObject()
+
+    compilerOptions["rootDir"] <- JsonValue.Create root
+    compilerOptions["noEmit"] <- JsonValue.Create true
+
+    let settings = JsonObject()
+    settings["extends"] <- JsonValue.Create(Path.Combine(root, "tests/TypeScript/tsconfig.json"))
+    settings["compilerOptions"] <- compilerOptions
+    settings["include"] <- JsonArray(JsonValue.Create "*.ts")
+
+    File.WriteAllText(config, settings.ToJsonString())
 
     let info =
         System.Diagnostics.ProcessStartInfo(
@@ -102,80 +116,85 @@ let private typeCheckTypeScript (testCaseDir: string) =
     child.WaitForExit()
     Expect.equal child.ExitCode 0 $"tsc rejected {Path.GetFileName testCaseDir}:\n{stdout.Result}{stderr.Result}"
 
+/// Compiles the project in one snapshot case and compares each `.expected` file with what it produced
+let private compileCase (testCaseDir: string) =
+    async {
+        let project =
+            Directory.GetFileSystemEntries(testCaseDir, "*.fsproj") |> Seq.exactlyOne
+        // clean up old actual files
+        for f in Directory.GetFileSystemEntries(testCaseDir, "*.actual") do
+            File.Delete f
+
+        let libraryDir = Path.Combine(testCaseDir, "library")
+        let precompiledDir = Path.Combine(testCaseDir, "precompiled")
+
+        let precompiledLibArgs =
+            // If we have a library folder, it means we want to use Fable precompiledLib feature for the test
+            if Directory.Exists libraryDir then
+                let libraryProject =
+                    Directory.GetFileSystemEntries(libraryDir, "*.fsproj") |> Seq.exactlyOne
+
+                if Directory.Exists precompiledDir then
+                    Directory.Delete(precompiledDir, true)
+
+                let exitCode =
+                    Fable.Cli.Entry.main
+                        [| "precompile"; libraryProject; "--outDir"; precompiledDir; "--noCache" |]
+
+                Expect.equal exitCode 0 "Expected precompile exit code to be 0"
+                checkBrowserInlineExprs precompiledDir
+                [| "--precompiledLib"; precompiledDir |]
+            else
+                [||]
+
+        let outputArgs =
+            if Directory.GetFileSystemEntries(testCaseDir, "*.ts.expected") |> Array.isEmpty then
+                [| "-e"; ".jsx.actual" |]
+            else
+                [| "--lang"; "ts"; "-e"; ".ts.actual" |]
+
+        // Compile project
+        let exitCode =
+            Array.concat
+                [
+                    [| project; "--cwd"; $"'%s{testCaseDir}'" |]
+                    outputArgs
+                    [| "--exclude"; "Fable.Core" |]
+                    precompiledLibArgs
+                ]
+            |> Fable.Cli.Entry.main
+
+        Expect.equal exitCode 0 "Expected exit code to be 0"
+
+        let normalize content =
+            Regex.Replace(content, @"(/fable-library-(?:js|ts))[^/]+", "$1")
+            |> fun c -> Regex.Replace(c, @"[^""]*/precompiled/", "precompiled/")
+            |> _.ReplaceLineEndings()
+            |> _.Trim()
+
+        for expected in Directory.GetFileSystemEntries(testCaseDir, "*.expected") do
+            let actual = Path.ChangeExtension(expected, ".actual")
+            Expect.isTrue (File.Exists actual) $"No actual file was produced for {expected}"
+            let expectedContent = File.ReadAllText expected |> normalize
+            let actualContent = File.ReadAllText actual |> normalize
+            Expect.equal actualContent expectedContent "The expected content differs from the actual content"
+
+        if Array.contains "ts" outputArgs then
+            typeCheckTypeScript testCaseDir
+
+        return ()
+    }
+
 let tests =
     Directory.EnumerateDirectories(data)
-    |> Seq.map (fun testCaseDir -> //
-        testCaseAsync
-            testCaseDir
-            (async {
-                let project =
-                    Directory.GetFileSystemEntries(testCaseDir, "*.fsproj") |> Seq.exactlyOne
-                // clean up old actual files
-                for f in Directory.GetFileSystemEntries(testCaseDir, "*.actual") do
-                    File.Delete f
-
-                let libraryDir = Path.Combine(testCaseDir, "library")
-                let precompiledDir = Path.Combine(testCaseDir, "precompiled")
-
-                let precompiledLibArgs =
-                    // If we have a library folder, it means we want to use Fable precompiledLib feature for the test
-                    if Directory.Exists libraryDir then
-                        let libraryProject =
-                            Directory.GetFileSystemEntries(libraryDir, "*.fsproj") |> Seq.exactlyOne
-
-                        if Directory.Exists precompiledDir then
-                            Directory.Delete(precompiledDir, true)
-
-                        let exitCode =
-                            Fable.Cli.Entry.main
-                                [| "precompile"; libraryProject; "--outDir"; precompiledDir; "--noCache" |]
-
-                        Expect.equal exitCode 0 "Expected precompile exit code to be 0"
-                        checkBrowserInlineExprs precompiledDir
-                        [| "--precompiledLib"; precompiledDir |]
-                    else
-                        [||]
-
-                let outputArgs =
-                    if Directory.GetFileSystemEntries(testCaseDir, "*.ts.expected") |> Array.isEmpty then
-                        [| "-e"; ".jsx.actual" |]
-                    else
-                        [| "--lang"; "ts"; "-e"; ".ts.actual" |]
-
-                // Compile project
-                let exitCode =
-                    Array.concat
-                        [
-                            [| project; "--cwd"; $"'%s{testCaseDir}'" |]
-                            outputArgs
-                            [| "--exclude"; "Fable.Core" |]
-                            precompiledLibArgs
-                        ]
-                    |> Fable.Cli.Entry.main
-
-                Expect.equal exitCode 0 "Expected exit code to be 0"
-
-                let normalize content =
-                    Regex.Replace(content, @"(/fable-library-(?:js|ts))[^/]+", "$1")
-                    |> fun c -> Regex.Replace(c, @"[^""]*/precompiled/", "precompiled/")
-                    |> _.ReplaceLineEndings()
-                    |> _.Trim()
-
-                for expected in Directory.GetFileSystemEntries(testCaseDir, "*.expected") do
-                    let actual = Path.ChangeExtension(expected, ".actual")
-                    Expect.isTrue (File.Exists actual) $"No actual file was produced for {expected}"
-                    let expectedContent = File.ReadAllText expected |> normalize
-                    let actualContent = File.ReadAllText actual |> normalize
-                    Expect.equal actualContent expectedContent "The expected content differs from the actual content"
-
-                if Array.contains "ts" outputArgs then
-                    typeCheckTypeScript testCaseDir
-
-                return ()
-            }))
-
+    |> Seq.map (fun testCaseDir -> testCaseAsync testCaseDir (compileCase testCaseDir))
     |> Seq.toList
     |> testList "Compilation"
+
+/// fickl: a snapshot case for a project with `<Nullable>enable</Nullable>`. Nullness checking is a process-wide
+/// switch, so Main runs this after the parallel compilations rather than among them.
+let nullableReferenceTests =
+    testCaseAsync "Nullable reference types" (compileCase (Path.Combine(__SOURCE_DIRECTORY__, "nullableReference")))
 
 /// fickl: `--declaration` writes a .d.ts next to each JavaScript file. Each `<file>.d.ts.expected` here is
 /// compared with the declaration file compiled from the project in the same folder.

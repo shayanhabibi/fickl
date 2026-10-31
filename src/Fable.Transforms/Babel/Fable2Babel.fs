@@ -1128,7 +1128,8 @@ module Annotation =
         if isStruct then
             makeFableLibImportTypeAnnotation com ctx [ genArg ] "Util" "Nullable"
         else
-            makeTypeAnnotation com ctx genArg // nullable reference types are erased
+            // fickl: an F# 9 nullable reference type `T | null` keeps its `| null`, which TS checks as F# does
+            UnionTypeAnnotation [| makeTypeAnnotation com ctx genArg; NullTypeAnnotation |]
 
     let makeOptionTypeAnnotation com ctx _isStruct genArg =
         makeFableLibImportTypeAnnotation com ctx [ genArg ] "Option" "Option"
@@ -1221,15 +1222,33 @@ module Annotation =
     let tryNativeOrFableLibraryInterface com ctx genArgs (ent: Fable.Entity) =
         match ent.FullName with
         | Types.fsharpAsyncGeneric -> makeFableLibImportTypeAnnotation com ctx genArgs "AsyncBuilder" "Async" |> Some
+        // fickl: a CancellationTokenSource is its own token
+        | Types.cancellationToken
+        | "System.Threading.CancellationTokenSource" ->
+            makeFableLibImportTypeAnnotation com ctx [] "AsyncBuilder" "CancellationToken"
+            |> Some
         | Types.task
         | "System.Threading.Tasks.ValueTask" -> makeNativeTypeAnnotation com ctx [ Fable.Unit ] "Promise" |> Some
         | Types.taskGeneric -> makeNativeTypeAnnotation com ctx genArgs "Promise" |> Some
+        // fickl: an ArraySegment is a typed-array view, such as a Uint8Array
+        | "System.ArraySegment`1" ->
+            match genArgs with
+            | [ JS.Replacements.TypedArrayCompatible com Fable.MutableArray name ] ->
+                makeNativeTypeAnnotation com ctx [] name |> Some
+            | _ -> None
         | "Fickl.Core.JsAsyncGenerator`3" -> makeNativeTypeAnnotation com ctx genArgs "AsyncGenerator" |> Some
         | "Fickl.Core.JsYieldRequest`2" -> makeTypeAnnotation com ctx genArgs.Head |> Some
         | "Fickl.Core.JsGenerator`3" -> makeNativeTypeAnnotation com ctx genArgs "Generator" |> Some
         | "Fickl.Core.JsGeneratorResult`2" -> makeNativeTypeAnnotation com ctx genArgs "IteratorResult" |> Some
         | "Fickl.Core.JsYieldResult`1" -> makeNativeTypeAnnotation com ctx genArgs "IteratorYieldResult" |> Some
         | "Fickl.Core.JsReturnResult`1" -> makeNativeTypeAnnotation com ctx genArgs "IteratorReturnResult" |> Some
+        // fickl: a WeakRef target must be an object, which an unconstrained type parameter is not
+        | "System.WeakReference`1" ->
+            match genArgs with
+            | [ Fable.GenericParam _ as arg ] ->
+                EmitTypeAnnotation("WeakRef<$0 & object>", [| makeTypeAnnotation com ctx arg |])
+                |> Some
+            | _ -> makeNativeTypeAnnotation com ctx genArgs "WeakRef" |> Some
         | _ when not ent.IsInterface -> None
         // everything below is an interface
         | Types.icollection ->
@@ -1469,8 +1488,32 @@ module Annotation =
             | _ -> None
         | _ -> None
 
+    /// fickl: property keys, written here rather than by their EmitType text so arguments get parentheses
+    /// and `keyof<'T, 'R>` gets the library's name for the mapped type
+    let tryKeyTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        match ent.FullName, genArgs with
+        | "Fickl.Core.keyof`1", [ target ] ->
+            IntersectionTypeAnnotation
+                [|
+                    KeyofTypeAnnotation(makeTypeAnnotation com ctx target)
+                    StringTypeAnnotation
+                |]
+            |> Some
+        | "Fickl.Core.keyof`2", _ -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "KeysOfType" |> Some
+        | "Fickl.Core.valueof`1", [ target ] ->
+            match makeTypeAnnotation com ctx target with
+            | UnionTypeAnnotation _
+            | IntersectionTypeAnnotation _
+            | FunctionTypeAnnotation _
+            | KeyofTypeAnnotation _
+            | EmitTypeAnnotation _ as ta -> EmitTypeAnnotation("($0)[keyof $0]", [| ta |])
+            | ta -> IndexedTypeAnnotation(ta, KeyofTypeAnnotation ta)
+            |> Some
+        | _ -> None
+
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
         match genArgs, ent with
+        | _, Patterns.Try (tryKeyTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryEmitTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta
 
@@ -2514,13 +2557,25 @@ module Util =
                         AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                     else
                         jsExpr
-                // fickl: an F# array may be a typed array, which TypeScript does not relate to an EmitType such as ReadonlyArray
-                | Fable.Array _ when toTaggedUnion ->
+                // fickl: an F# array may be a typed array, which TypeScript does not relate to an EmitType such as ReadonlyArray,
+                // or to the typed array an ArraySegment view is annotated as
+                | Fable.Array _ when toTaggedUnion || (com.IsTypeScript && entRef.FullName = "System.ArraySegment`1") ->
                     AsExpression(AsExpression(jsExpr, UnknownTypeAnnotation), makeTypeAnnotation com ctx typ)
                 | _ when toTaggedUnion -> AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                 | _ -> jsExpr
             )
         | Fable.Unit -> com.TransformAsExpr(ctx, e) |> Some |> undefined e.Range
+        // fickl: a `valueof<'T>` is any property type of T, so treating it as one of them is a visible cast
+        | _ when
+            com.IsTypeScript
+            && (
+                match e.Type with
+                | Fable.DeclaredType(entRef, _) -> entRef.FullName = "Fickl.Core.valueof`1"
+                | _ -> false
+            )
+            && typ <> Fable.Any
+            ->
+            AsExpression(com.TransformAsExpr(ctx, e), makeTypeAnnotation com ctx typ)
         | _ -> com.TransformAsExpr(ctx, e)
 
     let transformCurry (com: IBabelCompiler) (ctx: Context) expr arity : Expression =
@@ -3947,10 +4002,24 @@ but thanks to the optimisation done below we get
                     Statement.ifStatement (jsGuardExpr, thenStmnt, Statement.blockStatement (statements), ?loc = r)
                 |> Array.singleton
 
+    /// fickl: TypeScript cannot resolve `T[KeysOfType<T, R>]` to `R` while `T` or `R` is generic, but it can
+    /// index `Record<KeysOfType<T, R>, R>`, so the object is cast to that. `globalThis` passes the import of
+    /// Fable's own `Record` class
+    let private keyedAccessTarget (com: IBabelCompiler) ctx (key: Fable.Expr) (expr: Expression) =
+        match key.Type with
+        | Fable.DeclaredType(entRef, [ _; valueType ]) when
+            com.IsTypeScript
+            && entRef.FullName = "Fickl.Core.keyof`2"
+            && not (List.isEmpty (FSharp2Fable.Util.getGenParamNames key.Type.Generics))
+            ->
+            AsExpression(expr, makeNativeTypeAnnotation com ctx [ key.Type; valueType ] "globalThis.Record")
+        | _ -> expr
+
     let transformGet (com: IBabelCompiler) ctx range typ fableExpr kind =
         match kind with
-        | Fable.ExprGet(TransformExpr com ctx prop) ->
-            let expr = com.TransformAsExpr(ctx, fableExpr)
+        | Fable.ExprGet key ->
+            let prop = com.TransformAsExpr(ctx, key)
+            let expr = com.TransformAsExpr(ctx, fableExpr) |> keyedAccessTarget com ctx key
             getExpr range expr prop
 
         | Fable.FieldGet info ->
@@ -4045,7 +4114,7 @@ but thanks to the optimisation done below we get
         let ret =
             match kind with
             | Fable.ValueSet -> expr
-            | Fable.ExprSet(TransformExpr com ctx e) -> getExpr None expr e
+            | Fable.ExprSet key -> getExpr None (keyedAccessTarget com ctx key expr) (com.TransformAsExpr(ctx, key))
             | Fable.FieldSet(fieldName) -> SymbolKeys.access com ctx None fableExpr.Type expr fieldName
 
         // If this is an arry setter, we need to use the `setItem` method

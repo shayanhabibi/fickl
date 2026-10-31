@@ -4,7 +4,7 @@ namespace Fickl.Core
 
 open Fable.Core
 
-/// <summary>JavaScript bindings: the errors JavaScript throws, to catch them by type with <c>:?</c>, and <c>ReadonlyArray</c>.</summary>
+/// <summary>JavaScript bindings: the errors JavaScript throws, to catch them by type with <c>:?</c>, <c>AbortSignal</c>, and <c>ReadonlyArray</c>.</summary>
 /// <remarks>Each type is the JavaScript global of the same name, so <c>:? JS.TypeError</c> compiles to
 /// <c>instanceof TypeError</c>. They inherit <c>exn</c> only so that a handler can test for them; an F# exception is
 /// not a <c>JS.Error</c> unless it is compiled with <c>--nativeErrors</c> or <c>[&lt;JsError>]</c>.
@@ -74,6 +74,37 @@ module JS =
         /// <summary>The legacy numeric code of the error, <c>0</c> for names that have none.</summary>
         member _.code: int = nativeOnly
 
+    /// <summary>The web <c>AbortSignal</c>, which cancellable JavaScript APIs such as <c>fetch</c> and <c>addEventListener</c> take.</summary>
+    /// <remarks>Convert a <c>CancellationToken</c> to a signal with <c>token.ToAbortSignal()</c>, and back with
+    /// <c>CancellationToken.FromAbortSignal(signal)</c>. A global in browsers, Node.js 15 and later, Deno and Bun.</remarks>
+    [<Global; AllowNullLiteral>]
+    type AbortSignal private () =
+        /// <summary>Whether the signal has aborted.</summary>
+        member _.aborted: bool = nativeOnly
+        /// <summary>Why the signal aborted: by default a <c>DOMException</c> named <c>"AbortError"</c>, or <c>"TimeoutError"</c> for <c>AbortSignal.timeout</c>.</summary>
+        member _.reason: obj = nativeOnly
+        /// <summary>Throws the abort reason if the signal has aborted.</summary>
+        member _.throwIfAborted() : unit = nativeOnly
+
+        /// <summary>Calls a function once, when the signal aborts.</summary>
+        [<Emit("$0.addEventListener('abort', $1, { once: true })")>]
+        member _.onAbort(listener: unit -> unit) : unit = nativeOnly
+
+        /// <summary>A signal that has already aborted, with the given reason or an <c>"AbortError"</c> <c>DOMException</c>.</summary>
+        static member abort(?reason: obj) : AbortSignal = nativeOnly
+        /// <summary>A signal that aborts with a <c>"TimeoutError"</c> <c>DOMException</c> after the given time.</summary>
+        static member timeout(milliseconds: int) : AbortSignal = nativeOnly
+        /// <summary>A signal that aborts when any of the given signals does, with its reason.</summary>
+        static member any(signals: AbortSignal[]) : AbortSignal = nativeOnly
+
+    /// <summary>The web <c>AbortController</c>, which owns an <c>AbortSignal</c> and aborts it.</summary>
+    [<Global; AllowNullLiteral>]
+    type AbortController() =
+        /// <summary>The signal this controller aborts.</summary>
+        member _.signal: AbortSignal = nativeOnly
+        /// <summary>Aborts the signal, with the given reason or an <c>"AbortError"</c> <c>DOMException</c>.</summary>
+        member _.abort(?reason: obj) : unit = nativeOnly
+
     /// <summary>Matches a thrown value that is not an error: neither a JS <c>Error</c> nor an F# exception, such as a
     /// string, a plain object or <c>undefined</c>. The value is passed as it was thrown.</summary>
     /// <remarks>On .NET every thrown value is an exception, so this never matches. An F# <c>async</c> turns a thrown
@@ -126,3 +157,30 @@ module JS =
         /// <summary>Copies the elements into a new F# array.</summary>
         /// <param name="array">The read-only array to copy.</param>
         let toArray (array: ReadonlyArray<'T>) : 'T[] = nativeOnly
+
+    /// <summary>The JavaScript <c>WeakRef</c>: a reference that does not keep its target from being collected.</summary>
+    /// <remarks><c>System.WeakReference&lt;'T></c> compiles to this too, so use either. A global from ES2021.</remarks>
+    [<Global; AllowNullLiteral>]
+    type WeakRef<'T when 'T: not struct>(target: 'T) =
+        /// <summary>The target, or <c>None</c> once it has been collected.</summary>
+        member _.deref() : 'T option = nativeOnly
+
+    /// <summary>The JavaScript <c>FinalizationRegistry</c>: calls back, some time after a registered object is
+    /// collected, with the value it was registered with.</summary>
+    /// <remarks>The callback may run late or never, for example when the program ends first: use it to release
+    /// resources that are also safe to leak, not for logic the program depends on. A global from ES2021.</remarks>
+    /// <example><code lang="fsharp">
+    /// let registry = JS.FinalizationRegistry(fun (held: string) -> printfn "collected %s" held)
+    /// registry.register(node, "node-1")
+    /// </code></example>
+    [<Global; AllowNullLiteral>]
+    type FinalizationRegistry<'T>(cleanupCallback: 'T -> unit) =
+        /// <summary>Calls the cleanup callback with a held value once the target is collected.</summary>
+        /// <param name="target">The object to watch. It must not be the held value, which would keep it alive.</param>
+        /// <param name="heldValue">The value the callback receives.</param>
+        /// <param name="unregisterToken">An object to pass to <c>unregister</c>, often the target itself.</param>
+        member _.register(target: obj, heldValue: 'T, ?unregisterToken: obj) : unit = nativeOnly
+
+        /// <summary>Stops watching the targets registered with a token, and returns whether there were any.</summary>
+        /// <param name="unregisterToken">The token the targets were registered with.</param>
+        member _.unregister(unregisterToken: obj) : bool = nativeOnly

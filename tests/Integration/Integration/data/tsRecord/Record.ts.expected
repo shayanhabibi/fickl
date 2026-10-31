@@ -1,0 +1,68 @@
+
+import { Record } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import type { MutableArray, IComparable, IEquatable } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { record_type, string_type, int32_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+
+export class Config extends Record implements IEquatable<Config>, IComparable<Config> {
+    readonly Port: int32;
+    readonly Host: string;
+    constructor(Port: int32, Host: string) {
+        super();
+        this.Port = (Port | 0);
+        this.Host = Host;
+    }
+}
+
+export function Config_$reflection(): TypeInfo {
+    return record_type("Records.Config", [], Config, () => [["Port", int32_type], ["Host", string_type]]);
+}
+
+/**
+ * A user interface with an indexer is an index signature
+ */
+export interface Headers {
+    [key: string]: string
+}
+
+export function scores(): globalThis.Record<string, int32> {
+    const r = {} as globalThis.Record<string, int32>;
+    r["alice"]=3;
+    return r;
+}
+
+export function score(name: string, r: globalThis.Record<string, int32>): int32 {
+    return (r[name]) | 0;
+}
+
+export function tryScore(name: string, r: globalThis.Record<string, int32>): Option<int32> {
+    if (Object.hasOwn(r, name)) {
+        return r[name];
+    }
+    else {
+        return undefined;
+    }
+}
+
+export function names(r: globalThis.Record<string, int32>): MutableArray<string> {
+    return Object.keys(r);
+}
+
+export function frozen(r: Readonly<globalThis.Record<string, int32>>, name: string): int32 {
+    return (r[name]) | 0;
+}
+
+export function labels(): globalThis.Record<keyof Config & string, string> {
+    const r = {
+        Port: "port",
+        Host: "host",
+    } as globalThis.Record<keyof Config & string, string>;
+    r[("Port" as (keyof Config) & string)]="the port";
+    return r;
+}
+
+export function header(h: Headers): string {
+    return h["content-type"];
+}
+

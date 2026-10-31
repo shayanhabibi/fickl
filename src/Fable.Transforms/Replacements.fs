@@ -982,6 +982,7 @@ let tryEntityIdent (com: Compiler) entFullName =
     | BuiltinSystemException entName -> makeImportLib com Any entName "System" |> Some
     // | Naming.EndsWith "Exception" _ -> makeImportLib com Any "Exception" "Util" |> Some
     | Types.attribute -> makeImportLib com Any "Attribute" "Types" |> Some
+    | "System.WeakReference`1" -> makeIdentExpr "WeakRef" |> Some
     | "System.Uri" -> makeImportLib com Any "Uri" "Uri" |> Some
     | "System.Diagnostics.Stopwatch" -> makeImportLib com Any "Stopwatch" "Stopwatch" |> Some
     | "Microsoft.FSharp.Control.FSharpAsyncReplyChannel`1" ->
@@ -2530,6 +2531,74 @@ let readOnlySpans (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thi
     | "op_Implicit", [ arg ] -> arg |> Some
     | _ -> None
 
+/// fickl: an ArraySegment over a numeric array is a typed-array view made with `subarray`, which shares its memory
+let arraySegments (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    let isTypedArray =
+        match i.GenericArgs with
+        | [ TypedArrayCompatible com MutableArray _ ] -> true
+        | _ -> false
+
+    let int32 = Number(Int32, NumberInfo.Empty)
+
+    let subarray (segment: Expr) start count =
+        let args =
+            match count with
+            | Some count -> [ start; add start count ]
+            | None -> [ start ]
+
+        Helper.InstanceCall(segment, "subarray", t, args, ?loc = r)
+
+    match i.CompiledName, thisArg, args with
+    | _ when not isTypedArray ->
+        "ArraySegment is only supported in JS over numeric arrays compiled as typed arrays"
+        |> addErrorAndReturnNull com ctx.InlinePath r
+        |> Some
+    | ".ctor", _, [ array ] -> TypeCast(array, t) |> Some
+    | ".ctor", _, [ array; offset; count ] -> subarray (TypeCast(array, t)) offset (Some count) |> Some
+    | "get_Count", Some segment, _ -> getFieldWith r t segment "length" |> Some
+    // decision: the offset is from the start of the buffer, which is the array's for an array F# created
+    | "get_Offset", Some segment, _ ->
+        makeBinOp
+            r
+            t
+            (getFieldWith None int32 segment "byteOffset")
+            (getFieldWith None int32 segment "BYTES_PER_ELEMENT")
+            BinaryDivide
+        |> Some
+    | "get_Item", Some segment, [ index ] -> getExpr r t segment index |> Some
+    | "set_Item", Some segment, [ index; value ] -> setExpr r segment index value |> Some
+    | "Slice", Some segment, [ start ] -> subarray segment start None |> Some
+    | "Slice", Some segment, [ start; count ] -> subarray segment start (Some count) |> Some
+    | "ToArray", Some segment, [] -> Helper.InstanceCall(segment, "slice", t, [], ?loc = r) |> Some
+    | "CopyTo", Some segment, [ target ] ->
+        Helper.InstanceCall(TypeCast(target, segment.Type), "set", t, [ segment ], ?loc = r)
+        |> Some
+    | "CopyTo", Some segment, [ target; index ] ->
+        Helper.InstanceCall(TypeCast(target, segment.Type), "set", t, [ segment; index ], ?loc = r)
+        |> Some
+    | "GetEnumerator", Some segment, _ -> getEnumerator com r t segment |> Some
+    | "get_Array", _, _ ->
+        "ArraySegment.Array is not supported in JS, as a view does not keep the array it was made from"
+        |> addErrorAndReturnNull com ctx.InlinePath r
+        |> Some
+    | _ -> None
+
+/// fickl: numeric arrays over an ArrayBuffer, from Fickl.Core.TypedArrayExtensions
+let typedArrayExtensions (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) args =
+    match i.CompiledName, Option.toList thisArg @ args with
+    | Naming.EndsWith ".AsArrayBuffer" _, array :: _ ->
+        Helper.LibCall(com, "TypedArray", "asArrayBuffer", t, [ array ], ?loc = r)
+        |> Some
+    | "ofArrayBuffer", [ buffer ] ->
+        match t with
+        | Array(TypedArrayCompatible com MutableArray name, _) ->
+            Helper.GlobalCall(name, t, [ buffer ], isConstructor = true, ?loc = r) |> Some
+        | _ ->
+            "Array.ofArrayBuffer needs a numeric element type compiled as a typed array"
+            |> addErrorAndReturnNull com ctx.InlinePath r
+            |> Some
+    | _ -> None
+
 let nativeArrayFunctions =
     dict
         [|
@@ -3439,6 +3508,35 @@ let collections (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisA
     | "GetEnumerator", Some callee -> getEnumerator com r t callee |> Some
     | _ -> None
 
+/// fickl: `WeakReference<'T>` is a native `WeakRef`
+let weakReferences (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    match i.CompiledName, thisArg, args with
+    | ".ctor", _, target :: _ ->
+        match i.GenericArgs with
+        | [ Boolean ]
+        | [ String ]
+        | [ Char ]
+        | [ Number _ ] ->
+            "WeakReference does not support primitive targets in JS"
+            |> addError com ctx.InlinePath r
+        | _ -> ()
+
+        // decision: trackResurrection has no JS counterpart and is ignored
+        match i.GenericArgs with
+        // TypeScript's WeakRef takes only objects, which a type parameter may not be
+        | [ GenericParam _ ] -> Helper.LibCall(com, "WeakRef", "create", t, [ target ], ?loc = r) |> Some
+        | _ ->
+            Helper.GlobalCall("WeakRef", t, [ target ], isConstructor = true, ?loc = r)
+            |> Some
+    | "TryGetTarget", Some ref, [ target ] ->
+        Helper.LibCall(com, "WeakRef", "tryGetTarget", t, [ ref; target ], ?loc = r)
+        |> Some
+    | "SetTarget", _, _ ->
+        "WeakReference.SetTarget is not supported in JS, as a WeakRef cannot be retargeted: create a new WeakReference"
+        |> addErrorAndReturnNull com ctx.InlinePath r
+        |> Some
+    | _ -> None
+
 let conditionalWeakTable (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg with
     | ".ctor", _ ->
@@ -3555,6 +3653,21 @@ let exceptions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
         match i.DeclaringEntityFullName with
         | "System.Collections.Generic.KeyNotFoundException"
         | BuiltinSystemException _ -> bclType com ctx r t i thisArg args
+        // fickl: a real OperationCanceledException, so `:?` matches it and JS code sees an AbortError
+        | "System.OperationCanceledException" ->
+            let args =
+                Seq.zip args i.SignatureArgTypes
+                |> Seq.takeWhile (fun (_, t) ->
+                    match t with
+                    | String
+                    | DeclaredType({ FullName = Types.exception_ }, _) -> true
+                    | _ -> false
+                )
+                |> Seq.map fst
+                |> Seq.toList
+
+            Helper.LibCall(com, "AsyncBuilder", "OperationCanceledException", t, args, isConstructor = true, ?loc = r)
+            |> Some
         | _ ->
             Helper.LibCall(com, "Util", "Exception", Any, args, isConstructor = true)
             |> Some
@@ -5197,6 +5310,7 @@ let private replacedModules =
             Types.idictionary, dictionaries
             Types.ireadonlydictionary, dictionaries
             Types.conditionalWeakTable, conditionalWeakTable
+            "System.WeakReference`1", weakReferences
             Types.ienumerableGeneric, enumerables
             Types.ienumerable, enumerables
             "System.Collections.Generic.Dictionary`2.Enumerator", enumerators
@@ -5215,6 +5329,7 @@ let private replacedModules =
             Types.icollection, collections
             "System.Collections.Generic.CollectionExtensions", collectionExtensions
             "System.ReadOnlySpan`1", readOnlySpans
+            "System.ArraySegment`1", arraySegments
             Types.hashset, hashSets
             Types.stack, bclType
             Types.queue, bclType
@@ -5715,6 +5830,74 @@ let private jsErrors (com: ICompiler) r t methodName args =
         |> Some
     | _ -> None
 
+/// fickl: conversions between CancellationToken and AbortSignal, and promise interop that follows either
+let private cancellationExtensions (com: ICompiler) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    let args = Option.toList thisArg @ args
+
+    match info.CompiledName, args with
+    | "CancellationToken.ToAbortSignal", token :: _ ->
+        Helper.LibCall(com, "Cancellation", "toAbortSignal", t, [ token ], ?loc = r)
+        |> Some
+    | "CancellationToken.FromAbortSignal.Static", [ signal ] ->
+        Helper.LibCall(com, "Cancellation", "fromAbortSignal", t, [ signal ], ?loc = r)
+        |> Some
+    | "Async.AwaitPromise.Static", [ promise; token ] ->
+        Helper.LibCall(com, "Cancellation", "awaitPromiseWithToken", t, [ promise; token ], ?loc = r)
+        |> Some
+    | "Async.StartAsPromise.Static", [ workflow; signal ] ->
+        let token =
+            Helper.LibCall(com, "Cancellation", "fromAbortSignal", Any, [ signal ], ?loc = r)
+
+        Helper.LibCall(com, "Async", "startAsPromise", t, [ workflow; token ], ?loc = r)
+        |> Some
+    | _ -> None
+
+/// fickl: `keyof _.Port` is the name the compiled access reads, and `KeyOf.get`/`set` index the object by it
+let private keyOf (com: ICompiler) (ctx: Context) r t methodName args =
+    match methodName, args with
+    | "keyof", [ property ] ->
+        match property with
+        | MaybeInScope ctx (Lambda(arg, Get(IdentExpr target, kind, _, _), _)) when target.Name = arg.Name ->
+            match kind with
+            | FieldGet info -> Some info.Name
+            | ExprGet(StringConst name) -> Some name
+            | _ -> None
+        | _ -> None
+        |> Option.defaultWith (fun () ->
+            "keyof takes a lambda that reads one property of its argument, such as `fun x -> x.name` or `_.name`. "
+            + "A path, a method or a class property, which compiles to a call, has no key"
+            |> addError com ctx.InlinePath r
+
+            Naming.unknown
+        )
+        |> fun name -> Value(StringConstant name, r) |> Some
+    | "get", [ key; target ] -> Get(target, ExprGet key, t, r) |> Some
+    | "set", [ key; target; value ] -> Set(target, ExprSet key, value.Type, value, r) |> Some
+    | "tryGet", [ key; target ] -> TypeCast(Get(target, ExprGet key, Any, r), t) |> Some
+    | ("widen" | "unsafeOfString"), [ arg ] -> TypeCast(arg, t) |> Some
+    | "|Key|_|", [ name; key ] -> makeEqOp r (TypeCast(key, String)) name BinaryEqual |> Some
+    | _ -> None
+
+/// fickl: `Fickl.Core.Record` values are plain objects
+let private records (com: ICompiler) r t methodName args =
+    match methodName, args, t with
+    | "empty", _, _ -> typedObjExpr t [] |> Some
+    | "tryGet", [ key; record ], Option(valueType, isStruct) ->
+        let hasOwn =
+            Helper.GlobalCall("Object", Boolean, [ record; key ], memb = "hasOwn", ?loc = r)
+
+        let value = Get(record, ExprGet key, valueType, r)
+
+        IfThenElse(
+            hasOwn,
+            Value(NewOption(Some value, valueType, isStruct), r),
+            Value(NewOption(None, valueType, isStruct), r),
+            r
+        )
+        |> Some
+    | "keys", [ record ], _ -> Helper.GlobalCall("Object", t, [ record ], memb = "keys", ?loc = r) |> Some
+    | _ -> None
+
 let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match info.DeclaringEntityFullName with
     | Patterns.DicContains replacedModules replacement -> replacement com ctx r t info thisArg args
@@ -5724,6 +5907,15 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | Naming.StartsWith "Fable.Core." _ -> fableCoreLib com ctx r t info thisArg args
     | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
     | "Fickl.Core.JS" -> jsErrors com r t info.CompiledName args
+    | "Fickl.Core.CancellationExtensions" -> cancellationExtensions com r t info thisArg args
+    | "Fickl.Core.KeyOfBuilder"
+    | "Fickl.Core.KeyOf" -> keyOf com ctx r t info.CompiledName args
+    | "Fickl.Core.RecordModule" -> records com r t info.CompiledName args
+    | "Fickl.Core.ValueOf" ->
+        match info.CompiledName, args with
+        | "ofKey", [ key; target ] -> TypeCast(Get(target, ExprGet key, Any, r), t) |> Some
+        | "unsafeAs", [ value ] -> TypeCast(value, t) |> Some
+        | _ -> None
     | "Fickl.Core.JS.ReadonlyArrayModule"
     | "Fickl.Core.JS.ReadonlyArray" ->
         match info.CompiledName, args with
@@ -5738,6 +5930,7 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | "Fickl.Core.NativeAsyncGenerators" -> nativeGenerator true com ctx r t info args
     | "Fickl.Core.JsAsyncGenerator`3"
     | "Fickl.Core.JsGenerator`3" -> nativeGeneratorApi com r t info thisArg args
+    | Naming.StartsWith "Fickl.Core.TypedArrayExtensions" _ -> typedArrayExtensions com ctx r t info thisArg args
     | Naming.EndsWith "Exception" _ -> exceptions com ctx r t info thisArg args
     | "System.Timers.ElapsedEventArgs" -> thisArg // only signalTime is available here
     | Naming.StartsWith "System.Tuple" _

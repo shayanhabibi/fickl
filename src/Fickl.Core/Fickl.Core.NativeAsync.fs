@@ -4,7 +4,7 @@ open System
 open Fable.Core
 
 /// <summary>Builds native JavaScript async computations with Promise bindings.</summary>
-/// <remarks>Use <c>jsAsync</c>; bindings emit <c>await</c> and execution starts immediately. JavaScript/TypeScript only; no F# cancellation token.
+/// <remarks>Use <c>jsAsync</c>; bindings emit <c>await</c> and execution starts immediately. JavaScript/TypeScript only; no F# cancellation token, so pass one to the work: <c>token.ToAbortSignal()</c> for JavaScript APIs, or <c>token.Register</c> in a <c>use</c>.
 /// Return resolved values or adopt a Promise with <c>return!</c>. Opaque top-level thenables fail validation; wrap Promise data in a record.
 /// Interop payloads must keep their <c>then</c> property stable through validation and native resolution.</remarks>
 type JsAsyncBuilder() =

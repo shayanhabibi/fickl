@@ -2,6 +2,9 @@
 
 export type Nullable<T> = T | null | undefined;
 
+/** The string keys of `T` whose property type is assignable to `R`: `Fickl.Core.keyof<'T, 'R>`. */
+export type KeysOfType<T, R> = { [K in keyof T]-?: T[K] extends R ? K : never }[keyof T] & string;
+
 export interface MutableArray<T> extends Iterable<T> {
   readonly length: number;
   [index: number]: T;
@@ -72,12 +75,14 @@ export function createDisposable(dispose: () => void): IDisposable & Disposable 
   return { Dispose: dispose, [disposeSymbol]() { this.Dispose(); } };
 }
 
+// As on .NET, Compare and Equals accept null, so F# code compiled with nullable reference types can pass
+// the `T | null` that those signatures give it
 export interface IComparer<T> {
-  Compare(x: T, y: T): number;
+  Compare(x: T | null, y: T | null): number;
 }
 
 export interface IEqualityComparer<T> {
-  Equals(x: T, y: T): boolean;
+  Equals(x: T | null, y: T | null): boolean;
   GetHashCode(x: T): number;
 }
 
@@ -125,7 +130,7 @@ export class Exception {
   // a `defaultOf()` value, which is fine for code that reads `.InnerException`.
   public innerException!: Exception;
 
-  constructor(msg?: string, innerException?: Exception) {
+  constructor(msg?: string, innerException?: Exception | null) {
     this.message = msg ?? "";
     this.innerException = innerException as Exception;
     if (nativeErrors) {
@@ -153,7 +158,7 @@ export function enableNativeErrors(): void {
 export class ErrorException extends Error {
   public innerException!: Exception;
 
-  constructor(msg?: string, innerException?: Exception) {
+  constructor(msg?: string, innerException?: Exception | null) {
     super();
     this.message = msg ?? "";
     this.innerException = innerException as Exception;
@@ -461,7 +466,7 @@ export class ArrayEnumerator<T> implements IEnumerator<T> {
   public ["System.Collections.IEnumerator.MoveNext"]() {
     const i = ++this.index;
     if (i < this.array.length) {
-      this.current = this.array[i];
+      this.current = this.array[i]!;
       return true;
     }
     this.current = defaultOf();
@@ -677,7 +682,7 @@ export function combineHashCodes(hashes: ArrayLike<number>) {
   let h1 = 0;
   const len = hashes.length;
   for (let i = 0; i < len; i++) {
-    h1 = combineHashCode(h1, hashes[i]);
+    h1 = combineHashCode(h1, hashes[i]!);
   }
   return h1;
 }
@@ -774,7 +779,7 @@ export function equalArraysWith<T>(x: Nullable<ArrayLike<T>>, y: Nullable<ArrayL
   if (y == null) { return false; }
   if (x.length !== y.length) { return false; }
   for (let i = 0; i < x.length; i++) {
-    if (!eq(x[i], y[i])) { return false; }
+    if (!eq(x[i]!, y[i]!)) { return false; }
   }
   return true;
 }
@@ -792,7 +797,7 @@ function equalObjects(x: { [k: string]: any }, y: { [k: string]: any }): boolean
   xKeys.sort();
   yKeys.sort();
   for (let i = 0; i < xKeys.length; i++) {
-    if (xKeys[i] !== yKeys[i] || !equals(x[xKeys[i]], y[yKeys[i]])) {
+    if (xKeys[i] !== yKeys[i] || !equals(x[xKeys[i]!], y[yKeys[i]!])) {
       return false;
     }
   }
@@ -855,7 +860,7 @@ export function compareArraysWith<T>(x: ArrayLike<T>, y: ArrayLike<T>, comp: (x:
     return x.length < y.length ? -1 : 1;
   }
   for (let i = 0, j = 0; i < x.length; i++) {
-    j = comp(x[i], y[i]);
+    j = comp(x[i]!, y[i]!);
     if (j !== 0) { return j; }
   }
   return 0;
@@ -874,9 +879,9 @@ function compareObjects(x: { [k: string]: any }, y: { [k: string]: any }): numbe
   xKeys.sort();
   yKeys.sort();
   for (let i = 0, j = 0; i < xKeys.length; i++) {
-    const key = xKeys[i];
+    const key = xKeys[i]!;
     if (key !== yKeys[i]) {
-      return key < yKeys[i] ? -1 : 1;
+      return key < yKeys[i]! ? -1 : 1;
     } else {
       j = compare(x[key], y[key]);
       if (j !== 0) { return j; }
@@ -1355,11 +1360,11 @@ export function copyToArray<T>(source: MutableArray<T>, sourceIndex: number, tar
   } else if (source === target && targetIndex > sourceIndex) {
     // Overlapping ranges of one array: copy from the end, as Array.Copy preserves the source
     for (let i = count - 1; i >= 0; --i) {
-      target[targetIndex + i] = source[sourceIndex + i];
+      target[targetIndex + i] = source[sourceIndex + i]!;
     }
   } else {
     for (let i = 0; i < count; ++i) {
-      target[targetIndex + i] = source[sourceIndex + i];
+      target[targetIndex + i] = source[sourceIndex + i]!;
     }
   }
 }

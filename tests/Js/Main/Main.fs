@@ -10,6 +10,8 @@ let allTests =
     NativeFunctions.tests
     NativeDisposal.tests
     NativeErrors.tests
+    AbortSignals.tests
+    WeakReferences.tests
     NativeAsync.tests
     NativeGenerators.tests
     NativeAsyncGenerators.tests
@@ -22,6 +24,7 @@ let allTests =
     Arithmetic.tests
     RandomTests.tests
     Arrays.tests
+    TypedArrayViews.tests
     Async.tests
     Task.tests
     Chars.tests

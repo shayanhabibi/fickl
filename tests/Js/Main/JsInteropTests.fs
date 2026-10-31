@@ -248,6 +248,34 @@ type ParseSpeeds =
     | [<CompiledValue(500)>] Medium
     | [<CompiledValue(100)>] Slow
 
+module Keys =
+    type Server = { Port: int; Host: string; mutable Retries: int }
+
+    type IServer =
+        abstract Port: int
+        abstract Name: string with get, set
+
+    // Not inline, so the TypeScript output indexes a generic object by a generic key
+    let read (key: keyof<'T, 'R>) (target: 'T) : 'R = KeyOf.get key target
+    let write (key: keyof<'T, 'R>) (target: 'T) (value: 'R) = KeyOf.set key target value
+
+    let describe (key: keyof<Server>) =
+        match key with
+        | Key "Port" -> "port"
+        | Key "Host" -> "host"
+        | _ -> key.Value
+
+    let takesKey (key: keyof<Server>) = key.Value
+
+    type Headers =
+        [<EmitIndexer>]
+        abstract Item: string -> string with get, set
+
+    let total (scores: ReadonlyRecord<string, int>) (names: string[]) = names |> Array.sumBy (fun name -> scores.[name])
+
+    // Not inline, so the TypeScript output casts a generic indexed access type
+    let valueAs<'T, 'R> (value: valueof<'T>) : 'R = ValueOf.unsafeAs value
+
 [<StringEnum>]
 #endif
 type Field = OldPassword | NewPassword | ConfirmPassword
@@ -1182,6 +1210,64 @@ let tests =
 
     testCase "nameofLambda works in inlined functions" <| fun () ->
         getNamesofLambda(fun (x:Record) -> x.InnerRecord.Foo.Bar) |> equal [|"InnerRecord"; "Foo"; "Bar"|]
+
+    testCase "keyof is the name of a property access" <| fun () ->
+        let port = keyof (fun (s: Keys.Server) -> s.Port)
+        port.Value |> equal "Port"
+        (keyof _.Retries : keyof<Keys.Server, int>).Value |> equal "Retries"
+        (keyof (fun (s: Keys.IServer) -> s.Name)).Value |> equal "Name"
+
+    testCase "KeyOf.get and KeyOf.set index the object by the key" <| fun () ->
+        let server: Keys.Server = { Port = 80; Host = "localhost"; Retries = 0 }
+        KeyOf.get (keyof (fun (s: Keys.Server) -> s.Port)) server |> equal 80
+        KeyOf.get (keyof (fun (s: Keys.Server) -> s.Host)) server |> equal "localhost"
+        let retries = keyof (fun (s: Keys.Server) -> s.Retries)
+        KeyOf.set retries server 3
+        server.Retries |> equal 3
+        Keys.read retries server |> equal 3
+        Keys.write retries server 4
+        server.Retries |> equal 4
+        let named = createEmpty<Keys.IServer>
+        Keys.write (keyof (fun (s: Keys.IServer) -> s.Name)) named "web"
+        named.Name |> equal "web"
+
+    testCase "KeyOf.tryGet is None for a missing property" <| fun () ->
+        let server: Keys.Server = { Port = 80; Host = "localhost"; Retries = 0 }
+        KeyOf.tryGet (KeyOf.widen (keyof (fun (s: Keys.Server) -> s.Port))) server |> equal (Some(box 80))
+        KeyOf.tryGet (KeyOf.unsafeOfString<Keys.Server, obj> "Missing" |> KeyOf.widen) server |> equal None
+
+    testCase "keyof keys convert, compare and match by name" <| fun () ->
+        Keys.takesKey (KeyOf.widen (keyof (fun (s: Keys.Server) -> s.Host))) |> equal "Host"
+        Keys.describe (KeyOf.widen (keyof (fun (s: Keys.Server) -> s.Port))) |> equal "port"
+        Keys.describe (KeyOf.widen (keyof (fun (s: Keys.Server) -> s.Host))) |> equal "host"
+        Keys.describe (KeyOf.widen (keyof (fun (s: Keys.Server) -> s.Retries))) |> equal "Retries"
+        KeyOf.unsafeOfString<Keys.Server, int> "Port" |> equal (keyof (fun (s: Keys.Server) -> s.Port))
+
+    testCase "Fickl.Core.Record is a plain object indexed by its keys" <| fun () ->
+        let scores = Fickl.Core.Record.empty<string, int> ()
+        scores.["alice"] <- 3
+        scores.["bob"] <- 4
+        scores.["alice"] |> equal 3
+        Fickl.Core.Record.keys scores |> equal [| "alice"; "bob" |]
+        Fickl.Core.Record.tryGet "bob" scores |> equal (Some 4)
+        Fickl.Core.Record.tryGet "carol" scores |> equal None
+        Fickl.Core.Record.tryGet "toString" scores |> equal None
+        Keys.total !!scores [| "alice"; "bob" |] |> equal 7
+
+    testCase "PropertyRecord and EmitIndexer interfaces index by key" <| fun () ->
+        let labels: PropertyRecord<Keys.Server, string> = !!(createObj [ "Port", box "port"; "Host", box "host"; "Retries", box "retries" ])
+        labels.[KeyOf.widen (keyof (fun (s: Keys.Server) -> s.Host))] |> equal "host"
+        let headers = createEmpty<Keys.Headers>
+        headers.["accept"] <- "text/plain"
+        headers.["accept"] |> equal "text/plain"
+
+    testCase "valueof holds the value of a property" <| fun () ->
+        let server: Keys.Server = { Port = 80; Host = "localhost"; Retries = 0 }
+        let port = ValueOf.ofKey (keyof (fun (s: Keys.Server) -> s.Port)) server
+        let host = ValueOf.ofKey (keyof (fun (s: Keys.Server) -> s.Host)) server
+        ValueOf.unsafeAs<Keys.Server, int> port |> equal 80
+        ValueOf.unsafeAs<Keys.Server, string> host |> equal "localhost"
+        Keys.valueAs<Keys.Server, string> host |> equal "localhost"
 
     testCase "StringEnum attribute works" <| fun () ->
         Vertical |> unbox |> equal "vertical"
