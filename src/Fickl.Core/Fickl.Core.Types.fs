@@ -39,6 +39,24 @@ type AsyncFunctionAttribute() =
 type JsFunctionAttribute() =
     inherit Attribute()
 
+/// <summary>Calls the tag with an F# interpolated string as a native tagged template, <c>tag`...${x}...`</c>.</summary>
+/// <remarks>
+/// The binding is imported, global, or emitted as an expression without placeholders, and takes one
+/// <c>FormattableString</c>:
+/// <code>
+/// [&lt;Import("html", "lit"); TaggedTemplate>]
+/// let html (template: FormattableString) : TemplateResult = jsNative
+///
+/// let view name = html $"&lt;p>Hello {name}&lt;/p>"
+/// </code>
+/// The tag receives the frozen strings array, the same object on every evaluation, and the values unformatted,
+/// so format specifiers such as <c>{x:N2}</c> are a compile error. A <c>FormattableString</c> that is not written
+/// at the call is passed as its strings and arguments. Applies to JavaScript and TypeScript; other targets ignore it.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method ||| AttributeTargets.Property)>]
+type TaggedTemplateAttribute() =
+    inherit Attribute()
+
 /// <summary>Emits the function as a TypeScript type predicate, <c>parameter is T</c>, so TypeScript callers narrow the argument.</summary>
 /// <remarks>
 /// The function returns <c>bool</c>, or an <c>option</c> or <c>voption</c> of the predicate type:

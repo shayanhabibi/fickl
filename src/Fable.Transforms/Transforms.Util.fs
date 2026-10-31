@@ -133,6 +133,9 @@ module Atts =
     let ficklTypeAssertion = "Fickl.Core.TypeAssertionAttribute" // typeof<Fickl.Core.TypeAssertionAttribute>.FullName
 
     [<Literal>]
+    let ficklTaggedTemplate = "Fickl.Core.TaggedTemplateAttribute" // typeof<Fickl.Core.TaggedTemplateAttribute>.FullName
+
+    [<Literal>]
     let ficklTsEnum = "Fickl.Core.TsEnumAttribute" // typeof<Fickl.Core.TsEnumAttribute>.FullName
 
     [<Literal>]

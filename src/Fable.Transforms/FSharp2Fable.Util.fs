@@ -4022,8 +4022,12 @@ module Util =
             )
             |> makeCallWithArgInfo com ctx r typ callee memb memberRef
 
-        match (TypeGuards.tryGet com memb: TypeGuards.TypeGuard option) with
-        | Some guard when guard.Return <> TypeGuards.GuardReturn.Direct && not ctx.CapturingQuotation ->
+        match
+            TaggedTemplates.tryTransformCall com ctx r typ memb callee args,
+            (TypeGuards.tryGet com memb: TypeGuards.TypeGuard option)
+        with
+        | Some tagged, _ -> tagged
+        | None, Some guard when guard.Return <> TypeGuards.GuardReturn.Direct && not ctx.CapturingQuotation ->
             let paramCount = memb.CurriedParameterGroups |> Seq.sumBy _.Count
 
             match TypeGuards.bindArguments com ctx guard callee args paramCount with
@@ -4688,3 +4692,104 @@ module TypeGuards =
 
             Fable.TryCatch(Fable.Sequential [ call; ok ], Some(errorIdent, error), None, r)
         | _ -> call
+
+/// fickl: `[<TaggedTemplate>]`, an imported, global or emitted JS tag called with an F# interpolated string
+module TaggedTemplates =
+    open Helpers
+    open Util
+
+    let private hasAttribute (memb: FSharpMemberOrFunctionOrValue) =
+        memb.Attributes
+        |> Seq.exists (fun att ->
+            (nonAbbreviatedDefinition att.AttributeType).TryFullName = Some Atts.ficklTaggedTemplate
+        )
+
+    let private isFormattableString (p: FSharpParameter) =
+        let t = nonAbbreviatedType p.Type
+
+        t.HasTypeDefinition
+        && t.TypeDefinition.TryFullName = Some "System.FormattableString"
+
+    /// The tag the template is called with: the imported or global value, or an emitted expression without arguments
+    let private tryTag (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        match tryGlobalOrImportedMember com Fable.Any memb with
+        | Some tag -> Ok tag
+        | None ->
+            memb.Attributes
+            |> Seq.tryPick (fun att ->
+                match att.AttributeType.TryFullName with
+                | Some Atts.emitAttr ->
+                    match tryAttribConsArg att 0 "" tryString with
+                    | macro when macro.Contains("$") ->
+                        Some(Error "TaggedTemplate cannot be combined with an Emit macro that has placeholders")
+                    | macro ->
+                        let info: Fable.EmitInfo =
+                            {
+                                Macro = macro
+                                IsStatement = false
+                                CallInfo = Fable.CallInfo.Create()
+                            }
+
+                        Some(Ok(Fable.Emit(info, Fable.Any, None)))
+                | _ -> None
+            )
+            |> Option.defaultValue (Error "TaggedTemplate requires an Import, Global or Emit attribute on the tag")
+
+    let private check (memb: FSharpMemberOrFunctionOrValue) (callee: Fable.Expr option) (args: Fable.Expr list) =
+        match List.ofSeq memb.CurriedParameterGroups, callee, args with
+        | _, Some _, _ -> Error "TaggedTemplate applies to module values and functions, not to methods"
+        | [ group ], None, [ _ ] when group.Count = 1 && isFormattableString group[0] -> Ok()
+        | _ -> Error "TaggedTemplate requires a single parameter of type FormattableString"
+
+    /// `tag`...``, for a call of a `[<TaggedTemplate>]` binding on JavaScript and TypeScript
+    let tryTransformCall
+        (com: Compiler)
+        (ctx: Context)
+        r
+        (typ: Fable.Type)
+        (memb: FSharpMemberOrFunctionOrValue)
+        (callee: Fable.Expr option)
+        (args: Fable.Expr list)
+        =
+        let isJsTarget =
+            com.Options.Language = JavaScript || com.Options.Language = TypeScript
+
+        if not isJsTarget || not (hasAttribute memb) then
+            None
+        else
+            let fail error =
+                addErrorAndReturnNull com ctx.InlinePath r error |> Some
+
+            match check memb callee args |> Result.bind (fun () -> tryTag com memb) with
+            | Error error -> fail error
+            | Ok tag ->
+                addWatchDependencyFromMember com memb
+
+                match args with
+                // `fmtWith` would format the values, which the tag receives as they are
+                | [ MaybeCasted(Fable.Value(Fable.StringTemplate(Some(Fable.Call _), _, _), _)) ] ->
+                    fail "A tagged template cannot have format specifiers, such as {x:N2}"
+                | [ MaybeCasted(Fable.Value(Fable.StringTemplate(Some _, parts, values), templateRange)) ] ->
+                    let template =
+                        Fable.Value(Fable.StringTemplate(Some tag, parts, values), templateRange)
+
+                    Fable.TypeCast(template, typ) |> Some
+                // A FormattableString value: its strings array is the one the template literal was tagged with
+                | [ formattable ] ->
+                    let call formattable =
+                        let info: Fable.EmitInfo =
+                            {
+                                Macro = "$0($1.strs, ...$1.args)"
+                                IsStatement = false
+                                CallInfo = Fable.CallInfo.Create(args = [ tag; formattable ])
+                            }
+
+                        Fable.Emit(info, typ, r)
+
+                    if canHaveSideEffects com formattable then
+                        let ident = makeTypedIdent formattable.Type (getIdentUniqueName com ctx "template")
+
+                        Fable.Let(ident, formattable, call (Fable.IdentExpr ident)) |> Some
+                    else
+                        call formattable |> Some
+                | _ -> None
