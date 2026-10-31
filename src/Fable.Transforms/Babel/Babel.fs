@@ -608,6 +608,8 @@ type TypeAnnotation =
         spread: FunctionTypeParam option
     | ArrayTypeAnnotation of TypeAnnotation
     | TupleTypeAnnotation of types: TypeAnnotation array
+    /// fickl: a tuple whose elements can be labelled and optional, `[url: string, init?: RequestInit]`
+    | LabelledTupleTypeAnnotation of elements: TupleElement array
     | KeyofTypeAnnotation of TypeAnnotation
     | TypeofTypeAnnotation of Expression
     | IndexedTypeAnnotation of typ: TypeAnnotation * prop: TypeAnnotation
@@ -618,6 +620,9 @@ type TypeAnnotation =
     | TypePredicateTypeAnnotation of parameterName: string * typ: TypeAnnotation option * asserts: bool
     /// fickl: the polymorphic `this` type of a class or interface member
     | ThisTypeAnnotation
+
+/// fickl: an element of a LabelledTupleTypeAnnotation; TypeScript labels all of a tuple's elements or none
+type TupleElement = | TupleElement of label: string option * typ: TypeAnnotation * isOptional: bool
 
 type TypeParameter = | TypeParameter of name: string * bound: TypeAnnotation option * ``default``: TypeAnnotation option
 

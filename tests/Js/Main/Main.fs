@@ -21,6 +21,7 @@ let allTests =
     SymbolKeys.tests
     TypeGuards.tests
     ReturnsThis.tests
+    ErasedTuples.tests
     TaggedTemplates.tests
     ImportAttributes.tests
     TopLevelAwait.tests

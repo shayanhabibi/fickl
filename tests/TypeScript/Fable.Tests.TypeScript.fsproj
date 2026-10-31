@@ -70,6 +70,7 @@
     <Compile Include="../Js/Main/SymbolKeyTests.fs" />
     <Compile Include="../Js/Main/TypeGuardTests.fs" />
     <Compile Include="../Js/Main/ReturnsThisTests.fs" />
+    <Compile Include="../Js/Main/ErasedTupleTests.fs" />
     <Compile Include="../Js/Main/TaggedTemplateTests.fs" />
     <Compile Include="../Js/Main/NewTargetTests.fs" />
     <Compile Include="../Js/Main/TsEnumTests.fs" />

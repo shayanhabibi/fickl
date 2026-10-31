@@ -1402,9 +1402,49 @@ module Annotation =
 
         match ent.UnionCases with
         | [ uci ] when List.isMultiple uci.UnionCaseFields ->
-            uci.UnionCaseFields
-            |> List.mapToArray (fun fi -> fi.FieldType |> resolveInlineType genArgs |> makeFieldAnnotation com ctx)
-            |> TupleTypeAnnotation
+            let fields = uci.UnionCaseFields
+
+            let types =
+                fields
+                |> List.mapToArray (fun fi -> fi.FieldType |> resolveInlineType genArgs |> makeFieldAnnotation com ctx)
+
+            // fickl: the names of the fields label the elements when every field is named, as F# calls unnamed
+            // fields Item1, Item2..., and the option fields after the last other field are optional elements
+            let labels =
+                let isUnnamed (fi: Fable.Field) =
+                    fi.Name.StartsWith("Item", StringComparison.Ordinal)
+                    && fi.Name.Substring(4) |> Seq.forall Char.IsDigit
+
+                if fields |> List.exists isUnnamed then
+                    None
+                else
+                    fields
+                    |> List.mapToArray (fun fi ->
+                        Naming.sanitizeIdentForbiddenCharsWith Naming.isJsIdentChar (fun _ -> "_") fi.Name
+                        |> Naming.checkJsKeywords
+                    )
+                    |> Some
+
+            let firstOptional =
+                let isOption (fi: Fable.Field) =
+                    match fi.FieldType with
+                    | Fable.Option _ -> true
+                    | _ -> false
+
+                fields
+                |> List.rev
+                |> List.takeWhile isOption
+                |> List.length
+                |> (-) fields.Length
+
+            match labels with
+            | None when firstOptional = fields.Length -> TupleTypeAnnotation types
+            | _ ->
+                types
+                |> Array.mapi (fun index typ ->
+                    TupleElement(labels |> Option.map (fun labels -> labels[index]), typ, index >= firstOptional)
+                )
+                |> LabelledTupleTypeAnnotation
         | [ uci ] -> transformSingleFieldType uci
         | ucis -> ucis |> List.mapToArray transformSingleFieldType |> UnionTypeAnnotation
 
@@ -2548,6 +2588,21 @@ module Util =
             match com.TransformAsExpr(ctx, e), Annotation.tryTsEnumTypeAnnotation com ctx entRef with
             | Literal _ as literal, Some ta -> AsExpression(AsExpression(literal, NumberTypeAnnotation), ta)
             | jsExpr, _ -> jsExpr
+        // fickl: a tuple left without its trailing optional elements is typed as the erased union it builds
+        | Fable.DeclaredType(entRef, _) when
+            com.IsTypeScript
+            && (
+                match e with
+                | Fable.Value(Fable.NewTuple _, _) ->
+                    com.TryGetEntity(entRef)
+                    |> Option.exists (fun ent -> ent.IsFSharpUnion && hasAttribute Atts.erase ent.Attributes)
+                | _ -> false
+            )
+            ->
+            match e with
+            | Fable.Value(Fable.NewTuple(values, _), _) ->
+                AsExpression(makeArray com ctx values, makeTypeAnnotation com ctx typ)
+            | _ -> com.TransformAsExpr(ctx, e)
         // Optimization for (numeric) array or list literals casted to seq
         // Done at the very end of the compile pipeline to get more opportunities
         // of matching cast and literal expressions after resolving pipes, inlining...

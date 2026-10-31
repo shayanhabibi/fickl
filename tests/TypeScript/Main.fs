@@ -23,6 +23,7 @@ let allTests =
     SymbolKeys.tests
     TypeGuards.tests
     ReturnsThis.tests
+    ErasedTuples.tests
     TaggedTemplates.tests
     NewTarget.tests
     TsEnums.tests

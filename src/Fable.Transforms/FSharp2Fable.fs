@@ -142,6 +142,47 @@ let private transformNewUnion
             "Erased unions with multiple cases must have one single field: "
             + (getFsTypeFullName fsType)
             |> addErrorAndReturnNull com ctx.InlinePath r
+        // fickl: trailing option fields are optional tuple elements in TypeScript, so the trailing None values are
+        // left out, `["u"]` for `FetchArgs("u", None)`: a literal None here, any other at runtime
+        | argExprs when com.Options.Language = JavaScript || com.Options.Language = TypeScript ->
+            let isOptionField (field: FSharpField) =
+                match tryDefinition field.FieldType with
+                | Some(_, Some(Types.option | Types.valueOption)) -> true
+                | _ -> false
+
+            let required =
+                unionCase.Fields.Count
+                - (unionCase.Fields |> Seq.rev |> Seq.takeWhile isOptionField |> Seq.length)
+
+            let kept =
+                argExprs
+                |> List.indexed
+                |> List.rev
+                |> List.skipWhile (fun (index, arg) ->
+                    match arg with
+                    | Fable.Value(Fable.NewOption(None, _, _), _) -> index >= required
+                    | _ -> false
+                )
+                |> List.rev
+                |> List.map snd
+
+            let unionType = makeType ctx.GenericArgs fsType
+
+            match List.tryLast kept with
+            | Some(Fable.Value(Fable.NewOption(Some _, _, _), _)) when kept.Length = argExprs.Length ->
+                makeTuple r false argExprs
+            | Some(Fable.Value(Fable.NewOption(Some _, _, _), _)) -> Fable.TypeCast(makeTuple r false kept, unionType)
+            | _ when kept.Length > required ->
+                Replacements.Util.Helper.LibCall(
+                    com,
+                    "Util",
+                    "trimOptionalElements",
+                    unionType,
+                    [ makeTuple r false kept; makeIntConst required ],
+                    ?loc = r
+                )
+            | _ when kept.Length = argExprs.Length -> makeTuple r false argExprs
+            | _ -> Fable.TypeCast(makeTuple r false kept, unionType)
         | argExprs -> makeTuple r false argExprs
 
     | TypeScriptTaggedUnion(tdef, _, tagName, rule) ->

@@ -210,6 +210,9 @@ and private addTypeNames (names: HashSet<string>) (typ: TypeAnnotation) =
     | UnionTypeAnnotation types
     | IntersectionTypeAnnotation types
     | TupleTypeAnnotation types -> types |> Array.iter add
+    | LabelledTupleTypeAnnotation elements ->
+        for TupleElement(_, t, _) in elements do
+            add t
     | ObjectTypeAnnotation members -> members |> Array.iter (addAbstractMemberNames names)
     | FunctionTypeAnnotation(parameters, returnType, spread) ->
         for FunctionTypeParam(_, t, _) in parameters do

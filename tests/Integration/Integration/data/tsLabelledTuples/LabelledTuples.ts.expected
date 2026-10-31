@@ -1,0 +1,45 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+import { trimOptionalElements } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+
+export interface Init {
+    get method(): string
+}
+
+export type Entry = [key: string, value: int32];
+
+export type FetchArgs = [url: string, init?: Option<Init>];
+
+export type Span = [start: int32, stop?: Option<int32>, step?: Option<int32>];
+
+export type Pair = [string, int32];
+
+export type Keywords = [default$: string, my_value: int32];
+
+export const entry = ["a", 1] as [string, int32];
+
+export const getArgs = ["/"] as FetchArgs;
+
+export function fetchArgs(init: Option<Init>): FetchArgs {
+    return trimOptionalElements(["/", init] as [string, Option<Init>], 1);
+}
+
+export function range(stop_1: Option<int32>): Span {
+    return trimOptionalElements([0, stop_1] as [int32, Option<int32>], 1);
+}
+
+export const stepped = [0, undefined, 2] as [int32, Option<int32>, Option<int32>];
+
+export const pair = ["a", 1] as [string, int32];
+
+export const keywords = ["a", 1] as [string, int32];
+
+export function url(_arg: FetchArgs): string {
+    return _arg[0];
+}
+
+export function stop(_arg: Span): Option<int32> {
+    return _arg[1];
+}
+

@@ -1750,6 +1750,33 @@ module PrinterExtensions =
                 printer.Print("[")
                 printer.PrintCommaSeparatedArray(types)
                 printer.Print("]")
+            | LabelledTupleTypeAnnotation(elements) ->
+                printer.Print("[")
+
+                printer.PrintArray(
+                    elements,
+                    (fun p (TupleElement(label, typ, isOptional)) ->
+                        match label with
+                        | Some label ->
+                            p.Print(label)
+
+                            p.Print(
+                                if isOptional then
+                                    "?: "
+                                else
+                                    ": "
+                            )
+
+                            p.Print(typ)
+                        | None when isOptional ->
+                            p.ComplexTypeWithParens(typ)
+                            p.Print("?")
+                        | None -> p.Print(typ)
+                    ),
+                    (fun p -> p.Print(", "))
+                )
+
+                printer.Print("]")
             | UnionTypeAnnotation(types) ->
                 printer.PrintArray(types, (fun p x -> p.ComplexTypeWithParens(x)), (fun p -> p.Print(" | ")))
             | IntersectionTypeAnnotation(types) ->
