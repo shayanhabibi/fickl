@@ -1222,6 +1222,11 @@ module Annotation =
     let tryNativeOrFableLibraryInterface com ctx genArgs (ent: Fable.Entity) =
         match ent.FullName with
         | Types.fsharpAsyncGeneric -> makeFableLibImportTypeAnnotation com ctx genArgs "AsyncBuilder" "Async" |> Some
+        // fickl: a CancellationTokenSource is its own token
+        | Types.cancellationToken
+        | "System.Threading.CancellationTokenSource" ->
+            makeFableLibImportTypeAnnotation com ctx [] "AsyncBuilder" "CancellationToken"
+            |> Some
         | Types.task
         | "System.Threading.Tasks.ValueTask" -> makeNativeTypeAnnotation com ctx [ Fable.Unit ] "Promise" |> Some
         | Types.taskGeneric -> makeNativeTypeAnnotation com ctx genArgs "Promise" |> Some

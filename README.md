@@ -69,7 +69,8 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 
 | Feature | Kind | What it does |
 | --- | --- | --- |
-| `jsAsync { }` | Computation expression | Compiles to a native `async` function returning a `JS.Promise`: `let!` emits `await`, `for` over a `JS.AsyncIterable` emits `for await`, and it starts running immediately. There is no F# cancellation token. |
+| `jsAsync { }` | Computation expression | Compiles to a native `async` function returning a `JS.Promise`: `let!` emits `await`, `for` over a `JS.AsyncIterable` emits `for await`, and it starts running immediately. There is no F# cancellation token: pass one to the work with `ToAbortSignal` or `Register`. |
+| `ToAbortSignal`, `FromAbortSignal` | Extension members | Convert a `CancellationToken` to the `AbortSignal` that `fetch` and other cancellable JavaScript APIs take, `cts.Token.ToAbortSignal()`, and back, `CancellationToken.FromAbortSignal(request.signal)`. `Async.AwaitPromise(p, token)` stops waiting when the token is cancelled and `Async.StartAsPromise(work, signal)` cancels on abort. An `AbortError` is an `OperationCanceledException` for `:?`, an async awaiting a promise that rejects with one is cancelled, and an `OperationCanceledException` is named `AbortError` for JavaScript. `JS.AbortSignal` and `JS.AbortController` bind the web types. |
 | `[<AsyncFunction>]` | Attribute on a module function | Emits a function returning `jsAsync` as a native `async function` declaration. |
 | `jsGenerator { }` | Computation expression | Compiles to a native generator, a `JsGenerator<'Yield, 'Return, 'Next>` typed by what it yields, returns and receives from `next`. `let!` binds the value sent back by `next`. |
 | `[<GeneratorFunction>]` | Attribute on a module function | Emits a function returning `jsGenerator` as a native `function*` declaration. |

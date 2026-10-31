@@ -14,6 +14,7 @@
     <Compile Include="Fickl.Core.Decorators.fs" />
     <Compile Include="Fickl.Core.JsInterop.fs" />
     <Compile Include="Fickl.Core.JS.fs" />
+    <Compile Include="Fickl.Core.Cancellation.fs" />
     <Compile Include="Fickl.Core.NativeAsync.fs" />
     <Compile Include="Fickl.Core.NativeGenerators.fs" />
     <Compile Include="Fickl.Core.NativeAsyncGenerators.fs" />
