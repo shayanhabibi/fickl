@@ -81,6 +81,9 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |
 | `--nativeErrors` | CLI flag | Makes every exception a JS `Error`, with a `stack` and, for an inner exception, a `cause`. |
 | `[<JsError>]` | Attribute on an F# exception | Compiles the exception as a JS `Error` subclass, with a `stack`. |
+| `JS.Error`, `JS.TypeError`, `JS.RangeError`, `JS.SyntaxError`, `JS.ReferenceError`, `JS.AggregateError`, `JS.DOMException` | Bindings | The errors JavaScript throws, to catch with `:?` (`instanceof`) and construct, with `message`, `name`, `stack` and `cause`. |
+| `JS.Thrown` | Active pattern | Matches a caught value that is neither a JS `Error` nor an F# exception, such as a thrown string, and passes it as it was thrown. |
+| `e.Message` of a thrown value | Runtime | A caught value typed `exn` that is not an object, such as a thrown string or `undefined`, has `String(e)` as its message instead of `undefined` or a `TypeError`. |
 | `--temporal` | CLI flag | Represents dates and times with the JavaScript Temporal API (experimental). |
 | `--server` | CLI flag | Compiles through a background server that keeps check results, so a recompile only rechecks what changed. `FICKL_SERVER=1` turns it on too. |
 | `--timings` | CLI flag | Prints a per-phase timing and allocation report after each compilation. |
