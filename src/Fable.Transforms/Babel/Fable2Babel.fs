@@ -1238,7 +1238,10 @@ module Annotation =
             // makeFableLibImportTypeAnnotation com ctx genArgs "Util" "ICollection" |> Some
             makeNativeTypeAnnotation com ctx genArgs "Iterable" |> Some
         // | Types.idictionary
-        // | Types.ireadonlydictionary
+        // fickl: read-only views accept what F# can pass as them, including readonly arrays and ReadonlyMap
+        | Types.ireadonlydictionary -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IReadOnlyMap" |> Some
+        | Types.ireadonlycollection
+        | "System.Collections.Generic.IReadOnlyList`1" -> makeNativeTypeAnnotation com ctx genArgs "Iterable" |> Some
         | Types.idisposable -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IDisposable" |> Some
         | Types.iasyncdisposable ->
             makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IAsyncDisposable"
@@ -2484,6 +2487,9 @@ module Util =
                         AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                     else
                         jsExpr
+                // fickl: an F# array may be a typed array, which TypeScript does not relate to an EmitType such as ReadonlyArray
+                | Fable.Array _ when toTaggedUnion ->
+                    AsExpression(AsExpression(jsExpr, UnknownTypeAnnotation), makeTypeAnnotation com ctx typ)
                 | _ when toTaggedUnion -> AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                 | _ -> jsExpr
             )

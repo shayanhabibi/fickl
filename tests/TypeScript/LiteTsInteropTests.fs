@@ -107,6 +107,26 @@ module Partials =
     let bump () = patch (partial (fun c -> c.count <- current.count + 1))
     let relabel (label: string) : Partial<Counter> = partial (fun c -> c.label <- label)
     let freeze (counter: Counter) : Readonly<Counter> = !!(JS.Constructors.Object.freeze counter)
+
+// TypeScript readonly arrays and maps must be accepted where F# only reads
+module Readonlys =
+    open System.Collections.Generic
+    open Fickl.Core.JS
+
+    [<Emit("Object.freeze([1, 2, 3])")>]
+    let frozenNumbers () : ReadonlyArray<int> = jsNative
+
+    [<Emit("new Map([['a', 1]])")>]
+    let nativeMap () : IReadOnlyDictionary<string, int> = jsNative
+
+    let sum (xs: ReadonlyArray<int>) = Seq.sum xs
+    let last (xs: ReadonlyArray<int>) = xs.[xs.length - 1]
+    let countAll (xs: IReadOnlyCollection<int>) = xs.Count
+    let firstTwo (xs: IReadOnlyList<int>) = xs |> Seq.truncate 2 |> Seq.toList
+    let find (d: IReadOnlyDictionary<string, int>) key =
+        match d.TryGetValue key with
+        | true, v -> v
+        | _ -> -1
 #endif
 
 type HidingBase() =
@@ -224,5 +244,19 @@ let tests =
         full.label |> equal "only"
         let frozen = Partials.freeze Partials.current
         JS.Constructors.Object.isFrozen frozen |> equal true
+
+    testCase "Read-only collections accept readonly arrays and maps" <| fun () ->
+        Readonlys.sum (Readonlys.frozenNumbers ()) |> equal 6
+        Readonlys.last (Readonlys.frozenNumbers ()) |> equal 3
+        Readonlys.sum (Fickl.Core.JS.ReadonlyArray.ofArray [| 4; 5 |]) |> equal 9
+        Readonlys.last (Fickl.Core.JS.ReadonlyArray.ofResizeArray (ResizeArray [ 7; 8 ])) |> equal 8
+        Fickl.Core.JS.ReadonlyArray.toArray (Readonlys.frozenNumbers ()) |> equal [| 1; 2; 3 |]
+        (Readonlys.frozenNumbers ()).includes 2 |> equal true
+        Readonlys.countAll [| 1; 2 |] |> equal 2
+        Readonlys.countAll (System.Collections.Generic.HashSet [ 1 ]) |> equal 1
+        Readonlys.firstTwo [ 1; 2; 3 ] |> equal [ 1; 2 ]
+        Readonlys.find (Readonlys.nativeMap ()) "a" |> equal 1
+        Readonlys.find (Map [ ("b", 2) ]) "b" |> equal 2
+        Readonlys.find (dict [ ("c", 3) ] |> System.Collections.Generic.Dictionary) "z" |> equal -1
     #endif
   ]
