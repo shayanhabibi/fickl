@@ -100,6 +100,7 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `--declaration` | CLI flag | Writes a TypeScript declaration file (`.d.ts`) next to each JavaScript file. |
 | `--strictOptions` | CLI flag | Keeps `Some null` apart from `None`, as on .NET. |
 | `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |
+| `ArraySegment<'T>`, `Array.ofArrayBuffer`, `AsArrayBuffer` | Runtime, functions | An `ArraySegment` over a numeric array is a typed-array view, `ArraySegment<byte>(bytes, 4, 16)` compiling to `bytes.subarray(4, 20)`, so it shares the array's memory. `Array.ofArrayBuffer buffer` views a whole `ArrayBuffer` as a numeric array without a copy, and `array.AsArrayBuffer()` gives the array's buffer. `JS.Constructors.BigUint64Array` binds the array `uint64[]` compiles to. |
 | `--nativeErrors` | CLI flag | Makes every exception a JS `Error`, with a `stack` and, for an inner exception, a `cause`. |
 | `[<JsError>]` | Attribute on an F# exception | Compiles the exception as a JS `Error` subclass, with a `stack`. |
 | `JS.Error`, `JS.TypeError`, `JS.RangeError`, `JS.SyntaxError`, `JS.ReferenceError`, `JS.AggregateError`, `JS.DOMException` | Bindings | The errors JavaScript throws, to catch with `:?` (`instanceof`) and construct, with `message`, `name`, `stack` and `cause`. |
