@@ -176,8 +176,9 @@ let private check
     | Some message -> TypeCheck message
     | None when exitCode <> 0 || not (File.Exists(Path.Combine(output, "Main.js"))) ->
         Compile(
-            firstMatch @"^(?:.*error\s*:?\s*)(.*)$" log
-            |> Option.orElse (firstMatch @"^(Unknown argument.*)$" log)
+            // An unknown argument first: its name can contain "error", as --nativeErrors does
+            firstMatch @"^(Unknown argument.*)$" log
+            |> Option.orElse (firstMatch @"^(?:.*error\s*:?\s*)(.*)$" log)
             |> Option.defaultWith (fun () -> lastLine log)
         )
     | None ->

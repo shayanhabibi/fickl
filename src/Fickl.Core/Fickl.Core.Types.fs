@@ -167,3 +167,11 @@ type CurriedAttribute() =
                  ||| AttributeTargets.Struct)>]
 type NoOverloadSuffixAttribute() =
     inherit Attribute()
+
+/// <summary>Compiles an F# exception as a native JavaScript <c>Error</c> subclass.</summary>
+/// <remarks>The exception is <c>instanceof Error</c>, has a <c>stack</c> captured when it is created, and its inner
+/// exception is also its <c>cause</c>. Creating it costs a stack capture, which an ordinary F# exception skips.
+/// <c>--nativeErrors</c> does this for every exception. Applies to JavaScript and TypeScript.</remarks>
+[<AttributeUsage(AttributeTargets.Class)>]
+type JsErrorAttribute() =
+    inherit Attribute()

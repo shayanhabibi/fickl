@@ -6279,7 +6279,14 @@ but thanks to the optimisation done below we get
 
         let baseExpr =
             if ent.IsFSharpExceptionDeclaration then
-                libValue com ctx "Types" "FSharpException" |> SuperExpression |> Some
+                // fickl: [<JsError>] extends a native Error subclass, see FSharpError in fable-library
+                let baseName =
+                    if hasAttribute Atts.ficklJsError ent.Attributes then
+                        "FSharpError"
+                    else
+                        "FSharpException"
+
+                libValue com ctx "Types" baseName |> SuperExpression |> Some
             elif ent.IsFSharpRecord || ent.IsValueType then
                 libValue com ctx "Types" "Record" |> SuperExpression |> Some
             else
@@ -7318,6 +7325,16 @@ module Compiler =
 
         registerSymbolKeys file.Declarations
         let rootDecls = List.collect (transformDeclaration com ctx) file.Declarations
+
+        // fickl: --nativeErrors switches the library's Exception to a native Error before this file's code runs
+        let rootDecls =
+            if List.contains Fickl.Options.nativeErrorsDefine com.Options.Define then
+                (Lib.libCall com ctx None "Util" "enableNativeErrors" [] []
+                 |> ExpressionStatement
+                 |> PrivateModuleDeclaration)
+                :: rootDecls
+            else
+                rootDecls
 
         let topDirectivesPrologue =
             com.GetAllAllTopDirectivesPrologue() |> transformDirectivesPrologue
