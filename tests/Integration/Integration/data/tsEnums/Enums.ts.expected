@@ -1,0 +1,95 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { type FSharpList, ofArray } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import { Dir, move } from "./dir.js";
+import { int32ToString, type MutableArray, equals } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { enum_type, int32_type, parseEnum } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+
+declare enum Color_$enum {
+    Red = 0,
+    Green = 1,
+    Blue = 4
+}
+
+export const Color: typeof Color_$enum = Object.freeze({
+    Red: 0,
+    Green: 1,
+    Blue: 4,
+    0: "Red",
+    1: "Green",
+    4: "Blue",
+}) as typeof Color_$enum;
+
+export type Color = Color_$enum;
+
+declare enum Access_$enum {
+    Read = 1,
+    Write = 2
+}
+
+export const Access: typeof Access_$enum = Object.freeze({
+    Read: 1,
+    Write: 2,
+    1: "Read",
+    2: "Write",
+}) as typeof Access_$enum;
+
+export type Access = Access_$enum;
+
+export const favourite = 1;
+
+export function next(color: Color): Color {
+    switch (color) {
+        case 0:
+            return 1;
+        case 1:
+            return 4;
+        default:
+            return 0;
+    }
+}
+
+export function ofInt(n: int32): Color {
+    return n;
+}
+
+export function toInt(color: Color): int32 {
+    return color | 0;
+}
+
+export function combine(a: Access, b: Access): Access {
+    return a | b;
+}
+
+export function plain(p: int32): int32 {
+    return p;
+}
+
+export const colors: FSharpList<Color> = ofArray([0, 4]);
+
+export function goUp(): string {
+    return move(Dir.Up);
+}
+
+export function isDown(): boolean {
+    return equals(Dir.Down, 'DOWN');
+}
+
+export const outside = 5 as number as Color;
+
+export const mixed: Color = 0 | 4;
+
+export const zero = 0;
+
+export const zeros: MutableArray<Color> = new Int32Array(2);
+
+export const parsed: Color = parseEnum(enum_type("Enums.Color", int32_type, [["Red", 0], ["Green", 1], ["Blue", 4]]), "Blue");
+
+export function isGreen(color: Color): boolean {
+    return color === 1;
+}
+
+export function label(color: Color): string {
+    return int32ToString(color);
+}
+
