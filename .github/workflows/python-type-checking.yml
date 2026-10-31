@@ -3,6 +3,7 @@ name: Python Type Checking
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'src/Fable.Transforms/Python/**'
       - 'src/fable-library-py/**'
@@ -16,6 +17,7 @@ permissions:
 
 jobs:
   pyright:
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     env:
       UV_LINK_MODE: copy
