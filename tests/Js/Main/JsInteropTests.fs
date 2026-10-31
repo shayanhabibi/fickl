@@ -295,6 +295,15 @@ let validatePassword = function
     | NewPassword -> "np"
     | ConfirmPassword -> "cp"
 
+module Brands =
+    [<Measure>] type UserId
+    [<Measure>] type OrderId
+    [<Measure>] type Verified
+
+    type User = { Id: string<UserId>; Verified: bool<Verified>; Initial: char<UserId> }
+
+    let findUser (id: string<UserId>) (users: User list) = users |> List.tryFind (fun u -> u.Id = id)
+
 type JsOptions =
     abstract foo: string with get, set
     abstract bar: int with get, set
@@ -852,6 +861,20 @@ let tests =
         let instance = ClassWithInlineAttachments()
         instance.greet "Pepe" |> equal "hi Pepe"
         instance.regular 3 |> equal 4
+
+    testCase "Branded primitives tag and untag their values" <| fun () ->
+        let id: string<Brands.UserId> = Brand.tag "u1"
+        let user: Brands.User = { Id = id; Verified = Brand.tagBool true; Initial = Brand.tagChar 'u' }
+        Brand.untag user.Id |> equal "u1"
+        Brand.untagBool user.Verified |> equal true
+        Brand.untagChar user.Initial |> equal 'u'
+        Brands.findUser (Brand.tag "u1") [ user ] |> equal (Some user)
+        Brands.findUser (Brand.tag "u2") [ user ] |> equal None
+        compare (Brand.tag<Brands.OrderId> "a") (Brand.tag "b") |> equal -1
+#if FABLE_COMPILER
+        emitJsExpr id "typeof $0" |> equal "string"
+        emitJsExpr user.Verified "typeof $0" |> equal "boolean"
+#endif
 
 #if FABLE_COMPILER
     testCase "Can type test interfaces decorated with Global" <| fun () ->

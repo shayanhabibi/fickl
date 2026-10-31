@@ -1765,6 +1765,10 @@ module TypeHelpers =
     let runtimeTypesWithMeasure =
         dict
             [
+                // fickl: Fickl.Core's branded primitives
+                "Fickl.Core.Brands.string`1", Choice1Of2 Fable.String
+                "Fickl.Core.Brands.bool`1", Choice1Of2 Fable.Boolean
+                "Fickl.Core.Brands.char`1", Choice1Of2 Fable.Char
                 "FSharp.UMX.bool`1", Choice1Of2 Fable.Boolean
                 "FSharp.UMX.string`1", Choice1Of2 Fable.String
                 "FSharp.UMX.Guid`1", Choice2Of2 Types.guid
@@ -2807,6 +2811,7 @@ module Util =
             || entFullName = "Fickl.Core.KeyOf"
             || entFullName = "Fickl.Core.RecordModule"
             || entFullName = "Fickl.Core.ValueOf"
+            || entFullName = "Fickl.Core.Brand"
             || entFullName = "Fickl.Core.JsAsyncBuilder"
             || entFullName = "Fickl.Core.NativeAsync"
             || entFullName.StartsWith("Fickl.Core.JsGeneratorBuilder", StringComparison.Ordinal)
