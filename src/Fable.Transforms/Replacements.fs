@@ -5907,6 +5907,11 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | Naming.StartsWith "Fable.Core." _ -> fableCoreLib com ctx r t info thisArg args
     | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
     | "Fickl.Core.JS" -> jsErrors com r t info.CompiledName args
+    // fickl: a proxy handler holds only the traps that are set
+    | "Fickl.Core.JS.ProxyHandlerModule" ->
+        match info.CompiledName, args with
+        | "create", [ setters ] -> makePojoFromLambda com setters |> Some
+        | _ -> None
     | "Fickl.Core.CancellationExtensions" -> cancellationExtensions com r t info thisArg args
     | "Fickl.Core.KeyOfBuilder"
     | "Fickl.Core.KeyOf" -> keyOf com ctx r t info.CompiledName args

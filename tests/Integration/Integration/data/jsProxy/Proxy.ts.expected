@@ -1,0 +1,48 @@
+
+import { Record } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { float64, int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import type { MutableArray, IComparable, IEquatable } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { record_type, int32_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+
+export class Point extends Record implements IEquatable<Point>, IComparable<Point> {
+    readonly X: int32;
+    readonly Y: int32;
+    constructor(X: int32, Y: int32) {
+        super();
+        this.X = (X | 0);
+        this.Y = (Y | 0);
+    }
+}
+
+export function Point_$reflection(): TypeInfo {
+    return record_type("Proxy.Point", [], Point, () => [["X", int32_type], ["Y", int32_type]]);
+}
+
+export const reads: string[] = [];
+
+export function logged(point: Point): Point {
+    return new Proxy(point, ({
+        get: (target: Point, key: string | float64 | (symbol), receiver: any): any => {
+            if (typeof key === "string") {
+                const name: string = key;
+                void (reads.push(name));
+            }
+            return Reflect.get(target, key, receiver);
+        },
+    } satisfies Partial<ProxyHandler<Point>> as ProxyHandler<Point>));
+}
+
+export function readOnly(point: Point): { proxy: Point; revoke: () => void } {
+    return Proxy.revocable(point, ({
+        set: (_arg: Point, _arg_1: string | float64 | (symbol), _arg_2: any, _arg_3: any): boolean => false,
+    } satisfies Partial<ProxyHandler<Point>> as ProxyHandler<Point>));
+}
+
+export function keys(o: any): MutableArray<string | float64 | (symbol)> {
+    return Reflect.ownKeys(o);
+}
+
+export const tag: symbol = Symbol("tag");
+
+export const tagKey: symbol = tag;
+

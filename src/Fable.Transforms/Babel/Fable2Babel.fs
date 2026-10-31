@@ -926,6 +926,8 @@ module Reflection =
             | Types.exception_ ->
                 [ com.TransformAsExpr(ctx, expr) ]
                 |> libCall com ctx range "Util" "isException" []
+            // fickl: a symbol is a primitive, not an instance of Symbol
+            | "Fickl.Core.JS.Symbol" -> jsTypeof "symbol" expr
             | _ ->
                 match com.GetEntity(entRef) with
                 | Patterns.Try (Util.tryFindAnyEntAttribute [ Atts.stringEnum
