@@ -1,0 +1,41 @@
+
+import { Record } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { IComparable, IEquatable } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { record_type, char_type, bool_type, string_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { type FSharpList, tryFind } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+
+export class User extends Record implements IEquatable<User>, IComparable<User> {
+    readonly Id: string;
+    readonly IsAdmin: boolean;
+    readonly Initial: string;
+    constructor(Id: string, IsAdmin: boolean, Initial: string) {
+        super();
+        this.Id = Id;
+        this.IsAdmin = IsAdmin;
+        this.Initial = Initial;
+    }
+}
+
+export function User_$reflection(): TypeInfo {
+    return record_type("Brands.User", [], User, () => [["Id", string_type], ["IsAdmin", bool_type], ["Initial", char_type]]);
+}
+
+export const id = "u1";
+
+export const raw: string = id;
+
+export const user: User = new User(id, true, "u");
+
+export function find(key: string, users: FSharpList<User>): Option<User> {
+    return tryFind<User>((u: User): boolean => (u.Id === key), users);
+}
+
+export function isAdmin(user_1: User): boolean {
+    return user_1.IsAdmin;
+}
+
+export function tagAs(value: string): string {
+    return value;
+}
+

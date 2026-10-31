@@ -5911,6 +5911,11 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | "Fickl.Core.KeyOfBuilder"
     | "Fickl.Core.KeyOf" -> keyOf com ctx r t info.CompiledName args
     | "Fickl.Core.RecordModule" -> records com r t info.CompiledName args
+    // fickl: a branded primitive is the bare value
+    | "Fickl.Core.Brand" ->
+        match args with
+        | [ arg ] -> TypeCast(arg, t) |> Some
+        | _ -> None
     | "Fickl.Core.ValueOf" ->
         match info.CompiledName, args with
         | "ofKey", [ key; target ] -> TypeCast(Get(target, ExprGet key, Any, r), t) |> Some
