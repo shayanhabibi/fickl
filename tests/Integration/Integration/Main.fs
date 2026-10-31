@@ -8,6 +8,7 @@ let allTests =
     FileWatcher.tests
     CompilationTests.tests
     CompilationTests.dllAttributeTests
+    CacheInvalidation.tests
   ]
 
 open Expecto

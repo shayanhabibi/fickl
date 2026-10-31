@@ -734,6 +734,17 @@ let tests = testList "Strings" [
         sprintf "%s" s.[2..] |> equal "t and dog"
         sprintf "%s" s.[..8] |> equal "cat and d"
 
+    testCase "String slices clamp the bounds like .NET" <| fun () -> // See #5164
+        let s = "abc"
+        s.[-1..1] |> equal "ab"
+        s.[-5..] |> equal "abc"
+        s.[1..5] |> equal "bc"
+        s.[.. -2] |> equal ""
+        s.[-3.. -2] |> equal ""
+        s.[2..1] |> equal ""
+        let lower, upper = -1, 1
+        s.[lower..upper] |> equal "ab"
+
     testCase "String.Format works" <| fun () ->
         let arg1, arg2, arg3 = "F#", "Fable", "Babel"
         String.Format(CultureInfo.InvariantCulture, "{2} is to {1} what {1} is to {0}", arg1, arg2, arg3)
@@ -745,6 +756,13 @@ let tests = testList "Strings" [
         String.Format(CultureInfo.InvariantCulture, "{0:F2} {0:P2} {1:yyyy-MM-dd HH:mm}", i, dt)
                 .Replace(",", ".").Replace(" %", "%")
         |> equal "0.55 54.67% 2014-09-26 00:19"
+
+    testCase "String.Format unescapes doubled braces with a culture" <| fun () -> // See #5163
+        String.Format(CultureInfo.InvariantCulture, "{{{0}}}", 5) |> equal "{5}"
+        String.Format(CultureInfo.InvariantCulture, "{{x}} {0}", 1) |> equal "{x} 1"
+        String.Format(CultureInfo.InvariantCulture, "}}{{", 1) |> equal "}{"
+        String.Format(CultureInfo.InvariantCulture, "{{{0:N1}}}", 2.26) |> equal "{2.3}"
+        String.Format(CultureInfo.InvariantCulture, "{{{0,4}}}", 5) |> equal "{   5}"
 
 // String.Format has to recognise the value at runtime. The default JS
 // representation passes a Date for DateOnly and a number for TimeOnly and
@@ -1304,6 +1322,22 @@ let tests = testList "Strings" [
         String.Join(",", "abc") |> equal "abc"
         String.Join(",", [|"abc"|]) |> equal "abc"
         String.Join(",", ["abc"]) |> equal "abc"
+
+    testCase "String.Join treats a null separator as empty" <| fun () -> // See #5167
+        String.Join((null: string), [| "a"; "b" |]) |> equal "ab"
+        String.Join((null: string), seq { yield "a"; yield "b" }) |> equal "ab"
+        String.Join((null: string), "a", "b") |> equal "ab"
+        String.Join((null: string), [| "a"; "b"; "c" |], 1, 2) |> equal "bc"
+
+    testCase "String.Join treats null elements as empty" <| fun () ->
+        String.Join(",", [| "a"; null; "b" |]) |> equal "a,,b"
+        String.Join(",", [| box "a"; null; box 1 |]) |> equal "a,,1"
+
+    testCase "System.String.Concat treats null arguments as empty" <| fun () -> // See #5167
+        String.Concat("a", (null: string), "b") |> equal "ab"
+        String.Concat((null: string), "b") |> equal "b"
+        String.Concat([| "a"; null; "b" |]) |> equal "ab"
+        String.Concat(box "a", null, box 1) |> equal "a1"
 
     testCase "System.String.Concat works" <| fun () ->
         String.Concat("a", "b", "c")

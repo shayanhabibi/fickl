@@ -19,6 +19,7 @@
     <Compile Include="ProjectCrackerTests.fs" />
     <Compile Include="CompilationTests.fs" />
     <Compile Include="IncrementalTests.fs" />
+    <Compile Include="CacheInvalidationTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 </Project>
