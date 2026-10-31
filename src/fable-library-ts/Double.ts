@@ -40,6 +40,18 @@ export function equals(x: number, y: number): boolean {
   return x === y || (x !== x && y !== y);
 }
 
+export function tryParseSingle(str: string, style: number, defValue: FSharpRef<number>): boolean {
+  if (tryParse(str, style, defValue)) {
+    defValue.contents = Math.fround(defValue.contents);
+    return true;
+  }
+  return false;
+}
+
+export function parseSingle(str: string, style?: number): number {
+  return Math.fround(parse(str, style));
+}
+
 export function parseIgnoringUnderscores(str: string): number {
   return parse(str == null ? str : str.replace(/_/g, ""), NumberStyles.Float);
 }

@@ -264,9 +264,14 @@ let needToCast fromKind toKind =
     let h = kindIndex toKind // return type (horizontal)
     ((v > h) || (v < 4 && h > 3)) && (h < 8) || (h <> v && (h = 11 || v = 11))
 
+let roundToFloat32 r t (expr: Expr) =
+    match t with
+    | Number(Float32, _) -> emitExpr r t [ expr ] "Math.fround($0)"
+    | _ -> expr
+
 /// Conversions to floating point
 let toFloat com (ctx: Context) r targetType (args: Expr list) : Expr =
-    let converted =
+    let value =
         match args.Head.Type with
         | Char -> Helper.InstanceCall(args.Head, "charCodeAt", Int32.Number, [ makeIntConst 0 ])
         | String ->
@@ -287,11 +292,10 @@ let toFloat com (ctx: Context) r targetType (args: Expr list) : Expr =
 
             TypeCast(args.Head, targetType)
 
-    // A Single holds fewer digits: round to the nearest one, as the conversion does in .NET
-    match targetType, args.Head.Type with
-    | Number(Float32, _), Number(Float32, _) -> converted
-    | Number(Float32, _), _ -> Helper.GlobalCall("Math", targetType, [ converted ], memb = "fround")
-    | _ -> converted
+    match args.Head.Type with
+    | Char
+    | Number((Float32 | Int8 | UInt8 | Int16 | UInt16), _) -> value
+    | _ -> roundToFloat32 r targetType value
 
 let toDecimal com (ctx: Context) r targetType (args: Expr list) : Expr =
     match args.Head.Type with
@@ -524,12 +528,7 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
         Operation(Unary(operator, operand), Tags.empty, t, r)
 
     let binOp op left right =
-        let operation = Operation(Binary(op, left, right), Tags.empty, t, r)
-
-        match t with
-        // Single arithmetic rounds every result to single precision
-        | Number(Float32, _) -> Helper.GlobalCall("Math", t, [ operation ], memb = "fround")
-        | _ -> operation
+        Operation(Binary(op, left, right), Tags.empty, t, r)
 
     let binOpChar op left right =
         let toUInt16 e = toInt com ctx None UInt16.Number [ e ]
@@ -1729,6 +1728,7 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     // Unlike Double.Parse, FSharp.Core's float and float32 remove underscores
     | ("ToSingle" | "ToDouble"), [ ExprType String as str ] ->
         Helper.LibCall(com, "Double", "parseIgnoringUnderscores", t, [ str ], ?loc = r)
+        |> roundToFloat32 r t
         |> Some
     | ("ToSingle" | "ToDouble"), _ -> toFloat com ctx r t args |> Some
     | "ToDecimal", _ -> toDecimal com ctx r t args |> Some
@@ -2985,18 +2985,19 @@ let parseBool (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     | _ -> None
 
 let numericStringFormat (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) format =
-    let libCallFormat () =
+    let libCallFormat (token: string option) =
         let format = emitExpr r String [ format ] "'{0:' + $0 + '}'"
+        let thisArg = thisArg.Value
 
-        Helper.LibCall(
-            com,
-            "String",
-            "format",
-            t,
-            [ format; thisArg.Value ],
-            [ format.Type; thisArg.Value.Type ],
-            ?loc = r
-        )
+        let meth, thisArg =
+            match thisArg.Type, token |> Option.map (fun token -> token.ToLower()) with
+            | Number(Float32, _), (None | Some("g" | "r")) -> "formatSingle", thisArg
+            // "G" and "R" would print the sign of an int that JS holds as -0
+            | Number(Integers _, _), (None | Some("g" | "r")) ->
+                "format", makeBinOp r thisArg.Type thisArg (makeIntConst 0) BinaryPlus
+            | _ -> "format", thisArg
+
+        Helper.LibCall(com, "String", meth, t, [ format; thisArg ], [ format.Type; thisArg.Type ], ?loc = r)
         |> Some
 
     match format with
@@ -3034,8 +3035,8 @@ let numericStringFormat (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisA
                 | "f"
                 | "g"
                 | "n"
-                | "p" -> None
-                | "r" -> "with round-trip format specifier is not support by Fable" |> Some
+                | "p"
+                | "r" -> None
                 | "x" ->
                     match numberKind with
                     | Integers _
@@ -3049,11 +3050,11 @@ let numericStringFormat (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisA
                 |> addError com ctx.InlinePath r
 
                 None
-            | None -> libCallFormat ()
+            | None -> libCallFormat (Some token)
         else
-            libCallFormat ()
+            libCallFormat (Some format)
 
-    | _ -> libCallFormat ()
+    | _ -> libCallFormat None
 
 
 let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
@@ -3076,6 +3077,11 @@ let parseNum (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
                 [ str; style ] @ outValue
             else
                 [ str; style; makeBoolConst unsigned; makeIntConst bitsize ] @ outValue
+
+        let meth =
+            match kind with
+            | Float32 -> meth + "Single"
+            | _ -> meth
 
         let callExpr =
             Helper.LibCall(com, numberModule, Naming.lowerFirst meth, t, args, ?loc = r)
@@ -3365,21 +3371,28 @@ let intrinsicFunctions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisAr
     | "GetArray", _, [ ar; idx ] -> arrayGetItem com r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
     | "SetArray", _, [ ar; idx; value ] -> setExpr r ar idx value |> Some
     | ("GetArraySlice" | "GetStringSlice"), None, [ ar; lower; upper ] ->
-        // .NET clamps a negative bound to 0, where JS's slice counts it from the end
-        let nonNegative =
-            function
-            | Value(NumberConstant(NumberValue.Int32 v, _), _) as e when v >= 0 -> e
-            | Value(NewOption(None, _, _), _) as e -> e
-            | e -> Helper.GlobalCall("Math", Int32.Number, [ makeIntConst 0; e ], memb = "max")
+        // JS slice counts a negative index from the end, .NET clamps it to 0
+        let clampToZero (index: Expr) =
+            match index with
+            | Value(NumberConstant(NumberValue.Int32 n, _), _) when n >= 0 -> index
+            | _ -> Helper.GlobalCall("Math", Int32.Number, [ index; makeIntConst 0 ], memb = "max")
+
+        let lower =
+            match lower with
+            | Value(NewOption(None, _, _), _) -> makeIntConst 0
+            | Value(NewOption(Some lower, _, _), _)
+            | lower -> clampToZero lower
 
         let upper =
             match upper with
             | Value(NewOption(None, _, _), _) -> getExpr None (Int32.Number) ar (makeStrConst "length")
-            | Value(NumberConstant(NumberValue.Int32 v, _), _) -> makeIntConst (max 0 (v + 1))
-            | _ -> add upper (makeIntConst 1) |> nonNegative
+            | Value(NewOption(Some upper, _, _), _)
+            | upper ->
+                match upper with
+                | Value(NumberConstant(NumberValue.Int32 n, _), _) when n >= 0 -> makeIntConst (n + 1)
+                | upper -> add upper (makeIntConst 1) |> clampToZero
 
-        Helper.InstanceCall(ar, "slice", t, [ nonNegative lower; upper ], ?loc = r)
-        |> Some
+        Helper.InstanceCall(ar, "slice", t, [ lower; upper ], ?loc = r) |> Some
     | "SetArraySlice", None, args ->
         Helper.LibCall(com, "Array", "setSlice", t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
@@ -3680,6 +3693,7 @@ let exceptions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
         | _ -> getFieldWith r t e "message" |> Some
     | "get_StackTrace", Some e -> getFieldWith r t e "stack" |> Some
     | "get_InnerException", Some e -> getFieldWith r t e "innerException" |> Some
+    | "get_ParamName", Some _ -> bclType com ctx r t i thisArg args
     | _ -> None
 
 let unchecked (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (args: Expr list) =
@@ -3759,6 +3773,13 @@ let bitConvert (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option
         Helper.LibCall(com, "BitConverter", memberName, t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
 
+// The library decodes into a Uint8Array regardless of the typedArrays option
+let private decodedBytes (com: ICompiler) r t expr =
+    if com.Options.TypedArrays then
+        expr
+    else
+        toArray r t expr
+
 let convert (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (args: Expr list) =
     match i.CompiledName with
     | "ToSByte"
@@ -3783,7 +3804,19 @@ let convert (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option) (
         if not (List.isSingle args) then
             WarningCodes.base64ArgumentsIgnored |> addWarningWithCode com ctx.InlinePath r
 
-        Helper.LibCall(com, "String", (Naming.lowerFirst i.CompiledName), t, args, i.SignatureArgTypes, ?loc = r)
+        let expr =
+            Helper.LibCall(com, "String", (Naming.lowerFirst i.CompiledName), t, args, i.SignatureArgTypes, ?loc = r)
+
+        match i.CompiledName with
+        | "FromBase64String" -> decodedBytes com r t expr |> Some
+        | _ -> Some expr
+    | "ToHexString"
+    | "ToHexStringLower" ->
+        Helper.LibCall(com, "String", Naming.lowerFirst i.CompiledName, t, args, i.SignatureArgTypes, ?loc = r)
+        |> Some
+    | "FromHexString" when List.isSingle args ->
+        Helper.LibCall(com, "String", "fromHexString", t, args, i.SignatureArgTypes, ?loc = r)
+        |> decodedBytes com r t
         |> Some
     | _ -> None
 
@@ -4410,6 +4443,7 @@ let random (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opti
         | args ->
             Helper.LibCall(com, "Random", "seeded", t, args, i.SignatureArgTypes, ?loc = r)
             |> Some
+    | "get_Shared", None -> Helper.LibCall(com, "Random", "shared", t, [], ?loc = r) |> Some
     // Not yet supported
     | ("NextInt64" | "NextSingle"), _ -> None
     | meth, Some thisArg ->
@@ -5714,10 +5748,19 @@ let private nativeAsync (com: ICompiler) (ctx: Context) r t (info: CallInfo) arg
     let unitValue = Value(UnitConstant, r)
 
     match info.CompiledName, args with
-    | ("jsAsync" | "get_jsAsync" | ".ctor"), [] -> Value(Null t, r) |> Some
+    | ("jsAsync" | "get_jsAsync" | "promise" | "get_promise" | ".ctor"), [] -> Value(Null t, r) |> Some
     | "Return", [ value ] -> resolvedAsyncPayload com r value |> Some
     | "ReturnFrom", [ promise ] -> awaitPromise (genArg com ctx r 0 info.GenericArgs) promise |> Some
     | "Bind", [ promise; Body(arg, body) ] -> Let(arg, awaitPromise arg.Type promise, body) |> Some
+    | ("MergeSources" | "MergeSources3" | "MergeSources4" | "MergeSources5" | "MergeSources6"), promises ->
+        let promises = Value(NewTuple(promises, false), r)
+        Helper.GlobalCall("Promise", t, [ promises ], memb = "all", ?loc = r) |> Some
+    | "For", [ promise; Body(arg, body) ] when
+        (match info.SignatureArgTypes with
+         | DeclaredType(ent, _) :: _ -> ent.FullName = "Fable.Core.JS.Promise`1"
+         | _ -> false)
+        ->
+        Let(arg, awaitPromise arg.Type promise, body) |> Some
     | "Zero", ([] | [ Value(UnitConstant, _) ]) -> Some unitValue
     | "Delay", [ Body(_, body) ] -> Delegate([], body, None, [ "fickl-async-code" ]) |> Some
     | "Run", [ body ] ->

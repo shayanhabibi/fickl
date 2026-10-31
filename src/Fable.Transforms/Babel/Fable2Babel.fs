@@ -3511,7 +3511,7 @@ module Util =
         | Some(Assign left) -> ExpressionStatement(assign babelExpr.Location left babelExpr)
         | Some(Target left) -> ExpressionStatement(assign babelExpr.Location (left |> Expression.Identifier) babelExpr)
 
-    let transformOperation com ctx range opKind : Expression =
+    let transformOperation com ctx range typ opKind : Expression =
         match opKind with
         | Fable.Unary(op, TransformExpr com ctx expr) -> Expression.unaryExpression (op, expr, ?loc = range)
 
@@ -3547,7 +3547,16 @@ module Util =
                     Expression.binaryExpression (op, left, right, ?loc = range)
 
             | _, TransformExpr com ctx left, TransformExpr com ctx right ->
-                Expression.binaryExpression (op, left, right, ?loc = range)
+                let e = Expression.binaryExpression (op, left, right, ?loc = range)
+
+                match op, typ with
+                // Rounding the float64 result of one operation to float32 equals the float32 operation
+                | (BinaryPlus | BinaryMinus | BinaryMultiply | BinaryDivide | BinaryModulus), Fable.Number(Float32, _) ->
+                    let fround =
+                        Expression.memberExpression (Expression.identifier "Math", Expression.identifier "fround")
+
+                    Expression.callExpression (fround, [| e |], ?loc = range)
+                | _ -> e
 
         | Fable.Logical(op, TransformExpr com ctx left, TransformExpr com ctx right) ->
             Expression.logicalExpression (left, op, right, ?loc = range)
@@ -3614,9 +3623,15 @@ module Util =
                 |> Option.map (fun e -> com.TransformAsExpr(ctx, e))
                 |> Option.toList
 
-            transformCallArgs com ctx info
-            |> List.append thisArg
-            |> emitExpression range macro
+            let args = transformCallArgs com ctx info |> List.append thisArg
+
+            EmitMacro.tryFindNonLiteralRawArg (List.toArray args) macro
+            |> Option.iter (fun i ->
+                $"Emit placeholder $%d{i}! splices a string literal as raw code, but argument %d{i} is not a string literal. For a TypeScript non-null assertion, write ($%d{i})! instead"
+                |> addError com [] range
+            )
+
+            emitExpression range macro args
 
     [<RequireQualifiedAccess>]
     type JsxPropExpr =
@@ -5007,7 +5022,7 @@ but thanks to the optimisation done below we get
 
         | Fable.CurriedApply(callee, args, _, range) -> transformCurriedApply com ctx range callee args
 
-        | Fable.Operation(kind, _, _, range) -> transformOperation com ctx range kind
+        | Fable.Operation(kind, _, t, range) -> transformOperation com ctx range t kind
 
         | Fable.Get(expr, kind, typ, range) -> transformGet com ctx range typ expr kind
 
@@ -5163,7 +5178,7 @@ but thanks to the optimisation done below we get
                 [| resolveExpr t returnStrategy e |]
 
         | Fable.Operation(kind, _, t, range) ->
-            [| transformOperation com ctx range kind |> resolveExpr t returnStrategy |]
+            [| transformOperation com ctx range t kind |> resolveExpr t returnStrategy |]
 
         | Fable.Get(expr, kind, t, range) ->
             [| transformGet com ctx range t expr kind |> resolveExpr t returnStrategy |]

@@ -78,7 +78,7 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 
 | Feature | Kind | What it does |
 | --- | --- | --- |
-| `jsAsync { }` | Computation expression | Compiles to a native `async` function returning a `JS.Promise`: `let!` emits `await`, `for` over a `JS.AsyncIterable` emits `for await`, and it starts running immediately. There is no F# cancellation token: pass one to the work with `ToAbortSignal` or `Register`. |
+| `jsAsync { }`, `promise { }` | Computation expression | Compiles to a native `async` function returning a `JS.Promise`; `promise` is the same builder under Fable.Promise's name. `let!` emits `await`, `let! ... and! ...` awaits up to six promises together with `Promise.all`, `for value in aPromise do` awaits one promise, `for` over a `JS.AsyncIterable` emits `for await`, and it starts running immediately. There is no F# cancellation token: pass one to the work with `ToAbortSignal` or `Register`. |
 | `ToAbortSignal`, `FromAbortSignal` | Extension members | Convert a `CancellationToken` to the `AbortSignal` that `fetch` and other cancellable JavaScript APIs take, `cts.Token.ToAbortSignal()`, and back, `CancellationToken.FromAbortSignal(request.signal)`. `Async.AwaitPromise(p, token)` stops waiting when the token is cancelled and `Async.StartAsPromise(work, signal)` cancels on abort. An `AbortError` is an `OperationCanceledException` for `:?`, an async awaiting a promise that rejects with one is cancelled, and an `OperationCanceledException` is named `AbortError` for JavaScript. `JS.AbortSignal` and `JS.AbortController` bind the web types. |
 | `JsEvent.ofTarget`, `JsEvent.ofEmitter`, `JS.EventTarget` | Functions, bindings | `JsEvent.ofTarget button "click"` is an F# `IEvent` over `addEventListener`, so the `Event` and `Observable` functions apply, and disposing a subscription or removing a handler calls `removeEventListener`. `JsEvent.ofEmitter` does the same over a Node.js emitter's `on` and `off`. An F# class that inherits `JS.EventTarget` is one JavaScript subscribes to with `addEventListener`; `JsEvent.dispatch this "change" value` dispatches a `CustomEvent` with the value as `detail`. `JS.Event`, `JS.CustomEvent<'T>` and the listener options bind the web types, and `JS.AbortSignal` is an `EventTarget`. |
 | `[<AsyncFunction>]` | Attribute on a module function | Emits a function returning `jsAsync` as a native `async function` declaration. |
@@ -159,6 +159,10 @@ The capacity to explicitly control transformation via attributes does not have t
 | `--nativeErrors` | Every exception, from `failwith`, `invalidArg` and the runtime library to a declared F# exception, is `instanceof Error`, has a `stack` and has its inner exception as its `cause`, so Node, test runners and error reporters print it as an error. Without it, an exception is a plain object and is about 50 times faster to throw, because a native `Error` captures a stack trace when it is created ([#2160](https://github.com/fable-compiler/Fable/issues/2160)); code that throws exceptions for control flow pays that cost on every throw. The flag affects the whole program, including libraries compiled without it. |
 | `[<Fickl.Core.JsError>]` on an F# exception | The exception extends a native `Error` subclass, so only it pays for the stack trace. It still matches, compares and prints as an F# exception. |
 | `--temporal` | Represents `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly` and `TimeSpan` with the JavaScript Temporal API (experimental). |
+
+### Emit templates
+
+`$N!` in an `[<Emit>]` template writes string literal argument `N` as raw code, as in `let $0! = $1`. When argument `N` is anything other than a string literal, Fable prints nothing for it; Fickl reports an error instead. For a TypeScript non-null assertion on an argument, write `($N)!`.
 
 ## Transparency
 

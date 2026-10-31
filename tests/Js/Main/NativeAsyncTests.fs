@@ -39,7 +39,14 @@ let addAsync (first: JS.Promise<int>) (second: JS.Promise<int>) = jsAsync {
 }
 
 [<AsyncFunction>]
-let private readReceiver () : JS.Promise<string> = jsAsync {
+let promiseAdd (first: JS.Promise<int>) (second: JS.Promise<int>) = promise {
+    let! a = first
+    and! b = second
+    return a + b
+}
+
+[<AsyncFunction>]
+let private readReceiver (): JS.Promise<string> = jsAsync {
     do! JS.Constructors.Promise.resolve(())
     return emitJsExpr () "this.tag"
 }
@@ -218,6 +225,75 @@ let tests =
             let promise: JS.Promise<string> = emitJsExpr callback "$0.call({ tag: 'enclosing' })"
             let! value = Async.AwaitPromise promise
             value |> equal "enclosing"
+        }
+
+        testCaseAsync "and bang awaits each source and binds its value" <| fun () -> async {
+            let promise = jsAsync {
+                let! first = JS.Constructors.Promise.resolve(20)
+                and! second = JS.Constructors.Promise.resolve("22")
+                return first + int second
+            }
+            let! value = Async.AwaitPromise promise
+            value |> equal 42
+        }
+
+        testCaseAsync "and bang awaits three sources" <| fun () -> async {
+            let promise = jsAsync {
+                let! first = JS.Constructors.Promise.resolve(10)
+                and! second = JS.Constructors.Promise.resolve(12)
+                and! third = JS.Constructors.Promise.resolve(20)
+                return first + second + third
+            }
+            let! value = Async.AwaitPromise promise
+            value |> equal 42
+        }
+
+        testCaseAsync "and bang rejects without waiting for a pending source" <| fun () -> async {
+            let pending: JS.Promise<int> = JS.Constructors.Promise.Create(fun _ _ -> ())
+            let promise = jsAsync {
+                try
+                    let! first = pending
+                    and! second = JS.Constructors.Promise.reject<int>(System.Exception("rejected"))
+                    return first + second
+                with _ -> return 42
+            }
+            let! value = Async.AwaitPromise promise
+            value |> equal 42
+        }
+
+        testCaseAsync "and bang awaits six sources" <| fun () -> async {
+            let promise = jsAsync {
+                let! a = JS.Constructors.Promise.resolve(1)
+                and! b = JS.Constructors.Promise.resolve(2)
+                and! c = JS.Constructors.Promise.resolve(3)
+                and! d = JS.Constructors.Promise.resolve(4)
+                and! e = JS.Constructors.Promise.resolve(5)
+                and! f = JS.Constructors.Promise.resolve("27")
+                return a + b + c + d + e + int f
+            }
+            let! value = Async.AwaitPromise promise
+            value |> equal 42
+        }
+
+        testCaseAsync "promise is a native async computation like jsAsync" <| fun () -> async {
+            let mutable started = false
+            let computation = promise {
+                started <- true
+                let! first = JS.Constructors.Promise.resolve(20)
+                and! second = JS.Constructors.Promise.resolve(20)
+                for third in JS.Constructors.Promise.resolve(2) do
+                    return first + second + third
+            }
+            started |> equal true
+            emitJsExpr<bool> computation "$0 instanceof Promise" |> equal true
+            let! value = Async.AwaitPromise computation
+            value |> equal 42
+        }
+
+        testCaseAsync "promise functions marked AsyncFunction compile to async functions" <| fun () -> async {
+            emitJsExpr promiseAdd "$0.constructor.name" |> equal "AsyncFunction"
+            let! value = promiseAdd (JS.Constructors.Promise.resolve(20)) (JS.Constructors.Promise.resolve(22)) |> Async.AwaitPromise
+            value |> equal 42
         }
 
         testCaseAsync "return bang rejection is caught within native async handlers" <| fun () -> async {

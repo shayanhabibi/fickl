@@ -80,7 +80,7 @@ module EmitTypes =
     [<Fickl.Core.EmitType("`data-${string}`"); Erase>]
     type DataAttr = DataAttr of string
 
-    [<Fickl.Core.EmitType("Record<string, $0>")>]
+    [<Fickl.Core.EmitType("globalThis.Record<string, $0>")>]
     type Dict<'T> = interface end
 
     [<Fickl.Core.EmitType("Parameters<typeof JSON.stringify>[2]")>]
@@ -146,6 +146,11 @@ module Unknowns =
     let box' (value: obj) = { new IBox with member _.Get() = value }
 #endif
 
+type GenericNameRecord<'a> =
+    { Value: 'a }
+
+    static member Stringify v = string v
+
 type HidingBase() =
     member _.Read() = 1
     member _.Name = "base"
@@ -161,6 +166,11 @@ let tests =
         let value = HidingDerived()
         (value.Read(), value.Name) |> equal (2, "derived")
         ((value :> HidingBase).Read(), (value :> HidingBase).Name) |> equal (1, "base")
+
+    testCase "Compiler-generated generic names do not clash with the type's own" <| fun () ->
+        GenericNameRecord<string>.Stringify 456 |> equal "456"
+        { Value = "x" }.Value |> equal "x"
+
     #if FABLE_COMPILER
     testCase "jsOptions works" <| fun _ ->
         let opts = jsOptions<JsOptions>(fun o ->
