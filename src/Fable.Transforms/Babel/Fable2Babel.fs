@@ -2475,7 +2475,12 @@ module Util =
                     // won't automatically cast them to implementing interfaces
                     let fromUnion = sourceEnt.IsFSharpUnion && List.isMultiple sourceEnt.UnionCases
 
-                    if fromUnion || toTaggedUnion then
+                    // fickl: TypeScript cannot relate an EmitType annotation to the F# type it is cast to
+                    let fromEmitType =
+                        sourceEntRef.FullName <> entRef.FullName
+                        && hasAttribute Atts.ficklEmitType sourceEnt.Attributes
+
+                    if fromUnion || toTaggedUnion || fromEmitType then
                         AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                     else
                         jsExpr
@@ -2793,6 +2798,27 @@ module Util =
         let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
         let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
 
+        // fickl: jsOptions and partial build option bags from generated members
+        let isGeneratedBag =
+            isOptionBag
+            && not members.IsEmpty
+            && members
+               |> List.forall (fun (memb, _) ->
+                   match memb.MemberRef with
+                   | Fable.GeneratedMemberRef _ -> true
+                   | Fable.MemberRef _ -> false
+               )
+
+        // A nested setter makes a nested object, which a shallow Partial would check as complete
+        let isFlat =
+            members
+            |> List.forall (fun (memb, _) ->
+                match memb.Body with
+                | Fable.ObjectExpr _ -> false
+                | _ -> true
+            )
+
+
         let hasExplicitDisposal name =
             members
             |> List.exists (fun (memb, info) -> memb.Name = name || SymbolKeys.isWellKnownMember name info)
@@ -2923,9 +2949,18 @@ module Util =
 
             match typ with
             | Fable.DeclaredType(entRef, _) when com.IsTypeScript ->
-                if entRef.FullName = Types.ienumerableGeneric || isOptionBag then
+                let ta = makeTypeAnnotation com ctx typ
+
+                if isGeneratedBag && entRef.FullName = "Fickl.Core.Partial`1" then
+                    // `partial`: the literal is checked against Partial<T>, and keeps its own type
+                    SatisfiesExpression(expr, ta)
+                elif isGeneratedBag && isFlat then
+                    // jsOptions: misspelled keys and mistyped values are caught before the cast
+                    let partial = AliasTypeAnnotation(Identifier.identifier "Partial", [| ta |])
+
+                    AsExpression(SatisfiesExpression(expr, partial), ta)
+                elif entRef.FullName = Types.ienumerableGeneric || isOptionBag then
                     // Interop option bags can intentionally contain only part of the declared interface.
-                    let ta = makeTypeAnnotation com ctx typ
                     AsExpression(expr, ta)
                 else
                     expr
