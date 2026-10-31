@@ -67,6 +67,7 @@
     <Compile Include="NativeFunctionTests.fs" />
     <Compile Include="NativeDisposalTests.fs" />
     <Compile Include="NativeErrorTests.fs" />
+    <Compile Include="WeakReferenceTests.fs" />
     <Compile Include="NativeAsyncTests.fs" />
     <Compile Include="NativeGeneratorTests.fs" />
     <Compile Include="NativeAsyncGeneratorTests.fs" />

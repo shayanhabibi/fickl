@@ -1230,6 +1230,13 @@ module Annotation =
         | "Fickl.Core.JsGeneratorResult`2" -> makeNativeTypeAnnotation com ctx genArgs "IteratorResult" |> Some
         | "Fickl.Core.JsYieldResult`1" -> makeNativeTypeAnnotation com ctx genArgs "IteratorYieldResult" |> Some
         | "Fickl.Core.JsReturnResult`1" -> makeNativeTypeAnnotation com ctx genArgs "IteratorReturnResult" |> Some
+        // fickl: a WeakRef target must be an object, which an unconstrained type parameter is not
+        | "System.WeakReference`1" ->
+            match genArgs with
+            | [ Fable.GenericParam _ as arg ] ->
+                EmitTypeAnnotation("WeakRef<$0 & object>", [| makeTypeAnnotation com ctx arg |])
+                |> Some
+            | _ -> makeNativeTypeAnnotation com ctx genArgs "WeakRef" |> Some
         | _ when not ent.IsInterface -> None
         // everything below is an interface
         | Types.icollection ->

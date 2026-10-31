@@ -126,3 +126,30 @@ module JS =
         /// <summary>Copies the elements into a new F# array.</summary>
         /// <param name="array">The read-only array to copy.</param>
         let toArray (array: ReadonlyArray<'T>) : 'T[] = nativeOnly
+
+    /// <summary>The JavaScript <c>WeakRef</c>: a reference that does not keep its target from being collected.</summary>
+    /// <remarks><c>System.WeakReference&lt;'T></c> compiles to this too, so use either. A global from ES2021.</remarks>
+    [<Global; AllowNullLiteral>]
+    type WeakRef<'T when 'T: not struct>(target: 'T) =
+        /// <summary>The target, or <c>None</c> once it has been collected.</summary>
+        member _.deref() : 'T option = nativeOnly
+
+    /// <summary>The JavaScript <c>FinalizationRegistry</c>: calls back, some time after a registered object is
+    /// collected, with the value it was registered with.</summary>
+    /// <remarks>The callback may run late or never, for example when the program ends first: use it to release
+    /// resources that are also safe to leak, not for logic the program depends on. A global from ES2021.</remarks>
+    /// <example><code lang="fsharp">
+    /// let registry = JS.FinalizationRegistry(fun (held: string) -> printfn "collected %s" held)
+    /// registry.register(node, "node-1")
+    /// </code></example>
+    [<Global; AllowNullLiteral>]
+    type FinalizationRegistry<'T>(cleanupCallback: 'T -> unit) =
+        /// <summary>Calls the cleanup callback with a held value once the target is collected.</summary>
+        /// <param name="target">The object to watch. It must not be the held value, which would keep it alive.</param>
+        /// <param name="heldValue">The value the callback receives.</param>
+        /// <param name="unregisterToken">An object to pass to <c>unregister</c>, often the target itself.</param>
+        member _.register(target: obj, heldValue: 'T, ?unregisterToken: obj) : unit = nativeOnly
+
+        /// <summary>Stops watching the targets registered with a token, and returns whether there were any.</summary>
+        /// <param name="unregisterToken">The token the targets were registered with.</param>
+        member _.unregister(unregisterToken: obj) : bool = nativeOnly

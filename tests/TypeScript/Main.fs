@@ -12,6 +12,7 @@ let allTests =
     NativeFunctions.tests
     NativeDisposal.tests
     NativeErrors.tests
+    WeakReferences.tests
     NativeAsync.tests
     NativeGenerators.tests
     NativeAsyncGenerators.tests

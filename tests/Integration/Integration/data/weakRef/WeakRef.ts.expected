@@ -1,0 +1,75 @@
+
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { defaultOf } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { create, tryGetTarget } from "./fable_modules/fable-library-ts.5.25.0/WeakRef.ts";
+import { FSharpRef } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import { some, type Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+import { printf, toConsole } from "./fable_modules/fable-library-ts.5.25.0/String.ts";
+
+export class Node$ {
+    readonly name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+export function Node$_$reflection(): TypeInfo {
+    return class_type("WeakRef.Node", undefined, Node$);
+}
+
+export function Node_$ctor_Z721C83C5(name: string): Node$ {
+    return new Node$(name);
+}
+
+export function Node__get_Name(_: Node$): string {
+    return _.name;
+}
+
+export function track(node: Node$): WeakRef<Node$> {
+    return new WeakRef<Node$>(node);
+}
+
+export function tryName(reference: WeakRef<Node$>): Option<string> {
+    let matchValue: [boolean, Node$];
+    let outArg: Node$ = defaultOf();
+    matchValue = ([tryGetTarget(reference, new FSharpRef<Node$>((): Node$ => outArg, (v: Node$): void => {
+        outArg = v;
+    })), outArg] as [boolean, Node$]);
+    if (matchValue[0]) {
+        return Node__get_Name(matchValue[1]);
+    }
+    else {
+        return undefined;
+    }
+}
+
+export function trackAny<T>(value: T): WeakRef<T & object> {
+    return create(value);
+}
+
+export function tryTarget<T>(reference: WeakRef<T & object>): Option<T> {
+    let matchValue: [boolean, T];
+    let outArg: T = defaultOf();
+    matchValue = ([tryGetTarget(reference, new FSharpRef<T>((): T => outArg, (v: T): void => {
+        outArg = v;
+    })), outArg] as [boolean, T]);
+    if (matchValue[0]) {
+        return some(matchValue[1]);
+    }
+    else {
+        return undefined;
+    }
+}
+
+export const registry: FinalizationRegistry<string> = new FinalizationRegistry<string>((held: string): void => {
+    toConsole(printf("collected %s"))(held);
+});
+
+export function watch(node: Node$): void {
+    registry.register(node, Node__get_Name(node), node);
+}
+
+export function native(node: Node$): WeakRef<Node$> {
+    return new WeakRef<Node$>(node);
+}
+
