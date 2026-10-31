@@ -1018,6 +1018,7 @@ module Annotation =
         | Fable.String -> StringTypeAnnotation
         | Fable.Regex -> makeAliasTypeAnnotation com ctx "RegExp"
         | Fable.Number(BigInt, _) -> makeAliasTypeAnnotation com ctx "bigint"
+        | Fable.Number(_, Fable.NumberInfo.IsEnum(Patterns.Try (tryTsEnumTypeAnnotation com ctx) ta)) -> ta
         | Fable.Number(Int32, Fable.NumberInfo.IsEnum ent) when ent.FullName = "System.DateTimeKind" ->
             makeFableLibImportTypeAnnotation com ctx [] "Util" "DateTimeKind"
         | Fable.Number(kind, _) -> makeNumericTypeAnnotation com ctx kind
@@ -1458,6 +1459,15 @@ module Annotation =
             | (:? string as text) :: _ -> EmitTypeAnnotation(text, args)
             | _ -> AnyTypeAnnotation
         )
+
+    /// fickl: a `[<TsEnum>]` enum is typed by its name, which TypeScript resolves to the enum's ambient declaration
+    let tryTsEnumTypeAnnotation (com: IBabelCompiler) ctx (entRef: Fable.EntityRef) =
+        match com.TryGetEntity entRef with
+        | Some ent when FSharp2Fable.Util.isTsEnumEntity com ent ->
+            match annotationConstructor com ctx ent with
+            | Some(Expression.Identifier id) -> AliasTypeAnnotation(id, [||]) |> Some
+            | _ -> None
+        | _ -> None
 
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
         match genArgs, ent with
@@ -2449,6 +2459,11 @@ module Util =
 
     let transformCast (com: IBabelCompiler) (ctx: Context) typ e : Expression =
         match typ with
+        // fickl: TypeScript rejects a number literal outside a `[<TsEnum>]` enum, `enum 5`, unless it is widened
+        | Fable.Number(_, Fable.NumberInfo.IsEnum entRef) when com.IsTypeScript ->
+            match com.TransformAsExpr(ctx, e), Annotation.tryTsEnumTypeAnnotation com ctx entRef with
+            | Literal _ as literal, Some ta -> AsExpression(AsExpression(literal, NumberTypeAnnotation), ta)
+            | jsExpr, _ -> jsExpr
         // Optimization for (numeric) array or list literals casted to seq
         // Done at the very end of the compile pipeline to get more opportunities
         // of matching cast and literal expressions after resolving pipes, inlining...
@@ -7043,6 +7058,88 @@ but thanks to the optimisation done below we get
         )
         |> asModuleDeclaration ent.IsPublic
 
+    /// fickl: `[<TsEnum>]` emits `const Color = Object.freeze({ Red: 0, 0: "Red" })`, the object a TypeScript enum
+    /// compiles to. In TypeScript, an ambient `declare enum Color_$enum` types it, so the declaration stays erasable,
+    /// and `type Color = Color_$enum` annotates the enum's values
+    let transformTsEnumDeclaration (com: IBabelCompiler) ctx (ent: Fable.Entity) (decl: Fable.ClassDecl) =
+        let underlyingKind =
+            ent.FSharpFields
+            |> List.tryPick (fun fi ->
+                match fi.Name, fi.FieldType with
+                | "value__", Fable.Number(kind, _) -> Some kind
+                | _ -> None
+            )
+
+        match underlyingKind with
+        | Some(Int64 | UInt64) ->
+            $"TsEnum does not support %s{ent.FullName}, whose underlying type is 64-bit"
+            |> addError com [] None
+
+            []
+        | _ ->
+            let members =
+                ent.FSharpFields
+                |> List.choose (fun fi ->
+                    match fi.Name, fi.LiteralValue with
+                    | "value__", _ -> None
+                    | name, Some value -> Some(name, System.Convert.ToDouble value)
+                    | _, None -> None
+                )
+
+            let property (key: Expression, isComputed) value =
+                ObjectMember.objectProperty (key, value, isComputed = isComputed)
+
+            let reverseMapping =
+                members
+                |> List.map (fun (name, value) ->
+                    property (Expression.numericLiteral value, false) (Expression.stringLiteral name)
+                )
+
+            let enumObject =
+                Expression.callExpression (
+                    Expression.memberExpression (Expression.identifier "Object", Expression.identifier "freeze"),
+                    [|
+                        (members
+                         |> List.map (fun (name, value) ->
+                             property (memberFromName name) (Expression.numericLiteral value)
+                         ))
+                        @ reverseMapping
+                        |> List.toArray
+                        |> Expression.objectExpression
+                    |]
+                )
+
+            if com.IsTypeScript then
+                let ambientName = decl.Name + "_$enum"
+
+                let ambientEnum =
+                    Declaration.enumDeclaration (
+                        ambientName,
+                        members
+                        |> List.mapToArray (fun (name, value) -> name, Expression.numericLiteral value),
+                        isDeclare = true
+                    )
+
+                let enumObjectType = TypeofTypeAnnotation(Expression.identifier ambientName)
+
+                [
+                    PrivateModuleDeclaration(Statement.Declaration ambientEnum)
+                    Declaration.variableDeclaration (
+                        Const,
+                        decl.Name,
+                        annotation = enumObjectType,
+                        init = AsExpression(enumObject, enumObjectType)
+                    )
+                    |> asModuleDeclaration ent.IsPublic
+                    TypeAliasDeclaration(decl.Name, [||], AliasTypeAnnotation(Identifier.identifier ambientName, [||]))
+                    |> asModuleDeclaration ent.IsPublic
+                ]
+            else
+                [
+                    Declaration.variableDeclaration (Const, decl.Name, init = enumObject)
+                    |> asModuleDeclaration ent.IsPublic
+                ]
+
     let transformStringEnumDeclaration (ent: Fable.Entity) (attArgs: obj list) (decl: Fable.ClassDecl) =
         let ta = makeStringEnumTypeAnnotation ent attArgs
 
@@ -7193,6 +7290,7 @@ but thanks to the optimisation done below we get
                 | true, true, Atts.tsTaggedUnion ->
                     [ transformTypeScriptTaggedUnionDeclaration com ctx ent attArgs decl ]
                 | _ -> []
+            | ent when FSharp2Fable.Util.isTsEnumEntity com ent -> transformTsEnumDeclaration com ctx ent decl
             | ent when ent.IsInterface ->
                 if com.IsTypeScript then
                     [ transformInterfaceDeclaration com ctx ent decl ]

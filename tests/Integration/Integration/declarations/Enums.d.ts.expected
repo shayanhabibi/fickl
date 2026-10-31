@@ -1,0 +1,7 @@
+declare enum Status_$enum {
+    Active = 1,
+    Retired = 2
+}
+export declare const Status: typeof Status_$enum;
+export type Status = Status_$enum;
+export declare function retire(status: Status): Status;
