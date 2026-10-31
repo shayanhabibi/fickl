@@ -14,6 +14,50 @@ type JsAsyncBuilder() =
     member _.ReturnFrom(promise: JS.Promise<'T>) : JS.Promise<'T> = nativeOnly
     /// <summary>Awaits a Promise before continuing the computation.</summary>
     member _.Bind(promise: JS.Promise<'T>, continuation: 'T -> JS.Promise<'U>) : JS.Promise<'U> = nativeOnly
+    /// <summary>Awaits the Promises of <c>let! ... and! ...</c> together with <c>Promise.all</c>.</summary>
+    member _.MergeSources(first: JS.Promise<'T1>, second: JS.Promise<'T2>) : JS.Promise<'T1 * 'T2> = nativeOnly
+
+    /// <summary>Awaits the Promises of <c>let! ... and! ... and! ...</c> together with <c>Promise.all</c>.</summary>
+    member _.MergeSources3
+        (first: JS.Promise<'T1>, second: JS.Promise<'T2>, third: JS.Promise<'T3>)
+        : JS.Promise<'T1 * 'T2 * 'T3>
+        =
+        nativeOnly
+
+    /// <summary>Awaits four <c>and!</c> Promises together with <c>Promise.all</c>.</summary>
+    member _.MergeSources4
+        (first: JS.Promise<'T1>, second: JS.Promise<'T2>, third: JS.Promise<'T3>, fourth: JS.Promise<'T4>)
+        : JS.Promise<'T1 * 'T2 * 'T3 * 'T4>
+        =
+        nativeOnly
+
+    /// <summary>Awaits five <c>and!</c> Promises together with <c>Promise.all</c>.</summary>
+    member _.MergeSources5
+        (
+            first: JS.Promise<'T1>,
+            second: JS.Promise<'T2>,
+            third: JS.Promise<'T3>,
+            fourth: JS.Promise<'T4>,
+            fifth: JS.Promise<'T5>
+        )
+        : JS.Promise<'T1 * 'T2 * 'T3 * 'T4 * 'T5>
+        =
+        nativeOnly
+
+    /// <summary>Awaits six <c>and!</c> Promises together with <c>Promise.all</c>.</summary>
+    member _.MergeSources6
+        (
+            first: JS.Promise<'T1>,
+            second: JS.Promise<'T2>,
+            third: JS.Promise<'T3>,
+            fourth: JS.Promise<'T4>,
+            fifth: JS.Promise<'T5>,
+            sixth: JS.Promise<'T6>
+        )
+        : JS.Promise<'T1 * 'T2 * 'T3 * 'T4 * 'T5 * 'T6>
+        =
+        nativeOnly
+
     /// <summary>Produces a completed unit computation.</summary>
     member _.Zero() : JS.Promise<unit> = nativeOnly
     /// <summary>Defers execution of the computation body.</summary>
@@ -28,6 +72,8 @@ type JsAsyncBuilder() =
     member _.For(values: seq<'T>, body: 'T -> JS.Promise<unit>) : JS.Promise<unit> = nativeOnly
     /// <summary>Awaits each value from an asynchronous source, closing its iterator on early exit.</summary>
     member _.For(values: JS.AsyncIterable<'T>, body: 'T -> JS.Promise<unit>) : JS.Promise<unit> = nativeOnly
+    /// <summary>Awaits a single Promise and runs the body once with its value, as <c>for value in promise do</c>.</summary>
+    member _.For(promise: JS.Promise<'T>, body: 'T -> JS.Promise<'U>) : JS.Promise<'U> = nativeOnly
     /// <summary>Handles exceptions from a computation, including rejected Promises.</summary>
     member _.TryWith(body: JS.Promise<'T>, handler: exn -> JS.Promise<'T>) : JS.Promise<'T> = nativeOnly
     /// <summary>Runs compensation after the computation settles.</summary>
@@ -53,3 +99,6 @@ module NativeAsync =
     /// }
     /// </code></example>
     let jsAsync: JsAsyncBuilder = nativeOnly
+
+    /// <summary>The <c>jsAsync</c> computation expression under the name Fable.Promise uses, so <c>promise { }</c> compiles to a native async function.</summary>
+    let promise: JsAsyncBuilder = nativeOnly
