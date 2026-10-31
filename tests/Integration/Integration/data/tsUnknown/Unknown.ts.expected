@@ -1,0 +1,97 @@
+
+import { type IMap, type MutableArray, doubleToString } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { ofArray, type FSharpList, sumBy } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import type { float64 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { tryHead } from "./fable_modules/fable-library-ts.5.25.0/Array.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+
+/**
+ * Parses JSON; TypeScript callers must narrow the result.
+ */
+export function parse(text: string): unknown;
+
+export function parse(text: string): any {
+    return JSON.parse(text);
+}
+
+export function anyValue(value: any): any {
+    return value;
+}
+
+export function field(value: unknown, name: string): unknown;
+
+export function field(value: any, name: string): any {
+    return value[name];
+}
+
+export function describe(value: unknown): string;
+
+export function describe(value: any): string {
+    if (typeof value === "string") {
+        return "string " + value;
+    }
+    else if (typeof value === "number") {
+        return "number " + doubleToString(value);
+    }
+    else {
+        return "other";
+    }
+}
+
+export function sumOf(values: FSharpList<unknown>): float64;
+
+export function sumOf(values: FSharpList<any>): float64 {
+    return sumBy<any, float64>((value: any): float64 => value, values, {
+        GetZero: (): float64 => 0,
+        Add: (x: float64, y: float64): float64 => (x + y),
+    });
+}
+
+export function tryFirst(values: MutableArray<unknown>): Option<unknown>;
+
+export function tryFirst(values: MutableArray<any>): Option<any> {
+    return tryHead<any>(values);
+}
+
+export function onValue(handler: ((arg0: unknown) => void), value: any): void;
+
+export function onValue(handler: ((arg0: any) => void), value: any): void {
+    handler(value);
+}
+
+export function count(): unknown;
+
+export function count(): any {
+    return 1;
+}
+
+export function useResults(): float64 {
+    return ((field(parse("{\"a\":1}") as any, "a") as any) + (count() as any)) + sumOf(ofArray([1, 2]));
+}
+
+export interface IBag {
+    Get(key: string): unknown,
+    Put(key: string, value: unknown): void,
+    get Size(): any
+}
+
+export function bag(): IBag {
+    const items: IMap<string, any> = new Map();
+    return new (class {
+        Get(key: string): any {
+            return items.get(key);
+        }
+        Put(key_1: string, value: any): void {
+            items.set(key_1, value);
+        }
+        get Size(): any {
+            return items.size;
+        }
+    }
+    )();
+}
+
+export function readBag<$a>(b: IBag): $a {
+    return (b.Get("a") as any).length;
+}
+

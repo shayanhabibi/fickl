@@ -778,6 +778,16 @@ module PrinterExtensions =
                 printer.PrintNewLine()
             | InterfaceDeclaration(id, body, extends, typeParameters, _doc) ->
                 printer.PrintInterfaceDeclaration(id, body, extends, typeParameters)
+            | FunctionSignatureDeclaration(parameters, id, returnType, typeParameters, _doc) ->
+                printer.Print("function ")
+                printer.PrintIdent(id)
+                printer.Print(typeParameters)
+                printer.Print("(")
+                printer.PrintParameters(parameters)
+                printer.Print("): ")
+                printer.Print(returnType)
+                printer.Print(";")
+                printer.PrintNewLine()
             | EnumDeclaration(name, cases, isConst) ->
                 if isConst then
                     printer.Print("const ")
