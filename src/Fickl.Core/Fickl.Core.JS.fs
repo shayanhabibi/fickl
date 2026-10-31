@@ -200,3 +200,144 @@ module JS =
         /// <summary>Stops watching the targets registered with a token, and returns whether there were any.</summary>
         /// <param name="unregisterToken">The token the targets were registered with.</param>
         member _.unregister(unregisterToken: obj) : bool = nativeOnly
+
+    /// <summary>A JavaScript <c>symbol</c>: a unique value used as a property key.</summary>
+    /// <remarks>Create one with <c>JS.Symbol.create</c>, or a shared one with <c>JS.Symbol.``for``</c>.</remarks>
+    [<Global; EmitType("symbol"); AllowNullLiteral>]
+    type Symbol private () =
+        /// <summary>The description the symbol was created with, if any.</summary>
+        member _.description: string option = nativeOnly
+
+        /// <summary>A new symbol, unequal to every other: <c>Symbol(description)</c>.</summary>
+        [<Emit("Symbol($0)")>]
+        static member create(?description: string) : Symbol = nativeOnly
+
+        /// <summary>The symbol registered under a key, shared across the program: <c>Symbol.for(key)</c>.</summary>
+        static member ``for``(key: string) : Symbol = nativeOnly
+
+        /// <summary>The key a symbol from <c>Symbol.for</c> is registered under, or <c>None</c>.</summary>
+        static member keyFor(symbol: Symbol) : string option = nativeOnly
+
+        /// <summary>The well-known <c>Symbol.iterator</c>.</summary>
+        static member iterator: Symbol = nativeOnly
+
+        /// <summary>The well-known <c>Symbol.asyncIterator</c>.</summary>
+        static member asyncIterator: Symbol = nativeOnly
+
+        /// <summary>The well-known <c>Symbol.toStringTag</c>.</summary>
+        static member toStringTag: Symbol = nativeOnly
+
+    /// <summary>The TypeScript <c>PropertyKey</c>: a property name, which is a string, a number or a symbol.</summary>
+    /// <remarks>A key a proxy trap receives is a string or a symbol; a number key arrives as its string.</remarks>
+    type PropertyKey = U3<string, float, Symbol>
+
+    /// <summary>The traps of a <c>Proxy</c>, the TypeScript <c>ProxyHandler&lt;T></c>. Every trap is optional: one that
+    /// is not set forwards the operation to the target.</summary>
+    /// <remarks>Build a handler with <c>JS.ProxyHandler.create</c>, which sets only the traps assigned. In each trap,
+    /// the <c>JS.Reflect</c> member of the same name performs the default operation.</remarks>
+    [<AllowNullLiteral; EmitType("ProxyHandler<$0>")>]
+    type ProxyHandler<'T> =
+        /// <summary>Reads a property: <c>(target, key, receiver) => value</c>.</summary>
+        abstract get: ('T -> PropertyKey -> obj -> obj) with get, set
+        /// <summary>Writes a property: <c>(target, key, value, receiver) => succeeded</c>. Returning <c>false</c> makes the
+        /// write throw a <c>TypeError</c> in strict-mode code, which ES modules are.</summary>
+        abstract set: ('T -> PropertyKey -> obj -> obj -> bool) with get, set
+        /// <summary>The <c>in</c> operator: <c>(target, key) => present</c>.</summary>
+        abstract has: ('T -> PropertyKey -> bool) with get, set
+        /// <summary>The <c>delete</c> operator: <c>(target, key) => succeeded</c>.</summary>
+        abstract deleteProperty: ('T -> PropertyKey -> bool) with get, set
+        /// <summary>Lists own keys, for <c>Object.keys</c> and <c>Reflect.ownKeys</c>: <c>(target) => keys</c>.</summary>
+        abstract ownKeys: ('T -> PropertyKey[]) with get, set
+        /// <summary>Describes an own property: <c>(target, key) => descriptor</c>, <c>None</c> when it is missing.</summary>
+        abstract getOwnPropertyDescriptor: ('T -> PropertyKey -> Fable.Core.JS.PropertyDescriptor option) with get, set
+        /// <summary>Defines a property, for <c>Object.defineProperty</c>: <c>(target, key, descriptor) => succeeded</c>.</summary>
+        abstract defineProperty: ('T -> PropertyKey -> Fable.Core.JS.PropertyDescriptor -> bool) with get, set
+        /// <summary>Calls a function target: <c>(target, thisArg, args) => result</c>.</summary>
+        abstract apply: ('T -> obj -> obj[] -> obj) with get, set
+        /// <summary>Calls a function target with <c>new</c>: <c>(target, args, newTarget) => instance</c>.</summary>
+        abstract construct: ('T -> obj[] -> obj -> obj) with get, set
+        /// <summary>Reads the prototype, for <c>Object.getPrototypeOf</c>: <c>(target) => prototype</c>.</summary>
+        abstract getPrototypeOf: ('T -> obj) with get, set
+        /// <summary>Sets the prototype: <c>(target, prototype) => succeeded</c>.</summary>
+        abstract setPrototypeOf: ('T -> obj -> bool) with get, set
+        /// <summary>Whether properties can be added: <c>(target) => extensible</c>.</summary>
+        abstract isExtensible: ('T -> bool) with get, set
+        /// <summary>Stops properties from being added: <c>(target) => succeeded</c>.</summary>
+        abstract preventExtensions: ('T -> bool) with get, set
+
+    /// <summary>Builds <c>ProxyHandler</c> objects.</summary>
+    [<RequireQualifiedAccess>]
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module ProxyHandler =
+        /// <summary>A handler with only the traps the lambda sets, compiled to an object literal as <c>jsOptions</c> is.</summary>
+        /// <param name="setters">A lambda that assigns traps on its argument.</param>
+        /// <example><code lang="fsharp">
+        /// JS.ProxyHandler.create (fun h -> h.get &lt;- fun target key receiver -> JS.Reflect.get (target, key, receiver))
+        /// // { get: (target, key, receiver) => Reflect.get(target, key, receiver) }
+        /// </code></example>
+        let create<'T> (setters: ProxyHandler<'T> -> unit) : ProxyHandler<'T> = nativeOnly
+
+    /// <summary>A <c>Proxy</c> from <c>JS.Proxy.revocable</c>, with the function that revokes it.</summary>
+    [<AllowNullLiteral; EmitType("{ proxy: $0; revoke: () => void }")>]
+    type RevocableProxy<'T> =
+        /// <summary>The proxy.</summary>
+        abstract proxy: 'T
+        /// <summary>Revokes the proxy: every later operation on it throws a <c>TypeError</c>.</summary>
+        abstract revoke: unit -> unit
+
+    /// <summary>The JavaScript <c>Proxy</c>, which wraps an object and intercepts operations on it with traps.</summary>
+    /// <remarks>The proxy has the type of its target, and nothing checks that the traps keep to it.</remarks>
+    [<RequireQualifiedAccess>]
+    module Proxy =
+        /// <summary>A proxy for the target that runs the handler's traps: <c>new Proxy(target, handler)</c>.</summary>
+        /// <param name="target">The object, array or function the proxy forwards to.</param>
+        /// <param name="handler">The traps, from <c>JS.ProxyHandler.create</c>.</param>
+        [<Emit("new Proxy($0, $1)")>]
+        let create (target: 'T) (handler: ProxyHandler<'T>) : 'T = nativeOnly
+
+        /// <summary>A proxy that can be revoked: <c>Proxy.revocable(target, handler)</c>.</summary>
+        /// <param name="target">The object, array or function the proxy forwards to.</param>
+        /// <param name="handler">The traps, from <c>JS.ProxyHandler.create</c>.</param>
+        [<Emit("Proxy.revocable($0, $1)")>]
+        let revocable (target: 'T) (handler: ProxyHandler<'T>) : RevocableProxy<'T> = nativeOnly
+
+    /// <summary>The JavaScript <c>Reflect</c>: the default behaviour of each <c>Proxy</c> trap, as a function.</summary>
+    [<Global>]
+    type Reflect private () =
+        /// <summary>Reads a property, calling a getter with the receiver as <c>this</c>.</summary>
+        static member get(target: obj, key: PropertyKey, ?receiver: obj) : obj = nativeOnly
+        /// <summary>Writes a property, and returns whether it was written.</summary>
+        static member set(target: obj, key: PropertyKey, value: obj, ?receiver: obj) : bool = nativeOnly
+        /// <summary>Whether the object or its prototype chain has the property, as the <c>in</c> operator.</summary>
+        static member has(target: obj, key: PropertyKey) : bool = nativeOnly
+        /// <summary>Deletes a property, and returns whether it is gone.</summary>
+        static member deleteProperty(target: obj, key: PropertyKey) : bool = nativeOnly
+        /// <summary>The object's own keys, strings and symbols, enumerable or not.</summary>
+        static member ownKeys(target: obj) : PropertyKey[] = nativeOnly
+
+        /// <summary>The descriptor of an own property, or <c>None</c>.</summary>
+        static member getOwnPropertyDescriptor
+            (target: obj, key: PropertyKey)
+            : Fable.Core.JS.PropertyDescriptor option
+            =
+            nativeOnly
+
+        /// <summary>Defines a property, and returns whether it was defined.</summary>
+        static member defineProperty
+            (target: obj, key: PropertyKey, attributes: Fable.Core.JS.PropertyDescriptor)
+            : bool
+            =
+            nativeOnly
+
+        /// <summary>Calls a function with a <c>this</c> and arguments.</summary>
+        static member apply(target: obj, thisArgument: obj, arguments: obj[]) : obj = nativeOnly
+        /// <summary>Calls a constructor with <c>new</c>, and optionally another constructor as <c>new.target</c>.</summary>
+        static member construct(target: obj, arguments: obj[], ?newTarget: obj) : obj = nativeOnly
+        /// <summary>The object's prototype.</summary>
+        static member getPrototypeOf(target: obj) : obj = nativeOnly
+        /// <summary>Sets the object's prototype, and returns whether it was set.</summary>
+        static member setPrototypeOf(target: obj, prototype: obj) : bool = nativeOnly
+        /// <summary>Whether properties can be added to the object.</summary>
+        static member isExtensible(target: obj) : bool = nativeOnly
+        /// <summary>Stops properties from being added, and returns whether that succeeded.</summary>
+        static member preventExtensions(target: obj) : bool = nativeOnly
