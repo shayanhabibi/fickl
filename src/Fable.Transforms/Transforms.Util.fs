@@ -130,6 +130,9 @@ module Atts =
     let ficklTypePredicate = "Fickl.Core.TypePredicateAttribute" // typeof<Fickl.Core.TypePredicateAttribute>.FullName
 
     [<Literal>]
+    let ficklReturnsThis = "Fickl.Core.ReturnsThisAttribute" // typeof<Fickl.Core.ReturnsThisAttribute>.FullName
+
+    [<Literal>]
     let ficklTypeAssertion = "Fickl.Core.TypeAssertionAttribute" // typeof<Fickl.Core.TypeAssertionAttribute>.FullName
 
     [<Literal>]
