@@ -249,12 +249,12 @@ export class HiddenDerived extends HiddenBase {
         super();
     }
     @(identityDecorator)
-    accessor Value: int32 = 2;
+    override accessor Value: int32 = 2;
     @(identityDecorator)
-    Read(): int32 {
+    override Read(): int32 {
         return 2;
     }
-    [$ficklSymbol$393ec1a9](): int32 {
+    override [$ficklSymbol$393ec1a9](): int32 {
         return 2;
     }
     @(identityDecorator)

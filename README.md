@@ -85,6 +85,11 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `--declaration` | CLI flag | Writes a TypeScript declaration file (`.d.ts`) next to each JavaScript file. |
 | `--strictOptions` | CLI flag | Keeps `Some null` apart from `None`, as on .NET. |
 | `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |
+| `--nativeErrors` | CLI flag | Makes every exception a JS `Error`, with a `stack` and, for an inner exception, a `cause`. |
+| `[<JsError>]` | Attribute on an F# exception | Compiles the exception as a JS `Error` subclass, with a `stack`. |
+| `JS.Error`, `JS.TypeError`, `JS.RangeError`, `JS.SyntaxError`, `JS.ReferenceError`, `JS.AggregateError`, `JS.DOMException` | Bindings | The errors JavaScript throws, to catch with `:?` (`instanceof`) and construct, with `message`, `name`, `stack` and `cause`. |
+| `JS.Thrown` | Active pattern | Matches a caught value that is neither a JS `Error` nor an F# exception, such as a thrown string, and passes it as it was thrown. |
+| `e.Message` of a thrown value | Runtime | A caught value typed `exn` that is not an object, such as a thrown string or `undefined`, has `String(e)` as its message instead of `undefined` or a `TypeError`. |
 | `--temporal` | CLI flag | Represents dates and times with the JavaScript Temporal API (experimental). |
 | `--server` | CLI flag | Compiles through a background server that keeps check results, so a recompile only rechecks what changed. `FICKL_SERVER=1` turns it on too. |
 | `--timings` | CLI flag | Prints a per-phase timing and allocation report after each compilation. |
@@ -107,6 +112,8 @@ The capacity to explicitly control transformation via attributes does not have t
 | `--strictOptions` | An `option` of a type that can be null (string, array, class, record, function, `Nullable`) keeps `Some null` apart from `None`, as on .NET: it is built with `some` and read with `value`. Without it, such an option is erased, which is faster and reads as `T \| undefined` in TypeScript, but `Some null` is `None`. A `voption` stays erased either way, so it is the type to use for interop. |
 | `[<Fickl.Core.NoOverloadSuffix>]` on a member or type | Drops the overload hash from a method's compiled name, `Counter__Add` instead of `Counter__Add_Z524259A4`, so JavaScript can call it by name. On a type it applies to every member that is not overloaded; on an overloaded member it is an error. |
 | `--clampByteArrays` | Compiles byte arrays as `Uint8ClampedArray`, the type canvas pixel data uses. Out-of-range values clamp instead of wrapping as on .NET. |
+| `--nativeErrors` | Every exception, from `failwith`, `invalidArg` and the runtime library to a declared F# exception, is `instanceof Error`, has a `stack` and has its inner exception as its `cause`, so Node, test runners and error reporters print it as an error. Without it, an exception is a plain object and is about 50 times faster to throw, because a native `Error` captures a stack trace when it is created ([#2160](https://github.com/fable-compiler/Fable/issues/2160)); code that throws exceptions for control flow pays that cost on every throw. The flag affects the whole program, including libraries compiled without it. |
+| `[<Fickl.Core.JsError>]` on an F# exception | The exception extends a native `Error` subclass, so only it pays for the stack trace. It still matches, compares and prints as an F# exception. |
 | `--temporal` | Represents `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly` and `TimeSpan` with the JavaScript Temporal API (experimental). |
 
 ## Transparency

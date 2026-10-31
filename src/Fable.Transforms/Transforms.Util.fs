@@ -142,6 +142,9 @@ module Atts =
     let ficklNoOverloadSuffix = "Fickl.Core.NoOverloadSuffixAttribute" // typeof<Fickl.Core.NoOverloadSuffixAttribute>.FullName
 
     [<Literal>]
+    let ficklJsError = "Fickl.Core.JsErrorAttribute" // typeof<Fickl.Core.JsErrorAttribute>.FullName
+
+    [<Literal>]
     let stringEnum = "Fable.Core.StringEnumAttribute" // typeof<Fable.Core.StringEnumAttribute>.FullName
 
     [<Literal>]

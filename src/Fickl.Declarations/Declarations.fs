@@ -141,7 +141,7 @@ let rec private undecoratedModule =
 let rec private classMemberKey (memb: ClassMember) =
     match memb with
     | DecoratedClassMember(_, memberDeclaration) -> classMemberKey memberDeclaration
-    | ClassAutoAccessor(key, _, _, isStatic, _, _) -> Some(isStatic, keyName key)
+    | ClassAutoAccessor(key, _, _, isStatic, _, _, _) -> Some(isStatic, keyName key)
     | ClassMethod(kind, _, _, isStatic, _, _, _, _, _, _) ->
         match kind with
         | ClassPrimaryConstructor _ -> None
@@ -380,7 +380,7 @@ let rec private declarationClassMembers
         match memb with
         | DecoratedClassMember(_, memberDeclaration) ->
             declarationClassMembers isUnion jsMembers [| memberDeclaration |]
-        | ClassAutoAccessor(key, value, computed, isStatic, annotation, loc) ->
+        | ClassAutoAccessor(key, value, computed, isStatic, _, annotation, loc) ->
             declarationClassMembers
                 isUnion
                 jsMembers
