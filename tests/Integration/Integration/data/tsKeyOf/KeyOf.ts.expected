@@ -1,0 +1,70 @@
+
+import { Record } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import type { KeysOfType, IComparable, IEquatable } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { record_type, string_type, int32_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+
+export class Config extends Record implements IEquatable<Config>, IComparable<Config> {
+    readonly Port: int32;
+    readonly Host: string;
+    Retries: int32;
+    constructor(Port: int32, Host: string, Retries: int32) {
+        super();
+        this.Port = (Port | 0);
+        this.Host = Host;
+        this.Retries = (Retries | 0);
+    }
+}
+
+export function Config_$reflection(): TypeInfo {
+    return record_type("KeyOf.Config", [], Config, () => [["Port", int32_type], ["Host", string_type], ["Retries", int32_type]]);
+}
+
+export interface IConfig {
+    get Name(): string,
+    get Port(): int32,
+    set Name(arg0: string)
+}
+
+export const port = "Port";
+
+export const retries = "Retries";
+
+export const name = "Name";
+
+export function readPort(c: Config): int32 {
+    return c[port] | 0;
+}
+
+export function bump(c: Config): void {
+    c[retries] = ((c.Retries + 1) | 0);
+}
+
+export function tryRead(key: (keyof Config) & string, c: Config): Option<any> {
+    return c[key];
+}
+
+export function ofString(s: string): KeysOfType<Config, int32> {
+    return s as KeysOfType<Config, int32>;
+}
+
+export const widened = port as (keyof Config) & string;
+
+export function describe(key: (keyof Config) & string): string {
+    if (key === "Port") {
+        return "port";
+    }
+    else {
+        return key;
+    }
+}
+
+export function read<T, R>(key: KeysOfType<T, R>, target: T): R {
+    return (target as globalThis.Record<KeysOfType<T, R>, R>)[key];
+}
+
+export function write<T, R>(key: KeysOfType<T, R>, target: T, value: R): void {
+    (target as globalThis.Record<KeysOfType<T, R>, R>)[key] = value;
+}
+

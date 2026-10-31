@@ -5852,6 +5852,32 @@ let private cancellationExtensions (com: ICompiler) r t (info: CallInfo) (thisAr
         |> Some
     | _ -> None
 
+/// fickl: `keyof _.Port` is the name the compiled access reads, and `KeyOf.get`/`set` index the object by it
+let private keyOf (com: ICompiler) (ctx: Context) r t methodName args =
+    match methodName, args with
+    | "keyof", [ property ] ->
+        match property with
+        | MaybeInScope ctx (Lambda(arg, Get(IdentExpr target, kind, _, _), _)) when target.Name = arg.Name ->
+            match kind with
+            | FieldGet info -> Some info.Name
+            | ExprGet(StringConst name) -> Some name
+            | _ -> None
+        | _ -> None
+        |> Option.defaultWith (fun () ->
+            "keyof takes a lambda that reads one property of its argument, such as `fun x -> x.name` or `_.name`. "
+            + "A path, a method or a class property, which compiles to a call, has no key"
+            |> addError com ctx.InlinePath r
+
+            Naming.unknown
+        )
+        |> fun name -> Value(StringConstant name, r) |> Some
+    | "get", [ key; target ] -> Get(target, ExprGet key, t, r) |> Some
+    | "set", [ key; target; value ] -> Set(target, ExprSet key, value.Type, value, r) |> Some
+    | "tryGet", [ key; target ] -> TypeCast(Get(target, ExprGet key, Any, r), t) |> Some
+    | ("widen" | "unsafeOfString"), [ arg ] -> TypeCast(arg, t) |> Some
+    | "|Key|_|", [ name; key ] -> makeEqOp r (TypeCast(key, String)) name BinaryEqual |> Some
+    | _ -> None
+
 let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match info.DeclaringEntityFullName with
     | Patterns.DicContains replacedModules replacement -> replacement com ctx r t info thisArg args
@@ -5862,6 +5888,8 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
     | "Fickl.Core.JS" -> jsErrors com r t info.CompiledName args
     | "Fickl.Core.CancellationExtensions" -> cancellationExtensions com r t info thisArg args
+    | "Fickl.Core.KeyOfBuilder"
+    | "Fickl.Core.KeyOf" -> keyOf com ctx r t info.CompiledName args
     | "Fickl.Core.JS.ReadonlyArrayModule"
     | "Fickl.Core.JS.ReadonlyArray" ->
         match info.CompiledName, args with

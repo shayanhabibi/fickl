@@ -2,6 +2,9 @@
 
 export type Nullable<T> = T | null | undefined;
 
+/** The string keys of `T` whose property type is assignable to `R`: `Fickl.Core.keyof<'T, 'R>`. */
+export type KeysOfType<T, R> = { [K in keyof T]-?: T[K] extends R ? K : never }[keyof T] & string;
+
 export interface MutableArray<T> extends Iterable<T> {
   readonly length: number;
   [index: number]: T;

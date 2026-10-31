@@ -1488,8 +1488,23 @@ module Annotation =
             | _ -> None
         | _ -> None
 
+    /// fickl: property keys, written here rather than by their EmitType text so arguments get parentheses
+    /// and `keyof<'T, 'R>` gets the library's name for the mapped type
+    let tryKeyTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        match ent.FullName, genArgs with
+        | "Fickl.Core.keyof`1", [ target ] ->
+            IntersectionTypeAnnotation
+                [|
+                    KeyofTypeAnnotation(makeTypeAnnotation com ctx target)
+                    StringTypeAnnotation
+                |]
+            |> Some
+        | "Fickl.Core.keyof`2", _ -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "KeysOfType" |> Some
+        | _ -> None
+
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
         match genArgs, ent with
+        | _, Patterns.Try (tryKeyTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryEmitTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta
 
@@ -3967,10 +3982,24 @@ but thanks to the optimisation done below we get
                     Statement.ifStatement (jsGuardExpr, thenStmnt, Statement.blockStatement (statements), ?loc = r)
                 |> Array.singleton
 
+    /// fickl: TypeScript cannot resolve `T[KeysOfType<T, R>]` to `R` while `T` or `R` is generic, but it can
+    /// index `Record<KeysOfType<T, R>, R>`, so the object is cast to that. `globalThis` passes the import of
+    /// Fable's own `Record` class
+    let private keyedAccessTarget (com: IBabelCompiler) ctx (key: Fable.Expr) (expr: Expression) =
+        match key.Type with
+        | Fable.DeclaredType(entRef, [ _; valueType ]) when
+            com.IsTypeScript
+            && entRef.FullName = "Fickl.Core.keyof`2"
+            && not (List.isEmpty (FSharp2Fable.Util.getGenParamNames key.Type.Generics))
+            ->
+            AsExpression(expr, makeNativeTypeAnnotation com ctx [ key.Type; valueType ] "globalThis.Record")
+        | _ -> expr
+
     let transformGet (com: IBabelCompiler) ctx range typ fableExpr kind =
         match kind with
-        | Fable.ExprGet(TransformExpr com ctx prop) ->
-            let expr = com.TransformAsExpr(ctx, fableExpr)
+        | Fable.ExprGet key ->
+            let prop = com.TransformAsExpr(ctx, key)
+            let expr = com.TransformAsExpr(ctx, fableExpr) |> keyedAccessTarget com ctx key
             getExpr range expr prop
 
         | Fable.FieldGet info ->
@@ -4065,7 +4094,7 @@ but thanks to the optimisation done below we get
         let ret =
             match kind with
             | Fable.ValueSet -> expr
-            | Fable.ExprSet(TransformExpr com ctx e) -> getExpr None expr e
+            | Fable.ExprSet key -> getExpr None (keyedAccessTarget com ctx key expr) (com.TransformAsExpr(ctx, key))
             | Fable.FieldSet(fieldName) -> SymbolKeys.access com ctx None fableExpr.Type expr fieldName
 
         // If this is an arry setter, we need to use the `setItem` method
