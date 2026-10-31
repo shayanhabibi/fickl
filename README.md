@@ -34,9 +34,9 @@ Time from saving a file to `Watching` in one `--watch` session per compiler. Raw
 ## Differences from Fable
 
 <!-- fickl-differences:start -->
-What Fickl gets right that Fable 5.25.0 does not, checked by compiling each case in [tests/Differences](tests/Differences) with both and running it with node. A case leaves this table once Fable passes it too.
+What Fickl gets right that Fable 5.26.0 does not, checked by compiling each case in [tests/Differences](tests/Differences) with both and running it with node. A case leaves this table once Fable passes it too.
 
-| Change | Fickl | Fable 5.25.0 | Issues |
+| Change | Fickl | Fable 5.26.0 | Issues |
 | --- | --- | --- | --- |
 | `[<CallableInterface>]` | An object expression implementing a callable interface compiles to a plain JavaScript function, and keeps a generic `Invoke` generic. | doesn't type-check: The namespace or module 'Fickl' is not defined. | [#8](https://github.com/shayanhabibi/fickl/issues/8), [#10](https://github.com/shayanhabibi/fickl/issues/10), [#11](https://github.com/shayanhabibi/fickl/issues/11) |
 | `--clampByteArrays` | Compiles byte arrays as `Uint8ClampedArray`, the type canvas pixel data uses, so they can be passed to it without a copy. | doesn't compile: Unknown argument: --clampbytearrays | [#39](https://github.com/shayanhabibi/fickl/issues/39) |
