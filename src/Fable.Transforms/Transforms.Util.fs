@@ -152,6 +152,9 @@ module Atts =
 
     let ficklSymbolKey = "Fickl.Core.SymbolKeyAttribute"
 
+    [<Literal>]
+    let ficklPrivateFields = "Fickl.Core.PrivateFieldsAttribute"
+
     let ficklAsyncGeneratorFunction = "Fickl.Core.AsyncGeneratorFunctionAttribute"
 
     let ficklGeneratorFunction = "Fickl.Core.GeneratorFunctionAttribute"

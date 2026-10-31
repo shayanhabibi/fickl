@@ -4,21 +4,21 @@ import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
 import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
 
 export class Counter extends EventTarget {
-    count: int32;
+    #count: int32;
     constructor(start: int32) {
         super();
-        this.count = (start | 0);
+        this.#count = (start | 0);
     }
     static get observedAttributes(): MutableArray<string> {
         return ["count"];
     }
     get Count(): int32 {
         const _: Counter = this;
-        return _.count | 0;
+        return _.#count | 0;
     }
     Increment(): void {
         const _: Counter = this;
-        _.count = ((_.count + 1) | 0);
+        _.#count = ((_.#count + 1) | 0);
     }
     override dispatchEvent(_arg: any): boolean {
         return true;
