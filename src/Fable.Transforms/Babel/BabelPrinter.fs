@@ -847,12 +847,34 @@ module PrinterExtensions =
                 printer.Print(declaration)
             | ImportDeclaration(specifiers, source, attributes) ->
                 printer.PrintImportDeclaration(specifiers, source, attributes)
+            // fickl: `export {}` keeps a file of augmentations a module
+            | ExportNamedReferences([||], None) -> printer.Print("export {}")
             | ExportNamedReferences(specifiers, source) ->
                 printer.Print("export ")
                 printer.Print("{ ")
                 printer.PrintCommaSeparatedArray(specifiers)
                 printer.Print(" }")
                 printer.PrintOptional(source, " from ")
+            | AugmentationDeclaration(modulePath, declarations) ->
+                match modulePath with
+                | Some(StringLiteral(path, _)) ->
+                    // the path an import of the module would print, so both name the same module
+                    printer.Print("declare module \"")
+                    printer.Print(printer.MakeImportPath(path))
+                    printer.Print("\" ")
+                | None -> printer.Print("declare global ")
+
+                printer.PrintBlock(
+                    declarations,
+                    (fun p decl ->
+                        p.PrintJsDoc(decl.JsDoc)
+                        p.PrintDeclaration(decl)
+                    ),
+                    (fun p ->
+                        if p.Column > 0 then
+                            p.PrintNewLine()
+                    )
+                )
             | ExportNamedDeclaration(declaration) ->
                 printer.PrintJsDoc(declaration.JsDoc)
                 printer.Print("export ")

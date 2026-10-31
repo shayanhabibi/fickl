@@ -12,6 +12,7 @@
     <Compile Include="Mangling.fs" />
     <Compile Include="Guards.fs" />
     <Compile Include="Enums.fs" />
+    <Compile Include="Augment.fs" />
   </ItemGroup>
 
   <ItemGroup>

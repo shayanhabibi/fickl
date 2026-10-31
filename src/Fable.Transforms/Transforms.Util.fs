@@ -133,6 +133,12 @@ module Atts =
     let ficklReturnsThis = "Fickl.Core.ReturnsThisAttribute" // typeof<Fickl.Core.ReturnsThisAttribute>.FullName
 
     [<Literal>]
+    let ficklAugmentGlobal = "Fickl.Core.AugmentGlobalAttribute" // typeof<Fickl.Core.AugmentGlobalAttribute>.FullName
+
+    [<Literal>]
+    let ficklAugmentModule = "Fickl.Core.AugmentModuleAttribute" // typeof<Fickl.Core.AugmentModuleAttribute>.FullName
+
+    [<Literal>]
     let ficklTypeAssertion = "Fickl.Core.TypeAssertionAttribute" // typeof<Fickl.Core.TypeAssertionAttribute>.FullName
 
     [<Literal>]

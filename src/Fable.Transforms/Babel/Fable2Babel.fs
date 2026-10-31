@@ -1555,6 +1555,47 @@ module Annotation =
             | _ -> AnyTypeAnnotation
         )
 
+    /// fickl: the global interface an `[<AugmentGlobal>]` interface augments, or the module path and interface name of
+    /// an `[<AugmentModule>]`, with a relative path resolved from the declaring F# file
+    let tryAugmentedInterface (com: IBabelCompiler) (ent: Fable.Entity) =
+        ent.Attributes
+        // reading the arguments of every attribute would throw on those FCS cannot convert
+        |> Seq.filter (fun att ->
+            att.Entity.FullName = Atts.ficklAugmentGlobal
+            || att.Entity.FullName = Atts.ficklAugmentModule
+        )
+        |> Seq.tryPick (fun att ->
+            match att.Entity.FullName, att.ConstructorArgs with
+            | Atts.ficklAugmentGlobal, [ :? string as name ] -> Some(None, name)
+            | Atts.ficklAugmentModule, [ :? string as path; :? string as name ] ->
+                let path =
+                    if Path.isRelativePath path then
+                        ent.Ref.SourcePath
+                        |> Option.map (FSharp2Fable.Util.fixImportedRelativePath com path)
+                        |> Option.defaultValue path
+                    else
+                        path
+
+                Some(Some path, name)
+            | _ -> None
+        )
+
+    /// fickl: an augmenting interface has no declaration of its own, so it is typed as the interface it augments,
+    /// imported from its module for `[<AugmentModule>]`
+    let tryAugmentTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        tryAugmentedInterface com ent
+        |> Option.map (fun (path, name) ->
+            let id =
+                match path with
+                | Some path ->
+                    match com.InTypePosition(fun () -> com.GetImportExpr(ctx, name, path, None)) with
+                    | Expression.Identifier id -> id
+                    | _ -> Identifier.identifier name
+                | None -> Identifier.identifier name
+
+            AliasTypeAnnotation(id, genArgs |> List.mapToArray (makeTypeAnnotation com ctx))
+        )
+
     /// fickl: a `[<TsEnum>]` enum is typed by its name, which TypeScript resolves to the enum's ambient declaration
     let tryTsEnumTypeAnnotation (com: IBabelCompiler) ctx (entRef: Fable.EntityRef) =
         match com.TryGetEntity entRef with
@@ -1591,6 +1632,7 @@ module Annotation =
         match genArgs, ent with
         | _, Patterns.Try (tryKeyTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryEmitTypeAnnotation com ctx genArgs) ta -> ta
+        | _, Patterns.Try (tryAugmentTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta
 
         | _, Patterns.Try (annotationConstructor com ctx) entRef ->
@@ -7405,7 +7447,7 @@ but thanks to the optimisation done below we get
                     |> declareModuleMember com ctx exposedCons
         ]
 
-    let transformInterfaceDeclaration (com: IBabelCompiler) ctx (ent: Fable.Entity) (decl: Fable.ClassDecl) =
+    let private makeInterfaceDeclaration (com: IBabelCompiler) ctx (ent: Fable.Entity) name doc =
 
         let members =
             ent.MembersFunctionsAndValues
@@ -7430,14 +7472,18 @@ but thanks to the optimisation done below we get
         let typeParameters =
             FSharp2Fable.Util.getEntityGenArgs ent |> makeTypeParamDecl com ctx
 
-        Declaration.interfaceDeclaration (
-            Identifier.identifier decl.Name,
-            members,
-            extends,
-            typeParameters,
-            ?doc = decl.XmlDoc
-        )
+        Declaration.interfaceDeclaration (Identifier.identifier name, members, extends, typeParameters, ?doc = doc)
+
+    let transformInterfaceDeclaration (com: IBabelCompiler) ctx (ent: Fable.Entity) (decl: Fable.ClassDecl) =
+        makeInterfaceDeclaration com ctx ent decl.Name decl.XmlDoc
         |> asModuleDeclaration ent.IsPublic
+
+    /// fickl: `[<AugmentGlobal>]` and `[<AugmentModule>]` declare the interface's members under the augmented
+    /// interface's name, in `declare global { }` or `declare module "path" { }`
+    let transformAugmentation (com: IBabelCompiler) ctx (ent: Fable.Entity) (decl: Fable.ClassDecl) (path, name) =
+        let declaration = makeInterfaceDeclaration com ctx ent name decl.XmlDoc
+        let path = path |> Option.map (fun path -> StringLiteral(path, None))
+        AugmentationDeclaration(path, [| declaration |])
 
     /// fickl: `[<TsEnum>]` emits `const Color = Object.freeze({ Red: 0, 0: "Red" })`, the object a TypeScript enum
     /// compiles to. In TypeScript, an ambient `declare enum Color_$enum` types it, so the declaration stays erasable,
@@ -7682,7 +7728,9 @@ but thanks to the optimisation done below we get
             | ent when FSharp2Fable.Util.isTsEnumEntity com ent -> transformTsEnumDeclaration com ctx ent decl
             | ent when ent.IsInterface ->
                 if com.IsTypeScript then
-                    [ transformInterfaceDeclaration com ctx ent decl ]
+                    match Annotation.tryAugmentedInterface com ent with
+                    | Some augmented -> [ transformAugmentation com ctx ent decl augmented ]
+                    | None -> [ transformInterfaceDeclaration com ctx ent decl ]
                 else
                     []
             | ent ->
@@ -8111,5 +8159,27 @@ module Compiler =
         let body =
             topDirectivesPrologue @ importDecls @ com.GetSymbolDeclarations() @ rootDecls
             |> List.toArray
+
+        // fickl: TypeScript only allows augmentations in a module, so a file that imports and exports nothing
+        // else says `export {}`
+        let body =
+            let isAugmentation =
+                function
+                | AugmentationDeclaration _ -> true
+                | _ -> false
+
+            let isModuleSyntax =
+                function
+                | ImportDeclaration _
+                | ExportNamedDeclaration _
+                | ExportAllDeclaration _
+                | ExportDefaultDeclaration _
+                | ExportNamedReferences _ -> true
+                | _ -> false
+
+            if Array.exists isAugmentation body && not (Array.exists isModuleSyntax body) then
+                Array.append body [| ExportNamedReferences([||], None) |]
+            else
+                body
 
         Program(body)
