@@ -1,6 +1,6 @@
 
 import { defaultArg, type Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
-import { Exception } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { exceptionMessage, Exception } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
 import { FSharpResult$2_Ok, FSharpResult$2_Error$, type FSharpResult$2_$union } from "./fable_modules/fable-library-ts.5.25.0/Result.ts";
 import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
 import { isUserLike } from "./guards.js";
@@ -75,8 +75,7 @@ export function checkedName(x: any): string {
         matchValue = FSharpResult$2_Error$<User, Exception>(error);
     }
     if ((matchValue.tag as int32) === /* Error */ 1) {
-        const e = matchValue.fields[0] as Exception;
-        return e.message;
+        return exceptionMessage(matchValue.fields[0] as Exception);
     }
     else {
         const user = matchValue.fields[0] as User;
