@@ -160,6 +160,10 @@ The capacity to explicitly control transformation via attributes does not have t
 | `[<Fickl.Core.JsError>]` on an F# exception | The exception extends a native `Error` subclass, so only it pays for the stack trace. It still matches, compares and prints as an F# exception. |
 | `--temporal` | Represents `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly` and `TimeSpan` with the JavaScript Temporal API (experimental). |
 
+### Emit templates
+
+`$N!` in an `[<Emit>]` template writes string literal argument `N` as raw code, as in `let $0! = $1`. When argument `N` is anything other than a string literal, Fable prints nothing for it; Fickl reports an error instead. For a TypeScript non-null assertion on an argument, write `($N)!`.
+
 ## Transparency
 
 Development loops are increasingly becoming agentic, and workflows are increasingly being inhibited/obstructed by the lack of machine readable diagnostics/logs/information.
