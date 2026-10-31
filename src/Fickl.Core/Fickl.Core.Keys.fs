@@ -107,3 +107,18 @@ module Record =
     /// <summary>The object's own property names: <c>Object.keys(r)</c>.</summary>
     /// <remarks>A number key is a string here, as JavaScript object keys always are.</remarks>
     let keys (record: Record<'K, 'V>) : string[] = nativeOnly
+
+/// <summary>The TypeScript <c>T[keyof T]</c>: the value of some property of <c>'T</c>, not known which.</summary>
+/// <remarks>Read it as a type with <c>ValueOf.unsafeAs</c>, which nothing checks. Changes only TypeScript annotations;
+/// the JavaScript value is the property's value itself.</remarks>
+[<Erase; EmitType("$0[keyof $0]")>]
+type valueof<'T> = private | ValueOf of obj
+
+/// <summary>Builds and reads <c>valueof</c> values.</summary>
+[<RequireQualifiedAccess>]
+module ValueOf =
+    /// <summary>The value of the property the key names: <c>target[key]</c>.</summary>
+    let ofKey (key: keyof<'T, 'R>) (target: 'T) : valueof<'T> = nativeOnly
+
+    /// <summary>Treats the value as a <c>'R</c>; nothing checks that it is one. TypeScript sees the cast.</summary>
+    let unsafeAs<'T, 'R> (value: valueof<'T>) : 'R = nativeOnly

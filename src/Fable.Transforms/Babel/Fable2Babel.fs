@@ -1481,6 +1481,15 @@ module Annotation =
                 |]
             |> Some
         | "Fickl.Core.keyof`2", _ -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "KeysOfType" |> Some
+        | "Fickl.Core.valueof`1", [ target ] ->
+            match makeTypeAnnotation com ctx target with
+            | UnionTypeAnnotation _
+            | IntersectionTypeAnnotation _
+            | FunctionTypeAnnotation _
+            | KeyofTypeAnnotation _
+            | EmitTypeAnnotation _ as ta -> EmitTypeAnnotation("($0)[keyof $0]", [| ta |])
+            | ta -> IndexedTypeAnnotation(ta, KeyofTypeAnnotation ta)
+            |> Some
         | _ -> None
 
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
@@ -2536,6 +2545,17 @@ module Util =
                 | _ -> jsExpr
             )
         | Fable.Unit -> com.TransformAsExpr(ctx, e) |> Some |> undefined e.Range
+        // fickl: a `valueof<'T>` is any property type of T, so treating it as one of them is a visible cast
+        | _ when
+            com.IsTypeScript
+            && (
+                match e.Type with
+                | Fable.DeclaredType(entRef, _) -> entRef.FullName = "Fickl.Core.valueof`1"
+                | _ -> false
+            )
+            && typ <> Fable.Any
+            ->
+            AsExpression(com.TransformAsExpr(ctx, e), makeTypeAnnotation com ctx typ)
         | _ -> com.TransformAsExpr(ctx, e)
 
     let transformCurry (com: IBabelCompiler) (ctx: Context) expr arity : Expression =

@@ -273,6 +273,9 @@ module Keys =
 
     let total (scores: ReadonlyRecord<string, int>) (names: string[]) = names |> Array.sumBy (fun name -> scores.[name])
 
+    // Not inline, so the TypeScript output casts a generic indexed access type
+    let valueAs<'T, 'R> (value: valueof<'T>) : 'R = ValueOf.unsafeAs value
+
 [<StringEnum>]
 #endif
 type Field = OldPassword | NewPassword | ConfirmPassword
@@ -1257,6 +1260,14 @@ let tests =
         let headers = createEmpty<Keys.Headers>
         headers.["accept"] <- "text/plain"
         headers.["accept"] |> equal "text/plain"
+
+    testCase "valueof holds the value of a property" <| fun () ->
+        let server: Keys.Server = { Port = 80; Host = "localhost"; Retries = 0 }
+        let port = ValueOf.ofKey (keyof (fun (s: Keys.Server) -> s.Port)) server
+        let host = ValueOf.ofKey (keyof (fun (s: Keys.Server) -> s.Host)) server
+        ValueOf.unsafeAs<Keys.Server, int> port |> equal 80
+        ValueOf.unsafeAs<Keys.Server, string> host |> equal "localhost"
+        Keys.valueAs<Keys.Server, string> host |> equal "localhost"
 
     testCase "StringEnum attribute works" <| fun () ->
         Vertical |> unbox |> equal "vertical"

@@ -5773,6 +5773,11 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | "Fickl.Core.KeyOfBuilder"
     | "Fickl.Core.KeyOf" -> keyOf com ctx r t info.CompiledName args
     | "Fickl.Core.RecordModule" -> records com r t info.CompiledName args
+    | "Fickl.Core.ValueOf" ->
+        match info.CompiledName, args with
+        | "ofKey", [ key; target ] -> TypeCast(Get(target, ExprGet key, Any, r), t) |> Some
+        | "unsafeAs", [ value ] -> TypeCast(value, t) |> Some
+        | _ -> None
     | "Fickl.Core.JS.ReadonlyArrayModule"
     | "Fickl.Core.JS.ReadonlyArray" ->
         match info.CompiledName, args with
