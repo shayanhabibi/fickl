@@ -2280,6 +2280,18 @@ module Util =
                 Seq.zip args argsWithFlags
                 |> Seq.mapToArray (fun (a, (_, flags)) -> a.WithFlags(flags))
 
+        let returnType =
+            match FSharp2Fable.TypeGuards.tryGetFromInfo com info with
+            | Some guard when com.IsTypeScript ->
+                let index = guard.ParameterIndex + max 0 (args.Length - parameters.Length)
+
+                match Array.tryItem index args with
+                | Some(Parameter.Parameter(name, _, _)) ->
+                    let guardType = makeTypeAnnotation com ctx guard.GuardType
+                    TypePredicateTypeAnnotation(name, Some guardType, guard.Asserts) |> Some
+                | None -> returnType
+            | _ -> returnType
+
         args, body, returnType, typeParamDecl
 
     let getMemberArgsAndBody

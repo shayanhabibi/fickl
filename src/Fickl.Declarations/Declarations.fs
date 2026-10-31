@@ -222,6 +222,7 @@ and private addTypeNames (names: HashSet<string>) (typ: TypeAnnotation) =
         add t
         add prop
     | TypeofTypeAnnotation expr -> addExpressionRoot names expr
+    | TypePredicateTypeAnnotation(_, t, _) -> t |> Option.iter add
     | AnyTypeAnnotation
     | VoidTypeAnnotation
     | UndefinedTypeAnnotation

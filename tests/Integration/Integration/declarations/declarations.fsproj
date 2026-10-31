@@ -10,10 +10,12 @@
     <Compile Include="Shapes.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Mangling.fs" />
+    <Compile Include="Guards.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Fable.Core" Version="4.5.0" />
+    <ProjectReference Include="../../../../src/Fickl.Core/Fickl.Core.fsproj" />
   </ItemGroup>
 
 </Project>

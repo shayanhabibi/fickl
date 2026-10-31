@@ -39,6 +39,44 @@ type AsyncFunctionAttribute() =
 type JsFunctionAttribute() =
     inherit Attribute()
 
+/// <summary>Emits the function as a TypeScript type predicate, <c>parameter is T</c>, so TypeScript callers narrow the argument.</summary>
+/// <remarks>
+/// The function returns <c>bool</c>, or an <c>option</c> or <c>voption</c> of the predicate type:
+/// <code>
+/// [&lt;TypePredicate("x", typeof&lt;User>)>]
+/// let isUser (x: obj) : User option = ...
+/// </code>
+/// With an option, the compiled function still returns a boolean, and F# calls receive <c>Some x</c>
+/// when it returns true and <c>None</c> otherwise. This also binds an imported guard:
+/// <code>
+/// [&lt;Import("isAxiosError", "axios"); TypePredicate("e", typeof&lt;AxiosError>)>]
+/// let isAxiosError (e: obj) : AxiosError option = jsNative
+/// </code>
+/// Applies to JavaScript and TypeScript module functions and non-abstract class methods; other targets ignore it.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method)>]
+type TypePredicateAttribute(parameter: string, predicateType: Type) =
+    inherit Attribute()
+    member _.Parameter = parameter
+    member _.PredicateType = predicateType
+
+/// <summary>Emits the function as a TypeScript assertion function, <c>asserts parameter is T</c>, which throws when the argument is not a T.</summary>
+/// <remarks>
+/// The function returns <c>unit</c>, or <c>Result&lt;T, exn></c>:
+/// <code>
+/// [&lt;TypeAssertion("x", typeof&lt;User>)>]
+/// let assertUser (x: obj) : Result&lt;User, exn> = ...
+/// </code>
+/// With a Result, the compiled function returns nothing on <c>Ok</c> and throws the exception of <c>Error</c>,
+/// and F# calls receive <c>Ok x</c> when it returns and <c>Error e</c> when it throws.
+/// Applies to JavaScript and TypeScript module functions and non-abstract class methods; other targets ignore it.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method)>]
+type TypeAssertionAttribute(parameter: string, assertedType: Type) =
+    inherit Attribute()
+    member _.Parameter = parameter
+    member _.AssertedType = assertedType
+
 /// <summary>
 /// Represents a JavaScript callable with a single generic or non-generic Invoke method.
 /// </summary>

@@ -3855,15 +3855,29 @@ module Util =
         let ctx = addGenArgsToContext ctx memb genArgs
         let memberRef = getFunctionMemberRef memb
 
-        Fable.CallInfo.Create(
-            ?thisArg = callee,
-            args = transformOptionalArguments com ctx r memb args,
-            genArgs = genArgs,
-            sigArgTypes = getArgTypes com memb,
-            // isCons = memb.IsConstructor,
-            memberRef = memberRef
-        )
-        |> makeCallWithArgInfo com ctx r typ callee memb memberRef
+        let makeCall typ callee args =
+            Fable.CallInfo.Create(
+                ?thisArg = callee,
+                args = transformOptionalArguments com ctx r memb args,
+                genArgs = genArgs,
+                sigArgTypes = getArgTypes com memb,
+                // isCons = memb.IsConstructor,
+                memberRef = memberRef
+            )
+            |> makeCallWithArgInfo com ctx r typ callee memb memberRef
+
+        match (TypeGuards.tryGet com memb: TypeGuards.TypeGuard option) with
+        | Some guard when guard.Return <> TypeGuards.GuardReturn.Direct && not ctx.CapturingQuotation ->
+            let paramCount = memb.CurriedParameterGroups |> Seq.sumBy _.Count
+
+            match TypeGuards.bindArguments com ctx guard callee args paramCount with
+            | callee, args, Some guarded, bindings ->
+                let call = makeCall (TypeGuards.compiledReturnType guard typ) callee args
+
+                (bindings, TypeGuards.transformCall com r guard typ call guarded)
+                ||> List.foldBack (fun (ident, value) body -> Fable.Let(ident, value, body))
+            | _ -> makeCall typ callee args
+        | _ -> makeCall typ callee args
 
     let makeValueFrom (com: IFableCompiler) (ctx: Context) r (v: FSharpMemberOrFunctionOrValue) =
         let typ = makeType ctx.GenericArgs v.FullType
@@ -4296,3 +4310,225 @@ module Util =
                         )
                         |> ErasedUnionCaseTests.Tests
                     | result -> result
+
+/// fickl: `[<TypePredicate>]` and `[<TypeAssertion>]`, functions emitted as TypeScript type guards.
+/// F# can see a guard as returning an option or a Result of the narrowed argument; the compiled function still returns
+/// a boolean or throws, and each F# call converts that back.
+module TypeGuards =
+    open Helpers
+    open TypeHelpers
+
+    [<RequireQualifiedAccess>]
+    type GuardReturn =
+        /// F# sees what the compiled function returns: bool for a predicate, unit for an assertion
+        | Direct
+        /// F# sees an option of the argument, Some when the predicate holds
+        | Option
+        /// F# sees Result<'T, exn> of the argument, Error with what the assertion threw
+        | Result
+
+    type TypeGuard =
+        {
+            ParameterName: string
+            /// Index of the guarded parameter in the member's flattened parameters
+            ParameterIndex: int
+            GuardType: Fable.Type
+            Asserts: bool
+            Return: GuardReturn
+        }
+
+    let private isJsTarget (com: Compiler) =
+        com.Options.Language = JavaScript || com.Options.Language = TypeScript
+
+    let private tryGuardAttribute (memb: FSharpMemberOrFunctionOrValue) =
+        memb.Attributes
+        |> Seq.tryPick (fun att ->
+            match (nonAbbreviatedDefinition att.AttributeType).TryFullName with
+            | Some Atts.ficklTypePredicate -> Some(att, false)
+            | Some Atts.ficklTypeAssertion -> Some(att, true)
+            | _ -> None
+        )
+
+    let private checkReturn attName asserts (guardType: Fable.Type) (returnType: Fable.Type) =
+        match asserts, returnType with
+        | false, Fable.Boolean
+        | true, Fable.Unit -> Ok GuardReturn.Direct
+        | false, Fable.Option(t, _) when t = guardType -> Ok GuardReturn.Option
+        | false, Fable.Option _ -> Error $"%s{attName} returns an option, which must be of the predicate type"
+        | true, Fable.DeclaredType(ent, [ okType; errorType ]) when ent.FullName = Types.result ->
+            match errorType with
+            | _ when okType <> guardType ->
+                Error $"%s{attName} returns a Result, whose Ok type must be the asserted type"
+            | Fable.DeclaredType(errorEnt, _) when errorEnt.FullName = Types.exception_ -> Ok GuardReturn.Result
+            | _ -> Error $"%s{attName} returns a Result, whose Error type must be exn"
+        | false, _ ->
+            Error $"%s{attName} requires the function to return bool, or an option or voption of the predicate type"
+        | true, _ -> Error $"%s{attName} requires the function to return unit, or Result<'T, exn> of the asserted type"
+
+    let private checkGuard (memb: FSharpMemberOrFunctionOrValue) (att: FSharpAttribute) asserts =
+        let attName =
+            if asserts then
+                "TypeAssertion"
+            else
+                "TypePredicate"
+
+        let isAbstract =
+            memb.IsDispatchSlot
+            || memb.IsOverrideOrExplicitInterfaceImplementation
+            || memb.DeclaringEntity |> Option.exists _.IsInterface
+
+        match att.ConstructorArguments |> Seq.map snd |> Seq.toList with
+        | _ when isInline memb -> Error $"%s{attName} cannot be applied to an inline function"
+        | _ when isAbstract -> Error $"%s{attName} cannot be applied to an abstract, interface or override member"
+        | [ :? string as name; :? FSharpType as guardType ] ->
+            let parameters = memb.CurriedParameterGroups |> Seq.concat |> Seq.toList
+
+            match parameters |> List.tryFindIndex (fun p -> p.Name = Some name) with
+            | None -> Error $"%s{attName} names the parameter '%s{name}', which %s{memb.DisplayName} does not have"
+            | Some index ->
+                let guardType = makeType Map.empty guardType
+
+                makeType Map.empty memb.ReturnParameter.Type
+                |> checkReturn attName asserts guardType
+                |> Result.map (fun guardReturn ->
+                    {
+                        ParameterName = name
+                        ParameterIndex = index
+                        GuardType = guardType
+                        Asserts = asserts
+                        Return = guardReturn
+                    }
+                )
+        | _ -> Error $"%s{attName} requires a parameter name and a type"
+
+    /// Reports a misused guard attribute at the member's declaration
+    let check (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        if isJsTarget com then
+            match tryGuardAttribute memb with
+            | Some(att, asserts) ->
+                match checkGuard memb att asserts with
+                | Error error -> addError com [] (Some(makeRange memb.DeclarationLocation)) error
+                | Ok _ -> ()
+            | None -> ()
+
+    /// The guard of a member, on JavaScript and TypeScript; other targets compile the F# signature as written
+    let tryGet (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        if isJsTarget com then
+            tryGuardAttribute memb
+            |> Option.bind (fun (att, asserts) -> checkGuard memb att asserts |> Result.toOption)
+        else
+            None
+
+    let tryGetFromInfo (com: Compiler) (info: Fable.MemberFunctionOrValue) =
+        match info with
+        | :? FsMemberFunctionOrValue as info -> tryGet com info.FSharpMemberOrFunctionOrValue
+        | _ -> None
+
+    /// The type the compiled call returns, in place of the F# return type
+    let compiledReturnType (guard: TypeGuard) (fsReturnType: Fable.Type) =
+        match guard.Return with
+        | GuardReturn.Direct -> fsReturnType
+        | GuardReturn.Option -> Fable.Boolean
+        | GuardReturn.Result -> Fable.Unit
+
+    /// Turns the F# body of a guard into the body of the compiled function: a boolean from an option, a throw from Error
+    let transformBody (com: Compiler) (ctx: Context) (guard: TypeGuard) (body: Fable.Expr) =
+        match guard.Return, body.Type with
+        | GuardReturn.Option, _ -> Fable.Test(body, Fable.OptionTest true, body.Range)
+        | GuardReturn.Result, (Fable.DeclaredType(ent, [ _; errorType ]) as resultType) ->
+            let ident = makeTypedIdent resultType (getIdentUniqueName com ctx "result")
+            let result = Fable.IdentExpr ident
+
+            let error =
+                Fable.Get(result, Fable.UnionFieldInfo.Create(ent, 1, 0, resultType.Generics), errorType, None)
+
+            Fable.Let(
+                ident,
+                body,
+                Fable.IfThenElse(
+                    Fable.Test(result, Fable.UnionCaseTest 0, None),
+                    Fable.Value(Fable.UnitConstant, None),
+                    Fable.Extended(Fable.Throw(Some error, Fable.Unit), body.Range),
+                    body.Range
+                )
+            )
+        | _ -> body
+
+    /// Binds the receiver and arguments up to the guarded one, so the guarded argument is evaluated once
+    /// and in its original order, though the converted call reads it twice
+    let bindArguments
+        (com: Compiler)
+        (ctx: Context)
+        (guard: TypeGuard)
+        (callee: Fable.Expr option)
+        (args: Fable.Expr list)
+        (paramCount: int)
+        =
+        let index = guard.ParameterIndex + max 0 (List.length args - paramCount)
+        let mutable bindings = []
+
+        let bind (expr: Fable.Expr) =
+            let ident =
+                makeTypedIdent expr.Type (getIdentUniqueName com ctx guard.ParameterName)
+
+            bindings <- (ident, expr) :: bindings
+            Fable.IdentExpr ident
+
+        let bindImpure (expr: Fable.Expr) =
+            if canHaveSideEffects com expr then
+                bind expr
+            else
+                expr
+
+        let callee = callee |> Option.map bindImpure
+
+        let args =
+            args
+            |> List.mapi (fun i arg ->
+                if i < index then
+                    bindImpure arg
+                elif i = index then
+                    match arg with
+                    | Fable.IdentExpr ident when not ident.IsMutable -> arg
+                    | Fable.Value _ when not (canHaveSideEffects com arg) -> arg
+                    | _ -> bind arg
+                else
+                    arg
+            )
+
+        callee, args, List.tryItem index args, List.rev bindings
+
+    /// `as T` in TypeScript, from any, since a guard without TypeScript types does not narrow its argument
+    let private narrowed (com: Compiler) r (typ: Fable.Type) (guarded: Fable.Expr) =
+        let castTo typ expr =
+            let info = { Fable.CallInfo.Create(args = [ expr ]) with Tags = [ "downcast" ] }
+            Fable.Call(makeImportLib com Fable.Any "downcast" "Util", info, typ, r)
+
+        guarded |> castTo Fable.Any |> castTo typ
+
+    /// Converts the compiled call to what F# sees: Some or None from the boolean, Ok or Error from the assertion
+    let transformCall
+        (com: Compiler)
+        r
+        (guard: TypeGuard)
+        (fsReturnType: Fable.Type)
+        (call: Fable.Expr)
+        (guarded: Fable.Expr)
+        =
+        match guard.Return, fsReturnType with
+        | GuardReturn.Option, Fable.Option(t, isStruct) ->
+            let some =
+                Fable.Value(Fable.NewOption(Some(narrowed com r t guarded), t, isStruct), r)
+
+            Fable.IfThenElse(call, some, Fable.Value(Fable.NewOption(None, t, isStruct), r), r)
+        | GuardReturn.Result, Fable.DeclaredType(ent, ([ t; errorType ] as genArgs)) ->
+            let errorIdent = makeTypedIdent errorType "error"
+
+            let ok =
+                Fable.Value(Fable.NewUnion([ narrowed com r t guarded ], 0, ent, genArgs), r)
+
+            let error =
+                Fable.Value(Fable.NewUnion([ Fable.IdentExpr errorIdent ], 1, ent, genArgs), r)
+
+            Fable.TryCatch(Fable.Sequential [ call; ok ], Some(errorIdent, error), None, r)
+        | _ -> call

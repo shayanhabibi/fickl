@@ -121,6 +121,12 @@ module Atts =
     let ficklJsFunction = "Fickl.Core.JsFunctionAttribute"
 
     [<Literal>]
+    let ficklTypePredicate = "Fickl.Core.TypePredicateAttribute" // typeof<Fickl.Core.TypePredicateAttribute>.FullName
+
+    [<Literal>]
+    let ficklTypeAssertion = "Fickl.Core.TypeAssertionAttribute" // typeof<Fickl.Core.TypeAssertionAttribute>.FullName
+
+    [<Literal>]
     let ficklAsyncFunction = "Fickl.Core.AsyncFunctionAttribute"
 
     [<Literal>]

@@ -593,6 +593,8 @@ type TypeAnnotation =
     | TypeofTypeAnnotation of Expression
     | IndexedTypeAnnotation of typ: TypeAnnotation * prop: TypeAnnotation
     | LiteralTypeAnnotation of Literal
+    /// <summary>A function's return type that narrows a parameter: <c>x is T</c>, <c>asserts x is T</c> or <c>asserts x</c>.</summary>
+    | TypePredicateTypeAnnotation of parameterName: string * typ: TypeAnnotation option * asserts: bool
 
 type TypeParameter = | TypeParameter of name: string * bound: TypeAnnotation option * ``default``: TypeAnnotation option
 

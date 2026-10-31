@@ -1,0 +1,7 @@
+export interface Pet {
+    get name(): string
+}
+export declare function isText(value: any): value is string;
+export declare function tryPet(value: any): value is Pet;
+export declare function assertPet(value: any): asserts value is Pet;
+export declare function checkPet(value: any): asserts value is Pet;
