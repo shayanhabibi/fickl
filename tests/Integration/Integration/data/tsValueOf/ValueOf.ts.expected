@@ -1,0 +1,56 @@
+
+import { Record } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import type { KeysOfType, IComparable, IEquatable } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { record_type, string_type, int32_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+
+export class Config extends Record implements IEquatable<Config>, IComparable<Config> {
+    readonly Port: int32;
+    readonly Host: string;
+    constructor(Port: int32, Host: string) {
+        super();
+        this.Port = (Port | 0);
+        this.Host = Host;
+    }
+}
+
+export function Config_$reflection(): TypeInfo {
+    return record_type("ValueOf.Config", [], Config, () => [["Port", int32_type], ["Host", string_type]]);
+}
+
+export class Pair$2<A, B> extends Record implements IEquatable<Pair$2<A, B>>, IComparable<Pair$2<A, B>> {
+    readonly First: A;
+    readonly Second: B;
+    constructor(First: A, Second: B) {
+        super();
+        this.First = First;
+        this.Second = Second;
+    }
+}
+
+export function Pair$2_$reflection(gen0: TypeInfo, gen1: TypeInfo): TypeInfo {
+    return record_type("ValueOf.Pair`2", [gen0, gen1], Pair$2, () => [["First", gen0], ["Second", gen1]]);
+}
+
+export const port = "Port";
+
+export function anyValue(c: Config): Config[keyof Config] {
+    return c[port] as Config[keyof Config];
+}
+
+export function portOf(c: Config): int32 {
+    return (anyValue(c) as int32) | 0;
+}
+
+export function asConfig(v: Pair$2<Config, int32>[keyof Pair$2<Config, int32>]): Config {
+    return v as Config;
+}
+
+export function pick<T, R>(key: KeysOfType<T, R>, target: T): T[keyof T] {
+    return (target as globalThis.Record<KeysOfType<T, R>, R>)[key] as T[keyof T];
+}
+
+export function read<T, R>(value: T[keyof T]): R {
+    return value as R;
+}
+
