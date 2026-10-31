@@ -111,16 +111,16 @@ module Partials =
 // TypeScript readonly arrays and maps must be accepted where F# only reads
 module Readonlys =
     open System.Collections.Generic
-    open Fickl.Core.JS
+    open Fickl.Core
 
     [<Emit("Object.freeze([1, 2, 3])")>]
-    let frozenNumbers () : ReadonlyArray<int> = jsNative
+    let frozenNumbers () : JS.ReadonlyArray<int> = jsNative
 
     [<Emit("new Map([['a', 1]])")>]
     let nativeMap () : IReadOnlyDictionary<string, int> = jsNative
 
-    let sum (xs: ReadonlyArray<int>) = Seq.sum xs
-    let last (xs: ReadonlyArray<int>) = xs.[xs.length - 1]
+    let sum (xs: JS.ReadonlyArray<int>) = Seq.sum xs
+    let last (xs: JS.ReadonlyArray<int>) = xs.[xs.length - 1]
     let countAll (xs: IReadOnlyCollection<int>) = xs.Count
     let firstTwo (xs: IReadOnlyList<int>) = xs |> Seq.truncate 2 |> Seq.toList
     let find (d: IReadOnlyDictionary<string, int>) key =
