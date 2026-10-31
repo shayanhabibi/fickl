@@ -117,6 +117,15 @@ When adding a test, check if other targets already have a test for the same case
 
 **Never modify a test to make it pass on a target if it already passes on .NET.** If a test passes on .NET but fails on a target, the compiler or runtime library needs to be fixed — not the test.
 
+## Pull requests and CI
+
+CI is expensive, so a PR gets the full run only when it is about to land:
+
+- **Open feature PRs as drafts.** A draft runs only the lint and restore checks. Verify the change locally with the TypeScript, JavaScript and integration suites (and `differences` when it adds a case).
+- **Land drafts in batches**, about six at a time, with `.github/scripts/land-batch.sh <pr>...`. It merges the drafts onto the latest `main`, pushes `batch/<date>`, and opens one ready PR, so CI runs once for all of them. Pass `--dry-run` first to see whether they merge cleanly, and `--test` to run the local suites on the batch.
+- **Merge a batch PR with "Create a merge commit"**, not a squash, so each feature keeps its own commit for the changelog and its draft PR is marked as merged. Before batching, squash each draft into one conventional commit. If the batch fails CI, run the script again without the PR that broke it.
+- **The Python, Rust, Dart and BEAM jobs run only for a release**: a PR that bumps `<FicklVersion>` in `src/Fickl.Branding.targets`, a PR from a `release/` or `chore/release-` branch, a PR with the `release` label, a `v*` tag, or a run of `build` started by hand. Every other PR, and every push to `main`, runs only the JavaScript, TypeScript, integration and analyzer jobs.
+
 ## Changelogs
 
 DO NOT update the changelog files. These files are automatically generated based on the commit history.
