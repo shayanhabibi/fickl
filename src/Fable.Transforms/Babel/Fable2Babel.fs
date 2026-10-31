@@ -390,7 +390,15 @@ module private NativeDecorators =
                                 ?typeAnnotation = annotation
                             )
                         else
-                            ClassAutoAccessor(key, value, computed, false, annotation, memberDecl.Body.Range)
+                            ClassAutoAccessor(
+                                key,
+                                value,
+                                computed,
+                                false,
+                                Util.hidesBaseMember com info,
+                                annotation,
+                                memberDecl.Body.Range
+                            )
 
                     decorateMember com ctx info memberDeclaration
                 )
@@ -5152,6 +5160,35 @@ but thanks to the optimisation done below we get
            |> Option.bind com.TryGetEntity
            |> Option.exists (fun ent -> not ent.IsInterface)
 
+    /// fickl: whether an instance member hides a base class member of the same name and key instead of overriding it.
+    /// TypeScript's `noImplicitOverride` needs `override` on it all the same
+    let hidesBaseMember (com: IBabelCompiler) (info: Fable.MemberFunctionOrValue) =
+        let isProperty (memb: Fable.MemberFunctionOrValue) =
+            memb.IsProperty || memb.IsGetter || memb.IsSetter
+
+        let symbolKey (memb: Fable.MemberFunctionOrValue) =
+            memb.Attributes
+            |> Seq.tryFind (fun att -> att.Entity.FullName = Atts.ficklSymbolKey)
+            |> Option.map _.ConstructorArgs
+
+        let hides (memb: Fable.MemberFunctionOrValue) =
+            memb.IsInstance
+            && not memb.IsInline
+            && not memb.IsDispatchSlot
+            && memb.DisplayName = info.DisplayName
+            && isProperty memb = isProperty info
+            && symbolKey memb = symbolKey info
+
+        let rec baseHides (ent: Fable.Entity) =
+            match ent.BaseType |> Option.bind (fun baseType -> com.TryGetEntity(baseType.Entity)) with
+            | Some baseEnt when baseEnt.FullName <> Types.object ->
+                Seq.exists hides baseEnt.MembersFunctionsAndValues || baseHides baseEnt
+            | _ -> false
+
+        com.IsTypeScript
+        && info.IsInstance
+        && info.DeclaringEntity |> Option.bind com.TryGetEntity |> Option.exists baseHides
+
     /// Object.prototype members are in the type of any base class
     let objectPrototypeNames = [ "toString"; "toLocaleString"; "valueOf" ]
 
@@ -5808,7 +5845,7 @@ but thanks to the optimisation done below we get
             args,
             Some body,
             isStatic = isStatic,
-            isOverride = isBaseClassOverride com ent info memb,
+            isOverride = (isBaseClassOverride com ent info memb || hidesBaseMember com info),
             ?returnType = returnType,
             ?doc = memb.XmlDoc
         ) //, ?typeParameters=typeParamDecl)
@@ -5853,7 +5890,9 @@ but thanks to the optimisation done below we get
                 args,
                 Some body,
                 isStatic = isStatic,
-                isOverride = (name = memb.Name && isBaseClassOverride com ent info memb),
+                isOverride =
+                    (name = memb.Name
+                     && (isBaseClassOverride com ent info memb || hidesBaseMember com info)),
                 ?returnType = returnType,
                 ?typeParameters = typeParamDecl,
                 ?doc = memb.XmlDoc
