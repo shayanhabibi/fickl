@@ -1,7 +1,7 @@
 module Readonly
 
 open System.Collections.Generic
-open Fickl.Core.JS
+open Fickl.Core
 
 type Point = { x: float; y: float }
 
@@ -14,13 +14,13 @@ let lookup (d: IReadOnlyDictionary<string, int>) (key: string) =
     | true, value -> value
     | _ -> d.Count
 
-let draw (points: ReadonlyArray<Point>) =
+let draw (points: JS.ReadonlyArray<Point>) =
     let mutable length = 0.
     for i in 1 .. points.length - 1 do
         length <- length + abs (points.[i].x - points.[i - 1].x)
     length
 
-let names (xs: ReadonlyArray<string>) = xs.join ", "
+let names (xs: JS.ReadonlyArray<string>) = xs.join ", "
 
 let callers () =
     count (HashSet [ 1; 2 ])
@@ -28,7 +28,7 @@ let callers () =
     + int (total [ 1.; 2. ])
     + lookup (Map [ ("a", 1) ]) "a"
     + lookup (Dictionary()) "b"
-    + int (draw (ReadonlyArray.ofArray [| { x = 0.; y = 0. }; { x = 2.; y = 0. } |]))
-    + (names (ReadonlyArray.ofResizeArray (ResizeArray [ "a" ]))).Length
+    + int (draw (JS.ReadonlyArray.ofArray [| { x = 0.; y = 0. }; { x = 2.; y = 0. } |]))
+    + (names (JS.ReadonlyArray.ofResizeArray (ResizeArray [ "a" ]))).Length
 
-let copy (xs: ReadonlyArray<int>) = ReadonlyArray.toArray xs
+let copy (xs: JS.ReadonlyArray<int>) = JS.ReadonlyArray.toArray xs
