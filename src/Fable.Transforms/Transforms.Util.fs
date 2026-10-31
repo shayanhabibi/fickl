@@ -116,6 +116,9 @@ module Atts =
     let callableInterface = "Fickl.Core.CallableInterfaceAttribute"
 
     [<Literal>]
+    let ficklEmitType = "Fickl.Core.EmitTypeAttribute" // typeof<Fickl.Core.EmitTypeAttribute>.FullName
+
+    [<Literal>]
     let ficklCurried = "Fickl.Core.CurriedAttribute" // typeof<Fickl.Core.CurriedAttribute>.FullName
 
     let ficklJsFunction = "Fickl.Core.JsFunctionAttribute"

@@ -1,0 +1,54 @@
+
+import { Record } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { int32, float64 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import type { IComparable, IEquatable } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { record_type, float64_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { type FSharpList, ofArray } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import type { Box, Brand } from "./Types.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+
+export class Point extends Record implements IEquatable<Point>, IComparable<Point> {
+    readonly x: float64;
+    readonly y: float64;
+    constructor(x: float64, y: float64) {
+        super();
+        this.x = x;
+        this.y = y;
+    }
+}
+
+export function Point_$reflection(): TypeInfo {
+    return record_type("EmitType.Point", [], Point, () => [["x", float64_type], ["y", float64_type]]);
+}
+
+export function request(init: Parameters<typeof fetch>[1]): Parameters<typeof fetch>[1] {
+    return init;
+}
+
+export function dataAttr(name: string): `data-${string}` {
+    return "data-" + name as `data-${string}`;
+}
+
+export const attrs: FSharpList<`data-${string}`> = ofArray(["data-a" as `data-${string}`, dataAttr("b")]);
+
+export function getters(p: Point): { [K in keyof Point as `get${Capitalize<string & K>}`]: () => Point[K] } {
+    return {
+        getX: (): float64 => p.x,
+        getY: (): float64 => p.y,
+    } as { [K in keyof Point as `get${Capitalize<string & K>}`]: () => Point[K] };
+}
+
+export function userId(id: int32): Brand<int32, "user"> {
+    return id as Brand<int32, "user">;
+}
+
+export function boxed<T>(value: T): Box<T> {
+    return {
+        value: value,
+    } as Box<T>;
+}
+
+export function maybeInit(init: Option<Parameters<typeof fetch>[1]>): Option<Parameters<typeof fetch>[1]> {
+    return init;
+}
+
