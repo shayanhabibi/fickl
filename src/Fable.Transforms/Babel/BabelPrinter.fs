@@ -432,7 +432,8 @@ module PrinterExtensions =
             | UnionTypeAnnotation _
             | IntersectionTypeAnnotation _
             | KeyofTypeAnnotation _
-            | TypeofTypeAnnotation _ ->
+            | TypeofTypeAnnotation _
+            | EmitTypeAnnotation _ ->
                 printer.Print("(")
                 printer.Print(t)
                 printer.Print(")")
@@ -950,6 +951,20 @@ module PrinterExtensions =
                 printSegment printer value (lastMatch.Index + lastMatch.Length) value.Length
             else
                 printSegment printer value 0 value.Length
+
+        /// fickl: a placeholder with no argument is left as written, so a `$` in the type text survives
+        member printer.PrintEmitTypeAnnotation(value: string, args: TypeAnnotation array) =
+            let mutable last = 0
+
+            for m in Regex.Matches(value, @"\$(\d+)") do
+                match Array.tryItem (int m.Groups[1].Value) args with
+                | Some arg ->
+                    printer.Print(value.Substring(last, m.Index - last))
+                    printer.Print(arg)
+                    last <- m.Index + m.Length
+                | None -> ()
+
+            printer.Print(value.Substring(last))
 
         member printer.PrintIdent(identifier: Identifier) =
             let (Identifier(name, loc)) = identifier
@@ -1713,6 +1728,7 @@ module PrinterExtensions =
                 printer.Print(prop)
                 printer.Print("]")
             | LiteralTypeAnnotation lit -> printer.PrintLiteral(lit)
+            | EmitTypeAnnotation(value, args) -> printer.PrintEmitTypeAnnotation(value, args)
 
         member printer.Print((TypeParameter(name, bound, _default)): TypeParameter) =
             printer.Print(name)

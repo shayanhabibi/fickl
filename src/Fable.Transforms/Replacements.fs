@@ -1432,6 +1432,15 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
         | "op_BangHat", [ arg ] -> Some arg
         | "op_BangBang", [ arg ] ->
             match arg, i.GenericArgs with
+            // fickl: TypeScript sees the cast to the type an EmitType annotation writes
+            | _, [ _; DeclaredType(ent, _) ] when
+                com.TryGetEntity(ent)
+                |> Option.exists (fun ent ->
+                    ent.Attributes
+                    |> Seq.exists (fun att -> att.Entity.FullName = Atts.ficklEmitType)
+                )
+                ->
+                TypeCast(arg, t) |> Some
             | IsNewAnonymousRecord(_, exprs, fieldNames, _, _, _), [ _; DeclaredType(ent, []) ] ->
                 let ent = com.GetEntity(ent)
 
