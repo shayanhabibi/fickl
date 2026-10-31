@@ -164,7 +164,7 @@ function recordEquals<T>(self: T, other: T) {
   } else {
     const thisNames = recordKeys(self);
     for (let i = 0; i < thisNames.length; i++) {
-      if (!equals((self as any)[thisNames[i]], (other as any)[thisNames[i]])) {
+      if (!equals((self as any)[thisNames[i]!], (other as any)[thisNames[i]!])) {
         return false;
       }
     }
@@ -180,7 +180,7 @@ function recordCompareTo<T>(self: T, other: T) {
   } else {
     const thisNames = recordKeys(self);
     for (let i = 0; i < thisNames.length; i++) {
-      const result = compare((self as any)[thisNames[i]], (other as any)[thisNames[i]]);
+      const result = compare((self as any)[thisNames[i]!], (other as any)[thisNames[i]!]);
       if (result !== 0) {
         return result;
       }

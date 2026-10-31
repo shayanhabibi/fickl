@@ -183,7 +183,7 @@ export class Uri {
     const host = this.asUrl().host;
 
     if (host.includes(":")) {
-      return host.split(":")[0];
+      return host.split(":")[0]!;
     } else {
       return host;
     }

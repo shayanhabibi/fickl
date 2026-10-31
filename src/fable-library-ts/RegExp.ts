@@ -168,7 +168,7 @@ export function split(reg: string | RegExp, input: string, limit?: number, offse
     prev = m.index + m[0].length;
     for (let i = 1; i < m.length; i++) {
       if (m[i] !== undefined) {
-        result.push(m[i]);
+        result.push(m[i]!);
       }
     }
     count--;
