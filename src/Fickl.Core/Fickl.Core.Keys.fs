@@ -67,3 +67,43 @@ module KeyOf =
     /// <summary>Treats a string as a key; nothing checks that <c>'T</c> has the property, or that it is a <c>'R</c>.</summary>
     /// <remarks>TypeScript sees the cast, <c>name as KeysOfType&lt;T, R></c>.</remarks>
     let inline unsafeOfString<'T, 'R> (name: string) : keyof<'T, 'R> = unbox name
+
+/// <summary>The TypeScript <c>Record&lt;K, V></c>: a plain JavaScript object used as a map from <c>'K</c> keys to <c>'V</c> values.</summary>
+/// <remarks><c>r.[key]</c> compiles to <c>r[key]</c> and <c>r.[key] &lt;- value</c> to <c>r[key] = value</c>.
+/// Build one with <c>Record.empty</c>, or bind a JavaScript API that takes or returns one.
+/// TypeScript annotations write <c>globalThis.Record</c>, which Fable's own <c>Record</c> class cannot shadow.</remarks>
+[<EmitType("globalThis.Record<$0, $1>")>]
+type Record<'K, 'V> =
+    /// <summary>The value at a key; <c>undefined</c> at runtime when the key is missing.</summary>
+    [<EmitIndexer>]
+    abstract Item: key: 'K -> 'V with get, set
+
+/// <summary>The TypeScript <c>Readonly&lt;Record&lt;K, V>></c>: a <c>Record</c> that cannot be written.</summary>
+[<EmitType("Readonly<globalThis.Record<$0, $1>>")>]
+type ReadonlyRecord<'K, 'V> =
+    /// <summary>The value at a key; <c>undefined</c> at runtime when the key is missing.</summary>
+    [<EmitIndexer>]
+    abstract Item: key: 'K -> 'V
+
+/// <summary>The TypeScript <c>{ [P in keyof T]: V }</c>: a <c>'V</c> for each property name of <c>'T</c>.</summary>
+/// <remarks>TypeScript annotations write it <c>Record&lt;keyof T &amp; string, V></c>, so every key of <c>T</c> must be present.</remarks>
+[<EmitType("globalThis.Record<keyof $0 & string, $1>")>]
+type PropertyRecord<'T, 'V> =
+    /// <summary>The value for a property name.</summary>
+    [<EmitIndexer>]
+    abstract Item: key: keyof<'T> -> 'V with get, set
+
+/// <summary>Builds and reads <c>Record</c> objects.</summary>
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Record =
+    /// <summary>An empty object, <c>{}</c>.</summary>
+    let empty<'K, 'V> () : Record<'K, 'V> = nativeOnly
+
+    /// <summary>The value at a key the object has as its own property, or <c>None</c>: <c>Object.hasOwn(r, key)</c>.</summary>
+    /// <remarks>Unlike <c>r.[key]</c>, an inherited property such as <c>toString</c> is not found.</remarks>
+    let tryGet (key: 'K) (record: Record<'K, 'V>) : 'V option = nativeOnly
+
+    /// <summary>The object's own property names: <c>Object.keys(r)</c>.</summary>
+    /// <remarks>A number key is a string here, as JavaScript object keys always are.</remarks>
+    let keys (record: Record<'K, 'V>) : string[] = nativeOnly

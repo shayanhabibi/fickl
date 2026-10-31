@@ -5878,6 +5878,26 @@ let private keyOf (com: ICompiler) (ctx: Context) r t methodName args =
     | "|Key|_|", [ name; key ] -> makeEqOp r (TypeCast(key, String)) name BinaryEqual |> Some
     | _ -> None
 
+/// fickl: `Fickl.Core.Record` values are plain objects
+let private records (com: ICompiler) r t methodName args =
+    match methodName, args, t with
+    | "empty", _, _ -> typedObjExpr t [] |> Some
+    | "tryGet", [ key; record ], Option(valueType, isStruct) ->
+        let hasOwn =
+            Helper.GlobalCall("Object", Boolean, [ record; key ], memb = "hasOwn", ?loc = r)
+
+        let value = Get(record, ExprGet key, valueType, r)
+
+        IfThenElse(
+            hasOwn,
+            Value(NewOption(Some value, valueType, isStruct), r),
+            Value(NewOption(None, valueType, isStruct), r),
+            r
+        )
+        |> Some
+    | "keys", [ record ], _ -> Helper.GlobalCall("Object", t, [ record ], memb = "keys", ?loc = r) |> Some
+    | _ -> None
+
 let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match info.DeclaringEntityFullName with
     | Patterns.DicContains replacedModules replacement -> replacement com ctx r t info thisArg args
@@ -5890,6 +5910,7 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | "Fickl.Core.CancellationExtensions" -> cancellationExtensions com r t info thisArg args
     | "Fickl.Core.KeyOfBuilder"
     | "Fickl.Core.KeyOf" -> keyOf com ctx r t info.CompiledName args
+    | "Fickl.Core.RecordModule" -> records com r t info.CompiledName args
     | "Fickl.Core.JS.ReadonlyArrayModule"
     | "Fickl.Core.JS.ReadonlyArray" ->
         match info.CompiledName, args with
