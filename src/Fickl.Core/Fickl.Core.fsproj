@@ -17,6 +17,7 @@
     <Compile Include="Fickl.Core.NativeAsync.fs" />
     <Compile Include="Fickl.Core.NativeGenerators.fs" />
     <Compile Include="Fickl.Core.NativeAsyncGenerators.fs" />
+    <Compile Include="Fickl.Core.TypedArrays.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Fable.Core/Fable.Core.fsproj" />

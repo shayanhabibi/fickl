@@ -716,14 +716,20 @@ module JS =
         abstract Create: data: obj -> BigInt64Array
 
 
-    // no equivalent ?
-    //and BigUint64Array = TypedArray<BigUint64Array>
+    and BigUint64Array = TypedArray<uint64>
 
-    // and BigUint64ArrayConstructor =
-    //   [<Emit "new $0($1...)">] abstract Create: size: int -> BigUint64Array
-    //   [<Emit "new $0($1...)">] abstract Create: typedArray: TypedArray -> BigUint64Array
-    //   [<Emit "new $0($1...)">] abstract Create: buffer: ArrayBuffer * ?offset:int * ?length:int -> BigUint64Array
-    //   [<Emit "new $0($1...)">] abstract Create: data:obj -> BigUint64Array
+    and BigUint64ArrayConstructor =
+        [<Emit "new $0($1...)">]
+        abstract Create: size: int -> BigUint64Array
+
+        [<Emit "new $0($1...)">]
+        abstract Create: typedArray: TypedArray -> BigUint64Array
+
+        [<Emit "new $0($1...)">]
+        abstract Create: buffer: ArrayBuffer * ?offset: int * ?length: int -> BigUint64Array
+
+        [<Emit "new $0($1...)">]
+        abstract Create: data: obj -> BigUint64Array
 
 
     and [<AllowNullLiteral>] Console =
@@ -991,4 +997,6 @@ module JS =
 
         [<Global>]
         let BigInt64Array: BigInt64ArrayConstructor = nativeOnly
-// let [<Global>] BigUint64Array: BigUint64ArrayConstructor = nativeOnly
+
+        [<Global>]
+        let BigUint64Array: BigUint64ArrayConstructor = nativeOnly

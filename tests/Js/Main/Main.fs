@@ -22,6 +22,7 @@ let allTests =
     Arithmetic.tests
     RandomTests.tests
     Arrays.tests
+    TypedArrayViews.tests
     Async.tests
     Task.tests
     Chars.tests

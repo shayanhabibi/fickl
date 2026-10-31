@@ -1,0 +1,54 @@
+
+import type { MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import type { int32, float64, uint8 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { asArrayBuffer } from "./fable_modules/fable-library-ts.5.25.0/TypedArray.ts";
+import type { uint64 } from "./fable_modules/fable-library-ts.5.25.0/BigInt.ts";
+
+export function header(bytes: MutableArray<uint8>): Uint8Array {
+    return (bytes as unknown as Uint8Array).subarray(4, 20);
+}
+
+export function whole(values: MutableArray<float64>): Float64Array {
+    return values as unknown as Float64Array;
+}
+
+export function rest(segment: Uint8Array): Uint8Array {
+    return segment.subarray(1);
+}
+
+export function count(segment: Uint8Array): int32 {
+    return (segment.length + (segment.byteOffset / segment.BYTES_PER_ELEMENT)) | 0;
+}
+
+export function first(segment: Int32Array): int32 {
+    return segment[0] | 0;
+}
+
+export function bytesOf(buffer: ArrayBuffer): MutableArray<uint8> {
+    return new Uint8Array(buffer);
+}
+
+export function floatsOf(buffer: ArrayBuffer): MutableArray<float64> {
+    return new Float64Array(buffer);
+}
+
+export function bufferOf(bytes: MutableArray<uint8>): ArrayBuffer {
+    return asArrayBuffer(bytes);
+}
+
+export function bigUnsigned(): MutableArray<uint64> {
+    return new BigUint64Array(4);
+}
+
+export function bigUnsignedView(buffer: ArrayBuffer): BigUint64Array {
+    return new BigUint64Array(buffer, 0, 2);
+}
+
+export function copyInto(segment: Uint8Array, target: MutableArray<uint8>): void {
+    (target as unknown as Uint8Array).set(segment, 1);
+}
+
+export function copyOf(segment: Uint8Array): MutableArray<uint8> {
+    return segment.slice();
+}
+

@@ -1224,6 +1224,12 @@ module Annotation =
         | Types.task
         | "System.Threading.Tasks.ValueTask" -> makeNativeTypeAnnotation com ctx [ Fable.Unit ] "Promise" |> Some
         | Types.taskGeneric -> makeNativeTypeAnnotation com ctx genArgs "Promise" |> Some
+        // fickl: an ArraySegment is a typed-array view, such as a Uint8Array
+        | "System.ArraySegment`1" ->
+            match genArgs with
+            | [ JS.Replacements.TypedArrayCompatible com Fable.MutableArray name ] ->
+                makeNativeTypeAnnotation com ctx [] name |> Some
+            | _ -> None
         | "Fickl.Core.JsAsyncGenerator`3" -> makeNativeTypeAnnotation com ctx genArgs "AsyncGenerator" |> Some
         | "Fickl.Core.JsYieldRequest`2" -> makeTypeAnnotation com ctx genArgs.Head |> Some
         | "Fickl.Core.JsGenerator`3" -> makeNativeTypeAnnotation com ctx genArgs "Generator" |> Some
@@ -2514,8 +2520,9 @@ module Util =
                         AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                     else
                         jsExpr
-                // fickl: an F# array may be a typed array, which TypeScript does not relate to an EmitType such as ReadonlyArray
-                | Fable.Array _ when toTaggedUnion ->
+                // fickl: an F# array may be a typed array, which TypeScript does not relate to an EmitType such as ReadonlyArray,
+                // or to the typed array an ArraySegment view is annotated as
+                | Fable.Array _ when toTaggedUnion || (com.IsTypeScript && entRef.FullName = "System.ArraySegment`1") ->
                     AsExpression(AsExpression(jsExpr, UnknownTypeAnnotation), makeTypeAnnotation com ctx typ)
                 | _ when toTaggedUnion -> AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                 | _ -> jsExpr

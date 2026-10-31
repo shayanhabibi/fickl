@@ -2530,6 +2530,74 @@ let readOnlySpans (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thi
     | "op_Implicit", [ arg ] -> arg |> Some
     | _ -> None
 
+/// fickl: an ArraySegment over a numeric array is a typed-array view made with `subarray`, which shares its memory
+let arraySegments (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    let isTypedArray =
+        match i.GenericArgs with
+        | [ TypedArrayCompatible com MutableArray _ ] -> true
+        | _ -> false
+
+    let int32 = Number(Int32, NumberInfo.Empty)
+
+    let subarray (segment: Expr) start count =
+        let args =
+            match count with
+            | Some count -> [ start; add start count ]
+            | None -> [ start ]
+
+        Helper.InstanceCall(segment, "subarray", t, args, ?loc = r)
+
+    match i.CompiledName, thisArg, args with
+    | _ when not isTypedArray ->
+        "ArraySegment is only supported in JS over numeric arrays compiled as typed arrays"
+        |> addErrorAndReturnNull com ctx.InlinePath r
+        |> Some
+    | ".ctor", _, [ array ] -> TypeCast(array, t) |> Some
+    | ".ctor", _, [ array; offset; count ] -> subarray (TypeCast(array, t)) offset (Some count) |> Some
+    | "get_Count", Some segment, _ -> getFieldWith r t segment "length" |> Some
+    // decision: the offset is from the start of the buffer, which is the array's for an array F# created
+    | "get_Offset", Some segment, _ ->
+        makeBinOp
+            r
+            t
+            (getFieldWith None int32 segment "byteOffset")
+            (getFieldWith None int32 segment "BYTES_PER_ELEMENT")
+            BinaryDivide
+        |> Some
+    | "get_Item", Some segment, [ index ] -> getExpr r t segment index |> Some
+    | "set_Item", Some segment, [ index; value ] -> setExpr r segment index value |> Some
+    | "Slice", Some segment, [ start ] -> subarray segment start None |> Some
+    | "Slice", Some segment, [ start; count ] -> subarray segment start (Some count) |> Some
+    | "ToArray", Some segment, [] -> Helper.InstanceCall(segment, "slice", t, [], ?loc = r) |> Some
+    | "CopyTo", Some segment, [ target ] ->
+        Helper.InstanceCall(TypeCast(target, segment.Type), "set", t, [ segment ], ?loc = r)
+        |> Some
+    | "CopyTo", Some segment, [ target; index ] ->
+        Helper.InstanceCall(TypeCast(target, segment.Type), "set", t, [ segment; index ], ?loc = r)
+        |> Some
+    | "GetEnumerator", Some segment, _ -> getEnumerator com r t segment |> Some
+    | "get_Array", _, _ ->
+        "ArraySegment.Array is not supported in JS, as a view does not keep the array it was made from"
+        |> addErrorAndReturnNull com ctx.InlinePath r
+        |> Some
+    | _ -> None
+
+/// fickl: numeric arrays over an ArrayBuffer, from Fickl.Core.TypedArrayExtensions
+let typedArrayExtensions (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) args =
+    match i.CompiledName, Option.toList thisArg @ args with
+    | Naming.EndsWith ".AsArrayBuffer" _, array :: _ ->
+        Helper.LibCall(com, "TypedArray", "asArrayBuffer", t, [ array ], ?loc = r)
+        |> Some
+    | "ofArrayBuffer", [ buffer ] ->
+        match t with
+        | Array(TypedArrayCompatible com MutableArray name, _) ->
+            Helper.GlobalCall(name, t, [ buffer ], isConstructor = true, ?loc = r) |> Some
+        | _ ->
+            "Array.ofArrayBuffer needs a numeric element type compiled as a typed array"
+            |> addErrorAndReturnNull com ctx.InlinePath r
+            |> Some
+    | _ -> None
+
 let nativeArrayFunctions =
     dict
         [|
@@ -5215,6 +5283,7 @@ let private replacedModules =
             Types.icollection, collections
             "System.Collections.Generic.CollectionExtensions", collectionExtensions
             "System.ReadOnlySpan`1", readOnlySpans
+            "System.ArraySegment`1", arraySegments
             Types.hashset, hashSets
             Types.stack, bclType
             Types.queue, bclType
@@ -5738,6 +5807,7 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | "Fickl.Core.NativeAsyncGenerators" -> nativeGenerator true com ctx r t info args
     | "Fickl.Core.JsAsyncGenerator`3"
     | "Fickl.Core.JsGenerator`3" -> nativeGeneratorApi com r t info thisArg args
+    | Naming.StartsWith "Fickl.Core.TypedArrayExtensions" _ -> typedArrayExtensions com ctx r t info thisArg args
     | Naming.EndsWith "Exception" _ -> exceptions com ctx r t info thisArg args
     | "System.Timers.ElapsedEventArgs" -> thisArg // only signalTime is available here
     | Naming.StartsWith "System.Tuple" _
