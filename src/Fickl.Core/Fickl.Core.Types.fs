@@ -119,6 +119,27 @@ type TypeAssertionAttribute(parameter: string, assertedType: Type) =
     member _.Parameter = parameter
     member _.AssertedType = assertedType
 
+/// <summary>Annotates an abstract method's TypeScript return type as the polymorphic <c>this</c>, for fluent interfaces.</summary>
+/// <remarks>
+/// The method must return its declaring interface or abstract class, or one of its bases:
+/// <code>
+/// type IQuery =
+///     [&lt;ReturnsThis>] abstract where: string -> IQuery
+///
+/// type ISelect =
+///     inherit IQuery
+///     abstract columns: string[] -> ISelect
+/// </code>
+/// TypeScript declares <c>where(arg0: string): this</c>, so <c>select.where("x").columns(...)</c> type-checks there.
+/// A TypeScript class implementing or overriding the method returns <c>this</c> too, and its returned value is cast
+/// <c>as this</c>: the attribute promises the method returns its receiver, or an object of the receiver's type.
+/// F# still types the call as returning <c>IQuery</c>; <c>Fluent.chain (fun q -> q.where "x") select</c> gives back an
+/// <c>ISelect</c>. The JavaScript is unchanged, and other targets ignore the attribute.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method)>]
+type ReturnsThisAttribute() =
+    inherit Attribute()
+
 /// <summary>Emits an F# enum as a frozen JavaScript object of its members, typed in TypeScript by the enum's name.</summary>
 /// <remarks>
 /// <code>
@@ -325,3 +346,38 @@ type EmitTypeAttribute(typeText: string, from: string) =
     inherit Attribute()
     /// <summary>Writes the annotation as the given text, with no import.</summary>
     new(typeText: string) = EmitTypeAttribute(typeText, "")
+
+/// <summary>Adds the interface's members to a global TypeScript interface, <c>declare global { interface Name { ... } }</c>.</summary>
+/// <remarks>
+/// <code>
+/// [&lt;AugmentGlobal("HTMLElementTagNameMap")>]
+/// type TagNames =
+///     [&lt;EmitProperty("my-counter")>]
+///     abstract counter: Counter
+/// </code>
+/// makes <c>document.createElement("my-counter")</c> return a <c>Counter</c> in TypeScript code that imports the file.
+/// The interface has no declaration of its own, and TypeScript annotations of it are the global interface.
+/// A generic interface must have the same type parameters as the interface it augments.
+/// Only TypeScript output and declaration files change; there is no JavaScript for an interface.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Interface)>]
+type AugmentGlobalAttribute(interfaceName: string) =
+    inherit Attribute()
+    member _.InterfaceName = interfaceName
+
+/// <summary>Adds the interface's members to an interface a module exports, <c>declare module "path" { interface Name { ... } }</c>.</summary>
+/// <remarks>
+/// <code>
+/// [&lt;AugmentModule("vue", "ComponentCustomProperties")>]
+/// type Translations =
+///     abstract ``$t``: (string -> string)
+/// </code>
+/// A relative path is relative to the declaring F# file. TypeScript annotations of the interface import the augmented
+/// interface from the module. The interface has no declaration of its own, and a generic interface must have the
+/// same type parameters as the one it augments. Only TypeScript output and declaration files change.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Interface)>]
+type AugmentModuleAttribute(modulePath: string, interfaceName: string) =
+    inherit Attribute()
+    member _.ModulePath = modulePath
+    member _.InterfaceName = interfaceName

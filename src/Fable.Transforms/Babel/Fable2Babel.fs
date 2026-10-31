@@ -59,6 +59,8 @@ type Context =
         SymbolAccessCache: Dictionary<string, Expression option>
         /// <summary>Native fields replacing decorated auto-property backing storage in the current class.</summary>
         NativeAutoProperties: Map<string, ClassMember>
+        /// <summary>Directly in a primary constructor, where <c>new.target</c> is the class being constructed.</summary>
+        IsClassConstructor: bool
     }
 
 type ModuleDecl(name, ?isPublic, ?isMutable, ?typ, ?doc) =
@@ -1175,7 +1177,11 @@ module Annotation =
             // makeNativeTypeAnnotation com ctx [genArg] "Array"
             makeTypeAnnotation com ctx genArg |> ArrayTypeAnnotation
         | Fable.MutableArray
-        | Fable.ImmutableArray -> makeFableLibImportTypeAnnotation com ctx [ genArg ] "Util" "MutableArray"
+        | Fable.ImmutableArray ->
+            match makeTypeAnnotation com ctx genArg with
+            // fickl: `MutableArray<any>` is `any`, from which TS infers nothing, and an array of `any` is no typed array
+            | AnyTypeAnnotation -> ArrayTypeAnnotation AnyTypeAnnotation
+            | _ -> makeFableLibImportTypeAnnotation com ctx [ genArg ] "Util" "MutableArray"
 
     let makeListTypeAnnotation com ctx genArg =
         makeFableLibImportTypeAnnotation com ctx [ genArg ] "List" "FSharpList"
@@ -1396,9 +1402,49 @@ module Annotation =
 
         match ent.UnionCases with
         | [ uci ] when List.isMultiple uci.UnionCaseFields ->
-            uci.UnionCaseFields
-            |> List.mapToArray (fun fi -> fi.FieldType |> resolveInlineType genArgs |> makeFieldAnnotation com ctx)
-            |> TupleTypeAnnotation
+            let fields = uci.UnionCaseFields
+
+            let types =
+                fields
+                |> List.mapToArray (fun fi -> fi.FieldType |> resolveInlineType genArgs |> makeFieldAnnotation com ctx)
+
+            // fickl: the names of the fields label the elements when every field is named, as F# calls unnamed
+            // fields Item1, Item2..., and the option fields after the last other field are optional elements
+            let labels =
+                let isUnnamed (fi: Fable.Field) =
+                    fi.Name.StartsWith("Item", StringComparison.Ordinal)
+                    && fi.Name.Substring(4) |> Seq.forall Char.IsDigit
+
+                if fields |> List.exists isUnnamed then
+                    None
+                else
+                    fields
+                    |> List.mapToArray (fun fi ->
+                        Naming.sanitizeIdentForbiddenCharsWith Naming.isJsIdentChar (fun _ -> "_") fi.Name
+                        |> Naming.checkJsKeywords
+                    )
+                    |> Some
+
+            let firstOptional =
+                let isOption (fi: Fable.Field) =
+                    match fi.FieldType with
+                    | Fable.Option _ -> true
+                    | _ -> false
+
+                fields
+                |> List.rev
+                |> List.takeWhile isOption
+                |> List.length
+                |> (-) fields.Length
+
+            match labels with
+            | None when firstOptional = fields.Length -> TupleTypeAnnotation types
+            | _ ->
+                types
+                |> Array.mapi (fun index typ ->
+                    TupleElement(labels |> Option.map (fun labels -> labels[index]), typ, index >= firstOptional)
+                )
+                |> LabelledTupleTypeAnnotation
         | [ uci ] -> transformSingleFieldType uci
         | ucis -> ucis |> List.mapToArray transformSingleFieldType |> UnionTypeAnnotation
 
@@ -1509,6 +1555,47 @@ module Annotation =
             | _ -> AnyTypeAnnotation
         )
 
+    /// fickl: the global interface an `[<AugmentGlobal>]` interface augments, or the module path and interface name of
+    /// an `[<AugmentModule>]`, with a relative path resolved from the declaring F# file
+    let tryAugmentedInterface (com: IBabelCompiler) (ent: Fable.Entity) =
+        ent.Attributes
+        // reading the arguments of every attribute would throw on those FCS cannot convert
+        |> Seq.filter (fun att ->
+            att.Entity.FullName = Atts.ficklAugmentGlobal
+            || att.Entity.FullName = Atts.ficklAugmentModule
+        )
+        |> Seq.tryPick (fun att ->
+            match att.Entity.FullName, att.ConstructorArgs with
+            | Atts.ficklAugmentGlobal, [ :? string as name ] -> Some(None, name)
+            | Atts.ficklAugmentModule, [ :? string as path; :? string as name ] ->
+                let path =
+                    if Path.isRelativePath path then
+                        ent.Ref.SourcePath
+                        |> Option.map (FSharp2Fable.Util.fixImportedRelativePath com path)
+                        |> Option.defaultValue path
+                    else
+                        path
+
+                Some(Some path, name)
+            | _ -> None
+        )
+
+    /// fickl: an augmenting interface has no declaration of its own, so it is typed as the interface it augments,
+    /// imported from its module for `[<AugmentModule>]`
+    let tryAugmentTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        tryAugmentedInterface com ent
+        |> Option.map (fun (path, name) ->
+            let id =
+                match path with
+                | Some path ->
+                    match com.InTypePosition(fun () -> com.GetImportExpr(ctx, name, path, None)) with
+                    | Expression.Identifier id -> id
+                    | _ -> Identifier.identifier name
+                | None -> Identifier.identifier name
+
+            AliasTypeAnnotation(id, genArgs |> List.mapToArray (makeTypeAnnotation com ctx))
+        )
+
     /// fickl: a `[<TsEnum>]` enum is typed by its name, which TypeScript resolves to the enum's ambient declaration
     let tryTsEnumTypeAnnotation (com: IBabelCompiler) ctx (entRef: Fable.EntityRef) =
         match com.TryGetEntity entRef with
@@ -1545,6 +1632,7 @@ module Annotation =
         match genArgs, ent with
         | _, Patterns.Try (tryKeyTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryEmitTypeAnnotation com ctx genArgs) ta -> ta
+        | _, Patterns.Try (tryAugmentTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta
 
         | _, Patterns.Try (annotationConstructor com ctx) entRef ->
@@ -1677,6 +1765,7 @@ module Annotation =
             { ctx with
                 IsNativeAsync = false
                 NativeGeneratorType = None
+                IsClassConstructor = false
             }
             name
             typeParams
@@ -2257,6 +2346,10 @@ module Util =
                         Some info.ReturnParameter.Type
                     else
                         None
+                IsClassConstructor =
+                    match kind with
+                    | ClassConstructor -> true
+                    | _ -> false
             }
 
         let funcName, args, body =
@@ -2537,6 +2630,21 @@ module Util =
             match com.TransformAsExpr(ctx, e), Annotation.tryTsEnumTypeAnnotation com ctx entRef with
             | Literal _ as literal, Some ta -> AsExpression(AsExpression(literal, NumberTypeAnnotation), ta)
             | jsExpr, _ -> jsExpr
+        // fickl: a tuple left without its trailing optional elements is typed as the erased union it builds
+        | Fable.DeclaredType(entRef, _) when
+            com.IsTypeScript
+            && (
+                match e with
+                | Fable.Value(Fable.NewTuple _, _) ->
+                    com.TryGetEntity(entRef)
+                    |> Option.exists (fun ent -> ent.IsFSharpUnion && hasAttribute Atts.erase ent.Attributes)
+                | _ -> false
+            )
+            ->
+            match e with
+            | Fable.Value(Fable.NewTuple(values, _), _) ->
+                AsExpression(makeArray com ctx values, makeTypeAnnotation com ctx typ)
+            | _ -> com.TransformAsExpr(ctx, e)
         // Optimization for (numeric) array or list literals casted to seq
         // Done at the very end of the compile pipeline to get more opportunities
         // of matching cast and literal expressions after resolving pipes, inlining...
@@ -2904,11 +3012,53 @@ module Util =
             None
         | None, _ -> None
 
+    /// fickl: casts each value the method body returns to `ta`, for a method implementing a `[<ReturnsThis>]`
+    /// slot; returns of nested functions are expressions, so they are left alone
+    let private castReturns (ta: TypeAnnotation) (body: BlockStatement) : BlockStatement =
+        let rec block (b: BlockStatement) : BlockStatement =
+            BlockStatement(Array.map statement b.Body)
+
+        and statement s =
+            match s with
+            | ReturnStatement(argument, loc) -> ReturnStatement(AsExpression(argument, ta), loc)
+            | Statement.BlockStatement b -> Statement.BlockStatement(block b)
+            | LabeledStatement(body, label) -> LabeledStatement(statement body, label)
+            | WhileStatement(test, body, loc) -> WhileStatement(test, block body, loc)
+            | SwitchStatement(discriminant, cases, loc) ->
+                let cases =
+                    cases
+                    |> Array.map (fun (SwitchCase(test, consequent, loc)) ->
+                        SwitchCase(test, Array.map statement consequent, loc)
+                    )
+
+                SwitchStatement(discriminant, cases, loc)
+            | IfStatement(test, consequent, alternate, loc) ->
+                IfStatement(test, block consequent, Option.map statement alternate, loc)
+            | TryStatement(body, handler, finalizer, loc) ->
+                let handler =
+                    handler
+                    |> Option.map (fun (CatchClause(param, annotation, body, loc)) ->
+                        CatchClause(param, annotation, block body, loc)
+                    )
+
+                TryStatement(block body, handler, Option.map block finalizer, loc)
+            | ForOfStatement(name, right, body, isAwait, loc) -> ForOfStatement(name, right, block body, isAwait, loc)
+            | ForStatement(body, init, test, update, loc) -> ForStatement(block body, init, test, update, loc)
+            | Declaration _
+            | ExpressionStatement _
+            | DebuggerStatement _
+            | ThrowStatement _
+            | BreakStatement _
+            | ContinueStatement _ -> s
+
+        block body
+
     /// The members of an object expression as object-literal members, whether getters and setters need a class,
     /// and the members of a base class it overrides
     let private transformObjectExprMembers
         (com: IBabelCompiler)
         ctx
+        (selfType: TypeAnnotation option)
         baseCall
         (members: (Fable.ObjectExprMember * Fable.MemberFunctionOrValue) list)
         =
@@ -2973,6 +3123,18 @@ module Util =
                             |> Option.map (fun t -> UnionTypeAnnotation [| t; UndefinedTypeAnnotation |])
                         else
                             returnType
+
+                    // fickl: a `[<ReturnsThis>]` slot returns `this` in a class; an object literal cannot say `this`,
+                    // so it returns the type of the object expression, which its `this` is checked as
+                    let returnType, body =
+                        if com.IsTypeScript && hasAttribute Atts.ficklReturnsThis info.Attributes then
+                            match compileAsClass, selfType with
+                            | true, _ -> Some ThisTypeAnnotation, castReturns ThisTypeAnnotation body
+                            | false, Some selfType when returnType <> Some selfType ->
+                                Some selfType, castReturns selfType body
+                            | false, _ -> returnType, body
+                        else
+                            returnType, body
 
                     ObjectMember.objectMethod (
                         kind,
@@ -3073,7 +3235,13 @@ module Util =
 
 
         let compileAsClass, overrideNames, members =
-            transformObjectExprMembers com ctx baseCall members
+            let selfType =
+                if com.IsTypeScript then
+                    Some(makeTypeAnnotation com ctx typ)
+                else
+                    None
+
+            transformObjectExprMembers com ctx selfType baseCall members
 
         if not compileAsClass then
             let expr = Expression.objectExpression (List.toArray members)
@@ -3155,7 +3323,7 @@ module Util =
         let _, _, members =
             members
             |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
-            |> transformObjectExprMembers com ctx None
+            |> transformObjectExprMembers com ctx None None
 
         let functionOwnKeys = set [ "name"; "length"; "prototype"; "arguments"; "caller" ]
 
@@ -3420,6 +3588,11 @@ module Util =
             addErrorAndReturnNull com range "Native yields and returns must be inside a jsGenerator computation"
         | Fable.Tags.Contains "fickl-native-await" when not ctx.IsNativeAsync ->
             addErrorAndReturnNull com range "Native promise bindings must be inside a jsAsync computation"
+        | Fable.Tags.Contains "fickl-new-target" when not ctx.IsClassConstructor ->
+            addErrorAndReturnNull
+                com
+                range
+                "JS.newTarget and JS.isNewTarget are only allowed in a primary constructor, outside lambdas"
         | Fable.Tags.Contains "fickl-top-level-await" ->
             addErrorAndReturnNull
                 com
@@ -5654,8 +5827,10 @@ but thanks to the optimisation done below we get
             ClassMember.classMethod (ClassPrimaryConstructor consArgsModifiers, consArgs, Some consBody)
 
         let classFields =
-            if com.IsTypeScript && not ent.IsFSharpUnion then
+            if com.IsTypeScript then
                 ent.FSharpFields
+                // fickl: a union keeps its case fields in `fields`, so it declares only its static fields
+                |> List.filter (fun field -> not ent.IsFSharpUnion || field.IsStatic)
                 |> List.filter (fun field -> not (ctx.NativeAutoProperties.ContainsKey field.Name))
                 |> List.mapToArray (fun field ->
                     let prop, isComputed =
@@ -5663,7 +5838,20 @@ but thanks to the optimisation done below we get
                         | Some privateName -> Expression.identifier privateName, false
                         | None -> SymbolKeys.fieldKey com ctx field
 
-                    let ta = makeFieldAnnotationOf com ctx field
+                    // fickl: a static member cannot name the class's type parameters (TS2302), so they become `any`
+                    let ta =
+                        if field.IsStatic then
+                            let rec erase (t: Fable.Type) =
+                                match t with
+                                | Fable.GenericParam _ -> Fable.Any
+                                | t -> t.MapGenerics erase
+
+                            if FSharp2Fable.FsField.IsCurriedField field then
+                                makeTypeAnnotation com ctx (erase field.FieldType)
+                            else
+                                makeFieldAnnotation com ctx (erase field.FieldType)
+                        else
+                            makeFieldAnnotationOf com ctx field
                     // Static fields need to be initialized by static constructor
                     let am =
                         if field.IsMutable || field.IsStatic then
@@ -6299,6 +6487,17 @@ but thanks to the optimisation done below we get
 
         let args, body, returnType, typeParamDecl =
             getMemberArgsAndBody com ctx (Attached isStatic) (Some ent) info memb.Args memb.Body
+
+        // fickl: `info` is the implemented or overridden slot, so a TypeScript class keeps its `this` return
+        let returnType, body =
+            if
+                com.IsTypeScript
+                && not isStatic
+                && hasAttribute Atts.ficklReturnsThis info.Attributes
+            then
+                Some ThisTypeAnnotation, castReturns ThisTypeAnnotation body
+            else
+                returnType, body
 
         [|
             yield makeMethod memb.Name args body returnType typeParamDecl
@@ -7026,6 +7225,32 @@ but thanks to the optimisation done below we get
             |> FableTransforms.uncurryType
             |> makeTypeAnnotation com ctx
 
+        // fickl: `[<ReturnsThis>]` annotates the polymorphic `this`, which only stands for the declaring type
+        let returnType =
+            if hasAttribute Atts.ficklReturnsThis memb.Attributes then
+                let returnsOwnType =
+                    match memb.ReturnParameter.Type with
+                    | Fable.DeclaredType(returned, _) ->
+                        let rec isOwnOrBase (e: Fable.Entity) =
+                            e.FullName = returned.FullName
+                            || e.AllInterfaces |> Seq.exists (fun i -> i.Entity.FullName = returned.FullName)
+                            || e.BaseType
+                               |> Option.bind (fun b -> com.TryGetEntity b.Entity)
+                               |> Option.exists isOwnOrBase
+
+                        isOwnOrBase ent
+                    | _ -> false
+
+                if returnsOwnType then
+                    ThisTypeAnnotation
+                else
+                    $"%s{ent.FullName}.%s{memb.DisplayName} has [<ReturnsThis>] but does not return %s{ent.DisplayName} or one of its bases"
+                    |> addError com [] None
+
+                    returnType
+            else
+                returnType
+
         let kind =
             if not isMangled && isGetter then
                 ObjectGetter
@@ -7196,7 +7421,7 @@ but thanks to the optimisation done below we get
 
         let baseExpr, consBody =
             classDecl.BaseCall
-            |> extractSuperClassFromBaseCall com ctx baseType
+            |> extractSuperClassFromBaseCall com { ctx with IsClassConstructor = true } baseType
             |> Option.orElseWith (fun () ->
                 if ent.IsValueType then
                     Some(libValue com ctx "Types" "Record" |> SuperExpression, [])
@@ -7222,7 +7447,7 @@ but thanks to the optimisation done below we get
                     |> declareModuleMember com ctx exposedCons
         ]
 
-    let transformInterfaceDeclaration (com: IBabelCompiler) ctx (ent: Fable.Entity) (decl: Fable.ClassDecl) =
+    let private makeInterfaceDeclaration (com: IBabelCompiler) ctx (ent: Fable.Entity) name doc =
 
         let members =
             ent.MembersFunctionsAndValues
@@ -7247,14 +7472,18 @@ but thanks to the optimisation done below we get
         let typeParameters =
             FSharp2Fable.Util.getEntityGenArgs ent |> makeTypeParamDecl com ctx
 
-        Declaration.interfaceDeclaration (
-            Identifier.identifier decl.Name,
-            members,
-            extends,
-            typeParameters,
-            ?doc = decl.XmlDoc
-        )
+        Declaration.interfaceDeclaration (Identifier.identifier name, members, extends, typeParameters, ?doc = doc)
+
+    let transformInterfaceDeclaration (com: IBabelCompiler) ctx (ent: Fable.Entity) (decl: Fable.ClassDecl) =
+        makeInterfaceDeclaration com ctx ent decl.Name decl.XmlDoc
         |> asModuleDeclaration ent.IsPublic
+
+    /// fickl: `[<AugmentGlobal>]` and `[<AugmentModule>]` declare the interface's members under the augmented
+    /// interface's name, in `declare global { }` or `declare module "path" { }`
+    let transformAugmentation (com: IBabelCompiler) ctx (ent: Fable.Entity) (decl: Fable.ClassDecl) (path, name) =
+        let declaration = makeInterfaceDeclaration com ctx ent name decl.XmlDoc
+        let path = path |> Option.map (fun path -> StringLiteral(path, None))
+        AugmentationDeclaration(path, [| declaration |])
 
     /// fickl: `[<TsEnum>]` emits `const Color = Object.freeze({ Red: 0, 0: "Red" })`, the object a TypeScript enum
     /// compiles to. In TypeScript, an ambient `declare enum Color_$enum` types it, so the declaration stays erasable,
@@ -7499,7 +7728,9 @@ but thanks to the optimisation done below we get
             | ent when FSharp2Fable.Util.isTsEnumEntity com ent -> transformTsEnumDeclaration com ctx ent decl
             | ent when ent.IsInterface ->
                 if com.IsTypeScript then
-                    [ transformInterfaceDeclaration com ctx ent decl ]
+                    match Annotation.tryAugmentedInterface com ent with
+                    | Some augmented -> [ transformAugmentation com ctx ent decl augmented ]
+                    | None -> [ transformInterfaceDeclaration com ctx ent decl ]
                 else
                     []
             | ent ->
@@ -7872,6 +8103,7 @@ module Compiler =
                 NativeGeneratorType = None
                 SymbolAccessCache = Dictionary()
                 NativeAutoProperties = Map.empty
+                IsClassConstructor = false
             }
 
         let registerSymbolKey (att: Fable.Attribute) =
@@ -7927,5 +8159,27 @@ module Compiler =
         let body =
             topDirectivesPrologue @ importDecls @ com.GetSymbolDeclarations() @ rootDecls
             |> List.toArray
+
+        // fickl: TypeScript only allows augmentations in a module, so a file that imports and exports nothing
+        // else says `export {}`
+        let body =
+            let isAugmentation =
+                function
+                | AugmentationDeclaration _ -> true
+                | _ -> false
+
+            let isModuleSyntax =
+                function
+                | ImportDeclaration _
+                | ExportNamedDeclaration _
+                | ExportAllDeclaration _
+                | ExportDefaultDeclaration _
+                | ExportNamedReferences _ -> true
+                | _ -> false
+
+            if Array.exists isAugmentation body && not (Array.exists isModuleSyntax body) then
+                Array.append body [| ExportNamedReferences([||], None) |]
+            else
+                body
 
         Program(body)

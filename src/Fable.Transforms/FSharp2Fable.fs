@@ -142,6 +142,47 @@ let private transformNewUnion
             "Erased unions with multiple cases must have one single field: "
             + (getFsTypeFullName fsType)
             |> addErrorAndReturnNull com ctx.InlinePath r
+        // fickl: trailing option fields are optional tuple elements in TypeScript, so the trailing None values are
+        // left out, `["u"]` for `FetchArgs("u", None)`: a literal None here, any other at runtime
+        | argExprs when com.Options.Language = JavaScript || com.Options.Language = TypeScript ->
+            let isOptionField (field: FSharpField) =
+                match tryDefinition field.FieldType with
+                | Some(_, Some(Types.option | Types.valueOption)) -> true
+                | _ -> false
+
+            let required =
+                unionCase.Fields.Count
+                - (unionCase.Fields |> Seq.rev |> Seq.takeWhile isOptionField |> Seq.length)
+
+            let kept =
+                argExprs
+                |> List.indexed
+                |> List.rev
+                |> List.skipWhile (fun (index, arg) ->
+                    match arg with
+                    | Fable.Value(Fable.NewOption(None, _, _), _) -> index >= required
+                    | _ -> false
+                )
+                |> List.rev
+                |> List.map snd
+
+            let unionType = makeType ctx.GenericArgs fsType
+
+            match List.tryLast kept with
+            | Some(Fable.Value(Fable.NewOption(Some _, _, _), _)) when kept.Length = argExprs.Length ->
+                makeTuple r false argExprs
+            | Some(Fable.Value(Fable.NewOption(Some _, _, _), _)) -> Fable.TypeCast(makeTuple r false kept, unionType)
+            | _ when kept.Length > required ->
+                Replacements.Util.Helper.LibCall(
+                    com,
+                    "Util",
+                    "trimOptionalElements",
+                    unionType,
+                    [ makeTuple r false kept; makeIntConst required ],
+                    ?loc = r
+                )
+            | _ when kept.Length = argExprs.Length -> makeTuple r false argExprs
+            | _ -> Fable.TypeCast(makeTuple r false kept, unionType)
         | argExprs -> makeTuple r false argExprs
 
     | TypeScriptTaggedUnion(tdef, _, tagName, rule) ->
@@ -2354,18 +2395,20 @@ let private transformMemberFunction
     match body with
     // Accept import expressions, e.g. let foo x y = import "foo" "myLib"
     | Fable.Import(info, _, r) when not info.IsCompilerGenerated ->
-        // Use the full function type
-        let typ = makeType Map.empty memb.FullType
         let selector = importExprSelector memb info.Selector
 
-        let memberRef =
+        let typ, memberRef =
             // If this is a getter, it means the imported value is an object but Fable will call it as a function, see #2329
             if
                 memb.IsPropertyGetterMethod // || (memb.IsFunction && com.Options.Language = Rust)
             then
-                Fable.GeneratedMember.Function(name, [], typ)
+                // fickl: the getter returns the imported value, so the value has the property's type
+                let typ = makeType Map.empty memb.ReturnParameter.Type
+                typ, Fable.GeneratedMember.Function(name, [], typ)
             else
-                Fable.GeneratedMember.Value(name, typ)
+                // Use the full function type
+                let typ = makeType Map.empty memb.FullType
+                typ, Fable.GeneratedMember.Value(name, typ)
 
         transformImport com r typ name [] memberRef selector info.Path
     | body ->

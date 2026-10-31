@@ -2864,6 +2864,7 @@ module Util =
             || entFullName = "Fickl.Core.RecordModule"
             || entFullName = "Fickl.Core.ValueOf"
             || entFullName = "Fickl.Core.Brand"
+            || entFullName = "Fickl.Core.Fluent"
             || entFullName = "Fickl.Core.JsAsyncBuilder"
             || entFullName = "Fickl.Core.NativeAsync"
             || entFullName.StartsWith("Fickl.Core.JsGeneratorBuilder", StringComparison.Ordinal)
@@ -4055,7 +4056,13 @@ module Util =
         | _, Some entity when entity.IsDelegate ->
             match callInfo.ThisArg, memb.DisplayName with
             | Some callee, "Invoke" ->
-                let callInfo = { callInfo with ThisArg = None }
+                // fickl: the generic arguments belong to the delegate type, not to the function it holds
+                let callInfo =
+                    { callInfo with
+                        ThisArg = None
+                        GenericArgs = []
+                    }
+
                 makeCall r typ callInfo callee
             | _ ->
                 "Only Invoke is supported in delegates"

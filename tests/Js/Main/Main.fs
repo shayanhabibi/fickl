@@ -20,9 +20,12 @@ let allTests =
     NativeAsyncGenerators.tests
     SymbolKeys.tests
     TypeGuards.tests
+    ReturnsThis.tests
+    ErasedTuples.tests
     TaggedTemplates.tests
     ImportAttributes.tests
     TopLevelAwait.tests
+    NewTarget.tests
     TsEnums.tests
     JsNamespaceLibrary.tests
     Currying.tests

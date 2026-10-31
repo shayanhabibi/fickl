@@ -5,7 +5,8 @@ export type Nullable<T> = T | null | undefined;
 /** The string keys of `T` whose property type is assignable to `R`: `Fickl.Core.keyof<'T, 'R>`. */
 export type KeysOfType<T, R> = { [K in keyof T]-?: T[K] extends R ? K : never }[keyof T] & string;
 
-export interface MutableArray<T> extends Iterable<T> {
+/** The members a typed array shares with `Array`, which is all an F# array of numbers can rely on. */
+export interface NumericArray<T> extends Iterable<T> {
   readonly length: number;
   [index: number]: T;
   every(predicate: (value: T, index: number, array: this) => unknown, thisArg?: any): boolean;
@@ -28,6 +29,14 @@ export interface MutableArray<T> extends Iterable<T> {
   some(predicate: (value: T, index: number, array: this) => unknown, thisArg?: any): boolean;
   sort(compareFn?: (a: T, b: T) => number): this;
 }
+
+/**
+ * An F# array. Only numbers and bigints can be stored in a typed array, so an array of any other
+ * element type is also a plain `T[]`, which TS functions and properties declared `T[]` accept.
+ * `MutableArray<any>` is `any`, as its elements may be numbers or not. The intersection keeps a
+ * generic `MutableArray<T>` usable as a `NumericArray<T>`.
+ */
+export type MutableArray<T> = NumericArray<T> & (0 extends (1 & T) ? any : [T] extends [number | bigint] ? unknown : T[]);
 
 // Don't change, this corresponds to DateTimeKind.Kind enum values in .NET
 export const DateTimeKind = {
@@ -298,6 +307,17 @@ export function ensureErrorOrException(e: any): any {
 /** fickl: a callable interface's function, with the properties, accessors and methods of an object literal */
 export function callableObject<F extends Function, P extends object>(f: F, properties: P & ThisType<F & P>): F & P {
   return Object.defineProperties(f, Object.getOwnPropertyDescriptors(properties)) as F & P;
+}
+
+/** fickl: an erased union's tuple without the None values ending it, which are its optional elements */
+export function trimOptionalElements<T extends unknown[]>(values: T, required: number): T {
+  const elements: unknown[] = values;
+  let length = elements.length;
+  while (length > required && elements[length - 1] === undefined) {
+    length--;
+  }
+  elements.length = length;
+  return values;
 }
 
 export function isArrayLike<T>(x: T | ArrayLike<T> | Iterable<T>): x is T[] {

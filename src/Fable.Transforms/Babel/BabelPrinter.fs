@@ -847,12 +847,34 @@ module PrinterExtensions =
                 printer.Print(declaration)
             | ImportDeclaration(specifiers, source, attributes) ->
                 printer.PrintImportDeclaration(specifiers, source, attributes)
+            // fickl: `export {}` keeps a file of augmentations a module
+            | ExportNamedReferences([||], None) -> printer.Print("export {}")
             | ExportNamedReferences(specifiers, source) ->
                 printer.Print("export ")
                 printer.Print("{ ")
                 printer.PrintCommaSeparatedArray(specifiers)
                 printer.Print(" }")
                 printer.PrintOptional(source, " from ")
+            | AugmentationDeclaration(modulePath, declarations) ->
+                match modulePath with
+                | Some(StringLiteral(path, _)) ->
+                    // the path an import of the module would print, so both name the same module
+                    printer.Print("declare module \"")
+                    printer.Print(printer.MakeImportPath(path))
+                    printer.Print("\" ")
+                | None -> printer.Print("declare global ")
+
+                printer.PrintBlock(
+                    declarations,
+                    (fun p decl ->
+                        p.PrintJsDoc(decl.JsDoc)
+                        p.PrintDeclaration(decl)
+                    ),
+                    (fun p ->
+                        if p.Column > 0 then
+                            p.PrintNewLine()
+                    )
+                )
             | ExportNamedDeclaration(declaration) ->
                 printer.PrintJsDoc(declaration.JsDoc)
                 printer.Print("export ")
@@ -1739,6 +1761,7 @@ module PrinterExtensions =
             | BooleanTypeAnnotation -> printer.Print("boolean")
             | AnyTypeAnnotation -> printer.Print("any")
             | UnknownTypeAnnotation -> printer.Print("unknown")
+            | ThisTypeAnnotation -> printer.Print("this")
             | VoidTypeAnnotation -> printer.Print("void")
             | UndefinedTypeAnnotation -> printer.Print("undefined")
             | NullTypeAnnotation -> printer.Print("null")
@@ -1748,6 +1771,33 @@ module PrinterExtensions =
             | TupleTypeAnnotation(types) ->
                 printer.Print("[")
                 printer.PrintCommaSeparatedArray(types)
+                printer.Print("]")
+            | LabelledTupleTypeAnnotation(elements) ->
+                printer.Print("[")
+
+                printer.PrintArray(
+                    elements,
+                    (fun p (TupleElement(label, typ, isOptional)) ->
+                        match label with
+                        | Some label ->
+                            p.Print(label)
+
+                            p.Print(
+                                if isOptional then
+                                    "?: "
+                                else
+                                    ": "
+                            )
+
+                            p.Print(typ)
+                        | None when isOptional ->
+                            p.ComplexTypeWithParens(typ)
+                            p.Print("?")
+                        | None -> p.Print(typ)
+                    ),
+                    (fun p -> p.Print(", "))
+                )
+
                 printer.Print("]")
             | UnionTypeAnnotation(types) ->
                 printer.PrintArray(types, (fun p x -> p.ComplexTypeWithParens(x)), (fun p -> p.Print(" | ")))

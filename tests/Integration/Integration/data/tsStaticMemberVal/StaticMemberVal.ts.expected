@@ -1,0 +1,139 @@
+
+import { Union } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { class_type, union_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+
+export type Color_$union = 
+    | Color<0>
+    | Color<1>
+
+export type Color_$cases = {
+    0: ["Red", []],
+    1: ["Green", []]
+}
+
+export function Color_Red() {
+    return Color.Red;
+}
+
+export function Color_Green() {
+    return Color.Green;
+}
+
+export class Color<Tag extends keyof Color_$cases> extends Union<Tag, Color_$cases[Tag][0]> {
+    static "defaultColor@": Color_$union;
+    static "init@4": int32;
+    constructor(tag: Tag, fields: Color_$cases[Tag][1]) {
+        super();
+        this.tag = tag;
+        this.fields = fields;
+    }
+    readonly tag: Tag;
+    readonly fields: Color_$cases[Tag][1];
+    cases() {
+        return ["Red", "Green"];
+    }
+    static readonly Red: any = new Color<0>(0, []);
+    static readonly Green: any = new Color<1>(1, []);
+}
+
+export function Color_$reflection(): TypeInfo {
+    return union_type("StaticMemberVal.Color", [], Color, () => [[], []]);
+}
+
+((): void => {
+    let matchValue: Option<Color_$union> = undefined as any;
+    Color["defaultColor@"] = ((matchValue = Color_tryFetchDefaultColor(), (matchValue == null) ? Color.Red : (matchValue as Color_$union)));
+})();
+
+export function Color_tryFetchDefaultColor(): Option<Color_$union> {
+    return undefined;
+}
+
+export function Color_get_defaultColor(): Color_$union {
+    return Color["defaultColor@"];
+}
+
+export type Box$1_$union<T> = 
+    | Box$1<T, 0>
+    | Box$1<T, 1>
+
+export type Box$1_$cases<T> = {
+    0: ["Full", [T]],
+    1: ["Empty", []]
+}
+
+export function Box$1_Full<T>(Item: T) {
+    return new Box$1<T, 0>(0, [Item]);
+}
+
+export function Box$1_Empty<T>() {
+    return Box$1.Empty;
+}
+
+export class Box$1<T, Tag extends keyof Box$1_$cases<T>> extends Union<Tag, Box$1_$cases<T>[Tag][0]> {
+    static "Created@": int32;
+    static "Default@": Box$1_$union<any>;
+    static "init@16-1": int32;
+    constructor(tag: Tag, fields: Box$1_$cases<T>[Tag][1]) {
+        super();
+        this.tag = tag;
+        this.fields = fields;
+    }
+    readonly tag: Tag;
+    readonly fields: Box$1_$cases<T>[Tag][1];
+    cases() {
+        return ["Full", "Empty"];
+    }
+    static readonly Empty: any = new Box$1<any, 1>(1, []);
+}
+
+export function Box$1_$reflection(gen0: TypeInfo): TypeInfo {
+    return union_type("StaticMemberVal.Box`1", [gen0], Box$1, () => [[["Item", gen0]], []]);
+}
+
+((): void => {
+    Box$1["Created@"] = 0;
+    Box$1["Default@"] = Box$1.Empty;
+})();
+
+export function Box$1_get_Created<T>(): int32 {
+    return Box$1["Created@"] | 0;
+}
+
+export function Box$1_set_Created_Z524259A4<T>(v: int32): void {
+    Box$1["Created@"] = (v | 0);
+}
+
+export function Box$1_get_Default<T>(): Box$1_$union<T> {
+    return Box$1["Default@"];
+}
+
+export class Registry$1<T> {
+    static "Last@": Option<any>;
+    static "init@23-2": int32;
+    constructor() {
+    }
+}
+
+export function Registry$1_$reflection(gen0: TypeInfo): TypeInfo {
+    return class_type("StaticMemberVal.Registry`1", [gen0], Registry$1);
+}
+
+export function Registry$1_$ctor<T>(): Registry$1<T> {
+    return new Registry$1();
+}
+
+((): void => {
+    Registry$1["Last@"] = undefined;
+})();
+
+export function Registry$1_get_Last<T>(): Option<T> {
+    return Registry$1["Last@"];
+}
+
+export function Registry$1_set_Last_7462E5D6<T>(v: Option<T>): void {
+    Registry$1["Last@"] = v;
+}
+

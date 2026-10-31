@@ -468,6 +468,13 @@ let tests =
         throwsAnyError (fun () -> xs.[-1] <- 42)
         throwsAnyError (fun () -> xs.[10] <- 42)
 
+    testCase "ResizeArray bound before a loop is one instance across iterations" <| fun _ ->
+        let seen = ResizeArray<ResizeArray<int>>()
+        let shared = ResizeArray<int>()
+        for _ in 1..2 do
+            seen.Add shared
+        obj.ReferenceEquals(seen[0], seen[1]) |> equal true
+
     testCase "ResizeArray uses reference equality not structural equality" <| fun _ -> // See #3718
         let xs = ResizeArray [0; 1; 2]
         let ys = ResizeArray [0; 1; 2]

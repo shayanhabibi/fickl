@@ -493,6 +493,11 @@ let dtest2 (f: MyIntDelegate -> int) =
 let dInvoke (d: MyIntDelegate) =
     d.Invoke ()
 
+// fickl#201 - the delegate's type argument is not passed to the function it holds
+type MyGenericDelegate<'T> = delegate of 'T * int -> 'T
+
+let genericDelegateInvoke (d: MyGenericDelegate<string>) = d.Invoke("ab", 2)
+
 let (>>*) (f: string -> unit) () (x: string) =
     f x
 
@@ -543,6 +548,9 @@ let tests =
     testCase "Passing delegate works" <| fun _ -> // #3862
         dtest1 dInvoke |> equal 42
         dtest2 dInvoke |> equal 43
+
+    testCase "Invoking a generic delegate works" <| fun _ ->
+        MyGenericDelegate(fun s n -> String.replicate n s) |> genericDelegateInvoke |> equal "abab"
 
     testCase "Generic unit args work" <| fun _ -> // #3584
         let to_str = inlineToString (fun (props: unit) -> "s")

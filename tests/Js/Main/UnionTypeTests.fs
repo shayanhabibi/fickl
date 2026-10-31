@@ -209,6 +209,20 @@ let matchNumbers = function
     | DeepWrappedF _ -> 0
     | DeepWrappedG x -> x.Y
 
+// fickl#198 - the backing fields of static member val are declared on the union class
+type UnionWithStaticMemberVal =
+    | StaticValA of int
+    | StaticValB
+
+    static member internal TryFetchDefault() : UnionWithStaticMemberVal option = None
+
+    static member val Default =
+        match UnionWithStaticMemberVal.TryFetchDefault() with
+        | Some u -> u
+        | None -> StaticValB
+
+    static member val Count = 0 with get, set
+
 let matchStringWhenStringNotHello = function
     | DeepWrappedB s when s <> "hello" -> "not hello"
     | _ -> "hello"
@@ -536,5 +550,10 @@ let tests =
         let b2 = DeepWrappedB "not"
         b1 |> matchStringWhenStringNotHello |> equal "hello"
         b2 |> matchStringWhenStringNotHello |> equal "not hello"
+
+    testCase "Union with static member val works" <| fun () ->
+        UnionWithStaticMemberVal.Default |> equal StaticValB
+        UnionWithStaticMemberVal.Count <- UnionWithStaticMemberVal.Count + 2
+        UnionWithStaticMemberVal.Count |> equal 2
 
   ]

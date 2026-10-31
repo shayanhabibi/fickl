@@ -1,0 +1,17 @@
+
+import type { MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { html } from "./tags.js";
+
+export interface Template {
+    get strings(): MutableArray<string>,
+    get values(): any[]
+}
+
+export function render(name: string): Template {
+    return html(["<b>", "</b>"], name);
+}
+
+export function applyMapper<T, U>(mapper: ((arg0: T) => U), x: T): U {
+    return mapper(x);
+}
+
