@@ -6,7 +6,7 @@ module Main
 
 open System.Collections.Generic
 open Fable.Core
-open Fickl.Core.JS
+open Fickl.Core
 
 [<Import("readFileSync", "node:fs")>]
 let readFileSync (path: obj, encoding: string) : string = jsNative
@@ -15,9 +15,9 @@ let readFileSync (path: obj, encoding: string) : string = jsNative
 let besideThisFile (name: string) : obj = jsNative
 
 [<Emit("Object.freeze([1, 2, 3])")>]
-let frozen () : ReadonlyArray<int> = jsNative
+let frozen () : JS.ReadonlyArray<int> = jsNative
 
-let sum (xs: ReadonlyArray<int>) = Seq.sum xs
+let sum (xs: JS.ReadonlyArray<int>) = Seq.sum xs
 let size (xs: IReadOnlyCollection<int>) = xs.Count
 let firstOf (xs: IReadOnlyList<int>) = Seq.head xs
 let find (d: IReadOnlyDictionary<string, int>) (key: string) = d.[key]
@@ -25,7 +25,7 @@ let find (d: IReadOnlyDictionary<string, int>) (key: string) = d.[key]
 let declaration = readFileSync (besideThisFile "Main.d.ts", "utf8")
 
 Check.equal 6 (sum (frozen ()))
-Check.equal 3 (sum (ReadonlyArray.ofArray [| 1; 2 |]))
+Check.equal 3 (sum (JS.ReadonlyArray.ofArray [| 1; 2 |]))
 Check.equal 2 (size [| 1; 2 |])
 Check.equal 1 (firstOf [ 1; 2 ])
 Check.equal 5 (find (Map [ ("a", 5) ]) "a")
