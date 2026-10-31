@@ -267,6 +267,12 @@ module Keys =
 
     let takesKey (key: keyof<Server>) = key.Value
 
+    type Headers =
+        [<EmitIndexer>]
+        abstract Item: string -> string with get, set
+
+    let total (scores: ReadonlyRecord<string, int>) (names: string[]) = names |> Array.sumBy (fun name -> scores.[name])
+
 [<StringEnum>]
 #endif
 type Field = OldPassword | NewPassword | ConfirmPassword
@@ -1233,6 +1239,24 @@ let tests =
         Keys.describe (KeyOf.widen (keyof (fun (s: Keys.Server) -> s.Host))) |> equal "host"
         Keys.describe (KeyOf.widen (keyof (fun (s: Keys.Server) -> s.Retries))) |> equal "Retries"
         KeyOf.unsafeOfString<Keys.Server, int> "Port" |> equal (keyof (fun (s: Keys.Server) -> s.Port))
+
+    testCase "Fickl.Core.Record is a plain object indexed by its keys" <| fun () ->
+        let scores = Fickl.Core.Record.empty<string, int> ()
+        scores.["alice"] <- 3
+        scores.["bob"] <- 4
+        scores.["alice"] |> equal 3
+        Fickl.Core.Record.keys scores |> equal [| "alice"; "bob" |]
+        Fickl.Core.Record.tryGet "bob" scores |> equal (Some 4)
+        Fickl.Core.Record.tryGet "carol" scores |> equal None
+        Fickl.Core.Record.tryGet "toString" scores |> equal None
+        Keys.total !!scores [| "alice"; "bob" |] |> equal 7
+
+    testCase "PropertyRecord and EmitIndexer interfaces index by key" <| fun () ->
+        let labels: PropertyRecord<Keys.Server, string> = !!(createObj [ "Port", box "port"; "Host", box "host"; "Retries", box "retries" ])
+        labels.[KeyOf.widen (keyof (fun (s: Keys.Server) -> s.Host))] |> equal "host"
+        let headers = createEmpty<Keys.Headers>
+        headers.["accept"] <- "text/plain"
+        headers.["accept"] |> equal "text/plain"
 
     testCase "StringEnum attribute works" <| fun () ->
         Vertical |> unbox |> equal "vertical"

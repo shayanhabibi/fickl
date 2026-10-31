@@ -2787,6 +2787,7 @@ module Util =
             || entFullName = "Fickl.Core.JS.ReadonlyArray"
             || entFullName = "Fickl.Core.KeyOfBuilder"
             || entFullName = "Fickl.Core.KeyOf"
+            || entFullName = "Fickl.Core.RecordModule"
             || entFullName = "Fickl.Core.JsAsyncBuilder"
             || entFullName = "Fickl.Core.NativeAsync"
             || entFullName.StartsWith("Fickl.Core.JsGeneratorBuilder", StringComparison.Ordinal)
