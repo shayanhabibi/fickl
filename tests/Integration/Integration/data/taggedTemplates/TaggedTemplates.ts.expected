@@ -1,0 +1,30 @@
+
+import type { MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { html } from "./tags.js";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+
+export interface Template {
+    get strings(): ReadonlyArray<string>,
+    get values(): MutableArray<any>
+}
+
+export function view(name: string, count: int32): Template {
+    return html`<p>Hello ${name}, ${count} items</p>`;
+}
+
+export function noHoles(): Template {
+    return html`<br>`;
+}
+
+export function path(dir: string): string {
+    return String.raw`/${dir}/file`;
+}
+
+export function ofValue(template: any): Template {
+    return html(template.strs, ...template.args);
+}
+
+export function ofCall(name: string): Template {
+    return html`<b>${name}</b>`;
+}
+

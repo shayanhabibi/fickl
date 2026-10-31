@@ -11,12 +11,18 @@ let allTests =
     NativeDisposal.tests
     NativeErrors.tests
     AbortSignals.tests
+    Proxies.tests
+    JsEvents.tests
+    Transfers.tests
     WeakReferences.tests
     NativeAsync.tests
     NativeGenerators.tests
     NativeAsyncGenerators.tests
     SymbolKeys.tests
     TypeGuards.tests
+    TaggedTemplates.tests
+    ImportAttributes.tests
+    TopLevelAwait.tests
     TsEnums.tests
     JsNamespaceLibrary.tests
     Currying.tests

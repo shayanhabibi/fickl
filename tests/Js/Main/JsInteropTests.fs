@@ -90,6 +90,58 @@ type MyCustomHTMLElement() =
     member this.SaySomethingNiceTo(name: string) =
         $"Repeat with me {name}: {this.getMotivated()}"
 
+type GlobalSubclassWithMembers(start: int) =
+    inherit GlobalClasses.MyHTMLElement(start)
+    let mutable count = start
+    static member observedAttributes = [| "count" |]
+    member _.Count = count
+    member _.Increment() = count <- count + 1
+
+type GlobalSubclassGrandchild() =
+    inherit GlobalSubclassWithMembers(10)
+    member this.IncrementTwice() =
+        this.Increment()
+        this.Increment()
+
+[<Fickl.Core.AttachMembers>]
+type FicklAttachedCounter(start: int) =
+    let mutable count = start
+    member _.Count = count
+    member _.Increment() = count <- count + 1
+
+type GlobalSubclassWithPrivateField(v: int) =
+    inherit GlobalClasses.MyHTMLElement(2)
+    let mutable value = v
+    member _.Value = value
+    member _.Bump() = value <- value + 10
+
+[<Global("Map")>]
+type GlobalMap() =
+    class
+    end
+
+type MapSubclassWithPrivateField(n: int) =
+    inherit GlobalMap()
+    let size = n
+    member _.Count = size
+
+[<Fickl.Core.PrivateFields>]
+type ClassWithPrivateFields(v: int) =
+    let value = v
+    member _.Value = value
+
+[<Fickl.Core.PrivateFields(false)>]
+type GlobalSubclassWithPublicField(v: int) =
+    inherit GlobalClasses.MyHTMLElement(1)
+    let label = v
+    member _.Label = label
+
+[<Fickl.Core.AttachMembers(false)>]
+type GlobalSubclassDetached() =
+    inherit GlobalClasses.MyHTMLElement(1)
+    static member Kind = "detached"
+    member _.Value = 5
+
 let inline sqrtJsExpr (jsExpr: string): float =
     emitJsExpr () ("Math.sqrt(" + jsExpr + ")")
 
@@ -294,6 +346,15 @@ let validatePassword = function
     | OldPassword -> "op"
     | NewPassword -> "np"
     | ConfirmPassword -> "cp"
+
+module Brands =
+    [<Measure>] type UserId
+    [<Measure>] type OrderId
+    [<Measure>] type Verified
+
+    type User = { Id: string<UserId>; Verified: bool<Verified>; Initial: char<UserId> }
+
+    let findUser (id: string<UserId>) (users: User list) = users |> List.tryFind (fun u -> u.Id = id)
 
 type JsOptions =
     abstract foo: string with get, set
@@ -853,6 +914,20 @@ let tests =
         instance.greet "Pepe" |> equal "hi Pepe"
         instance.regular 3 |> equal 4
 
+    testCase "Branded primitives tag and untag their values" <| fun () ->
+        let id: string<Brands.UserId> = Brand.tag "u1"
+        let user: Brands.User = { Id = id; Verified = Brand.tagBool true; Initial = Brand.tagChar 'u' }
+        Brand.untag user.Id |> equal "u1"
+        Brand.untagBool user.Verified |> equal true
+        Brand.untagChar user.Initial |> equal 'u'
+        Brands.findUser (Brand.tag "u1") [ user ] |> equal (Some user)
+        Brands.findUser (Brand.tag "u2") [ user ] |> equal None
+        compare (Brand.tag<Brands.OrderId> "a") (Brand.tag "b") |> equal -1
+#if FABLE_COMPILER
+        emitJsExpr id "typeof $0" |> equal "string"
+        emitJsExpr user.Verified "typeof $0" |> equal "boolean"
+#endif
+
 #if FABLE_COMPILER
     testCase "Can type test interfaces decorated with Global" <| fun () ->
         let ar = ResizeArray [| 1; 2; 3 |] |> box
@@ -1330,6 +1405,58 @@ let tests =
         let x = MyCustomHTMLElement()
         x.SaySomethingNiceTo("Mary")
         |> equal "Repeat with me Mary: I can do it! I can do it! I can do it!"
+
+    testCase "Classes inheriting a global class attach their members" <| fun () ->
+        let x = GlobalSubclassWithMembers(1)
+        x.Increment()
+        x.Count |> equal 2
+        x?Count |> equal 2
+        jsConstructor<GlobalSubclassWithMembers>?observedAttributes |> equal [| "count" |]
+        x.getMotivated() |> equal "I can do it!"
+
+    testCase "Classes inheriting a JS subclass attach their members" <| fun () ->
+        let x = GlobalSubclassGrandchild()
+        x.IncrementTwice()
+        x.Count |> equal 12
+        x?IncrementTwice()
+        x?Count |> equal 14
+
+    testCase "AttachMembers(false) keeps members of a JS subclass as module functions" <| fun () ->
+        let x = GlobalSubclassDetached()
+        x.Value |> equal 5
+        GlobalSubclassDetached.Kind |> equal "detached"
+        isNull (box x?Value) |> equal true
+        isNull (jsConstructor<GlobalSubclassDetached>?Kind) |> equal true
+
+    testCase "Fickl.Core's AttachMembers attaches members like Fable.Core's" <| fun () ->
+        let x = FicklAttachedCounter(1)
+        x?Increment()
+        x?Count |> equal 2
+        x.Count |> equal 2
+
+    testCase "Let fields of a JS subclass do not collide with fields of the base" <| fun () ->
+        let x = GlobalSubclassWithPrivateField(5)
+        x.Value |> equal 5
+        x.Bump()
+        x.Value |> equal 15
+        x.getMotivated() |> equal "I can do it! I can do it!"
+        (box x)?value |> equal 2
+
+    testCase "Let fields of a JS subclass do not set accessors of the base" <| fun () ->
+        let x = MapSubclassWithPrivateField(3)
+        x.Count |> equal 3
+        (box x)?size |> equal 0
+
+    testCase "PrivateFields compiles let fields to #private fields" <| fun () ->
+        let x = ClassWithPrivateFields(4)
+        x.Value |> equal 4
+        x?Value |> equal 4
+        emitJsExpr x "Object.keys($0).length" |> equal 0
+
+    testCase "PrivateFields(false) keeps let fields of a JS subclass as properties" <| fun () ->
+        let x = GlobalSubclassWithPublicField(7)
+        x.Label |> equal 7
+        (box x)?label |> equal 7
 
     testCase "Local import with curried signatures works" <| fun () ->
         let add (x:int) (y:int): int = importMember "./js/1foo.js"

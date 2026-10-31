@@ -701,14 +701,14 @@ let private transformObjExpr
             let r = makeRangeFrom baseCallExpr
 
             match validateCallableInterface com entity, members, baseCall, otherOverrides with
-            | None, [ _ ], None, [] ->
+            | None, _ :: _, None, [] ->
                 // Keep method metadata through the target transform: rest parameters and
                 // generic binders used only in the body cannot be recovered from a delegate.
                 return Fable.ObjectExpr(members, typ, baseCall)
             | Some error, _, _, _ -> return error |> addErrorAndReturnNull com ctx.InlinePath r
             | _ ->
                 return
-                    "CallableInterface object expressions must implement only their single Invoke method"
+                    "CallableInterface object expressions must implement only the callable interface"
                     |> addErrorAndReturnNull com ctx.InlinePath r
         | _ when
             otherOverrides

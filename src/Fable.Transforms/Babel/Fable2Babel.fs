@@ -24,6 +24,8 @@ type Import =
         Selector: string
         LocalIdent: string option
         Path: string
+        /// fickl: the `with { type: "json" }` attributes of the import
+        Attributes: (string * string) list
         /// Only requested from type annotations, so TypeScript can print it as `import type`
         IsTypeOnly: bool
     }
@@ -544,10 +546,36 @@ module private SymbolKeys =
                 key
         | _ -> loop Set.empty typ
 
+    /// fickl: the ES #private name of a class `let` field, see FSharp2Fable.Util.usesPrivateFields
+    let tryPrivateFieldName (com: IBabelCompiler) (ent: Fable.Entity) (field: Fable.Field) =
+        if
+            not field.IsStatic
+            && FSharp2Fable.FsField.IsLetBinding field
+            && FSharp2Fable.Util.usesPrivateFields com ent
+        then
+            // F# names a `let` that shadows a constructor argument `balance@20`
+            Some("#" + Naming.sanitizeJsIdentForbiddenChars (field.Name.Replace("@", "$")))
+        else
+            None
+
+    let private tryPrivateFieldAccess (com: IBabelCompiler) typ name =
+        match typ with
+        | Fable.DeclaredType(entRef, _) ->
+            com.TryGetEntity entRef
+            |> Option.bind (fun ent ->
+                ent.FSharpFields
+                |> List.tryFind (fun field -> field.Name = name)
+                |> Option.bind (tryPrivateFieldName com ent)
+            )
+        | _ -> None
+
     let access com ctx range typ target name =
-        match tryAccessKey com ctx typ name with
-        | Some key -> Expression.memberExpression (target, key, true, ?loc = range)
-        | None -> Util.get range target name
+        match tryPrivateFieldAccess com typ name with
+        | Some privateName -> Expression.memberExpression (target, Expression.identifier privateName, ?loc = range)
+        | None ->
+            match tryAccessKey com ctx typ name with
+            | Some key -> Expression.memberExpression (target, key, true, ?loc = range)
+            | None -> Util.get range target name
 
 module Reflection =
     open Lib
@@ -926,6 +954,8 @@ module Reflection =
             | Types.exception_ ->
                 [ com.TransformAsExpr(ctx, expr) ]
                 |> libCall com ctx range "Util" "isException" []
+            // fickl: a symbol is a primitive, not an instance of Symbol
+            | "Fickl.Core.JS.Symbol" -> jsTypeof "symbol" expr
             | _ ->
                 match com.GetEntity(entRef) with
                 | Patterns.Try (Util.tryFindAnyEntAttribute [ Atts.stringEnum
@@ -2874,39 +2904,14 @@ module Util =
             None
         | None, _ -> None
 
-    let private transformOrdinaryObjectExpr
+    /// The members of an object expression as object-literal members, whether getters and setters need a class,
+    /// and the members of a base class it overrides
+    let private transformObjectExprMembers
         (com: IBabelCompiler)
         ctx
-        typ
-        (members: Fable.ObjectExprMember list)
         baseCall
-        : Expression
+        (members: (Fable.ObjectExprMember * Fable.MemberFunctionOrValue) list)
         =
-
-        let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
-        let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
-
-        // fickl: jsOptions and partial build option bags from generated members
-        let isGeneratedBag =
-            isOptionBag
-            && not members.IsEmpty
-            && members
-               |> List.forall (fun (memb, _) ->
-                   match memb.MemberRef with
-                   | Fable.GeneratedMemberRef _ -> true
-                   | Fable.MemberRef _ -> false
-               )
-
-        // A nested setter makes a nested object, which a shallow Partial would check as complete
-        let isFlat =
-            members
-            |> List.forall (fun (memb, _) ->
-                match memb.Body with
-                | Fable.ObjectExpr _ -> false
-                | _ -> true
-            )
-
-
         let hasExplicitDisposal name =
             members
             |> List.exists (fun (memb, info) -> memb.Name = name || SymbolKeys.isWellKnownMember name info)
@@ -3032,6 +3037,44 @@ module Util =
                     [ makeMethod ObjectMeth ]
             )
 
+        compileAsClass, overrideNames, members
+
+    let private transformOrdinaryObjectExpr
+        (com: IBabelCompiler)
+        ctx
+        typ
+        (members: Fable.ObjectExprMember list)
+        baseCall
+        : Expression
+        =
+
+        let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
+        let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
+
+        // fickl: jsOptions and partial build option bags from generated members
+        let isGeneratedBag =
+            isOptionBag
+            && not members.IsEmpty
+            && members
+               |> List.forall (fun (memb, _) ->
+                   match memb.MemberRef with
+                   | Fable.GeneratedMemberRef _ -> true
+                   | Fable.MemberRef _ -> false
+               )
+
+        // A nested setter makes a nested object, which a shallow Partial would check as complete
+        let isFlat =
+            members
+            |> List.forall (fun (memb, _) ->
+                match memb.Body with
+                | Fable.ObjectExpr _ -> false
+                | _ -> true
+            )
+
+
+        let compileAsClass, overrideNames, members =
+            transformObjectExprMembers com ctx baseCall members
+
         if not compileAsClass then
             let expr = Expression.objectExpression (List.toArray members)
 
@@ -3100,15 +3143,62 @@ module Util =
 
             Expression.newExpression (classExpr, [||])
 
+    /// fickl: puts the other members of a callable interface on its function, with `Object.assign` when they are
+    /// plain values, or the descriptors of an object literal when there are accessors, methods, or keys a function
+    /// already owns
+    let private attachCallableMembers
+        (com: IBabelCompiler)
+        ctx
+        (func: Expression)
+        (members: Fable.ObjectExprMember list)
+        =
+        let _, _, members =
+            members
+            |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
+            |> transformObjectExprMembers com ctx None
+
+        let functionOwnKeys = set [ "name"; "length"; "prototype"; "arguments"; "caller" ]
+
+        let needsDescriptors =
+            members
+            |> List.exists (
+                function
+                | ObjectMethod _ -> true
+                | ObjectProperty(key, _, isComputed, _) ->
+                    match key with
+                    | Expression.Identifier(Identifier(name, _))
+                    | Expression.Literal(Literal.StringLiteral(StringLiteral(name, _))) when not isComputed ->
+                        functionOwnKeys.Contains name
+                    | _ -> true
+            )
+
+        let properties = Expression.objectExpression (List.toArray members)
+
+        if needsDescriptors then
+            libCall com ctx None "Util" "callableObject" [] [ func; properties ]
+        else
+            Expression.callExpression (
+                Expression.memberExpression (Expression.identifier "Object", Expression.identifier "assign"),
+                [| func; properties |]
+            )
+
     let transformObjectExpr (com: IBabelCompiler) ctx typ (members: Fable.ObjectExprMember list) baseCall : Expression =
-        match typ, members, baseCall with
-        | Fable.DeclaredType(entityRef, _), [ memberInfo ], None when
+        let isInvoke (memb: Fable.ObjectExprMember) =
+            let info = com.GetMember(memb.MemberRef)
+
+            info.CompiledName = "Invoke"
+            && not (info.IsGetter || info.IsSetter || info.IsValue)
+
+        match typ, List.partition isInvoke members, baseCall with
+        | Fable.DeclaredType(entityRef, _), ([ memberInfo ], otherMembers), None when
             hasAttribute Atts.callableInterface (com.GetEntity(entityRef).Attributes)
             ->
             let entity = com.GetEntity(entityRef)
             let info = com.GetMember(memberInfo.MemberRef)
 
-            let name, args, body =
+            // fickl: TypeScript types the name of a function expression as the bare function, so with other members
+            // the receiver is a constant typed as the interface
+            let name, selfAlias, args, body =
                 match memberInfo.Args with
                 | self :: args when self.IsThisArgument ->
                     let self = { self with IsThisArgument = false }
@@ -3121,8 +3211,11 @@ module Util =
                             | expression -> expression
                         )
 
-                    self.Name, args, body
-                | args -> "Invoke", args, memberInfo.Body
+                    if com.IsTypeScript && not otherMembers.IsEmpty && isIdentUsed self.Name body then
+                        getUniqueNameInDeclarationScope ctx "Invoke", Some self, args, body
+                    else
+                        self.Name, None, args, body
+                | args -> "Invoke", None, args, memberInfo.Body
 
             let capturesReceiver = usesGeneratorReceiver body
 
@@ -3135,13 +3228,35 @@ module Util =
                 else
                     args
 
-            Expression.functionExpression (
-                args,
-                body,
-                id = Identifier.identifier name,
-                ?returnType = returnType,
-                ?typeParameters = typeParameters
-            )
+            let body =
+                match selfAlias, body with
+                | Some self, BlockStatement statements ->
+                    let annotation = makeTypeAnnotation com ctx typ
+
+                    let alias =
+                        Statement.variableDeclaration (
+                            Const,
+                            self.Name,
+                            annotation = annotation,
+                            init = AsExpression(Expression.identifier name, annotation)
+                        )
+
+                    BlockStatement(Array.append [| alias |] statements)
+                | None, body -> body
+
+            let func =
+                Expression.functionExpression (
+                    args,
+                    body,
+                    id = Identifier.identifier name,
+                    ?returnType = returnType,
+                    ?typeParameters = typeParameters
+                )
+
+            if otherMembers.IsEmpty then
+                func
+            else
+                attachCallableMembers com ctx func otherMembers
         | _ -> transformOrdinaryObjectExpr com ctx typ members baseCall
 
     let transformCallArgsWithNamedArgs (com: IBabelCompiler) ctx (callInfo: Fable.CallInfo) =
@@ -3305,6 +3420,11 @@ module Util =
             addErrorAndReturnNull com range "Native yields and returns must be inside a jsGenerator computation"
         | Fable.Tags.Contains "fickl-native-await" when not ctx.IsNativeAsync ->
             addErrorAndReturnNull com range "Native promise bindings must be inside a jsAsync computation"
+        | Fable.Tags.Contains "fickl-top-level-await" ->
+            addErrorAndReturnNull
+                com
+                range
+                "JS.awaitTopLevel is only allowed as the whole initializer of a module-level value"
         | Fable.Tags.Contains "topDirectiveProloge" ->
             com.SaveTopDirectivePrologue(info.Macro)
             // Return empty sequence expression so it can be erased at print time
@@ -5538,7 +5658,11 @@ but thanks to the optimisation done below we get
                 ent.FSharpFields
                 |> List.filter (fun field -> not (ctx.NativeAutoProperties.ContainsKey field.Name))
                 |> List.mapToArray (fun field ->
-                    let prop, isComputed = SymbolKeys.fieldKey com ctx field
+                    let prop, isComputed =
+                        match SymbolKeys.tryPrivateFieldName com ent field with
+                        | Some privateName -> Expression.identifier privateName, false
+                        | None -> SymbolKeys.fieldKey com ctx field
+
                     let ta = makeFieldAnnotationOf com ctx field
                     // Static fields need to be initialized by static constructor
                     let am =
@@ -5555,6 +5679,11 @@ but thanks to the optimisation done below we get
                         ?accessModifier = am
                     )
                 )
+            // fickl: JavaScript declares #private fields too, as a class can only use the ones it declares
+            elif not ent.IsFSharpUnion then
+                ent.FSharpFields
+                |> List.choose (SymbolKeys.tryPrivateFieldName com ent)
+                |> List.mapToArray (fun privateName -> ClassMember.classProperty (Expression.identifier privateName))
             else
                 Array.empty
 
@@ -5568,7 +5697,7 @@ but thanks to the optimisation done below we get
             ent.MembersFunctionsAndValues
             |> Seq.exists (fun memb ->
                 (memb.CompiledName = name
-                 && (hasAttribute Atts.attachMembers ent.Attributes
+                 && (FSharp2Fable.Util.isAttachMembersFableEntity com ent
                      || memb.IsOverrideOrExplicitInterfaceImplementation))
                 || SymbolKeys.isWellKnownMember name memb
             )
@@ -6796,7 +6925,7 @@ but thanks to the optimisation done below we get
 
         // fickl: the mangling logic of FSharp2Fable.Util.getAbstractMemberInfo, so the members are named as
         // the JavaScript calls them
-        let isMangled = FSharp2Fable.Util.isMangledAbstractFableEntity ent
+        let isMangled = FSharp2Fable.Util.isMangledAbstractFableEntity com ent
 
         let isGetter = memb.IsGetter
         let isSetter = memb.IsSetter
@@ -7267,6 +7396,14 @@ but thanks to the optimisation done below we get
 
                 let valueExpr =
                     match decl.Body with
+                    // fickl: `export const x = await p;`, the one place JS.awaitTopLevel is allowed
+                    | MaybeCasted(Fable.Emit(info, t, r)) when
+                        memb.IsValue && List.contains "fickl-top-level-await" info.CallInfo.Tags
+                        ->
+                        let tags = info.CallInfo.Tags |> List.filter ((<>) "fickl-top-level-await")
+
+                        let info = { info with CallInfo = { info.CallInfo with Tags = tags } }
+                        transformAsExpr com ctx (Fable.Emit(info, t, r)) |> Some
                     | body when memb.IsValue -> transformAsExpr com ctx body |> Some
                     // Some calls with special attributes (like React lazy or memo) can turn the surrounding function into a value
                     | Fable.Call(callee,
@@ -7452,10 +7589,10 @@ but thanks to the optimisation done below we get
                         )
                 )
 
-            import.Path, specifier
+            (import.Path, import.Attributes), specifier
         )
         |> Seq.groupBy fst
-        |> Seq.collect (fun (path, specifiers) ->
+        |> Seq.collect (fun ((path, attributes), specifiers) ->
             let mems, defs, alls =
                 (([], [], []), Seq.choose snd specifiers)
                 ||> Seq.fold (fun (mems, defs, alls) x ->
@@ -7471,14 +7608,29 @@ but thanks to the optimisation done below we get
                 function
                 | [] -> None
                 | specifiers ->
-                    ImportDeclaration(List.toArray specifiers, StringLiteral.stringLiteral (path))
+                    // fickl: TypeScript rejects attributes on `import type`, which needs no module at run time
+                    let attributes =
+                        let isTypeOnly =
+                            specifiers
+                            |> List.forall (
+                                function
+                                | ImportMemberSpecifier(isTypeOnly = isTypeOnly) -> isTypeOnly
+                                | _ -> false
+                            )
+
+                        if isTypeOnly then
+                            []
+                        else
+                            attributes
+
+                    ImportDeclaration(List.toArray specifiers, StringLiteral.stringLiteral (path), attributes)
                     |> Some
             )
             |> function
                 | [] ->
                     // If there are no specifiers, this is just an import for side effects,
                     // put it after the other ones to match standard JS practices, see #2228
-                    ImportDeclaration([||], StringLiteral.stringLiteral (path))
+                    ImportDeclaration([||], StringLiteral.stringLiteral (path), attributes)
                     |> statefulImports.Add
 
                     []
@@ -7547,6 +7699,7 @@ module Compiler =
                 let selector = selector.Trim()
                 let path = path.Trim()
                 let cachedName = path + "::" + selector
+                let path, attributes = ImportAttributes.decode path
 
                 let isTypeOnly = typePositionDepth > 0
 
@@ -7568,6 +7721,7 @@ module Compiler =
                         {
                             Selector = selector
                             Path = path
+                            Attributes = attributes
                             LocalIdent = localId
                             IsTypeOnly = isTypeOnly
                         }

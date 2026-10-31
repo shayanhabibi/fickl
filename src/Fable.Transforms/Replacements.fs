@@ -5783,6 +5783,28 @@ let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
         | _ -> None
 
     match methodName, literal with
+    | "importDynamicWith", _ ->
+        match args with
+        | [ path; ArrayOrListLiteral(attributes, _) ] ->
+            let attributes =
+                attributes
+                |> List.map (
+                    function
+                    | MaybeCasted(Value(NewTuple([ StringConst key; value ], _), _)) -> Some(key, value)
+                    | _ -> None
+                )
+
+            if attributes |> List.forall Option.isSome then
+                let options = objExpr [ "with", objExpr (List.choose id attributes) ]
+                Helper.GlobalCall("import", t, [ path; options ], ?loc = r) |> Some
+            else
+                "importDynamicWith requires constant keys"
+                |> addErrorAndReturnNull com ctx.InlinePath r
+                |> Some
+        | _ ->
+            "importDynamicWith requires the attributes as a list literal of pairs"
+            |> addErrorAndReturnNull com ctx.InlinePath r
+            |> Some
     | "partial", _ ->
         match args with
         | [ arg ] ->
@@ -5828,6 +5850,8 @@ let private jsErrors (com: ICompiler) r t methodName args =
 
         IfThenElse(isError, Value(NewOption(None, Any, false), r), Value(NewOption(Some value, Any, false), r), r)
         |> Some
+    // Fable2Babel accepts it only as the initializer of a module value
+    | "awaitTopLevel", [ promise ] -> emit r t [ promise ] false "await $0" |> withTag "fickl-top-level-await" |> Some
     | _ -> None
 
 /// fickl: conversions between CancellationToken and AbortSignal, and promise interop that follows either
@@ -5898,6 +5922,23 @@ let private records (com: ICompiler) r t methodName args =
     | "keys", [ record ], _ -> Helper.GlobalCall("Object", t, [ record ], memb = "keys", ?loc = r) |> Some
     | _ -> None
 
+/// fickl: EventTarget and event emitter events as F# events
+let private jsEvents (com: ICompiler) r t methodName args =
+    match methodName, args with
+    | "ofTarget", [ target; eventType ] ->
+        Helper.LibCall(com, "Event", "fromEventTarget", t, [ target; eventType ], ?loc = r)
+        |> Some
+    | "ofTargetWith", [ options; target; eventType ] ->
+        Helper.LibCall(com, "Event", "fromEventTarget", t, [ target; eventType; options ], ?loc = r)
+        |> Some
+    | "ofEmitter", [ emitter; eventName ] ->
+        Helper.LibCall(com, "Event", "fromEmitter", t, [ emitter; eventName ], ?loc = r)
+        |> Some
+    | "dispatch", [ target; eventType; detail ] ->
+        Helper.LibCall(com, "Event", "dispatchCustomEvent", t, [ target; eventType; detail ], ?loc = r)
+        |> Some
+    | _ -> None
+
 let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match info.DeclaringEntityFullName with
     | Patterns.DicContains replacedModules replacement -> replacement com ctx r t info thisArg args
@@ -5907,10 +5948,32 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | Naming.StartsWith "Fable.Core." _ -> fableCoreLib com ctx r t info thisArg args
     | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
     | "Fickl.Core.JS" -> jsErrors com r t info.CompiledName args
+    // fickl: a proxy handler holds only the traps that are set
+    | "Fickl.Core.JS.ProxyHandlerModule" ->
+        match info.CompiledName, args with
+        | "create", [ setters ] -> makePojoFromLambda com setters |> Some
+        | _ -> None
     | "Fickl.Core.CancellationExtensions" -> cancellationExtensions com r t info thisArg args
+    | "Fickl.Core.JsEvent" -> jsEvents com r t info.CompiledName args
+    // fickl: F# values to and from plain data, following the type's reflection info
+    | "Fickl.Core.Transfer" ->
+        let typeInfo () =
+            genArg com ctx r 0 info.GenericArgs
+            |> makeTypeInfo (changeRangeToCallSite ctx.InlinePath r)
+
+        match info.CompiledName, args with
+        | ("toPlain" | "ofPlain" | "clone" as name), [ value ] ->
+            Helper.LibCall(com, "Transfer", name, t, [ value; typeInfo () ], ?loc = r)
+            |> Some
+        | _ -> None
     | "Fickl.Core.KeyOfBuilder"
     | "Fickl.Core.KeyOf" -> keyOf com ctx r t info.CompiledName args
     | "Fickl.Core.RecordModule" -> records com r t info.CompiledName args
+    // fickl: a branded primitive is the bare value
+    | "Fickl.Core.Brand" ->
+        match args with
+        | [ arg ] -> TypeCast(arg, t) |> Some
+        | _ -> None
     | "Fickl.Core.ValueOf" ->
         match info.CompiledName, args with
         | "ofKey", [ key; target ] -> TypeCast(Get(target, ExprGet key, Any, r), t) |> Some

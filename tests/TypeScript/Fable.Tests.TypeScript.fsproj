@@ -59,6 +59,9 @@
     <Compile Include="../Js/Main/NativeDisposalTests.fs" />
     <Compile Include="../Js/Main/NativeErrorTests.fs" />
     <Compile Include="../Js/Main/AbortSignalTests.fs" />
+    <Compile Include="../Js/Main/ProxyTests.fs" />
+    <Compile Include="../Js/Main/JsEventTests.fs" />
+    <Compile Include="../Js/Main/TransferTests.fs" />
     <Compile Include="../Js/Main/WeakReferenceTests.fs" />
     <Compile Include="../Js/Main/NativeAsyncTests.fs" />
     <Compile Include="../Js/Main/NativeGeneratorTests.fs" />
@@ -66,6 +69,7 @@
     <Compile Include="../Js/Main/SymbolKeyBindings.fs" />
     <Compile Include="../Js/Main/SymbolKeyTests.fs" />
     <Compile Include="../Js/Main/TypeGuardTests.fs" />
+    <Compile Include="../Js/Main/TaggedTemplateTests.fs" />
     <Compile Include="../Js/Main/TsEnumTests.fs" />
     <Compile Include="../Js/Main/JsNamespaceLibraryBindings.fs" />
     <Compile Include="../Js/Main/JsNamespaceLibraryTests.fs" />

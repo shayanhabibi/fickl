@@ -1,0 +1,73 @@
+
+import type { float64, int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+
+export class Counter extends HTMLElement {
+    #title: string;
+    #hidden: int32;
+    constructor() {
+        super();
+        this.#title = "counter";
+        this.#hidden = 0;
+    }
+    get Title(): string {
+        const _: Counter = this;
+        return _.#title;
+    }
+    Hide(): void {
+        const _: Counter = this;
+        _.#hidden = ((_.#hidden + 1) | 0);
+    }
+}
+
+export function Counter_$reflection(): TypeInfo {
+    return class_type("PrivateFields.Counter", undefined, Counter, class_type("PrivateFields.HTMLElement", undefined, HTMLElement));
+}
+
+export function Counter_$ctor(): Counter {
+    return new Counter();
+}
+
+export class Account {
+    #balance$20: float64;
+    constructor(balance: float64) {
+        this.#balance$20 = balance;
+    }
+    get Balance(): float64 {
+        const _: Account = this;
+        return _.#balance$20;
+    }
+    Deposit(amount: float64): void {
+        const _: Account = this;
+        _.#balance$20 = (_.#balance$20 + amount);
+    }
+}
+
+export function Account_$reflection(): TypeInfo {
+    return class_type("PrivateFields.Account", undefined, Account);
+}
+
+export function Account_$ctor_5E38073B(balance: float64): Account {
+    return new Account(balance);
+}
+
+export class PublicFields extends HTMLElement {
+    readonly label: string;
+    constructor() {
+        super();
+        this.label = "public";
+    }
+    get Label(): string {
+        const _: PublicFields = this;
+        return _.label;
+    }
+}
+
+export function PublicFields_$reflection(): TypeInfo {
+    return class_type("PrivateFields.PublicFields", undefined, PublicFields, class_type("PrivateFields.HTMLElement", undefined, HTMLElement));
+}
+
+export function PublicFields_$ctor(): PublicFields {
+    return new PublicFields();
+}
+

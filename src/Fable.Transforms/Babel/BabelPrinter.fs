@@ -845,7 +845,8 @@ module PrinterExtensions =
                     printer.PrintNewLine()
 
                 printer.Print(declaration)
-            | ImportDeclaration(specifiers, source) -> printer.PrintImportDeclaration(specifiers, source)
+            | ImportDeclaration(specifiers, source, attributes) ->
+                printer.PrintImportDeclaration(specifiers, source, attributes)
             | ExportNamedReferences(specifiers, source) ->
                 printer.Print("export ")
                 printer.Print("{ ")
@@ -1618,7 +1619,7 @@ module PrinterExtensions =
             printer.Print("* as ")
             printer.PrintIdent(local)
 
-        member printer.PrintImportDeclaration(specifiers, source) =
+        member printer.PrintImportDeclaration(specifiers, source, attributes: (string * string) list) =
             let members =
                 specifiers
                 |> Array.choose (
@@ -1698,6 +1699,25 @@ module PrinterExtensions =
             let (StringLiteral(value, _)) = source
             printer.Print(printer.MakeImportPath(value))
             printer.Print("\"")
+
+            if not (List.isEmpty attributes) then
+                printer.Print(" with { ")
+
+                attributes
+                |> List.iteri (fun i (key, value) ->
+                    if i > 0 then
+                        printer.Print(", ")
+
+                    if Naming.hasIdentForbiddenChars Naming.isJsIdentChar key then
+                        printer.Print(StringLiteral(key, None))
+                    else
+                        printer.Print(key)
+
+                    printer.Print(": ")
+                    printer.Print(StringLiteral(value, None))
+                )
+
+                printer.Print(" }")
 
         member printer.Print(node: ExportSpecifier) =
             let (ExportSpecifier(local, exported)) = node

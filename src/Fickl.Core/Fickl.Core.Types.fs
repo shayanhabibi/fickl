@@ -39,6 +39,48 @@ type AsyncFunctionAttribute() =
 type JsFunctionAttribute() =
     inherit Attribute()
 
+/// <summary>Calls the tag with an F# interpolated string as a native tagged template, <c>tag`...${x}...`</c>.</summary>
+/// <remarks>
+/// The binding is imported, global, or emitted as an expression without placeholders, and takes one
+/// <c>FormattableString</c>:
+/// <code>
+/// [&lt;Import("html", "lit"); TaggedTemplate>]
+/// let html (template: FormattableString) : TemplateResult = jsNative
+///
+/// let view name = html $"&lt;p>Hello {name}&lt;/p>"
+/// </code>
+/// The tag receives the frozen strings array, the same object on every evaluation, and the values unformatted,
+/// so format specifiers such as <c>{x:N2}</c> are a compile error. A <c>FormattableString</c> that is not written
+/// at the call is passed as its strings and arguments. Applies to JavaScript and TypeScript; other targets ignore it.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method ||| AttributeTargets.Property)>]
+type TaggedTemplateAttribute() =
+    inherit Attribute()
+
+/// <summary>Adds an import attribute to the import of the value, <c>with { type: "json" }</c>.</summary>
+/// <remarks>
+/// Goes with an <c>Import</c>, <c>ImportDefault</c>, <c>ImportAll</c> or <c>ImportMember</c> attribute, on a value,
+/// function or class, for the modules that need one, such as JSON and CSS module scripts:
+/// <code>
+/// [&lt;ImportDefault("./config.json"); ImportWith("type", "json")>]
+/// let config: Config = jsNative
+/// // import config from "./config.json" with { type: "json" };
+/// </code>
+/// The attributes are part of the import: the same path imported with other attributes is a separate
+/// <c>import</c> declaration. A JSON module only has a default export. Applies to JavaScript and TypeScript;
+/// TypeScript needs <c>module</c> set to <c>esnext</c>, <c>preserve</c> or <c>nodenext</c>. Other targets ignore it.
+/// For a dynamic import, use <c>Fickl.Core.JsInterop.importDynamicWith</c>.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method
+                 ||| AttributeTargets.Property
+                 ||| AttributeTargets.Class
+                 ||| AttributeTargets.Interface,
+                 AllowMultiple = true)>]
+type ImportWithAttribute(key: string, value: string) =
+    inherit Attribute()
+    member _.Key = key
+    member _.Value = value
+
 /// <summary>Emits the function as a TypeScript type predicate, <c>parameter is T</c>, so TypeScript callers narrow the argument.</summary>
 /// <remarks>
 /// The function returns <c>bool</c>, or an <c>option</c> or <c>voption</c> of the predicate type:
@@ -94,6 +136,19 @@ type TypeAssertionAttribute(parameter: string, assertedType: Type) =
 type TsEnumAttribute() =
     inherit Attribute()
 
+/// <summary>Compiles the private <c>let</c> fields of a class to ES <c>#private</c> fields.</summary>
+/// <remarks>
+/// A <c>#private</c> field cannot collide with a property or accessor of a base class, such as
+/// <c>title</c> or <c>hidden</c> of <c>HTMLElement</c>. The members of the class are attached, as
+/// <c>#private</c> fields can only be read inside the class body.
+/// Classes inheriting a global or imported JavaScript class use private fields without this attribute;
+/// <c>[&lt;PrivateFields(false)>]</c> turns them off. Applies to JavaScript and TypeScript.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Class)>]
+type PrivateFieldsAttribute(enabled: bool) =
+    inherit Attribute()
+    new() = PrivateFieldsAttribute(true)
+
 /// <summary>
 /// Represents a JavaScript callable with a single generic or non-generic Invoke method.
 /// </summary>
@@ -101,8 +156,10 @@ type TsEnumAttribute() =
 /// Object expressions implementing the interface compile to functions, and Invoke calls
 /// compile to direct function calls. Method type parameters remain method-owned.
 /// The interface declares one Invoke method with one argument group, or inherits callable
-/// interfaces without additional members. Multiple parents must share the same instantiated
-/// interface declaring Invoke. This representation targets JavaScript and TypeScript.
+/// interfaces without declaring Invoke. Multiple parents must share the same instantiated
+/// interface declaring Invoke. Other properties and methods are members of the function object,
+/// like <c>debug.enabled</c> or a React component's <c>displayName</c>.
+/// This representation targets JavaScript and TypeScript.
 /// </remarks>
 [<AttributeUsage(AttributeTargets.Interface)>]
 type CallableInterfaceAttribute() =
@@ -230,6 +287,16 @@ type NoOverloadSuffixAttribute() =
 [<AttributeUsage(AttributeTargets.Class)>]
 type JsErrorAttribute() =
     inherit Attribute()
+
+/// <summary>Fable.Core's <c>AttachMembers</c>, which can also keep a class's members as module functions.</summary>
+/// <remarks>In JavaScript and TypeScript, a class inheriting a global, imported or attached class attaches its
+/// members without any attribute. <c>[&lt;AttachMembers(false)>]</c> keeps them as module functions.
+/// <c>[&lt;AttachMembers>]</c> and <c>[&lt;AttachMembers(true)>]</c> are the same as Fable.Core's attribute.
+/// Be aware that overloads of attached members won't work.</remarks>
+[<AttributeUsage(AttributeTargets.Class)>]
+type AttachMembersAttribute(attach: bool) =
+    inherit Attribute()
+    new() = AttachMembersAttribute(true)
 
 /// <summary>
 /// Writes the TypeScript annotation of this type as the given text, for a type F# cannot describe:

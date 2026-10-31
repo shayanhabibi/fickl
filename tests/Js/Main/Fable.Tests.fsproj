@@ -69,6 +69,9 @@
     <Compile Include="NativeDisposalTests.fs" />
     <Compile Include="NativeErrorTests.fs" />
     <Compile Include="AbortSignalTests.fs" />
+    <Compile Include="ProxyTests.fs" />
+    <Compile Include="JsEventTests.fs" />
+    <Compile Include="TransferTests.fs" />
     <Compile Include="WeakReferenceTests.fs" />
     <Compile Include="NativeAsyncTests.fs" />
     <Compile Include="NativeGeneratorTests.fs" />
@@ -76,6 +79,9 @@
     <Compile Include="SymbolKeyBindings.fs" />
     <Compile Include="SymbolKeyTests.fs" />
     <Compile Include="TypeGuardTests.fs" />
+    <Compile Include="TaggedTemplateTests.fs" />
+    <Compile Include="ImportAttributeTests.fs" />
+    <Compile Include="TopLevelAwaitTests.fs" />
     <Compile Include="TsEnumTests.fs" />
     <Compile Include="JsNamespaceLibraryBindings.fs" />
     <Compile Include="JsNamespaceLibraryTests.fs" />

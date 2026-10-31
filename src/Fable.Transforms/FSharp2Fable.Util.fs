@@ -85,6 +85,16 @@ type FsField(fi: FSharpField) =
         fi.PropertyAttributes |> Helpers.hasAttrib Atts.ficklCurried
         || fi.FieldAttributes |> Helpers.hasAttrib Atts.ficklCurried
 
+    /// fickl: the field holds a `let` binding of a class, which F# keeps private to the class
+    static member IsLetBinding(field: Fable.Field) =
+        match field with
+        | :? FsField as field ->
+            field.FSharpField.IsCompilerGenerated
+            && not (field.FSharpField.Name.EndsWith("@", System.StringComparison.Ordinal))
+        | _ -> false
+
+    member _.FSharpField: FSharpField = fi
+
     /// fickl: whether a field keeps its function value curried, see FsField.IsCurried
     static member IsCurriedField(field: Fable.Field) =
         match field with
@@ -1765,6 +1775,10 @@ module TypeHelpers =
     let runtimeTypesWithMeasure =
         dict
             [
+                // fickl: Fickl.Core's branded primitives
+                "Fickl.Core.Brands.string`1", Choice1Of2 Fable.String
+                "Fickl.Core.Brands.bool`1", Choice1Of2 Fable.Boolean
+                "Fickl.Core.Brands.char`1", Choice1Of2 Fable.Char
                 "FSharp.UMX.bool`1", Choice1Of2 Fable.Boolean
                 "FSharp.UMX.string`1", Choice1Of2 Fable.String
                 "FSharp.UMX.Guid`1", Choice2Of2 Types.guid
@@ -2606,6 +2620,21 @@ module Util =
         )
         |> Option.defaultValue NoGlobalNorImport
 
+    /// fickl: the path with the `[<ImportWith>]` attributes, `with { type: "json" }`, on JavaScript and TypeScript
+    let withImportAttributes (com: Compiler) (atts: Fable.Attribute seq) (path: string) =
+        match com.Options.Language with
+        | JavaScript
+        | TypeScript ->
+            atts
+            |> Seq.choose (fun att ->
+                match att.Entity.FullName, att.ConstructorArgs with
+                | Atts.ficklImportWith, [ (:? string as key); (:? string as value) ] -> Some(key.Trim(), value)
+                | _ -> None
+            )
+            |> Seq.toList
+            |> ImportAttributes.encode path
+        | _ -> path
+
     /// Function used to check if calls must be replaced by global idents or direct imports
     let tryGlobalOrImportedMember (com: Compiler) typ (memb: FSharpMemberOrFunctionOrValue) =
         let attributes = memb.Attributes |> Seq.map (fun x -> FsAtt(x) :> Fable.Attribute)
@@ -2628,6 +2657,7 @@ module Util =
                     |> Option.defaultValue path
                 | _ -> path
 
+            let path = withImportAttributes com attributes path
             makeImportUserGenerated None typ selector path |> Some
         | _ -> None
 
@@ -2677,6 +2707,7 @@ module Util =
                 else
                     path
 
+            let path = withImportAttributes com attributes path
             makeImportUserGenerated None Fable.Any selector path |> Some
         | _ -> None
 
@@ -2739,18 +2770,57 @@ module Util =
                 | _ -> false
             )
 
+    /// fickl: the argument of Fickl.Core's [<AttachMembers>] on the entity, true for Fable.Core's or when it has none
+    let tryAttachMembersAttribute (ent: FSharpEntity) =
+        ent.Attributes
+        |> Seq.tryPick (fun att ->
+            match att.AttributeType.TryFullName with
+            | Some Atts.attachMembers -> Some true
+            | Some Atts.ficklAttachMembers ->
+                match Seq.tryHead att.ConstructorArguments with
+                | Some(_, (:? bool as value)) -> Some value
+                | _ -> Some true
+            | _ -> None
+        )
+
+    /// fickl: the argument of [<Fickl.Core.PrivateFields>] on the entity, true when it has none
+    let tryPrivateFieldsAttribute (ent: FSharpEntity) =
+        ent.Attributes
+        |> Seq.tryPick (fun att ->
+            match att.AttributeType.TryFullName with
+            | Some Atts.ficklPrivateFields ->
+                match Seq.tryHead att.ConstructorArguments with
+                | Some(_, (:? bool as value)) -> Some value
+                | _ -> Some true
+            | _ -> None
+        )
+
+    /// fickl: whether a base class, transitively, is a global, imported or [<AttachMembers>] class
+    let rec private inheritsJsClass (ent: FSharpEntity) =
+        match ent.BaseType |> Option.bind tryDefinition with
+        | Some(baseEnt, _) ->
+            isGlobalOrImportedFSharpEntity baseEnt
+            || tryAttachMembersAttribute baseEnt = Some true
+            || inheritsJsClass baseEnt
+        | None -> false
+
     let isAttachMembersEntity (com: Compiler) (ent: FSharpEntity) =
         not (ent.IsFSharpModule || ent.IsInterface)
         && (
         // com.Options.Language = Php ||
         com.Options.Language = Rust
         || // attach all members for Rust
-        ent.Attributes
-        |> Seq.exists (fun att ->
-            match att.AttributeType.TryFullName with
-            | Some Atts.attachMembers -> true
-            | _ -> isPyClassAttribute att
-        ))
+        (let explicitAttach = tryAttachMembersAttribute ent
+
+         explicitAttach = Some true
+         || Seq.exists isPyClassAttribute ent.Attributes
+         // fickl: the platform or framework calls the members of a JavaScript subclass on the instance and the class,
+         // and #private fields can only be read inside the class body
+         || (explicitAttach.IsNone
+             && (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+             && ent.IsClass
+             && not (isGlobalOrImportedFSharpEntity ent)
+             && (inheritsJsClass ent || tryPrivateFieldsAttribute ent = Some true))))
 
     let isPojoDefinedByConsArgsEntity (entity: Fable.Entity) =
         entity |> hasAttribute Atts.pojoDefinedByConsArgs
@@ -2784,12 +2854,16 @@ module Util =
             entFullName = "Fickl.Core.JsInterop"
             || entFullName = "Fickl.Core.JS"
             || entFullName = "Fickl.Core.CancellationExtensions"
+            || entFullName = "Fickl.Core.JsEvent"
+            || entFullName = "Fickl.Core.Transfer"
             || entFullName = "Fickl.Core.JS.ReadonlyArrayModule"
             || entFullName = "Fickl.Core.JS.ReadonlyArray"
+            || entFullName = "Fickl.Core.JS.ProxyHandlerModule"
             || entFullName = "Fickl.Core.KeyOfBuilder"
             || entFullName = "Fickl.Core.KeyOf"
             || entFullName = "Fickl.Core.RecordModule"
             || entFullName = "Fickl.Core.ValueOf"
+            || entFullName = "Fickl.Core.Brand"
             || entFullName = "Fickl.Core.JsAsyncBuilder"
             || entFullName = "Fickl.Core.NativeAsync"
             || entFullName.StartsWith("Fickl.Core.JsGeneratorBuilder", StringComparison.Ordinal)
@@ -3155,7 +3229,75 @@ module Util =
 
     // fickl: isMangledAbstractEntity for a Fable entity, so TypeScript declarations name abstract members
     // as the JavaScript calls them
-    let isMangledAbstractFableEntity (ent: Fable.Entity) =
+    /// fickl: the argument of Fickl.Core's [<AttachMembers>] on a Fable entity, true for Fable.Core's or when it has none
+    let tryAttachMembersFableAttribute (ent: Fable.Entity) =
+        ent.Attributes
+        |> Seq.tryPick (fun att ->
+            match att.Entity.FullName with
+            | Atts.attachMembers -> Some true
+            | Atts.ficklAttachMembers ->
+                match att.ConstructorArgs with
+                | (:? bool as value) :: _ -> Some value
+                | _ -> Some true
+            | _ -> None
+        )
+
+    /// fickl: the argument of [<Fickl.Core.PrivateFields>] on a Fable entity, true when it has none
+    let tryPrivateFieldsFableAttribute (ent: Fable.Entity) =
+        ent.Attributes
+        |> Seq.tryPick (fun att ->
+            if att.Entity.FullName = Atts.ficklPrivateFields then
+                match att.ConstructorArgs with
+                | (:? bool as value) :: _ -> Some value
+                | _ -> Some true
+            else
+                None
+        )
+
+    /// fickl: whether a base class of a Fable entity, transitively, is global or imported, or, with
+    /// `includeAttached`, has [<AttachMembers>]
+    let private inheritsJsFableClass (com: Compiler) includeAttached (ent: Fable.Entity) =
+        let rec loop (ent: Fable.Entity) =
+            match ent.BaseType |> Option.bind (fun baseType -> com.TryGetEntity baseType.Entity) with
+            | Some baseEnt ->
+                isGlobalOrImportedEntity baseEnt
+                || (includeAttached && tryAttachMembersFableAttribute baseEnt = Some true)
+                || loop baseEnt
+            | None -> false
+
+        loop ent
+
+    /// fickl: isAttachMembersEntity for a Fable entity, for JavaScript and TypeScript
+    let isAttachMembersFableEntity (com: Compiler) (ent: Fable.Entity) =
+        match tryAttachMembersFableAttribute ent with
+        | Some value -> value
+        | None ->
+            (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+            && not (ent.IsInterface || ent.IsFSharpModule)
+            && not (isGlobalOrImportedEntity ent)
+            && (inheritsJsFableClass com true ent
+                || tryPrivateFieldsFableAttribute ent = Some true)
+
+    /// fickl: whether the `let` fields of a class compile to ES #private fields: with [<PrivateFields>],
+    /// `--privateFields`, or when it inherits a JavaScript class, and only when its members are attached
+    let usesPrivateFields (com: Compiler) (ent: Fable.Entity) =
+        (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+        && not (
+            ent.IsFSharpUnion
+            || ent.IsFSharpRecord
+            || ent.IsValueType
+            || ent.IsFSharpExceptionDeclaration
+        )
+        && isAttachMembersFableEntity com ent
+        && (
+            match tryPrivateFieldsFableAttribute ent with
+            | Some value -> value
+            | None ->
+                List.contains Fickl.Options.privateFieldsDefine com.Options.Define
+                || inheritsJsFableClass com false ent
+        )
+
+    let isMangledAbstractFableEntity (com: Compiler) (ent: Fable.Entity) =
         match ent.FullName with
         | fullName when fullName.StartsWith("System.", StringComparison.Ordinal) ->
             match fullName with
@@ -3189,7 +3331,7 @@ module Util =
         | _ ->
             not (
                 isGlobalOrImportedEntity ent
-                || (ent |> hasAttribute Atts.attachMembers)
+                || isAttachMembersFableEntity com ent
                 || isPojoDefinedByConsArgsEntity ent
             )
 
@@ -3822,56 +3964,56 @@ module Util =
         entity.Attributes
         |> Seq.exists (fun attribute -> attribute.AttributeType.TryFullName = Some Atts.callableInterface)
 
+    /// fickl: the Invoke method of a callable interface, which compiles to the function itself
+    let isCallableInvoke (memb: FSharpMemberOrFunctionOrValue) =
+        memb.CompiledName = "Invoke" && not memb.IsProperty
+
     let rec validateCallableInterface (com: IFableCompiler) (entity: FSharpEntity) =
         let members =
             entity.MembersFunctionsAndValues |> Seq.filter _.IsInstanceMember |> Seq.toList
+
+        // fickl: members other than Invoke are properties and methods of the function object
+        let invokes = members |> List.filter isCallableInvoke
+
+        let inheritanceError =
+            Some
+                "CallableInterface inheritance requires a single callable base; an inheriting interface can add properties and methods, but not Invoke"
 
         if com.Options.Language <> JavaScript && com.Options.Language <> TypeScript then
             Some "CallableInterface is only supported for JavaScript and TypeScript"
         elif not entity.IsInterface then
             Some "CallableInterface requires an interface"
         elif entity.DeclaredInterfaces.Count <> 0 then
-            match members, Seq.toList entity.DeclaredInterfaces with
-            | [], [ parent ] ->
-                match tryDefinition parent with
-                | Some(parentEntity, _) when isCallableInterface parentEntity ->
-                    validateCallableInterface com parentEntity
-                | _ -> Some "CallableInterface inheritance requires a single callable base and no additional members"
-            | [], parents when
-                parents
-                |> List.forall (fun parent ->
+            let parentsAreCallable =
+                entity.DeclaredInterfaces
+                |> Seq.forall (fun parent ->
                     match tryDefinition parent with
                     | Some(parentEntity, _) when isCallableInterface parentEntity ->
                         (validateCallableInterface com parentEntity).IsNone
                     | _ -> false
                 )
-                ->
-                // A diamond is one implementation slot only when every path reaches the
-                // same instantiated declaring interface, not merely an equivalent signature.
-                let slots =
-                    entity.AllInterfaces
-                    |> Seq.filter (fun parent ->
-                        match tryDefinition parent with
-                        | Some(parentEntity, _) ->
-                            parentEntity.MembersFunctionsAndValues |> Seq.exists _.IsInstanceMember
-                        | _ -> false
-                    )
-                    |> Seq.distinct
-                    |> Seq.length
 
-                if slots = 1 then
-                    None
-                else
-                    Some "CallableInterface inheritance requires a single callable base and no additional members"
-            | _ -> Some "CallableInterface inheritance requires a single callable base and no additional members"
-        else
-            match members with
-            | [ memberInfo ] when
-                memberInfo.CompiledName = "Invoke"
-                && not memberInfo.IsProperty
-                && memberInfo.CurriedParameterGroups.Count = 1
-                ->
+            // A diamond is one implementation slot only when every path reaches the
+            // same instantiated declaring interface, not merely an equivalent signature.
+            let slots =
+                entity.AllInterfaces
+                |> Seq.filter (fun parent ->
+                    match tryDefinition parent with
+                    | Some(parentEntity, _) ->
+                        parentEntity.MembersFunctionsAndValues
+                        |> Seq.exists (fun memb -> memb.IsInstanceMember && isCallableInvoke memb)
+                    | _ -> false
+                )
+                |> Seq.distinct
+                |> Seq.length
+
+            if invokes.IsEmpty && parentsAreCallable && slots = 1 then
                 None
+            else
+                inheritanceError
+        else
+            match invokes with
+            | [ memberInfo ] when memberInfo.CurriedParameterGroups.Count = 1 -> None
             | _ -> Some "CallableInterface requires exactly one instance Invoke method with one argument group"
 
     let makeCallWithArgInfo
@@ -3919,9 +4061,9 @@ module Util =
                 "Only Invoke is supported in delegates"
                 |> addErrorAndReturnNull com ctx.InlinePath r
 
-        | _, Some entity when memb.IsInstanceMember && isCallableInterface entity ->
-            match validateCallableInterface com entity, callInfo.ThisArg, memb.CompiledName with
-            | None, Some callee, "Invoke" ->
+        | _, Some entity when memb.IsInstanceMember && isCallableInterface entity && isCallableInvoke memb ->
+            match validateCallableInterface com entity, callInfo.ThisArg with
+            | None, Some callee ->
                 let callInfo =
                     { callInfo with
                         ThisArg = None
@@ -3929,10 +4071,18 @@ module Util =
                     }
 
                 makeCall r typ callInfo callee
-            | Some error, _, _ -> error |> addErrorAndReturnNull com ctx.InlinePath r
-            | _ ->
+            | Some error, _ -> error |> addErrorAndReturnNull com ctx.InlinePath r
+            | None, None ->
                 "Only Invoke is supported on callable interfaces"
                 |> addErrorAndReturnNull com ctx.InlinePath r
+
+        | _, Some entity when
+            memb.IsInstanceMember
+            && isCallableInterface entity
+            && (validateCallableInterface com entity).IsSome
+            ->
+            (validateCallableInterface com entity).Value
+            |> addErrorAndReturnNull com ctx.InlinePath r
 
         // Check if this is an interface or abstract/overriden method
         | _, Some entity when
@@ -4022,8 +4172,12 @@ module Util =
             )
             |> makeCallWithArgInfo com ctx r typ callee memb memberRef
 
-        match (TypeGuards.tryGet com memb: TypeGuards.TypeGuard option) with
-        | Some guard when guard.Return <> TypeGuards.GuardReturn.Direct && not ctx.CapturingQuotation ->
+        match
+            TaggedTemplates.tryTransformCall com ctx r typ memb callee args,
+            (TypeGuards.tryGet com memb: TypeGuards.TypeGuard option)
+        with
+        | Some tagged, _ -> tagged
+        | None, Some guard when guard.Return <> TypeGuards.GuardReturn.Direct && not ctx.CapturingQuotation ->
             let paramCount = memb.CurriedParameterGroups |> Seq.sumBy _.Count
 
             match TypeGuards.bindArguments com ctx guard callee args paramCount with
@@ -4688,3 +4842,104 @@ module TypeGuards =
 
             Fable.TryCatch(Fable.Sequential [ call; ok ], Some(errorIdent, error), None, r)
         | _ -> call
+
+/// fickl: `[<TaggedTemplate>]`, an imported, global or emitted JS tag called with an F# interpolated string
+module TaggedTemplates =
+    open Helpers
+    open Util
+
+    let private hasAttribute (memb: FSharpMemberOrFunctionOrValue) =
+        memb.Attributes
+        |> Seq.exists (fun att ->
+            (nonAbbreviatedDefinition att.AttributeType).TryFullName = Some Atts.ficklTaggedTemplate
+        )
+
+    let private isFormattableString (p: FSharpParameter) =
+        let t = nonAbbreviatedType p.Type
+
+        t.HasTypeDefinition
+        && t.TypeDefinition.TryFullName = Some "System.FormattableString"
+
+    /// The tag the template is called with: the imported or global value, or an emitted expression without arguments
+    let private tryTag (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        match tryGlobalOrImportedMember com Fable.Any memb with
+        | Some tag -> Ok tag
+        | None ->
+            memb.Attributes
+            |> Seq.tryPick (fun att ->
+                match att.AttributeType.TryFullName with
+                | Some Atts.emitAttr ->
+                    match tryAttribConsArg att 0 "" tryString with
+                    | macro when macro.Contains("$") ->
+                        Some(Error "TaggedTemplate cannot be combined with an Emit macro that has placeholders")
+                    | macro ->
+                        let info: Fable.EmitInfo =
+                            {
+                                Macro = macro
+                                IsStatement = false
+                                CallInfo = Fable.CallInfo.Create()
+                            }
+
+                        Some(Ok(Fable.Emit(info, Fable.Any, None)))
+                | _ -> None
+            )
+            |> Option.defaultValue (Error "TaggedTemplate requires an Import, Global or Emit attribute on the tag")
+
+    let private check (memb: FSharpMemberOrFunctionOrValue) (callee: Fable.Expr option) (args: Fable.Expr list) =
+        match List.ofSeq memb.CurriedParameterGroups, callee, args with
+        | _, Some _, _ -> Error "TaggedTemplate applies to module values and functions, not to methods"
+        | [ group ], None, [ _ ] when group.Count = 1 && isFormattableString group[0] -> Ok()
+        | _ -> Error "TaggedTemplate requires a single parameter of type FormattableString"
+
+    /// `tag`...``, for a call of a `[<TaggedTemplate>]` binding on JavaScript and TypeScript
+    let tryTransformCall
+        (com: Compiler)
+        (ctx: Context)
+        r
+        (typ: Fable.Type)
+        (memb: FSharpMemberOrFunctionOrValue)
+        (callee: Fable.Expr option)
+        (args: Fable.Expr list)
+        =
+        let isJsTarget =
+            com.Options.Language = JavaScript || com.Options.Language = TypeScript
+
+        if not isJsTarget || not (hasAttribute memb) then
+            None
+        else
+            let fail error =
+                addErrorAndReturnNull com ctx.InlinePath r error |> Some
+
+            match check memb callee args |> Result.bind (fun () -> tryTag com memb) with
+            | Error error -> fail error
+            | Ok tag ->
+                addWatchDependencyFromMember com memb
+
+                match args with
+                // `fmtWith` would format the values, which the tag receives as they are
+                | [ MaybeCasted(Fable.Value(Fable.StringTemplate(Some(Fable.Call _), _, _), _)) ] ->
+                    fail "A tagged template cannot have format specifiers, such as {x:N2}"
+                | [ MaybeCasted(Fable.Value(Fable.StringTemplate(Some _, parts, values), templateRange)) ] ->
+                    let template =
+                        Fable.Value(Fable.StringTemplate(Some tag, parts, values), templateRange)
+
+                    Fable.TypeCast(template, typ) |> Some
+                // A FormattableString value: its strings array is the one the template literal was tagged with
+                | [ formattable ] ->
+                    let call formattable =
+                        let info: Fable.EmitInfo =
+                            {
+                                Macro = "$0($1.strs, ...$1.args)"
+                                IsStatement = false
+                                CallInfo = Fable.CallInfo.Create(args = [ tag; formattable ])
+                            }
+
+                        Fable.Emit(info, typ, r)
+
+                    if canHaveSideEffects com formattable then
+                        let ident = makeTypedIdent formattable.Type (getIdentUniqueName com ctx "template")
+
+                        Fable.Let(ident, formattable, call (Fable.IdentExpr ident)) |> Some
+                    else
+                        call formattable |> Some
+                | _ -> None

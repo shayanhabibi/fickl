@@ -9,3 +9,8 @@ let strictOptionsDefine = "FICKL_STRICT_OPTIONS"
 /// `--nativeErrors`: every exception is a JS `Error`, with a stack trace and a `cause` (JavaScript and TypeScript)
 [<Literal>]
 let nativeErrorsDefine = "FICKL_NATIVE_ERRORS"
+
+/// `--privateFields`: the `let` fields of every class with attached members are ES `#private` fields
+/// (JavaScript and TypeScript)
+[<Literal>]
+let privateFieldsDefine = "FICKL_PRIVATE_FIELDS"

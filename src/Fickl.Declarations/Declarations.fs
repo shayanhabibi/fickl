@@ -662,7 +662,7 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
         body
         |> Array.choose (
             function
-            | ImportDeclaration(specifiers, source) ->
+            | ImportDeclaration(specifiers, source, attributes) ->
                 specifiers
                 |> Array.filter (
                     function
@@ -685,7 +685,7 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
                             else
                                 source
 
-                        Some(ImportDeclaration(specifiers, source))
+                        Some(ImportDeclaration(specifiers, source, attributes))
             | _ -> None
         )
 
