@@ -5,7 +5,7 @@
         Namespaces and assembly names are deliberately left as Fable.* to keep upstream merges cheap.
     -->
     <PropertyGroup>
-        <FicklVersion>0.7.4</FicklVersion>
+        <FicklVersion>0.8.0</FicklVersion>
         <PackageProjectUrl>https://github.com/shayanhabibi/fickl</PackageProjectUrl>
         <RepositoryUrl>https://github.com/shayanhabibi/fickl.git</RepositoryUrl>
         <PackageTags>fsharp;fickl;fable;javascript;typescript;python;f#;js</PackageTags>
