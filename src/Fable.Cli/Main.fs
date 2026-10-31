@@ -583,6 +583,10 @@ type FableCompilerState =
 and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fableProj: Project) =
     let activeReplyChannel: ReplyChannel option ref = ref None
 
+    // fickl: a watch rebuild cracks a new project with the edited sources' `fable-disable`
+    // directives, so each file compiles against the latest one rather than the first.
+    let mutable currentProjCracked = projCracked
+
     let agent =
         MailboxProcessor<FableCompilerMsg>.Start(fun agent ->
             let postTo toMsg work =
@@ -655,7 +659,7 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                     (fun () ->
                         async {
                             let com =
-                                projCracked.MakeCompiler(
+                                currentProjCracked.MakeCompiler(
                                     fileName,
                                     fableProj,
                                     triggeredByDependency = state.TriggeredByDependency(fileName)
@@ -913,9 +917,19 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
         agent.PostAndAsyncReply(GetFableProject)
 
     member _.StartCompilation
-        (sourceFiles, filesToCompile, pathResolver, isSilent, isTriggeredByDependency, getSignatureDependents)
+        (
+            projCracked: ProjectCracked,
+            sourceFiles,
+            filesToCompile,
+            pathResolver,
+            isSilent,
+            isTriggeredByDependency,
+            getSignatureDependents
+        )
         =
         async {
+            currentProjCracked <- projCracked
+
             if Array.isEmpty filesToCompile then
                 return [||], []
             else
@@ -1686,6 +1700,7 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
 
             let! fsharpLogs, fableResults =
                 fableCompiler.StartCompilation(
+                    projCracked,
                     projCracked.SourceFiles, // Make sure to pass the up-to-date source files (with cleared hashes for changed files)
                     filesToCompile,
                     state.GetPathResolver(?precompiledInfo = projCracked.PrecompiledInfo),
