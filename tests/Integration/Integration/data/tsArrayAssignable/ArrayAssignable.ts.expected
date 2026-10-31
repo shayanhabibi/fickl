@@ -1,0 +1,55 @@
+
+import { Record } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
+import type { int32, float64 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import type { MutableArray, IComparable, IEquatable } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { record_type, float64_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { sum, type Holder, joinAll, countPoints } from "./points.ts";
+import { map } from "./fable_modules/fable-library-ts.5.25.0/Array.ts";
+import { type FSharpList, toArray } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+
+export class Point extends Record implements IEquatable<Point>, IComparable<Point> {
+    readonly x: float64;
+    readonly y: float64;
+    constructor(x: float64, y: float64) {
+        super();
+        this.x = x;
+        this.y = y;
+    }
+}
+
+export function Point_$reflection(): TypeInfo {
+    return record_type("ArrayAssignable.Point", [], Point, () => [["x", float64_type], ["y", float64_type]]);
+}
+
+export function countAll(pts: MutableArray<Point>): int32 {
+    return countPoints(pts) | 0;
+}
+
+export function countMapped(xs: MutableArray<float64>): int32 {
+    return countPoints(map<float64, Point>((x: float64): Point => (new Point(x, x)), xs)) | 0;
+}
+
+export function countFiltered(pts: MutableArray<Point>): int32 {
+    return countPoints(pts.filter((p: Point): boolean => (p.x > 0))) | 0;
+}
+
+export function joinPair(pair_: MutableArray<string>, pair__1: int32): string {
+    return joinAll(pair_);
+}
+
+export function setItems(holder: Holder, items: FSharpList<string>): void {
+    holder.items = toArray<string>(items);
+}
+
+export function identity<T>(xs: MutableArray<T>): MutableArray<T> {
+    return xs;
+}
+
+export function countGeneric(pts: MutableArray<Point>): int32 {
+    return countPoints(identity<Point>(pts)) | 0;
+}
+
+export function total(xs: MutableArray<float64>): float64 {
+    return sum(xs);
+}
+

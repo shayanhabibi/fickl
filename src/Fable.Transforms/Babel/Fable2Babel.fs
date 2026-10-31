@@ -1175,7 +1175,11 @@ module Annotation =
             // makeNativeTypeAnnotation com ctx [genArg] "Array"
             makeTypeAnnotation com ctx genArg |> ArrayTypeAnnotation
         | Fable.MutableArray
-        | Fable.ImmutableArray -> makeFableLibImportTypeAnnotation com ctx [ genArg ] "Util" "MutableArray"
+        | Fable.ImmutableArray ->
+            match makeTypeAnnotation com ctx genArg with
+            // fickl: `MutableArray<any>` is `any`, from which TS infers nothing, and an array of `any` is no typed array
+            | AnyTypeAnnotation -> ArrayTypeAnnotation AnyTypeAnnotation
+            | _ -> makeFableLibImportTypeAnnotation com ctx [ genArg ] "Util" "MutableArray"
 
     let makeListTypeAnnotation com ctx genArg =
         makeFableLibImportTypeAnnotation com ctx [ genArg ] "List" "FSharpList"

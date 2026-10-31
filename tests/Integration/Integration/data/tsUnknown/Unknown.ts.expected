@@ -49,7 +49,7 @@ export function sumOf(values: FSharpList<any>): float64 {
 
 export function tryFirst(values: MutableArray<unknown>): Option<unknown>;
 
-export function tryFirst(values: MutableArray<any>): Option<any> {
+export function tryFirst(values: any[]): Option<any> {
     return tryHead<any>(values);
 }
 

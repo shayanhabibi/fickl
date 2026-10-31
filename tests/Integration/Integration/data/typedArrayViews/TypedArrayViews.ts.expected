@@ -1,6 +1,6 @@
 
-import type { MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
 import type { int32, float64, uint8 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import type { MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
 import { asArrayBuffer } from "./fable_modules/fable-library-ts.5.25.0/TypedArray.ts";
 import type { uint64 } from "./fable_modules/fable-library-ts.5.25.0/BigInt.ts";
 
