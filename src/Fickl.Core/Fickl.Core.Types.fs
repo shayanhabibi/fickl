@@ -325,3 +325,38 @@ type EmitTypeAttribute(typeText: string, from: string) =
     inherit Attribute()
     /// <summary>Writes the annotation as the given text, with no import.</summary>
     new(typeText: string) = EmitTypeAttribute(typeText, "")
+
+/// <summary>Adds the interface's members to a global TypeScript interface, <c>declare global { interface Name { ... } }</c>.</summary>
+/// <remarks>
+/// <code>
+/// [&lt;AugmentGlobal("HTMLElementTagNameMap")>]
+/// type TagNames =
+///     [&lt;EmitProperty("my-counter")>]
+///     abstract counter: Counter
+/// </code>
+/// makes <c>document.createElement("my-counter")</c> return a <c>Counter</c> in TypeScript code that imports the file.
+/// The interface has no declaration of its own, and TypeScript annotations of it are the global interface.
+/// A generic interface must have the same type parameters as the interface it augments.
+/// Only TypeScript output and declaration files change; there is no JavaScript for an interface.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Interface)>]
+type AugmentGlobalAttribute(interfaceName: string) =
+    inherit Attribute()
+    member _.InterfaceName = interfaceName
+
+/// <summary>Adds the interface's members to an interface a module exports, <c>declare module "path" { interface Name { ... } }</c>.</summary>
+/// <remarks>
+/// <code>
+/// [&lt;AugmentModule("vue", "ComponentCustomProperties")>]
+/// type Translations =
+///     abstract ``$t``: (string -> string)
+/// </code>
+/// A relative path is relative to the declaring F# file. TypeScript annotations of the interface import the augmented
+/// interface from the module. The interface has no declaration of its own, and a generic interface must have the
+/// same type parameters as the one it augments. Only TypeScript output and declaration files change.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Interface)>]
+type AugmentModuleAttribute(modulePath: string, interfaceName: string) =
+    inherit Attribute()
+    member _.ModulePath = modulePath
+    member _.InterfaceName = interfaceName

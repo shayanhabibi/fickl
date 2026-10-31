@@ -645,7 +645,8 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
                 declarationOf isPrivateValue decl
                 |> Option.map (Statement.Declaration >> PrivateModuleDeclaration)
             | ExportNamedReferences _
-            | ExportAllDeclaration _ -> Some md
+            | ExportAllDeclaration _
+            | AugmentationDeclaration _ -> Some md
             | _ -> None
         )
 
@@ -656,6 +657,7 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
         | ExportNamedDeclaration decl
         | ExportDefaultDeclaration(Choice1Of2 decl)
         | PrivateModuleDeclaration(Statement.Declaration decl) -> addDeclarationNames used decl
+        | AugmentationDeclaration(_, decls) -> decls |> Array.iter (addDeclarationNames used)
         | _ -> ()
 
     let imports =
@@ -751,7 +753,8 @@ let print (writer: Writer) (Program body) : Async<unit> =
             match undecoratedModule md with
             | ImportDeclaration _
             | ExportNamedReferences _
-            | ExportAllDeclaration _ -> p.Print(md)
+            | ExportAllDeclaration _
+            | AugmentationDeclaration _ -> p.Print(md)
             | ExportNamedDeclaration decl ->
                 p.PrintJsDoc(decl.JsDoc)
                 p.Print("export ")
@@ -767,8 +770,17 @@ let print (writer: Writer) (Program body) : Async<unit> =
 
             endDeclaration ()
 
-        // A file that declares nothing is still a module
-        if Array.isEmpty body then
+        // A file that declares nothing, or only augmentations, is still a module
+        let isModuleSyntax md =
+            match undecoratedModule md with
+            | ImportDeclaration _
+            | ExportNamedDeclaration _
+            | ExportAllDeclaration _
+            | ExportDefaultDeclaration _
+            | ExportNamedReferences _ -> true
+            | _ -> false
+
+        if not (Array.exists isModuleSyntax body) then
             p.Print("export {};")
             p.PrintNewLine()
 

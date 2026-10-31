@@ -1,0 +1,11 @@
+declare global {
+    interface Window {
+        get appName(): string
+    }
+}
+declare module "vue" {
+    interface ComponentCustomProperties {
+        $t(key: string): string
+    }
+}
+export {};

@@ -1,0 +1,64 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import type { MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { sumBy } from "./fable_modules/fable-library-ts.5.25.0/Array.ts";
+import { type FSharpList, map } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import type { PluginProperties } from "./plugin.js";
+
+export class Counter extends HTMLElement {
+    "count@": int32;
+    constructor() {
+        super();
+        this["count@"] = 0;
+    }
+    get count(): int32 {
+        const __: Counter = this;
+        return __["count@"] | 0;
+    }
+    set count(v: int32) {
+        const __: Counter = this;
+        __["count@"] = (v | 0);
+    }
+}
+
+export function Counter_$reflection(): TypeInfo {
+    return class_type("Augmentations.Counter", undefined, Counter, class_type("Augmentations.HTMLElement", undefined, HTMLElement));
+}
+
+export function Counter_$ctor(): Counter {
+    return new Counter();
+}
+
+declare global {
+    /**
+     * Custom elements this module defines
+     */
+    interface HTMLElementTagNameMap {
+        get "my-counter"(): Counter
+    }
+}
+
+declare global {
+    interface Window {
+        get counters(): MutableArray<Counter>
+    }
+}
+
+declare module "./plugin.js" {
+    interface PluginProperties {
+        translate(key: string): string
+    }
+}
+
+export function countAll(window$: Window): int32 {
+    return sumBy<Counter, int32>((counter: Counter): int32 => (counter.count | 0), window$.counters, {
+        GetZero: (): int32 => 0,
+        Add: (x: int32, y: int32): int32 => ((x + y) | 0),
+    }) | 0;
+}
+
+export function translateAll(plugin: PluginProperties, keys: FSharpList<string>): FSharpList<string> {
+    return map<string, string>((key: string): string => plugin.translate(key), keys);
+}
+

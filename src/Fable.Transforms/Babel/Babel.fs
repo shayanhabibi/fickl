@@ -267,6 +267,8 @@ type ModuleDeclaration =
         attributes: (string * string) list
     | ExportNamedReferences of specifiers: ExportSpecifier array * source: StringLiteral option
     | DirectivePrologueDeclaration of directiveText: DirectivePrologue
+    /// fickl: `declare global { ... }`, or `declare module "path" { ... }` with a module path
+    | AugmentationDeclaration of modulePath: StringLiteral option * declarations: Declaration array
 
 //    /// An export batch declaration, e.g., export * from "mod";.
 // Template Literals
