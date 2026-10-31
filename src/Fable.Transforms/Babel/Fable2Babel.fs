@@ -2874,39 +2874,14 @@ module Util =
             None
         | None, _ -> None
 
-    let private transformOrdinaryObjectExpr
+    /// The members of an object expression as object-literal members, whether getters and setters need a class,
+    /// and the members of a base class it overrides
+    let private transformObjectExprMembers
         (com: IBabelCompiler)
         ctx
-        typ
-        (members: Fable.ObjectExprMember list)
         baseCall
-        : Expression
+        (members: (Fable.ObjectExprMember * Fable.MemberFunctionOrValue) list)
         =
-
-        let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
-        let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
-
-        // fickl: jsOptions and partial build option bags from generated members
-        let isGeneratedBag =
-            isOptionBag
-            && not members.IsEmpty
-            && members
-               |> List.forall (fun (memb, _) ->
-                   match memb.MemberRef with
-                   | Fable.GeneratedMemberRef _ -> true
-                   | Fable.MemberRef _ -> false
-               )
-
-        // A nested setter makes a nested object, which a shallow Partial would check as complete
-        let isFlat =
-            members
-            |> List.forall (fun (memb, _) ->
-                match memb.Body with
-                | Fable.ObjectExpr _ -> false
-                | _ -> true
-            )
-
-
         let hasExplicitDisposal name =
             members
             |> List.exists (fun (memb, info) -> memb.Name = name || SymbolKeys.isWellKnownMember name info)
@@ -3032,6 +3007,44 @@ module Util =
                     [ makeMethod ObjectMeth ]
             )
 
+        compileAsClass, overrideNames, members
+
+    let private transformOrdinaryObjectExpr
+        (com: IBabelCompiler)
+        ctx
+        typ
+        (members: Fable.ObjectExprMember list)
+        baseCall
+        : Expression
+        =
+
+        let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
+        let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
+
+        // fickl: jsOptions and partial build option bags from generated members
+        let isGeneratedBag =
+            isOptionBag
+            && not members.IsEmpty
+            && members
+               |> List.forall (fun (memb, _) ->
+                   match memb.MemberRef with
+                   | Fable.GeneratedMemberRef _ -> true
+                   | Fable.MemberRef _ -> false
+               )
+
+        // A nested setter makes a nested object, which a shallow Partial would check as complete
+        let isFlat =
+            members
+            |> List.forall (fun (memb, _) ->
+                match memb.Body with
+                | Fable.ObjectExpr _ -> false
+                | _ -> true
+            )
+
+
+        let compileAsClass, overrideNames, members =
+            transformObjectExprMembers com ctx baseCall members
+
         if not compileAsClass then
             let expr = Expression.objectExpression (List.toArray members)
 
@@ -3100,15 +3113,62 @@ module Util =
 
             Expression.newExpression (classExpr, [||])
 
+    /// fickl: puts the other members of a callable interface on its function, with `Object.assign` when they are
+    /// plain values, or the descriptors of an object literal when there are accessors, methods, or keys a function
+    /// already owns
+    let private attachCallableMembers
+        (com: IBabelCompiler)
+        ctx
+        (func: Expression)
+        (members: Fable.ObjectExprMember list)
+        =
+        let _, _, members =
+            members
+            |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
+            |> transformObjectExprMembers com ctx None
+
+        let functionOwnKeys = set [ "name"; "length"; "prototype"; "arguments"; "caller" ]
+
+        let needsDescriptors =
+            members
+            |> List.exists (
+                function
+                | ObjectMethod _ -> true
+                | ObjectProperty(key, _, isComputed, _) ->
+                    match key with
+                    | Expression.Identifier(Identifier(name, _))
+                    | Expression.Literal(Literal.StringLiteral(StringLiteral(name, _))) when not isComputed ->
+                        functionOwnKeys.Contains name
+                    | _ -> true
+            )
+
+        let properties = Expression.objectExpression (List.toArray members)
+
+        if needsDescriptors then
+            libCall com ctx None "Util" "callableObject" [] [ func; properties ]
+        else
+            Expression.callExpression (
+                Expression.memberExpression (Expression.identifier "Object", Expression.identifier "assign"),
+                [| func; properties |]
+            )
+
     let transformObjectExpr (com: IBabelCompiler) ctx typ (members: Fable.ObjectExprMember list) baseCall : Expression =
-        match typ, members, baseCall with
-        | Fable.DeclaredType(entityRef, _), [ memberInfo ], None when
+        let isInvoke (memb: Fable.ObjectExprMember) =
+            let info = com.GetMember(memb.MemberRef)
+
+            info.CompiledName = "Invoke"
+            && not (info.IsGetter || info.IsSetter || info.IsValue)
+
+        match typ, List.partition isInvoke members, baseCall with
+        | Fable.DeclaredType(entityRef, _), ([ memberInfo ], otherMembers), None when
             hasAttribute Atts.callableInterface (com.GetEntity(entityRef).Attributes)
             ->
             let entity = com.GetEntity(entityRef)
             let info = com.GetMember(memberInfo.MemberRef)
 
-            let name, args, body =
+            // fickl: TypeScript types the name of a function expression as the bare function, so with other members
+            // the receiver is a constant typed as the interface
+            let name, selfAlias, args, body =
                 match memberInfo.Args with
                 | self :: args when self.IsThisArgument ->
                     let self = { self with IsThisArgument = false }
@@ -3121,8 +3181,11 @@ module Util =
                             | expression -> expression
                         )
 
-                    self.Name, args, body
-                | args -> "Invoke", args, memberInfo.Body
+                    if com.IsTypeScript && not otherMembers.IsEmpty && isIdentUsed self.Name body then
+                        getUniqueNameInDeclarationScope ctx "Invoke", Some self, args, body
+                    else
+                        self.Name, None, args, body
+                | args -> "Invoke", None, args, memberInfo.Body
 
             let capturesReceiver = usesGeneratorReceiver body
 
@@ -3135,13 +3198,35 @@ module Util =
                 else
                     args
 
-            Expression.functionExpression (
-                args,
-                body,
-                id = Identifier.identifier name,
-                ?returnType = returnType,
-                ?typeParameters = typeParameters
-            )
+            let body =
+                match selfAlias, body with
+                | Some self, BlockStatement statements ->
+                    let annotation = makeTypeAnnotation com ctx typ
+
+                    let alias =
+                        Statement.variableDeclaration (
+                            Const,
+                            self.Name,
+                            annotation = annotation,
+                            init = AsExpression(Expression.identifier name, annotation)
+                        )
+
+                    BlockStatement(Array.append [| alias |] statements)
+                | None, body -> body
+
+            let func =
+                Expression.functionExpression (
+                    args,
+                    body,
+                    id = Identifier.identifier name,
+                    ?returnType = returnType,
+                    ?typeParameters = typeParameters
+                )
+
+            if otherMembers.IsEmpty then
+                func
+            else
+                attachCallableMembers com ctx func otherMembers
         | _ -> transformOrdinaryObjectExpr com ctx typ members baseCall
 
     let transformCallArgsWithNamedArgs (com: IBabelCompiler) ctx (callInfo: Fable.CallInfo) =

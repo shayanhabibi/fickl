@@ -81,7 +81,7 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `withThis` | Function | Compiles a lambda as a `function` whose first argument is its `this` receiver, typed as a TypeScript `this` parameter. |
 | `[<JsDecorator>]` | Attribute on a class or member | Emits a native decorator, global or imported, on a class, method, property or field. |
 | `[<SymbolKey>]` | Attribute on a member or field | Uses a symbol expression, such as `Symbol.iterator` or an imported symbol, as the JavaScript key of a member, interface slot or record field. |
-| `[<CallableInterface>]` | Attribute on an interface | An object expression implementing the interface compiles to a plain function, and `Invoke` calls compile to direct calls. A generic `Invoke` stays generic. |
+| `[<CallableInterface>]` | Attribute on an interface | An object expression implementing the interface compiles to a plain function, and `Invoke` calls compile to direct calls. A generic `Invoke` stays generic. Other properties and methods of the interface are put on the function, `Object.assign(fn, { path: "/" })`, so it can stand for `debug` with `debug.enabled` or a component with a `displayName`. |
 | `[<CaseTest>]` | Attribute on a union case | A JavaScript predicate that identifies an erased union case, or tells apart `TypeScriptTaggedUnion` cases that share a tag. |
 | `[<InlineInterface>]` | Attribute on a union or case | Compiles a `TypeScriptTaggedUnion` case holding one interface as that interface with the tag added, `Take & { type: "take" }`. |
 | `[<Curried>]` | Attribute on a parameter or field | Keeps a function curried, for JavaScript that passes or calls it one argument at a time. |

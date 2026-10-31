@@ -101,8 +101,10 @@ type TsEnumAttribute() =
 /// Object expressions implementing the interface compile to functions, and Invoke calls
 /// compile to direct function calls. Method type parameters remain method-owned.
 /// The interface declares one Invoke method with one argument group, or inherits callable
-/// interfaces without additional members. Multiple parents must share the same instantiated
-/// interface declaring Invoke. This representation targets JavaScript and TypeScript.
+/// interfaces without declaring Invoke. Multiple parents must share the same instantiated
+/// interface declaring Invoke. Other properties and methods are members of the function object,
+/// like <c>debug.enabled</c> or a React component's <c>displayName</c>.
+/// This representation targets JavaScript and TypeScript.
 /// </remarks>
 [<AttributeUsage(AttributeTargets.Interface)>]
 type CallableInterfaceAttribute() =

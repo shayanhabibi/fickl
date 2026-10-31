@@ -1,0 +1,60 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { printf, toConsole } from "./fable_modules/fable-library-ts.5.25.0/String.ts";
+import { callableObject } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+
+export interface Logger {
+    (message: string): void,
+    get enabled(): boolean,
+    get ns(): string,
+    set enabled(arg0: boolean)
+}
+
+export interface Middleware {
+    (request: string): string,
+    get path(): string
+}
+
+export interface Router {
+    (request: string): string,
+    get routes(): int32,
+    handle(request: string): string
+}
+
+export function makeLogger(ns: string): Logger {
+    let enabled = true;
+    return callableObject(function Invoke(message: string): void {
+        const this$: Logger = Invoke as Logger;
+        if (this$.enabled) {
+            const arg: string = this$.ns;
+            toConsole(printf("%s: %s"))(arg)(message);
+        }
+    }, {
+        get enabled(): boolean {
+            return enabled;
+        },
+        set enabled(value: boolean) {
+            enabled = value;
+        },
+        get ns(): string {
+            return ns;
+        },
+    });
+}
+
+export const middleware: Middleware = Object.assign(function _(request: string): string {
+    return request + "!";
+}, {
+    path: "/",
+});
+
+export const router: Router = callableObject(function _(request: string): string {
+    return request;
+}, {
+    routes: 1,
+    handle(request_1: string): string {
+        const this$: Router = this;
+        return this$(request_1);
+    },
+});
+
