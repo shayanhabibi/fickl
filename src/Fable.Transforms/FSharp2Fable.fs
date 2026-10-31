@@ -2354,6 +2354,11 @@ let private transformMemberFunction
 
         transformImport com r typ name [] memberRef selector info.Path
     | body ->
+        let body =
+            match TypeGuards.tryGet com memb with
+            | Some guard -> TypeGuards.transformBody com bodyCtx guard body
+            | None -> body
+
         // If this is a static constructor, call it immediately
         if memb.CompiledName = ".cctor" then
             [
@@ -2472,6 +2477,12 @@ let private transformExplicitlyAttachedMember
     =
     let bodyCtx, args = bindMemberArgs com ctx args
     let body = transformExpr com bodyCtx [] body |> run
+
+    let body =
+        match TypeGuards.tryGet com memb with
+        | Some guard -> TypeGuards.transformBody com bodyCtx guard body
+        | None -> body
+
     let entFullName = declaringEntity.FullName
 
     let name, isMangled =
@@ -2508,6 +2519,8 @@ let private transformMemberDecl
             EnclosingMember = Some memb
             UsedNamesInDeclarationScope = HashSet()
         }
+
+    TypeGuards.check com memb
 
     if
         (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
