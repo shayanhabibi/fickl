@@ -5577,7 +5577,7 @@ but thanks to the optimisation done below we get
             ent.MembersFunctionsAndValues
             |> Seq.exists (fun memb ->
                 (memb.CompiledName = name
-                 && (hasAttribute Atts.attachMembers ent.Attributes
+                 && (FSharp2Fable.Util.isAttachMembersFableEntity com ent
                      || memb.IsOverrideOrExplicitInterfaceImplementation))
                 || SymbolKeys.isWellKnownMember name memb
             )
@@ -6805,7 +6805,7 @@ but thanks to the optimisation done below we get
 
         // fickl: the mangling logic of FSharp2Fable.Util.getAbstractMemberInfo, so the members are named as
         // the JavaScript calls them
-        let isMangled = FSharp2Fable.Util.isMangledAbstractFableEntity ent
+        let isMangled = FSharp2Fable.Util.isMangledAbstractFableEntity com ent
 
         let isGetter = memb.IsGetter
         let isSetter = memb.IsSetter

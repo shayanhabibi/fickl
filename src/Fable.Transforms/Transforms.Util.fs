@@ -163,6 +163,9 @@ module Atts =
     let ficklJsError = "Fickl.Core.JsErrorAttribute" // typeof<Fickl.Core.JsErrorAttribute>.FullName
 
     [<Literal>]
+    let ficklAttachMembers = "Fickl.Core.AttachMembersAttribute" // typeof<Fickl.Core.AttachMembersAttribute>.FullName
+
+    [<Literal>]
     let stringEnum = "Fable.Core.StringEnumAttribute" // typeof<Fable.Core.StringEnumAttribute>.FullName
 
     [<Literal>]

@@ -2760,18 +2760,44 @@ module Util =
                 | _ -> false
             )
 
+    /// fickl: the argument of Fickl.Core's [<AttachMembers>] on the entity, true for Fable.Core's or when it has none
+    let tryAttachMembersAttribute (ent: FSharpEntity) =
+        ent.Attributes
+        |> Seq.tryPick (fun att ->
+            match att.AttributeType.TryFullName with
+            | Some Atts.attachMembers -> Some true
+            | Some Atts.ficklAttachMembers ->
+                match Seq.tryHead att.ConstructorArguments with
+                | Some(_, (:? bool as value)) -> Some value
+                | _ -> Some true
+            | _ -> None
+        )
+
+    /// fickl: whether a base class, transitively, is a global, imported or [<AttachMembers>] class
+    let rec private inheritsJsClass (ent: FSharpEntity) =
+        match ent.BaseType |> Option.bind tryDefinition with
+        | Some(baseEnt, _) ->
+            isGlobalOrImportedFSharpEntity baseEnt
+            || tryAttachMembersAttribute baseEnt = Some true
+            || inheritsJsClass baseEnt
+        | None -> false
+
     let isAttachMembersEntity (com: Compiler) (ent: FSharpEntity) =
         not (ent.IsFSharpModule || ent.IsInterface)
         && (
         // com.Options.Language = Php ||
         com.Options.Language = Rust
         || // attach all members for Rust
-        ent.Attributes
-        |> Seq.exists (fun att ->
-            match att.AttributeType.TryFullName with
-            | Some Atts.attachMembers -> true
-            | _ -> isPyClassAttribute att
-        ))
+        (let explicitAttach = tryAttachMembersAttribute ent
+
+         explicitAttach = Some true
+         || Seq.exists isPyClassAttribute ent.Attributes
+         // fickl: the platform or framework calls the members of a JavaScript subclass on the instance and the class
+         || (explicitAttach.IsNone
+             && (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+             && ent.IsClass
+             && not (isGlobalOrImportedFSharpEntity ent)
+             && inheritsJsClass ent)))
 
     let isPojoDefinedByConsArgsEntity (entity: Fable.Entity) =
         entity |> hasAttribute Atts.pojoDefinedByConsArgs
@@ -3180,7 +3206,38 @@ module Util =
 
     // fickl: isMangledAbstractEntity for a Fable entity, so TypeScript declarations name abstract members
     // as the JavaScript calls them
-    let isMangledAbstractFableEntity (ent: Fable.Entity) =
+    /// fickl: the argument of Fickl.Core's [<AttachMembers>] on a Fable entity, true for Fable.Core's or when it has none
+    let tryAttachMembersFableAttribute (ent: Fable.Entity) =
+        ent.Attributes
+        |> Seq.tryPick (fun att ->
+            match att.Entity.FullName with
+            | Atts.attachMembers -> Some true
+            | Atts.ficklAttachMembers ->
+                match att.ConstructorArgs with
+                | (:? bool as value) :: _ -> Some value
+                | _ -> Some true
+            | _ -> None
+        )
+
+    /// fickl: isAttachMembersEntity for a Fable entity, for JavaScript and TypeScript
+    let isAttachMembersFableEntity (com: Compiler) (ent: Fable.Entity) =
+        let rec inheritsJsClass (ent: Fable.Entity) =
+            match ent.BaseType |> Option.bind (fun baseType -> com.TryGetEntity baseType.Entity) with
+            | Some baseEnt ->
+                isGlobalOrImportedEntity baseEnt
+                || tryAttachMembersFableAttribute baseEnt = Some true
+                || inheritsJsClass baseEnt
+            | None -> false
+
+        match tryAttachMembersFableAttribute ent with
+        | Some value -> value
+        | None ->
+            (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+            && not (ent.IsInterface || ent.IsFSharpModule)
+            && not (isGlobalOrImportedEntity ent)
+            && inheritsJsClass ent
+
+    let isMangledAbstractFableEntity (com: Compiler) (ent: Fable.Entity) =
         match ent.FullName with
         | fullName when fullName.StartsWith("System.", StringComparison.Ordinal) ->
             match fullName with
@@ -3214,7 +3271,7 @@ module Util =
         | _ ->
             not (
                 isGlobalOrImportedEntity ent
-                || (ent |> hasAttribute Atts.attachMembers)
+                || isAttachMembersFableEntity com ent
                 || isPojoDefinedByConsArgsEntity ent
             )
 
