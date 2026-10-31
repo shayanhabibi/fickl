@@ -1,4 +1,4 @@
-import { Exception, type IComparable, type IEquatable, type IHashable, combineHashCode, combineHashCodes, compare, compareArrays, equalArrays, equals, fieldName, sameConstructor, numberHash, structuralHash } from "./Util.ts";
+import { ErrorException, Exception, type IComparable, type IEquatable, type IHashable, combineHashCode, combineHashCodes, compare, compareArrays, equalArrays, equals, fieldName, sameConstructor, numberHash, structuralHash } from "./Util.ts";
 
 // This type is only used internally for .ts files in the library
 // F# Result type is in Choice.fs
@@ -237,6 +237,16 @@ export abstract class FSharpException extends Exception
   GetHashCode() { return recordGetHashCode(this); }
   Equals(other: FSharpException) { return recordEquals(this, other); }
   CompareTo(other: FSharpException) { return recordCompareTo(this, other); }
+}
+
+/** fickl: the base of an F# exception declared with [<Fickl.Core.JsError>], a native Error subclass. */
+export abstract class FSharpError extends ErrorException
+  implements IEquatable<FSharpError>, IComparable<FSharpError> {
+  toJSON() { return recordToJSON(this); }
+  override toString() { return recordToString(this); }
+  GetHashCode() { return recordGetHashCode(this); }
+  Equals(other: FSharpError) { return recordEquals(this, other); }
+  CompareTo(other: FSharpError) { return recordCompareTo(this, other); }
 }
 
 export class MatchFailureException extends FSharpException {

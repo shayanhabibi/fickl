@@ -516,6 +516,8 @@ type ClassMember =
         value: Expression option *
         isComputed: bool *
         isStatic: bool *
+        /// TypeScript `override` modifier
+        isOverride: bool *
         typeAnnotation: TypeAnnotation option *
         loc: SourceLocation option
     | ClassMethod of
