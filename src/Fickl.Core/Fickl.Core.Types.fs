@@ -231,6 +231,16 @@ type NoOverloadSuffixAttribute() =
 type JsErrorAttribute() =
     inherit Attribute()
 
+/// <summary>Fable.Core's <c>AttachMembers</c>, which can also keep a class's members as module functions.</summary>
+/// <remarks>In JavaScript and TypeScript, a class inheriting a global, imported or attached class attaches its
+/// members without any attribute. <c>[&lt;AttachMembers(false)>]</c> keeps them as module functions.
+/// <c>[&lt;AttachMembers>]</c> and <c>[&lt;AttachMembers(true)>]</c> are the same as Fable.Core's attribute.
+/// Be aware that overloads of attached members won't work.</remarks>
+[<AttributeUsage(AttributeTargets.Class)>]
+type AttachMembersAttribute(attach: bool) =
+    inherit Attribute()
+    new() = AttachMembersAttribute(true)
+
 /// <summary>
 /// Writes the TypeScript annotation of this type as the given text, for a type F# cannot describe:
 /// conditional, mapped and template literal types, or a library helper type.

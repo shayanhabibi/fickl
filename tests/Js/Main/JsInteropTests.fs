@@ -103,7 +103,13 @@ type GlobalSubclassGrandchild() =
         this.Increment()
         this.Increment()
 
-[<AttachMembers(false)>]
+[<Fickl.Core.AttachMembers>]
+type FicklAttachedCounter(start: int) =
+    let mutable count = start
+    member _.Count = count
+    member _.Increment() = count <- count + 1
+
+[<Fickl.Core.AttachMembers(false)>]
 type GlobalSubclassDetached() =
     inherit GlobalClasses.MyHTMLElement(1)
     static member Kind = "detached"
@@ -1371,6 +1377,12 @@ let tests =
         GlobalSubclassDetached.Kind |> equal "detached"
         isNull (box x?Value) |> equal true
         isNull (jsConstructor<GlobalSubclassDetached>?Kind) |> equal true
+
+    testCase "Fickl.Core's AttachMembers attaches members like Fable.Core's" <| fun () ->
+        let x = FicklAttachedCounter(1)
+        x?Increment()
+        x?Count |> equal 2
+        x.Count |> equal 2
 
     testCase "Local import with curried signatures works" <| fun () ->
         let add (x:int) (y:int): int = importMember "./js/1foo.js"

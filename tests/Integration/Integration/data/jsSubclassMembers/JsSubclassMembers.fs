@@ -21,7 +21,7 @@ type DoubleCounter() =
         this.Increment()
         this.Increment()
 
-[<AttachMembers(false)>]
+[<Fickl.Core.AttachMembers(false)>]
 type DetachedCounter() =
     inherit EventTarget()
     member _.Value = 5

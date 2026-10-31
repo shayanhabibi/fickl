@@ -2739,12 +2739,13 @@ module Util =
                 | _ -> false
             )
 
-    /// fickl: the argument of [<AttachMembers>] on the entity, true when it has none
+    /// fickl: the argument of Fickl.Core's [<AttachMembers>] on the entity, true for Fable.Core's or when it has none
     let tryAttachMembersAttribute (ent: FSharpEntity) =
         ent.Attributes
         |> Seq.tryPick (fun att ->
             match att.AttributeType.TryFullName with
-            | Some Atts.attachMembers ->
+            | Some Atts.attachMembers -> Some true
+            | Some Atts.ficklAttachMembers ->
                 match Seq.tryHead att.ConstructorArguments with
                 | Some(_, (:? bool as value)) -> Some value
                 | _ -> Some true
@@ -3180,16 +3181,17 @@ module Util =
 
     // fickl: isMangledAbstractEntity for a Fable entity, so TypeScript declarations name abstract members
     // as the JavaScript calls them
-    /// fickl: the argument of [<AttachMembers>] on a Fable entity, true when it has none
+    /// fickl: the argument of Fickl.Core's [<AttachMembers>] on a Fable entity, true for Fable.Core's or when it has none
     let tryAttachMembersFableAttribute (ent: Fable.Entity) =
         ent.Attributes
         |> Seq.tryPick (fun att ->
-            if att.Entity.FullName = Atts.attachMembers then
+            match att.Entity.FullName with
+            | Atts.attachMembers -> Some true
+            | Atts.ficklAttachMembers ->
                 match att.ConstructorArgs with
                 | (:? bool as value) :: _ -> Some value
                 | _ -> Some true
-            else
-                None
+            | _ -> None
         )
 
     /// fickl: isAttachMembersEntity for a Fable entity, for JavaScript and TypeScript
