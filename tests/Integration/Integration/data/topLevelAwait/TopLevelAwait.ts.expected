@@ -1,0 +1,22 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+
+export interface Settings {
+    get name(): string,
+    get retries(): int32
+}
+
+export interface SettingsModule {
+    get settings(): Settings
+}
+
+export const settingsModule: SettingsModule = await import("./settings.js");
+
+export const retries: int32 = await ((settingsModule.settings.retries > 0) ? Promise.resolve<int32>(1) : Promise.resolve<int32>(2));
+
+const ready: string = await Promise.resolve<string>("ready");
+
+export function describe(): string {
+    return `${settingsModule.settings.name} ${retries} ${ready}`;
+}
+

@@ -19,6 +19,7 @@ let allTests =
     TypeGuards.tests
     TaggedTemplates.tests
     ImportAttributes.tests
+    TopLevelAwait.tests
     TsEnums.tests
     JsNamespaceLibrary.tests
     Currying.tests

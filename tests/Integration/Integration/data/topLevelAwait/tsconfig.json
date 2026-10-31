@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {
+    // Top-level await needs an ES module setting newer than the suite's es2020
+    "module": "esnext"
+  }
+}

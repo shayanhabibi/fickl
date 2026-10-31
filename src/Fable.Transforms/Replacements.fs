@@ -5850,6 +5850,8 @@ let private jsErrors (com: ICompiler) r t methodName args =
 
         IfThenElse(isError, Value(NewOption(None, Any, false), r), Value(NewOption(Some value, Any, false), r), r)
         |> Some
+    // Fable2Babel accepts it only as the initializer of a module value
+    | "awaitTopLevel", [ promise ] -> emit r t [ promise ] false "await $0" |> withTag "fickl-top-level-await" |> Some
     | _ -> None
 
 /// fickl: conversions between CancellationToken and AbortSignal, and promise interop that follows either

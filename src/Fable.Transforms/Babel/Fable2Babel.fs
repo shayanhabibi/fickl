@@ -3307,6 +3307,11 @@ module Util =
             addErrorAndReturnNull com range "Native yields and returns must be inside a jsGenerator computation"
         | Fable.Tags.Contains "fickl-native-await" when not ctx.IsNativeAsync ->
             addErrorAndReturnNull com range "Native promise bindings must be inside a jsAsync computation"
+        | Fable.Tags.Contains "fickl-top-level-await" ->
+            addErrorAndReturnNull
+                com
+                range
+                "JS.awaitTopLevel is only allowed as the whole initializer of a module-level value"
         | Fable.Tags.Contains "topDirectiveProloge" ->
             com.SaveTopDirectivePrologue(info.Macro)
             // Return empty sequence expression so it can be erased at print time
@@ -7269,6 +7274,14 @@ but thanks to the optimisation done below we get
 
                 let valueExpr =
                     match decl.Body with
+                    // fickl: `export const x = await p;`, the one place JS.awaitTopLevel is allowed
+                    | MaybeCasted(Fable.Emit(info, t, r)) when
+                        memb.IsValue && List.contains "fickl-top-level-await" info.CallInfo.Tags
+                        ->
+                        let tags = info.CallInfo.Tags |> List.filter ((<>) "fickl-top-level-await")
+
+                        let info = { info with CallInfo = { info.CallInfo with Tags = tags } }
+                        transformAsExpr com ctx (Fable.Emit(info, t, r)) |> Some
                     | body when memb.IsValue -> transformAsExpr com ctx body |> Some
                     // Some calls with special attributes (like React lazy or memo) can turn the surrounding function into a value
                     | Fable.Call(callee,
