@@ -5783,6 +5783,28 @@ let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
         | _ -> None
 
     match methodName, literal with
+    | "importDynamicWith", _ ->
+        match args with
+        | [ path; ArrayOrListLiteral(attributes, _) ] ->
+            let attributes =
+                attributes
+                |> List.map (
+                    function
+                    | MaybeCasted(Value(NewTuple([ StringConst key; value ], _), _)) -> Some(key, value)
+                    | _ -> None
+                )
+
+            if attributes |> List.forall Option.isSome then
+                let options = objExpr [ "with", objExpr (List.choose id attributes) ]
+                Helper.GlobalCall("import", t, [ path; options ], ?loc = r) |> Some
+            else
+                "importDynamicWith requires constant keys"
+                |> addErrorAndReturnNull com ctx.InlinePath r
+                |> Some
+        | _ ->
+            "importDynamicWith requires the attributes as a list literal of pairs"
+            |> addErrorAndReturnNull com ctx.InlinePath r
+            |> Some
     | "partial", _ ->
         match args with
         | [ arg ] ->

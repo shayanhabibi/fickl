@@ -2606,6 +2606,21 @@ module Util =
         )
         |> Option.defaultValue NoGlobalNorImport
 
+    /// fickl: the path with the `[<ImportWith>]` attributes, `with { type: "json" }`, on JavaScript and TypeScript
+    let withImportAttributes (com: Compiler) (atts: Fable.Attribute seq) (path: string) =
+        match com.Options.Language with
+        | JavaScript
+        | TypeScript ->
+            atts
+            |> Seq.choose (fun att ->
+                match att.Entity.FullName, att.ConstructorArgs with
+                | Atts.ficklImportWith, [ (:? string as key); (:? string as value) ] -> Some(key.Trim(), value)
+                | _ -> None
+            )
+            |> Seq.toList
+            |> ImportAttributes.encode path
+        | _ -> path
+
     /// Function used to check if calls must be replaced by global idents or direct imports
     let tryGlobalOrImportedMember (com: Compiler) typ (memb: FSharpMemberOrFunctionOrValue) =
         let attributes = memb.Attributes |> Seq.map (fun x -> FsAtt(x) :> Fable.Attribute)
@@ -2628,6 +2643,7 @@ module Util =
                     |> Option.defaultValue path
                 | _ -> path
 
+            let path = withImportAttributes com attributes path
             makeImportUserGenerated None typ selector path |> Some
         | _ -> None
 
@@ -2677,6 +2693,7 @@ module Util =
                 else
                     path
 
+            let path = withImportAttributes com attributes path
             makeImportUserGenerated None Fable.Any selector path |> Some
         | _ -> None
 

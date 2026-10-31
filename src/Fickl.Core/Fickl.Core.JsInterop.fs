@@ -34,6 +34,16 @@ module JsInterop =
     /// </code></example>
     let partial<'T> (setters: 'T -> unit) : Partial<'T> = nativeOnly
 
+    /// <summary>Imports a module dynamically with import attributes, <c>import(path, { with: { type: "json" } })</c>.</summary>
+    /// <param name="path">The module path, as for <c>importDynamic</c>.</param>
+    /// <param name="attributes">The attributes as a list literal of key and value pairs, such as <c>[ "type", "json" ]</c>; the keys must be constants.</param>
+    /// <returns>A promise of the module namespace object; a JSON or CSS module is its <c>default</c> export.</returns>
+    /// <example><code lang="fsharp">
+    /// let config = importDynamicWith&lt;{| ``default``: Config |}> "./config.json" [ "type", "json" ]
+    /// // import("./config.json", { with: { type: "json" } })
+    /// </code></example>
+    let importDynamicWith<'T> (path: string) (attributes: (string * string) list) : JS.Promise<'T> = nativeOnly
+
     /// <summary>Treats a <c>Partial&lt;T></c> as a complete <c>'T</c>; TypeScript sees the cast.</summary>
     /// <param name="value">An object that the caller knows has every property of <c>'T</c>.</param>
     let full (value: Partial<'T>) : 'T = nativeOnly

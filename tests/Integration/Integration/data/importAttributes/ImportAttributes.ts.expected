@@ -1,0 +1,35 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import config from "./config.json" with { type: "json" };
+import config_1 from "./config.json" with { type: "json", "x-note": "kept" };
+import type { Theme } from "./theme.js";
+
+export interface Config {
+    get name(): string,
+    get port(): int32
+}
+
+export function describe(): string {
+    return `${config.name}:${config.port}:${config_1.name}`;
+}
+
+export function load(): Promise<{ default: Config }> {
+    return import("./config.json", {
+        with: {
+            type: "json",
+        },
+    });
+}
+
+export function loadWith(kind: string): Promise<any> {
+    return import("./config.json", {
+        with: {
+            type: kind,
+        },
+    });
+}
+
+export function themeName(theme: Theme): string {
+    return theme.name;
+}
+

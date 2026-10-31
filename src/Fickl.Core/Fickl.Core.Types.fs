@@ -57,6 +57,30 @@ type JsFunctionAttribute() =
 type TaggedTemplateAttribute() =
     inherit Attribute()
 
+/// <summary>Adds an import attribute to the import of the value, <c>with { type: "json" }</c>.</summary>
+/// <remarks>
+/// Goes with an <c>Import</c>, <c>ImportDefault</c>, <c>ImportAll</c> or <c>ImportMember</c> attribute, on a value,
+/// function or class, for the modules that need one, such as JSON and CSS module scripts:
+/// <code>
+/// [&lt;ImportDefault("./config.json"); ImportWith("type", "json")>]
+/// let config: Config = jsNative
+/// // import config from "./config.json" with { type: "json" };
+/// </code>
+/// The attributes are part of the import: the same path imported with other attributes is a separate
+/// <c>import</c> declaration. A JSON module only has a default export. Applies to JavaScript and TypeScript;
+/// TypeScript needs <c>module</c> set to <c>esnext</c>, <c>preserve</c> or <c>nodenext</c>. Other targets ignore it.
+/// For a dynamic import, use <c>Fickl.Core.JsInterop.importDynamicWith</c>.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method
+                 ||| AttributeTargets.Property
+                 ||| AttributeTargets.Class
+                 ||| AttributeTargets.Interface,
+                 AllowMultiple = true)>]
+type ImportWithAttribute(key: string, value: string) =
+    inherit Attribute()
+    member _.Key = key
+    member _.Value = value
+
 /// <summary>Emits the function as a TypeScript type predicate, <c>parameter is T</c>, so TypeScript callers narrow the argument.</summary>
 /// <remarks>
 /// The function returns <c>bool</c>, or an <c>option</c> or <c>voption</c> of the predicate type:

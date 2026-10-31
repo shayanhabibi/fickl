@@ -136,6 +136,9 @@ module Atts =
     let ficklTaggedTemplate = "Fickl.Core.TaggedTemplateAttribute" // typeof<Fickl.Core.TaggedTemplateAttribute>.FullName
 
     [<Literal>]
+    let ficklImportWith = "Fickl.Core.ImportWithAttribute" // typeof<Fickl.Core.ImportWithAttribute>.FullName
+
+    [<Literal>]
     let ficklTsEnum = "Fickl.Core.TsEnumAttribute" // typeof<Fickl.Core.TsEnumAttribute>.FullName
 
     [<Literal>]
@@ -802,6 +805,38 @@ module Log =
         | Some range -> msg + " " + (string<SourceLocation> range) + " (" + fileName + ")"
         | None -> msg + " (" + fileName + ")"
 
+
+/// fickl: import attributes, `with { type: "json" }`, travel with the import path through the Fable AST,
+/// whose ImportInfo has no field for them, and are split off when the JavaScript import is declared
+module ImportAttributes =
+    let private separator = ' '
+    let private keyValueSeparator = ''
+
+    /// The path, carrying the attributes when there are any
+    let encode (path: string) (attributes: (string * string) list) =
+        match attributes with
+        | [] -> path
+        | attributes ->
+            attributes
+            |> List.map (fun (key, value) -> key + string keyValueSeparator + value)
+            |> String.concat (string separator)
+            |> fun attributes -> path + string separator + attributes
+
+    /// The path and its attributes
+    let decode (path: string) =
+        match path.IndexOf(separator) with
+        | -1 -> path, []
+        | index ->
+            let attributes =
+                path.Substring(index + 1).Split(separator)
+                |> Array.toList
+                |> List.map (fun pair ->
+                    match pair.IndexOf(keyValueSeparator) with
+                    | -1 -> pair, ""
+                    | i -> pair.Substring(0, i), pair.Substring(i + 1)
+                )
+
+            path.Substring(0, index), attributes
 
 [<AutoOpen>]
 module AST =

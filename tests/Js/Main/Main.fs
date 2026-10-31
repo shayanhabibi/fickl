@@ -18,6 +18,7 @@ let allTests =
     SymbolKeys.tests
     TypeGuards.tests
     TaggedTemplates.tests
+    ImportAttributes.tests
     TsEnums.tests
     JsNamespaceLibrary.tests
     Currying.tests
