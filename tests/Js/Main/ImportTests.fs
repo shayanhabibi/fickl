@@ -93,8 +93,13 @@ type MyFSharpClass() =
 type ITreasure =
     abstract myKey: string
 
+[<Import("default", "./js/1foo.js")>]
+let importedKeyHolder: ITreasure = jsNative
+
 type Treasure =
     static member keyHolder: ITreasure = JsInterop.importDefault "./js/1foo.js"
+    // fickl#200 - typed as ITreasure, not as a function returning it
+    static member keyHolderValue: ITreasure = importedKeyHolder
     static member inline keyHolderInline: ITreasure = JsInterop.importDefault "./js/1foo.js"
 
 let myKeyInlineWrapper() =
@@ -106,6 +111,9 @@ let tests =
     #if FABLE_COMPILER
     testCase "importDefault works with getters" <| fun () -> // #2329
         Treasure.keyHolder.myKey |> equal "a secret"
+
+    testCase "Getters returning an imported value work" <| fun () ->
+        Treasure.keyHolderValue.myKey |> equal "a secret"
 
     testCase "importDefault works with getters when inlined" <| fun () -> // #2329
         Treasure.keyHolderInline.myKey |> equal "a secret"

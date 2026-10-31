@@ -2354,18 +2354,20 @@ let private transformMemberFunction
     match body with
     // Accept import expressions, e.g. let foo x y = import "foo" "myLib"
     | Fable.Import(info, _, r) when not info.IsCompilerGenerated ->
-        // Use the full function type
-        let typ = makeType Map.empty memb.FullType
         let selector = importExprSelector memb info.Selector
 
-        let memberRef =
+        let typ, memberRef =
             // If this is a getter, it means the imported value is an object but Fable will call it as a function, see #2329
             if
                 memb.IsPropertyGetterMethod // || (memb.IsFunction && com.Options.Language = Rust)
             then
-                Fable.GeneratedMember.Function(name, [], typ)
+                // fickl: the getter returns the imported value, so the value has the property's type
+                let typ = makeType Map.empty memb.ReturnParameter.Type
+                typ, Fable.GeneratedMember.Function(name, [], typ)
             else
-                Fable.GeneratedMember.Value(name, typ)
+                // Use the full function type
+                let typ = makeType Map.empty memb.FullType
+                typ, Fable.GeneratedMember.Value(name, typ)
 
         transformImport com r typ name [] memberRef selector info.Path
     | body ->

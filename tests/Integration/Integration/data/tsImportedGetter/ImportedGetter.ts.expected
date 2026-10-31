@@ -1,0 +1,30 @@
+
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { nothing } from "./sentinel.js";
+import { type FSharpList, ofArray } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+
+export interface Marker {
+
+}
+
+export class Api {
+    constructor() {
+    }
+}
+
+export function Api_$reflection(): TypeInfo {
+    return class_type("ImportedGetter.Api", undefined, Api);
+}
+
+export function Api_get_Nothing(): Marker {
+    return nothing;
+}
+
+export function Api_get_NothingUnboxed(): Marker {
+    return nothing;
+}
+
+export function useGetters(): FSharpList<Marker> {
+    return ofArray([Api_get_Nothing(), Api_get_NothingUnboxed()]);
+}
+
