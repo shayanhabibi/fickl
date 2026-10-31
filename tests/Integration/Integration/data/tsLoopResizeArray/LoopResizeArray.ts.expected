@@ -1,0 +1,22 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { item } from "./fable_modules/fable-library-ts.5.25.0/Array.ts";
+import { int32ToString, type MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+
+export function collect(xs: MutableArray<int32>): void {
+    const found: int32[] = [];
+    for (let idx = 0; idx <= (xs.length - 1); idx++) {
+        const x: int32 = item(idx, xs) | 0;
+        void (found.push(x));
+    }
+}
+
+export function collectWhile(n: int32): void {
+    const found: string[] = [];
+    let i = 0;
+    while (i < n) {
+        void (found.push(int32ToString(i)));
+        i = ((i + 1) | 0);
+    }
+}
+

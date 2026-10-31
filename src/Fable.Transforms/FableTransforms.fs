@@ -44,6 +44,24 @@ let getCapturedNames expr =
 let isIdentCaptured identName expr =
     walkCapturedIdents (fun candidate -> candidate = identName) expr
 
+/// Whether the identifier is referenced from a part of a loop that runs once per iteration.
+let isIdentReferencedInLoop identName expr =
+    let isReferenced e =
+        e
+        |> deepExists (
+            function
+            | IdentExpr id -> id.Name = identName
+            | _ -> false
+        )
+
+    expr
+    |> deepExists (
+        function
+        | WhileLoop(guard, body, _) -> isReferenced guard || isReferenced body
+        | ForLoop(_, _, limit, body, _, _) -> isReferenced limit || isReferenced body
+        | _ -> false
+    )
+
 let isUnitArg (ident: Ident) =
     ident.IsCompilerGenerated
     && ident.Type = Unit
@@ -328,7 +346,7 @@ let canInlineArg (com: Compiler) identName value body =
             // Don't inline values that create new mutable state (e.g. ResizeArray(), mutable arrays)
             // into closures: even though creation is side-effect-free, inlining into a closure
             // called multiple times would create a new instance per call instead of sharing the
-            // single captured instance
+            // single captured instance. The same holds for a loop body, which runs once per iteration
             let createsMutableState =
                 match value with
                 | Value(NewArray(_, _, kind), _) ->
@@ -340,7 +358,10 @@ let canInlineArg (com: Compiler) identName value body =
 
             (refCount <= 1
              && not (canHaveSideEffects com value)
-             && not (createsMutableState && isIdentCaptured identName body))
+             && not (
+                 createsMutableState
+                 && (isIdentCaptured identName body || isIdentReferencedInLoop identName body)
+             ))
             // If it can have side effects, make sure is at least referenced once so the expression is not erased
             || (refCount = 1
                 && noSideEffectBeforeIdent identName body
