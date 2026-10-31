@@ -216,6 +216,32 @@ module JS =
     /// </remarks>
     let awaitTopLevel (promise: Fable.Core.JS.Promise<'T>) : 'T = nativeOnly
 
+    /// <summary>The class being constructed, JavaScript's <c>new.target</c>: the class of the instance, which is a
+    /// subclass when a subclass constructor calls this one.</summary>
+    /// <remarks>
+    /// Allowed only in a primary constructor, including its <c>let</c> and <c>do</c> bindings and the arguments of
+    /// its <c>inherit</c> call, but not inside a lambda or object expression there; anywhere else it is a compile
+    /// error. Compare it with <c>obj.ReferenceEquals</c>, which compiles to <c>===</c>:
+    /// <code>
+    /// type Shape() =
+    ///     do if obj.ReferenceEquals(JS.newTarget, jsConstructor&lt;Shape>) then failwith "Shape is abstract"
+    /// </code>
+    /// Targets JavaScript and TypeScript. On .NET it throws.
+    /// </remarks>
+    let newTarget<'T> : 'T = nativeOnly
+
+    /// <summary>Whether the class being constructed is <c>'T</c> itself rather than a subclass of it:
+    /// <c>new.target === Shape</c>.</summary>
+    /// <remarks>
+    /// Allowed only where <c>JS.newTarget</c> is. <c>'T</c> must be a class that compiles to a JavaScript class:
+    /// <code>
+    /// type Shape() =
+    ///     do if JS.isNewTarget&lt;Shape> then failwith "Shape is abstract"
+    /// </code>
+    /// Targets JavaScript and TypeScript. On .NET it throws.
+    /// </remarks>
+    let isNewTarget<'T> : bool = nativeOnly
+
     /// <summary>A JavaScript array that is only read: the TypeScript <c>ReadonlyArray&lt;T></c>, also written <c>readonly T[]</c>.</summary>
     /// <remarks>A parameter of this type accepts a TypeScript <c>readonly T[]</c> or <c>as const</c> array, which a
     /// <c>'T[]</c> parameter rejects. Build one from an F# array or <c>ResizeArray</c> with <c>ReadonlyArray.ofArray</c> or

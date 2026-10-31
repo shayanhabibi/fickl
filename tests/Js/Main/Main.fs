@@ -23,6 +23,7 @@ let allTests =
     TaggedTemplates.tests
     ImportAttributes.tests
     TopLevelAwait.tests
+    NewTarget.tests
     TsEnums.tests
     JsNamespaceLibrary.tests
     Currying.tests
