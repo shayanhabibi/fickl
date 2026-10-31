@@ -1705,6 +1705,7 @@ module PrinterExtensions =
             | NumberTypeAnnotation -> printer.Print("number")
             | BooleanTypeAnnotation -> printer.Print("boolean")
             | AnyTypeAnnotation -> printer.Print("any")
+            | UnknownTypeAnnotation -> printer.Print("unknown")
             | VoidTypeAnnotation -> printer.Print("void")
             | UndefinedTypeAnnotation -> printer.Print("undefined")
             | ArrayTypeAnnotation(t) ->
