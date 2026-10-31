@@ -1721,6 +1721,7 @@ module PrinterExtensions =
             | UnknownTypeAnnotation -> printer.Print("unknown")
             | VoidTypeAnnotation -> printer.Print("void")
             | UndefinedTypeAnnotation -> printer.Print("undefined")
+            | NullTypeAnnotation -> printer.Print("null")
             | ArrayTypeAnnotation(t) ->
                 printer.ComplexTypeWithParens(t)
                 printer.Print("[]")

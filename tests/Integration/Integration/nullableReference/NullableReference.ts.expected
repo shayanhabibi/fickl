@@ -1,0 +1,43 @@
+
+import { item as item_1 } from "./fable_modules/fable-library-ts.5.25.0/Array.ts";
+import type { Nullable, MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { type FSharpList, tryItem } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
+import { value, type Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+
+export function orDefault(s: string | null): string {
+    if (s == null) {
+        return "default";
+    }
+    else {
+        return s;
+    }
+}
+
+export const fromNull: string = orDefault(null);
+
+export function tryFirst(xs: MutableArray<string>): string | null {
+    if (xs.length === 0) {
+        return null;
+    }
+    else {
+        return item_1(0, xs);
+    }
+}
+
+export const names: MutableArray<string | null> = ["a", null];
+
+export function findOrNull<T>(index: int32, list: FSharpList<T>): T | null {
+    const matchValue: Option<T> = tryItem<T>(index, list);
+    if (matchValue == null) {
+        return null;
+    }
+    else {
+        return value(matchValue);
+    }
+}
+
+export function nullableInt(x: Nullable<int32>): Nullable<int32> {
+    return x;
+}
+
