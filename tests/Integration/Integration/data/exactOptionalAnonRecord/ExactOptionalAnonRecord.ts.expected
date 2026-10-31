@@ -1,0 +1,30 @@
+
+import { type Option, unwrap } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+
+export function label(text: Option<string>): { Size: int32, Text?: string | undefined } {
+    return {
+        Size: 1,
+        Text: unwrap(text),
+    };
+}
+
+export function labelSome(text: string): { Size: int32, Text?: string | undefined } {
+    return {
+        Size: 1,
+        Text: text,
+    };
+}
+
+export function count(n: Option<int32>): { Count?: int32 | undefined } {
+    return {
+        Count: unwrap(n),
+    };
+}
+
+export function nested(x: Option<Option<string>>): { X?: Option<Option<string>> | undefined } {
+    return {
+        X: x,
+    };
+}
+
