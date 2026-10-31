@@ -73,6 +73,7 @@
     <Compile Include="SymbolKeyBindings.fs" />
     <Compile Include="SymbolKeyTests.fs" />
     <Compile Include="TypeGuardTests.fs" />
+    <Compile Include="TsEnumTests.fs" />
     <Compile Include="JsNamespaceLibraryBindings.fs" />
     <Compile Include="JsNamespaceLibraryTests.fs" />
     <Compile Include="CurryingTests.fs" />
