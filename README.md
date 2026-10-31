@@ -76,12 +76,23 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `[<InlineInterface>]` | Attribute on a union or case | Compiles a `TypeScriptTaggedUnion` case holding one interface as that interface with the tag added, `Take & { type: "take" }`. |
 | `[<Curried>]` | Attribute on a parameter or field | Keeps a function curried, for JavaScript that passes or calls it one argument at a time. |
 | `[<NoOverloadSuffix>]` | Attribute on a member or type | Drops the overload hash from compiled member names, `Counter__Add` instead of `Counter__Add_Z524259A4`. |
+| `[<EmitType>]` | Attribute on a type | Writes the type's TypeScript annotation as the given text, with `$0`, `$1`... for its generic arguments, for conditional, mapped and template literal types: ``[<EmitType("`data-${string}`")>]``. A module path imports the name the text starts with as a type. |
+| `partial`, `full` | Function | `partial (fun s -> s.count <- 1)` builds an object with some of a type's properties, `{ count: 1 } satisfies Partial<State>` in TypeScript; `full` casts it to the complete type. In TypeScript, `jsOptions` also checks a flat object with `satisfies Partial<T>` before its cast. |
+| `Partial<'T>`, `Required<'T>`, `Readonly<'T>` | Type | The TypeScript utility types, for binding signatures such as `abstract setState: Partial<State> -> unit`. |
+| Read-only collections in TypeScript | Compiler | `IReadOnlyCollection<T>` and `IReadOnlyList<T>` are annotated `Iterable<T>`, and `IReadOnlyDictionary<K, V>` `IReadOnlyMap<K, V>`, instead of `any`, so TypeScript can pass a `readonly T[]` or `ReadonlyMap`. |
+| `Fickl.Core.JS.ReadonlyArray<'T>` | Type | Binds TypeScript's `ReadonlyArray<T>`, for a parameter that accepts `readonly T[]` and `as const` arrays. `ReadonlyArray.ofArray` and `ofResizeArray` view an F# array without a copy. |
+| `unknown` | Type abbreviation | `Fickl.Core.unknown` is `obj` in F#. A module function or abstract member that takes or returns it has `unknown` in its TypeScript signature, so callers must narrow the value, while its body still sees `any`. `obj` stays `any`. |
 | `[<TypePredicate>]`, `[<TypeAssertion>]` | Attribute on a function or method | Emits a TypeScript type guard, `x is User` or `asserts x is User`. F# can see the guard as returning `User option`, `User voption` or `Result<User, exn>`: the compiled function still returns a boolean or throws, and F# calls get `Some x` or `Ok x`. Works on imported guards too. |
 | `[<TsEnum>]` | Attribute on an enum | Emits an F# enum as the frozen object a TypeScript enum compiles to, `Color.Red` and `Color[0]`. TypeScript types it with an ambient `declare enum`, so the output stays erasable, and values of the enum are annotated `Color` instead of `int32`. |
 | Imported string enums | Compiler | A case of an imported or global `[<StringEnum>]` union compiles to the member of the enum object, `Dir.Up`, so it type-checks against a TypeScript string enum. |
 | `--declaration` | CLI flag | Writes a TypeScript declaration file (`.d.ts`) next to each JavaScript file. |
 | `--strictOptions` | CLI flag | Keeps `Some null` apart from `None`, as on .NET. |
 | `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |
+| `--nativeErrors` | CLI flag | Makes every exception a JS `Error`, with a `stack` and, for an inner exception, a `cause`. |
+| `[<JsError>]` | Attribute on an F# exception | Compiles the exception as a JS `Error` subclass, with a `stack`. |
+| `JS.Error`, `JS.TypeError`, `JS.RangeError`, `JS.SyntaxError`, `JS.ReferenceError`, `JS.AggregateError`, `JS.DOMException` | Bindings | The errors JavaScript throws, to catch with `:?` (`instanceof`) and construct, with `message`, `name`, `stack` and `cause`. |
+| `JS.Thrown` | Active pattern | Matches a caught value that is neither a JS `Error` nor an F# exception, such as a thrown string, and passes it as it was thrown. |
+| `e.Message` of a thrown value | Runtime | A caught value typed `exn` that is not an object, such as a thrown string or `undefined`, has `String(e)` as its message instead of `undefined` or a `TypeError`. |
 | `--temporal` | CLI flag | Represents dates and times with the JavaScript Temporal API (experimental). |
 | `--server` | CLI flag | Compiles through a background server that keeps check results, so a recompile only rechecks what changed. `FICKL_SERVER=1` turns it on too. |
 | `--timings` | CLI flag | Prints a per-phase timing and allocation report after each compilation. |
@@ -106,6 +117,8 @@ The capacity to explicitly control transformation via attributes does not have t
 | `[<Fickl.Core.TsEnum>]` on an enum | Emits the enum's object and TypeScript type. Without it, an enum emits nothing and is typed as its underlying number. |
 | `[<Import>]` or `[<Global>]` on a `[<StringEnum>]` union | Its cases compile to members of the imported object, `Dir.Up`. Without the attribute, they compile to their string literals. |
 | `--clampByteArrays` | Compiles byte arrays as `Uint8ClampedArray`, the type canvas pixel data uses. Out-of-range values clamp instead of wrapping as on .NET. |
+| `--nativeErrors` | Every exception, from `failwith`, `invalidArg` and the runtime library to a declared F# exception, is `instanceof Error`, has a `stack` and has its inner exception as its `cause`, so Node, test runners and error reporters print it as an error. Without it, an exception is a plain object and is about 50 times faster to throw, because a native `Error` captures a stack trace when it is created ([#2160](https://github.com/fable-compiler/Fable/issues/2160)); code that throws exceptions for control flow pays that cost on every throw. The flag affects the whole program, including libraries compiled without it. |
+| `[<Fickl.Core.JsError>]` on an F# exception | The exception extends a native `Error` subclass, so only it pays for the stack trace. It still matches, compares and prints as an F# exception. |
 | `--temporal` | Represents `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly` and `TimeSpan` with the JavaScript Temporal API (experimental). |
 
 ## Transparency

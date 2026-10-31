@@ -101,6 +101,8 @@ type Expression =
         typeParameters: TypeParameter array *
         loc: SourceLocation option
     | AsExpression of expression: Expression * typeAnnotation: TypeAnnotation
+    /// fickl: `expression satisfies typeAnnotation`, checked against the type without changing its own
+    | SatisfiesExpression of expression: Expression * typeAnnotation: TypeAnnotation
 
     member this.Location =
         match this with
@@ -225,12 +227,20 @@ type Declaration =
         doc: string option
     /// <summary><c>isDeclare</c> makes it ambient, <c>declare enum</c>: a type with no value emitted for it.</summary>
     | EnumDeclaration of name: string * cases: (string * Expression) array * isConst: bool * isDeclare: bool
+    /// fickl: a TypeScript overload signature, `function f(x: unknown): unknown;`, before the implementation of `f`
+    | FunctionSignatureDeclaration of
+        parameters: Parameter array *
+        id: Identifier *
+        returnType: TypeAnnotation *
+        typeParameters: TypeParameter array *
+        doc: string option
     | TypeAliasDeclaration of name: string * typeParameters: TypeParameter array * alias: TypeAnnotation
 
     member this.JsDoc =
         match this with
         | ClassDeclaration(_, _, _, _, _, _, _, doc)
         | FunctionDeclaration(_, _, _, _, _, _, doc)
+        | FunctionSignatureDeclaration(_, _, _, _, doc)
         | InterfaceDeclaration(_, _, _, _, doc) -> doc
         | _ -> None
 
@@ -515,6 +525,8 @@ type ClassMember =
         value: Expression option *
         isComputed: bool *
         isStatic: bool *
+        /// TypeScript `override` modifier
+        isOverride: bool *
         typeAnnotation: TypeAnnotation option *
         loc: SourceLocation option
     | ClassMethod of
@@ -574,6 +586,7 @@ type ExportSpecifier = | ExportSpecifier of local: Identifier * exported: Identi
 type TypeAnnotation =
     | AliasTypeAnnotation of id: Identifier * typeArguments: TypeAnnotation array
     | AnyTypeAnnotation
+    | UnknownTypeAnnotation
     | VoidTypeAnnotation
     | UndefinedTypeAnnotation
     | StringTypeAnnotation
@@ -594,6 +607,8 @@ type TypeAnnotation =
     | TypeofTypeAnnotation of Expression
     | IndexedTypeAnnotation of typ: TypeAnnotation * prop: TypeAnnotation
     | LiteralTypeAnnotation of Literal
+    /// fickl: a TypeScript type written verbatim, where `$0`, `$1`... are the printed arguments
+    | EmitTypeAnnotation of value: string * args: TypeAnnotation array
     /// <summary>A function's return type that narrows a parameter: <c>x is T</c>, <c>asserts x is T</c> or <c>asserts x</c>.</summary>
     | TypePredicateTypeAnnotation of parameterName: string * typ: TypeAnnotation option * asserts: bool
 

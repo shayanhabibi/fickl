@@ -91,7 +91,31 @@ export interface ICollection<T> extends IEnumerable<T> {
   Remove(item: T): boolean;
 }
 
-// Exception is intentionally not derived from Error, for performance reasons (see #2160)
+// fickl: set by enableNativeErrors (--nativeErrors)
+let nativeErrors = false;
+
+type CaptureStackTrace = (target: object, constructorOpt?: Function) => void;
+
+// fickl: gives an exception the parts of a native Error that its constructor does not: `cause` and, unless the
+// object already is an Error, `stack`. Both are non-enumerable, so record equality and printing ignore them.
+function initNativeError(self: object, innerException: unknown, constructorOpt: Function | undefined, hasStack: boolean) {
+  if (innerException != null) {
+    Object.defineProperty(self, "cause", { value: innerException, writable: true, configurable: true });
+  }
+  if (!hasStack) {
+    const capture = (Error as unknown as { captureStackTrace?: CaptureStackTrace }).captureStackTrace;
+    if (typeof capture === "function") {
+      capture(self, constructorOpt);
+    } else {
+      Object.defineProperty(self, "stack", { value: new Error((self as { message?: string }).message).stack, writable: true, configurable: true });
+    }
+  }
+}
+
+// Exception is intentionally not derived from Error, for performance reasons (see #2160):
+// a native Error captures a stack trace when it is constructed.
+// fickl: --nativeErrors calls enableNativeErrors, which puts Error.prototype under Exception.prototype
+// and makes the constructor capture a stack trace.
 export class Exception {
   public message: string;
   public stack?: string;
@@ -104,11 +128,49 @@ export class Exception {
   constructor(msg?: string, innerException?: Exception) {
     this.message = msg ?? "";
     this.innerException = innerException as Exception;
+    if (nativeErrors) {
+      initNativeError(this, innerException, new.target, false);
+    }
   }
 
   toString() {
     return this.message;
   }
+}
+
+/** fickl: makes every Exception, and so every F# exception, a JS Error: `instanceof Error` holds for it, and it has
+ * a `stack` and, with an inner exception, a `cause`. Compiled code calls it under --nativeErrors. It affects the whole
+ * program, including Exceptions created earlier, which then have no stack. Calling it again does nothing. */
+export function enableNativeErrors(): void {
+  if (!nativeErrors) {
+    nativeErrors = true;
+    Object.setPrototypeOf(Exception.prototype, Error.prototype);
+  }
+}
+
+/** fickl: the base of an F# exception declared with [<Fickl.Core.JsError>]: a native Error subclass with the
+ * fields of Exception, whose inner exception is also its `cause`. */
+export class ErrorException extends Error {
+  public innerException!: Exception;
+
+  constructor(msg?: string, innerException?: Exception) {
+    super();
+    this.message = msg ?? "";
+    this.innerException = innerException as Exception;
+    initNativeError(this, innerException, new.target, true);
+  }
+
+  override toString() {
+    return this.message;
+  }
+}
+
+/** fickl: the Message of a caught value: its `message`, or `String(e)` for a thrown value that is not an object,
+ * such as a string or `undefined`. */
+export function exceptionMessage(e: unknown): string {
+  return (typeof e === "object" && e !== null) || typeof e === "function"
+    ? (e as { message: string }).message
+    : String(e);
 }
 
 export function isException(x: any) {
@@ -447,6 +509,19 @@ export interface IMapOrWeakMap<K, V> {
   get(key: K): V | undefined;
   has(key: K): boolean;
   set(key: K, value: V): IMapOrWeakMap<K, V>;
+}
+
+/** What reading a dictionary needs: a native Map or ReadonlyMap, a Dictionary or an F# Map. */
+export interface IReadOnlyMap<K, V> {
+  get(key: K): V | undefined;
+  has(key: K): boolean;
+  readonly size: number;
+
+  forEach(callbackfn: (value: V, key: K, map: IReadOnlyMap<K, V>) => void, thisArg?: any): void;
+  [Symbol.iterator](): Iterator<[K, V]>;
+  entries(): Iterable<[K, V]>;
+  keys(): Iterable<K>;
+  values(): Iterable<V>;
 }
 
 export interface IMap<K, V> extends IMapOrWeakMap<K, V> {
@@ -1219,7 +1294,7 @@ export function curry20<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, 
 // The `Failure` active pattern: in .NET it matches only an exception whose type is System.Exception. A JS error
 // that is not a Fable exception (TypeError, SyntaxError, ...) has no .NET type and still matches.
 export function failurePattern(e: any): string | undefined {
-  return e instanceof Exception && e.constructor !== Exception ? undefined : e?.message;
+  return (e instanceof Exception && e.constructor !== Exception) || e instanceof ErrorException ? undefined : e?.message;
 }
 
 // Fields named `constructor` or `__proto__` are stored with a trailing `$` (see sanitizeMemberName in Fable2Babel)

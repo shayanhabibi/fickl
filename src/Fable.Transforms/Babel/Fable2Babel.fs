@@ -390,7 +390,15 @@ module private NativeDecorators =
                                 ?typeAnnotation = annotation
                             )
                         else
-                            ClassAutoAccessor(key, value, computed, false, annotation, memberDecl.Body.Range)
+                            ClassAutoAccessor(
+                                key,
+                                value,
+                                computed,
+                                false,
+                                Util.hidesBaseMember com info,
+                                annotation,
+                                memberDecl.Body.Range
+                            )
 
                     decorateMember com ctx info memberDeclaration
                 )
@@ -1231,7 +1239,10 @@ module Annotation =
             // makeFableLibImportTypeAnnotation com ctx genArgs "Util" "ICollection" |> Some
             makeNativeTypeAnnotation com ctx genArgs "Iterable" |> Some
         // | Types.idictionary
-        // | Types.ireadonlydictionary
+        // fickl: read-only views accept what F# can pass as them, including readonly arrays and ReadonlyMap
+        | Types.ireadonlydictionary -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IReadOnlyMap" |> Some
+        | Types.ireadonlycollection
+        | "System.Collections.Generic.IReadOnlyList`1" -> makeNativeTypeAnnotation com ctx genArgs "Iterable" |> Some
         | Types.idisposable -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IDisposable" |> Some
         | Types.iasyncdisposable ->
             makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IAsyncDisposable"
@@ -1401,6 +1412,54 @@ module Annotation =
     let private annotationConstructor (com: IBabelCompiler) ctx ent =
         com.InTypePosition(fun () -> Lib.tryJsConstructorFor Annotation com ctx ent)
 
+    /// fickl: the identifier an `EmitType` text starts with, which its module path imports
+    let private emitTypeHead =
+        Regex(@"^\s*((?!\$\d)[A-Za-z_$][\w$]*)", RegexOptions.Compiled)
+
+    /// fickl: `[<EmitType>]` writes the annotation as its text. With a module path, the leading identifier
+    /// becomes one more argument, so the import it names is renamed and tracked like any other type reference.
+    let tryEmitTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        ent.Attributes
+        |> Seq.tryFind (fun att -> att.Entity.FullName = Atts.ficklEmitType)
+        |> Option.map (fun att ->
+            let args = genArgs |> List.mapToArray (makeTypeAnnotation com ctx)
+
+            match att.ConstructorArgs with
+            | (:? string as text) :: (:? string as from) :: _ when not (String.IsNullOrEmpty from) ->
+                let head = emitTypeHead.Match(text)
+
+                if head.Success then
+                    let name = head.Groups[1]
+
+                    let path =
+                        if Path.isRelativePath from then
+                            ent.Ref.SourcePath
+                            |> Option.map (FSharp2Fable.Util.fixImportedRelativePath com from)
+                            |> Option.defaultValue from
+                        else
+                            from
+
+                    let id =
+                        match com.InTypePosition(fun () -> com.GetImportExpr(ctx, name.Value, path, None)) with
+                        | Expression.Identifier id -> id
+                        | _ -> Identifier.identifier name.Value
+
+                    let text =
+                        text.Substring(0, name.Index)
+                        + "$"
+                        + string args.Length
+                        + text.Substring(name.Index + name.Length)
+
+                    EmitTypeAnnotation(text, Array.append args [| AliasTypeAnnotation(id, [||]) |])
+                else
+                    $"EmitType on {ent.FullName} imports from '{from}', but its text does not start with the name to import"
+                    |> addError com [] None
+
+                    EmitTypeAnnotation(text, args)
+            | (:? string as text) :: _ -> EmitTypeAnnotation(text, args)
+            | _ -> AnyTypeAnnotation
+        )
+
     /// fickl: a `[<TsEnum>]` enum is typed by its name, which TypeScript resolves to the enum's ambient declaration
     let tryTsEnumTypeAnnotation (com: IBabelCompiler) ctx (entRef: Fable.EntityRef) =
         match com.TryGetEntity entRef with
@@ -1412,6 +1471,7 @@ module Annotation =
 
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
         match genArgs, ent with
+        | _, Patterns.Try (tryEmitTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta
 
         | _, Patterns.Try (annotationConstructor com ctx) entRef ->
@@ -2427,7 +2487,16 @@ module Util =
                 let toTaggedUnion =
                     com.IsTypeScript
                     && com.TryGetEntity(entRef)
-                       |> Option.exists (fun ent -> hasAttribute Atts.tsTaggedUnion ent.Attributes)
+                       |> Option.exists (fun ent ->
+                           hasAttribute Atts.tsTaggedUnion ent.Attributes
+                           // fickl: an EmitType annotation is usually narrower than the value cast to it
+                           || (hasAttribute Atts.ficklEmitType ent.Attributes
+                               && (
+                                   match e.Type with
+                                   | Fable.DeclaredType(source, _) -> source.FullName <> entRef.FullName
+                                   | _ -> true
+                               ))
+                       )
 
                 match e.Type with
                 | Fable.DeclaredType(sourceEntRef, _) when com.IsTypeScript ->
@@ -2436,10 +2505,18 @@ module Util =
                     // won't automatically cast them to implementing interfaces
                     let fromUnion = sourceEnt.IsFSharpUnion && List.isMultiple sourceEnt.UnionCases
 
-                    if fromUnion || toTaggedUnion then
+                    // fickl: TypeScript cannot relate an EmitType annotation to the F# type it is cast to
+                    let fromEmitType =
+                        sourceEntRef.FullName <> entRef.FullName
+                        && hasAttribute Atts.ficklEmitType sourceEnt.Attributes
+
+                    if fromUnion || toTaggedUnion || fromEmitType then
                         AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                     else
                         jsExpr
+                // fickl: an F# array may be a typed array, which TypeScript does not relate to an EmitType such as ReadonlyArray
+                | Fable.Array _ when toTaggedUnion ->
+                    AsExpression(AsExpression(jsExpr, UnknownTypeAnnotation), makeTypeAnnotation com ctx typ)
                 | _ when toTaggedUnion -> AsExpression(jsExpr, makeTypeAnnotation com ctx typ)
                 | _ -> jsExpr
             )
@@ -2754,6 +2831,27 @@ module Util =
         let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
         let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
 
+        // fickl: jsOptions and partial build option bags from generated members
+        let isGeneratedBag =
+            isOptionBag
+            && not members.IsEmpty
+            && members
+               |> List.forall (fun (memb, _) ->
+                   match memb.MemberRef with
+                   | Fable.GeneratedMemberRef _ -> true
+                   | Fable.MemberRef _ -> false
+               )
+
+        // A nested setter makes a nested object, which a shallow Partial would check as complete
+        let isFlat =
+            members
+            |> List.forall (fun (memb, _) ->
+                match memb.Body with
+                | Fable.ObjectExpr _ -> false
+                | _ -> true
+            )
+
+
         let hasExplicitDisposal name =
             members
             |> List.exists (fun (memb, info) -> memb.Name = name || SymbolKeys.isWellKnownMember name info)
@@ -2884,9 +2982,18 @@ module Util =
 
             match typ with
             | Fable.DeclaredType(entRef, _) when com.IsTypeScript ->
-                if entRef.FullName = Types.ienumerableGeneric || isOptionBag then
+                let ta = makeTypeAnnotation com ctx typ
+
+                if isGeneratedBag && entRef.FullName = "Fickl.Core.Partial`1" then
+                    // `partial`: the literal is checked against Partial<T>, and keeps its own type
+                    SatisfiesExpression(expr, ta)
+                elif isGeneratedBag && isFlat then
+                    // jsOptions: misspelled keys and mistyped values are caught before the cast
+                    let partial = AliasTypeAnnotation(Identifier.identifier "Partial", [| ta |])
+
+                    AsExpression(SatisfiesExpression(expr, partial), ta)
+                elif entRef.FullName = Types.ienumerableGeneric || isOptionBag then
                     // Interop option bags can intentionally contain only part of the declared interface.
-                    let ta = makeTypeAnnotation com ctx typ
                     AsExpression(expr, ta)
                 else
                     expr
@@ -3718,6 +3825,15 @@ but thanks to the optimisation done below we get
         )
         |> fst
 
+    /// fickl: a call to a member declared to return `unknown` is `any` inside Fickl's own output, as `obj` is
+    let anyIfReturnsUnknown (com: IBabelCompiler) (info: Fable.CallInfo) (expr: Expression) =
+        match info.MemberRef with
+        | Some memberRef when com.IsTypeScript ->
+            match com.TryGetMember(memberRef) with
+            | Some memb when FSharp2Fable.Util.TsUnknown.returnsUnknown memb -> AsExpression(expr, AnyTypeAnnotation)
+            | _ -> expr
+        | _ -> expr
+
     let transformCallAsStatements com ctx range typ returnStrategy callee callInfo =
         let argsLen (i: Fable.CallInfo) =
             List.length i.Args
@@ -3737,6 +3853,7 @@ but thanks to the optimisation done below we get
         | _ ->
             [|
                 transformCall com ctx range typ callee callInfo
+                |> anyIfReturnsUnknown com callInfo
                 |> resolveExpr typ returnStrategy
             |]
 
@@ -4523,7 +4640,8 @@ but thanks to the optimisation done below we get
 
         | Fable.ObjectExpr(members, typ, baseCall) -> transformObjectExpr com ctx typ members baseCall
 
-        | Fable.Call(callee, info, typ, range) -> transformCall com ctx range typ callee info
+        | Fable.Call(callee, info, typ, range) ->
+            transformCall com ctx range typ callee info |> anyIfReturnsUnknown com info
 
         | Fable.CurriedApply(callee, args, _, range) -> transformCurriedApply com ctx range callee args
 
@@ -5179,6 +5297,35 @@ but thanks to the optimisation done below we get
            |> Option.bind com.TryGetEntity
            |> Option.exists (fun ent -> not ent.IsInterface)
 
+    /// fickl: whether an instance member hides a base class member of the same name and key instead of overriding it.
+    /// TypeScript's `noImplicitOverride` needs `override` on it all the same
+    let hidesBaseMember (com: IBabelCompiler) (info: Fable.MemberFunctionOrValue) =
+        let isProperty (memb: Fable.MemberFunctionOrValue) =
+            memb.IsProperty || memb.IsGetter || memb.IsSetter
+
+        let symbolKey (memb: Fable.MemberFunctionOrValue) =
+            memb.Attributes
+            |> Seq.tryFind (fun att -> att.Entity.FullName = Atts.ficklSymbolKey)
+            |> Option.map _.ConstructorArgs
+
+        let hides (memb: Fable.MemberFunctionOrValue) =
+            memb.IsInstance
+            && not memb.IsInline
+            && not memb.IsDispatchSlot
+            && memb.DisplayName = info.DisplayName
+            && isProperty memb = isProperty info
+            && symbolKey memb = symbolKey info
+
+        let rec baseHides (ent: Fable.Entity) =
+            match ent.BaseType |> Option.bind (fun baseType -> com.TryGetEntity(baseType.Entity)) with
+            | Some baseEnt when baseEnt.FullName <> Types.object ->
+                Seq.exists hides baseEnt.MembersFunctionsAndValues || baseHides baseEnt
+            | _ -> false
+
+        com.IsTypeScript
+        && info.IsInstance
+        && info.DeclaringEntity |> Option.bind com.TryGetEntity |> Option.exists baseHides
+
     /// Object.prototype members are in the type of any base class
     let objectPrototypeNames = [ "toString"; "toLocaleString"; "valueOf" ]
 
@@ -5672,6 +5819,65 @@ but thanks to the optimisation done below we get
             | _ -> None
         | _ -> None
 
+    /// fickl: the TypeScript signature of a module function that takes or returns `unknown`. It is declared before
+    /// the implementation, which keeps `any`, so callers see `unknown` while the body type-checks as before.
+    let tryUnknownSignature
+        (com: IBabelCompiler)
+        ctx
+        (memb: Fable.MemberFunctionOrValue)
+        (args: Fable.Ident list)
+        (expr: Expression)
+        =
+        let unknown = FSharp2Fable.Util.TsUnknown.tryFSharpMember memb
+
+        // A unit argument has no parameter
+        let args =
+            match args, expr with
+            | [ arg ], FunctionExpression(_, [||], _, _, _, _) when arg.Type = Fable.Unit -> []
+            | _ -> args
+
+        match unknown, expr with
+        | Some fsMemb, FunctionExpression(_, parameters, _, returnType, typeParameters, _) when
+            com.IsTypeScript && parameters.Length = List.length args
+            ->
+            let argsWithoutThis = args |> List.filter (fun arg -> not arg.IsThisArgument)
+
+            FSharp2Fable.Util.TsUnknown.tryParameterTypes fsMemb argsWithoutThis.Length
+            |> Option.bind (fun fsTypes ->
+                let fsTypes =
+                    Dictionary<Fable.Ident, FSharp.Compiler.Symbols.FSharpType>(HashIdentity.Reference)
+                    |> fun d ->
+                        List.iter2 (fun arg t -> d[arg] <- t) argsWithoutThis fsTypes
+                        d
+
+                let mark fsType typ =
+                    FSharp2Fable.Util.TsUnknown.markType fsType typ |> makeTypeAnnotation com ctx
+
+                let parameters =
+                    Array.zip parameters (List.toArray args)
+                    |> Array.map (fun (Parameter.Parameter(name, annotation, flags), arg) ->
+                        match fsTypes.TryGetValue(arg) with
+                        | true, fsType when FSharp2Fable.Util.TsUnknown.contains fsType ->
+                            Parameter.Parameter(name, Some(mark fsType arg.Type), flags), true
+                        | _ -> Parameter.Parameter(name, annotation, flags), false
+                    )
+
+                let fsReturn = fsMemb.ReturnParameter.Type
+                let returnsUnknown = FSharp2Fable.Util.TsUnknown.contains fsReturn
+
+                if returnsUnknown || parameters |> Array.exists snd then
+                    let returnType =
+                        if returnsUnknown then
+                            mark fsReturn memb.ReturnParameter.Type
+                        else
+                            defaultArg returnType AnyTypeAnnotation
+
+                    Some(Array.map fst parameters, returnType, typeParameters)
+                else
+                    None
+            )
+        | _ -> None
+
     let transformModuleFunction com ctx (info: Fable.MemberFunctionOrValue) membName (args: Fable.Ident list) body =
         let args, body =
             if info.Attributes |> hasAttribute Atts.jsxComponent then
@@ -5835,7 +6041,7 @@ but thanks to the optimisation done below we get
             args,
             Some body,
             isStatic = isStatic,
-            isOverride = isBaseClassOverride com ent info memb,
+            isOverride = (isBaseClassOverride com ent info memb || hidesBaseMember com info),
             ?returnType = returnType,
             ?doc = memb.XmlDoc
         ) //, ?typeParameters=typeParamDecl)
@@ -5880,7 +6086,9 @@ but thanks to the optimisation done below we get
                 args,
                 Some body,
                 isStatic = isStatic,
-                isOverride = (name = memb.Name && isBaseClassOverride com ent info memb),
+                isOverride =
+                    (name = memb.Name
+                     && (isBaseClassOverride com ent info memb || hidesBaseMember com info)),
                 ?returnType = returnType,
                 ?typeParameters = typeParamDecl,
                 ?doc = memb.XmlDoc
@@ -6306,7 +6514,14 @@ but thanks to the optimisation done below we get
 
         let baseExpr =
             if ent.IsFSharpExceptionDeclaration then
-                libValue com ctx "Types" "FSharpException" |> SuperExpression |> Some
+                // fickl: [<JsError>] extends a native Error subclass, see FSharpError in fable-library
+                let baseName =
+                    if hasAttribute Atts.ficklJsError ent.Attributes then
+                        "FSharpError"
+                    else
+                        "FSharpException"
+
+                libValue com ctx "Types" baseName |> SuperExpression |> Some
             elif ent.IsFSharpRecord || ent.IsValueType then
                 libValue com ctx "Types" "Record" |> SuperExpression |> Some
             else
@@ -6554,6 +6769,25 @@ but thanks to the optimisation done below we get
 
         let argsLen = Array.length args
 
+        // fickl: the F# types of the parameters, where `unknown` is written; accessors keep `any`, as reads of
+        // a property are not calls that Fickl's output can cast back to `any`
+        let fsMemb =
+            if isGetter || isSetter then
+                None
+            else
+                FSharp2Fable.Util.TsUnknown.tryFSharpMember memb
+
+        let markUnknown =
+            let fsTypes =
+                fsMemb
+                |> Option.bind (fun m -> FSharp2Fable.Util.TsUnknown.tryParameterTypes m argsLen)
+                |> Option.map List.toArray
+
+            fun index (argType: Fable.Type) ->
+                match fsTypes with
+                | Some fsTypes -> FSharp2Fable.Util.TsUnknown.markType fsTypes[index] argType
+                | None -> argType
+
         let args =
             args
             |> Array.mapi (fun index arg ->
@@ -6561,11 +6795,11 @@ but thanks to the optimisation done below we get
                 let argIsSpread = (index = argsLen - 1 && memb.HasSpread)
 
                 let argType =
-                    match arg.Type with
+                    match markUnknown index arg.Type with
                     | Fable.Array(genArg, Fable.MutableArray) when argIsSpread ->
                         // modify the last argument's type if it's a spread parameter
                         Fable.Array(genArg, Fable.ResizeArray)
-                    | _ -> arg.Type
+                    | argType -> argType
 
                 let ta =
                     if arg.IsOptional then
@@ -6588,7 +6822,9 @@ but thanks to the optimisation done below we get
             |> makeTypeParamDecl com ctx
 
         let returnType =
-            memb.ReturnParameter.Type
+            match fsMemb with
+            | Some m -> FSharp2Fable.Util.TsUnknown.markType m.ReturnParameter.Type memb.ReturnParameter.Type
+            | None -> memb.ReturnParameter.Type
             |> FableTransforms.uncurryType
             |> makeTypeAnnotation com ctx
 
@@ -7005,10 +7241,25 @@ but thanks to the optimisation done below we get
                         if hasAttribute Atts.entryPoint memb.Attributes then
                             [ declareEntryPoint com ctx expr ]
                         else
-                            [
-                                ModuleDecl(decl.Name, isPublic = memb.IsPublic, ?doc = decl.XmlDoc)
-                                |> declareModuleMember com ctx expr
-                            ]
+                            match tryUnknownSignature com ctx memb decl.Args expr with
+                            | Some(parameters, returnType, typeParameters) ->
+                                [
+                                    FunctionSignatureDeclaration(
+                                        parameters,
+                                        Identifier.identifier decl.Name,
+                                        returnType,
+                                        typeParameters,
+                                        decl.XmlDoc
+                                    )
+                                    |> asModuleDeclaration memb.IsPublic
+                                    ModuleDecl(decl.Name, isPublic = memb.IsPublic)
+                                    |> declareModuleMember com ctx expr
+                                ]
+                            | None ->
+                                [
+                                    ModuleDecl(decl.Name, isPublic = memb.IsPublic, ?doc = decl.XmlDoc)
+                                    |> declareModuleMember com ctx expr
+                                ]
 
                 let isDefaultExport =
                     List.contains "export-default" decl.Tags
@@ -7026,6 +7277,12 @@ but thanks to the optimisation done below we get
 
         | Fable.ClassDeclaration decl ->
             match com.GetEntity(decl.Entity) with
+            // fickl: annotations write the EmitType text, so a type with no JS value has nothing to declare
+            | ent when
+                hasAttribute Atts.ficklEmitType ent.Attributes
+                && (ent.IsInterface || FSharp2Fable.Util.isErasedOrStringEnumEntity ent)
+                ->
+                []
             | Patterns.Try (tryFindAnyEntAttribute [ Atts.stringEnum; Atts.erase; Atts.tsTaggedUnion ]) (att, attArgs) as ent ->
                 match com.IsTypeScript, ent.IsFSharpUnion, att with
                 | true, true, Atts.stringEnum -> [ transformStringEnumDeclaration ent attArgs decl ]
@@ -7428,6 +7685,16 @@ module Compiler =
 
         registerSymbolKeys file.Declarations
         let rootDecls = List.collect (transformDeclaration com ctx) file.Declarations
+
+        // fickl: --nativeErrors switches the library's Exception to a native Error before this file's code runs
+        let rootDecls =
+            if List.contains Fickl.Options.nativeErrorsDefine com.Options.Define then
+                (Lib.libCall com ctx None "Util" "enableNativeErrors" [] []
+                 |> ExpressionStatement
+                 |> PrivateModuleDeclaration)
+                :: rootDecls
+            else
+                rootDecls
 
         let topDirectivesPrologue =
             com.GetAllAllTopDirectivesPrologue() |> transformDirectivesPrologue

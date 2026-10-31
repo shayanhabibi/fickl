@@ -117,13 +117,26 @@ let private inlinedInterface (com: IFableCompiler) (ctx: Context) r tdef (unionC
         addError com ctx.InlinePath r msg
         None
 
-let private transformNewUnion com ctx r fsType (unionCase: FSharpUnionCase) (argExprs: Fable.Expr list) =
+let private transformNewUnion
+    (com: IFableCompiler)
+    (ctx: Context)
+    r
+    fsType
+    (unionCase: FSharpUnionCase)
+    (argExprs: Fable.Expr list)
+    =
     match getUnionPattern fsType unionCase with
     | ErasedUnionCase -> makeTuple r false argExprs
 
     | ErasedUnion(tdef, _genArgs, rule) ->
         match argExprs with
         | [] -> transformStringEnum rule unionCase
+        // fickl: the payload is cast to the type an EmitType annotation writes, which is narrower than the payload's
+        | [ argExpr ] when
+            (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+            && hasAttrib Atts.ficklEmitType tdef.Attributes
+            ->
+            Fable.TypeCast(argExpr, makeType ctx.GenericArgs fsType)
         | [ argExpr ] -> argExpr
         | _ when tdef.UnionCases.Count > 1 ->
             "Erased unions with multiple cases must have one single field: "
