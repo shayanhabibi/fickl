@@ -1,0 +1,72 @@
+
+import type { MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+
+export class Counter extends EventTarget {
+    count: int32;
+    constructor(start: int32) {
+        super();
+        this.count = (start | 0);
+    }
+    static get observedAttributes(): MutableArray<string> {
+        return ["count"];
+    }
+    get Count(): int32 {
+        const _: Counter = this;
+        return _.count | 0;
+    }
+    Increment(): void {
+        const _: Counter = this;
+        _.count = ((_.count + 1) | 0);
+    }
+    override dispatchEvent(_arg: any): boolean {
+        return true;
+    }
+}
+
+export function Counter_$reflection(): TypeInfo {
+    return class_type("JsSubclassMembers.Counter", undefined, Counter, class_type("JsSubclassMembers.EventTarget", undefined, EventTarget));
+}
+
+export function Counter_$ctor_Z524259A4(start: int32): Counter {
+    return new Counter(start);
+}
+
+export class DoubleCounter extends Counter {
+    constructor() {
+        super(10);
+    }
+    IncrementTwice(): void {
+        const this$: DoubleCounter = this;
+        this$.Increment();
+        this$.Increment();
+    }
+}
+
+export function DoubleCounter_$reflection(): TypeInfo {
+    return class_type("JsSubclassMembers.DoubleCounter", undefined, DoubleCounter, Counter_$reflection());
+}
+
+export function DoubleCounter_$ctor(): DoubleCounter {
+    return new DoubleCounter();
+}
+
+export class DetachedCounter extends EventTarget {
+    constructor() {
+        super();
+    }
+}
+
+export function DetachedCounter_$reflection(): TypeInfo {
+    return class_type("JsSubclassMembers.DetachedCounter", undefined, DetachedCounter, class_type("JsSubclassMembers.EventTarget", undefined, EventTarget));
+}
+
+export function DetachedCounter_$ctor(): DetachedCounter {
+    return new DetachedCounter();
+}
+
+export function DetachedCounter__get_Value(_: DetachedCounter): int32 {
+    return 5;
+}
+

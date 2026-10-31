@@ -62,10 +62,13 @@ type MangleAttribute(mangle: bool) =
 /// </summary>
 /// <remarks>
 /// Be aware that overloads won't work.
+/// <para>In JavaScript and TypeScript, classes inheriting a global, imported or attached class attach their
+/// members without this attribute. <c>[&lt;AttachMembers(false)>]</c> keeps them as module functions.</para>
 /// </remarks>
 [<AttributeUsage(AttributeTargets.Class)>]
-type AttachMembersAttribute() =
+type AttachMembersAttribute(attach: bool) =
     inherit Attribute()
+    new() = AttachMembersAttribute(true)
 
 /// <summary>
 /// Used for erased union types, erasing default constructors, and to ignore modules in Fable compilation.

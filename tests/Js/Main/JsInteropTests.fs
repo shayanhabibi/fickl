@@ -90,6 +90,25 @@ type MyCustomHTMLElement() =
     member this.SaySomethingNiceTo(name: string) =
         $"Repeat with me {name}: {this.getMotivated()}"
 
+type GlobalSubclassWithMembers(start: int) =
+    inherit GlobalClasses.MyHTMLElement(start)
+    let mutable count = start
+    static member observedAttributes = [| "count" |]
+    member _.Count = count
+    member _.Increment() = count <- count + 1
+
+type GlobalSubclassGrandchild() =
+    inherit GlobalSubclassWithMembers(10)
+    member this.IncrementTwice() =
+        this.Increment()
+        this.Increment()
+
+[<AttachMembers(false)>]
+type GlobalSubclassDetached() =
+    inherit GlobalClasses.MyHTMLElement(1)
+    static member Kind = "detached"
+    member _.Value = 5
+
 let inline sqrtJsExpr (jsExpr: string): float =
     emitJsExpr () ("Math.sqrt(" + jsExpr + ")")
 
@@ -1330,6 +1349,28 @@ let tests =
         let x = MyCustomHTMLElement()
         x.SaySomethingNiceTo("Mary")
         |> equal "Repeat with me Mary: I can do it! I can do it! I can do it!"
+
+    testCase "Classes inheriting a global class attach their members" <| fun () ->
+        let x = GlobalSubclassWithMembers(1)
+        x.Increment()
+        x.Count |> equal 2
+        x?Count |> equal 2
+        jsConstructor<GlobalSubclassWithMembers>?observedAttributes |> equal [| "count" |]
+        x.getMotivated() |> equal "I can do it!"
+
+    testCase "Classes inheriting a JS subclass attach their members" <| fun () ->
+        let x = GlobalSubclassGrandchild()
+        x.IncrementTwice()
+        x.Count |> equal 12
+        x?IncrementTwice()
+        x?Count |> equal 14
+
+    testCase "AttachMembers(false) keeps members of a JS subclass as module functions" <| fun () ->
+        let x = GlobalSubclassDetached()
+        x.Value |> equal 5
+        GlobalSubclassDetached.Kind |> equal "detached"
+        isNull (box x?Value) |> equal true
+        isNull (jsConstructor<GlobalSubclassDetached>?Kind) |> equal true
 
     testCase "Local import with curried signatures works" <| fun () ->
         let add (x:int) (y:int): int = importMember "./js/1foo.js"

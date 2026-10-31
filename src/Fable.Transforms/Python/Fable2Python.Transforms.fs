@@ -3927,7 +3927,10 @@ let declareClassType
     let keywords =
         // Add metaclass if the class has static properties but only if the class is
         // decorated with [<AttachMembers>]
-        if hasStaticProperties && hasAttribute Atts.attachMembers ent.Attributes then
+        if
+            hasStaticProperties
+            && FSharp2Fable.Util.tryAttachMembersFableAttribute ent = Some true
+        then
             let staticPropertyMetaExpr = libValue com ctx "util" "StaticPropertyMeta"
             [ Keyword.keyword (Identifier "metaclass", staticPropertyMetaExpr) ]
         else
