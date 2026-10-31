@@ -123,6 +123,7 @@ let private declarationNames (decl: Declaration) =
     match decl with
     | ClassDeclaration(id = Some(Identifier(name, _)))
     | FunctionDeclaration(id = Identifier(name, _))
+    | FunctionSignatureDeclaration(id = Identifier(name, _))
     | InterfaceDeclaration(id = Identifier(name, _)) -> [ name ]
     | EnumDeclaration(name = name)
     | TypeAliasDeclaration(name = name) -> [ name ]
@@ -283,6 +284,10 @@ let private addDeclarationNames names (decl: Declaration) =
     | FunctionDeclaration(parameters, _, _, returnType, typeParameters, _, _) ->
         addParameterNames names parameters
         returnType |> Option.iter (addTypeNames names)
+        addTypeParameterNames names typeParameters
+    | FunctionSignatureDeclaration(parameters, _, returnType, typeParameters, _) ->
+        addParameterNames names parameters
+        addTypeNames names returnType
         addTypeParameterNames names typeParameters
     | InterfaceDeclaration(_, members, extends, typeParameters, _) ->
         members |> Array.iter (addAbstractMemberNames names)
@@ -495,13 +500,27 @@ let rec private declarationClassMembers
     )
 
 /// A declaration reduced to its shape, or None when it declares a value the JavaScript doesn't have.
-let private declarationOf (js: JsSurface) (isValueKnown: string -> bool) (decl: Declaration) =
+let private declarationOf (js: JsSurface) (signed: HashSet<string>) (isValueKnown: string -> bool) (decl: Declaration) =
     match decl with
     | InterfaceDeclaration _
     | TypeAliasDeclaration _ -> Some decl
     | EnumDeclaration(name = name)
     | ClassDeclaration(id = Some(Identifier(name, _)))
+    | FunctionSignatureDeclaration(id = Identifier(name, _))
     | FunctionDeclaration(id = Identifier(name, _)) when not (isValueKnown name) -> None
+    // The signature is what callers see; its implementation is declared by it
+    | FunctionSignatureDeclaration(parameters, id, returnType, typeParameters, doc) ->
+        FunctionDeclaration(
+            Array.map declarationParameter parameters,
+            BlockStatement [||],
+            id,
+            Some returnType,
+            typeParameters,
+            None,
+            doc
+        )
+        |> Some
+    | FunctionDeclaration(id = Identifier(name, _)) when signed.Contains(name) -> None
     | EnumDeclaration _ -> Some decl
     | ClassDeclaration(members, id, isAbstract, superClass, implements, typeParameters, loc, doc) ->
         let jsMembers =
@@ -600,16 +619,27 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
     let isPrivateValue name =
         reexported.Contains(name) || js.ClassMembers.ContainsKey(name)
 
+    let signed = HashSet<string>()
+
+    for md in body do
+        match undecoratedModule md with
+        | ExportNamedDeclaration(FunctionSignatureDeclaration(id = Identifier(name, _)))
+        | PrivateModuleDeclaration(Statement.Declaration(FunctionSignatureDeclaration(id = Identifier(name, _)))) ->
+            signed.Add(name) |> ignore
+        | _ -> ()
+
+    let declarationOf = declarationOf js signed
+
     let declarations =
         body
         |> Array.choose (fun md ->
             match undecoratedModule md with
-            | ExportNamedDeclaration decl -> declarationOf js isExportedValue decl |> Option.map ExportNamedDeclaration
+            | ExportNamedDeclaration decl -> declarationOf isExportedValue decl |> Option.map ExportNamedDeclaration
             | ExportDefaultDeclaration(Choice1Of2 decl) when js.Exports.Contains("default") ->
-                declarationOf js (fun _ -> true) decl
+                declarationOf (fun _ -> true) decl
                 |> Option.map (Choice1Of2 >> ExportDefaultDeclaration)
             | PrivateModuleDeclaration(Statement.Declaration decl) ->
-                declarationOf js isPrivateValue decl
+                declarationOf isPrivateValue decl
                 |> Option.map (Statement.Declaration >> PrivateModuleDeclaration)
             | ExportNamedReferences _
             | ExportAllDeclaration _ -> Some md
@@ -673,6 +703,7 @@ let private printDeclaration (printer: Printer) isDefault (decl: Declaration) =
     | ClassDeclaration(members, id, isAbstract, superClass, implements, typeParameters, loc, _) ->
         declare ()
         printer.PrintClass(id, isAbstract, superClass, typeParameters, implements, members, loc)
+    | FunctionSignatureDeclaration _ -> printer.PrintDeclaration(decl)
     | FunctionDeclaration(parameters, _, id, returnType, typeParameters, _, _) ->
         declare ()
         printer.Print("function ")
