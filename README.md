@@ -9,6 +9,16 @@ You can use fickl without making use of any of its extra compiler flags or attri
 functions (which are contained in `Fickl` prefixed namespaces; `Fable` prefixed namespaces
 operate as they would normally in `Fable`).
 
+## Where
+
+Currently, Fickl is fully compatible with Fable and intends to stay that way.
+
+Our work focuses on the compiler pipeline, and JS/TS transpilation, and closing existing
+issues and bugs that are in scope for those two premises.
+
+Future direction will continue to work towards closing the gap in JS/TS interop, and
+improving runtime & compiler performance.
+
 <details>
 <summary><a id="about-fork"></a>About this fork</summary>
 
