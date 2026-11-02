@@ -1,25 +1,153 @@
-# Fickl: Fable Performance Lab
+# Fickl - A Fable JS/TS focused Lab
 
-This repository is the fork of [Fable](https://github.com/fable-compiler/fable) that refrains from work on bringing cross-language targetting to parity, and instead focuses on three main objectives, in order of priority:
+A fork of [Fable](https://github.com/fable-compiler/fable) that currently maintains **FULL**
+compatibility with upstream, and does not degrade **any** of the existing fable tests.
 
-1. Performance and ergonomics of the Fable compiler
+**Fickl explicitly passes the full corpus of upstream Fable tests**.
+
+You can use fickl without making use of any of its extra compiler flags or attributes and
+functions (which are contained in `Fickl` prefixed namespaces; `Fable` prefixed namespaces
+operate as they would normally in `Fable`).
+
+<details>
+<summary><a id="about-fork"></a>About this fork</summary>
+
+## What
+
+A fork of [Fable](https://github.com/fable-compiler/fable) that currently maintains **FULL**
+compatibility with upstream, and does not degrade **any** of the existing fable tests.
+
+Focus on JS/TS transpilation, the speed of that transpilation, and allowing explicit control of expression.
+
+The three main objectives, in order of priority:
+
+1. Performance and ergonomics of the compiler
 2. Explicit control of expression
-3. Transparency
+3. Decision tree transparency and diagnostics
 
-> **Fable Compatibility**
+## Why
+
+A high velocity environment that unshackles itself from x-lang concerns, and has multiple
+large projects depending on it that serve as a litmus test for features and operations
+that validate it.
+
+These changes, as they are validated, are upstreamed to [Fable](https://github.com/fable-compiler/fable), but remain
+free to be iterated on quickly, without waiting for the [Fable](https://github.com/fable-compiler/fable)
+publishing cycle.
+
+In this way, Fickl serves as an aggressive feature development fork, while staying production-graded.
+
+## How
+
+The [Fable](https://github.com/fable-compiler/fable) compiler owns a slice of the F#
+compiler, and distributes it as a tool.
+
+- No requirement to maintain backwards compatibility in the compiler
+- Consumers only need to have a supported SDK on the system, not in their project
+- Allows significant compiler improvement
+
+Fickl makes significant strides in improving performance and providing features through
+the use of AI. The difficulty ceiling for making these improvements is remarkably low using
+AI; the importance remains in ensuring there is a solid foundation of *behavioural* tests
+that cover edge cases and expected behaviour.
+
+We find there is more yield to asking AI to pursue finding code utilising/stressing a feature
+to points that it won't compile, or compiles and provides the wrong runtime behaviour.
+
+## Compatibility
+
+Full compatibility with [Fable](https://github.com/fable-compiler/fable) is assured.
+Fickl passes the full corpus of Fable tests, and introduces a litany of new tests.
+
+### Fickl.Core
+
+Where Fickl provides features that are not yet present in Fable, or where it provides
+extra configuration in existing attributes, it explicitly scopes them to its own
+set of `Fickl` prefixed dependencies, such as `Fickl.Core`, `Fickl.Core.JS` etc.
+
+### Compiler flags
+
+Where Fickl provides **significant** changes to implicit behavior of Fable that
+may significantly change existing code behavior, it is gated behind a compiler flag
+and/or `Fickl.Core` attributes.
+
+A good example of this is opting in for `--strictOptions`, which allows `Some None` to
+be delineated from `None` at runtime in javascript. This *should* be a default, as it
+closes the gap in .NET and transpiled runtime behavior, but it *does* significantly change
+semantics at runtime which can break existing code. Therefore, it currently remains
+as an *opt-in*.
+
+### TypeScript
+
+There is **significant** changes in typescript typing to correctly produce consumable
+typescript libraries borne from our transpiled code.
+
+In saying that, our priority is:
+
+1. Correct JavaScript
+2. Correct TypeScript *declarations*
+3. Compilable TypeScript
+4. Correct TypeScript
+
+We prefer the usage of `--declaration` which generates your `.d.ts` typings for the
+compiler generated javascript. These declaration files are tested against a *strict*
+typescript `tsconfig`.
+
+### `FICKL_COMPILER`
+
+Use `#if FICKL_COMPILER` conditional compiler directives when you want to experiment
+with Fickl specific features.
+
+### Fable or Fickl
+
+Without using a fickl specific flag or feature, you are essentially getting the same
+output, although there may be bug fixes on fickl that are not yet existing on fable,
+and there are differences in the compiler architecture that make fickl faster until those
+optimisations are taken upstream.
+
+We constantly sync on fable commits, so we keep that compatibility.
+
+**This means you can use fickl just for the improved compilation times without any concern**.
+
+## Explicit Expression Control
+
+When targeting another language, a sensible collection of ergonomic changes are made to faithfully represent F# semantics in the target language. Beyond this, are a collection of attributes and other compiler recognised constructs that inform our transformation pipeline.
+
+There should be a distinct combination of target related and target agnostic attributes that provide predictable behaviour in the transformation pipeline. Behaviours should **always** have toggles. And the compiler should **always** recognise these toggles and adjust accordingly. Crossing the bounds of generic types can always make this more difficult to apply correctly.
+
+The capacity to explicitly control transformation via attributes does not have to be as ergonomic as normal usage. We expect explicit control to be used in exception; however, we acknowledge that some libraries/authors/tools will use them in excess, so we will not attempt to deter users; instead, we will attempt to adjust the balance between implicit and explicit.
+
+> An example of this is the implicit change of a parameter function such as
+> `let foo (fn: 'a -> 'b -> 'c) = fn x y` which is implicitly transpiled as `fn(x, y)`.
+> This is desired in the vast majority of cases, but you can also prevent this
+> using an ergonomic attribute (rather than using `Func` types and other work arounds):
 >
-> Fickl is fully compatible with compiling **any** fable code. However, since fickl includes bug fixes that are not yet upstream, there might be differences in the compiled output.
+> `let foo([<Curried>] fn: 'a -> 'b -> 'c) = fn x y`
 >
-> In contrast, you cannot expect fickl only attributes (which are contained in `Fickl.` prefixed modules) to exist in fable.
+> `fn(x)(y)`
 
-## Performance and ergonomics
+## Benchmarks
 
-The fable compiler owns a slice of the F# Compiler, and distributes it as a tool. This includes: a slim version of FSharp.Compiler.Services, and FSharp.Core.
+Every publish cycle of Fickl benchmarks itself against the latest Fable compiler, to
+measure performance differences in the compiler. This keeps the claims honest; we are
+contributing upstream, and these gaps **SHOULD** close over time.
 
-This means there is no concern for the compiler itself to keep target frameworks beyond anything other than what is in LTS. At the moment, this means .NET 10+.
-This also benefits the ecosystem of plugins, as they also benefit from modern performance constructs.
+## Bug fixes
 
-Fickl has already made significant strides in improving performance. The difficulty ceiling for completing these tasks is remarkably low in the advent of AI. The importance is in ensuring there is a solid foundation of *behavioural* tests that cover edge cases. There is more yield from prompting AI to try its best to find code utilising/stressing a feature and won't compile, or will compile and provide the wrong runtime behaviour.
+Every bug fix is checked on publish cycles against the latest Fable. When that bug
+is fixed upstream, we remove it from our differences list automatically.
+
+## Features
+
+When features are upstreamed, we remove them from the differences list. Where
+we retain differences in our implementation, we keep the difference, and say why, and
+where the difference is.
+
+> In the case where we have a different behavior for a shared attribute, we usually
+> keep a `Fable` version of the attribute that gives the upstream behavior, and a
+> `Fickl` version which provides our behavior.
+
+</details>
 
 <!-- fickl-benchmarks:start -->
 ![Fickl 0.8.0 against Fable 5.26.0: up to 7.9× faster end to end](notes/benchmarks/fickl-0.8.0.svg)
@@ -138,14 +266,6 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | Package cache | Compiler | Type-checked package sources are cached per user, keyed by their contents and the compiler options, so later compiles skip checking them. `--noPackageCache` turns it off. |
 | `FICKL_COMPILER` | Define | Defined when compiling with Fickl, so code can choose between Fickl.Core and Fable.Core. |
 
-## Explicit control of expression
-
-When targeting another language, a sensible collection of ergonomic changes are made to faithfully represent F# semantics in the target language. Beyond this, are a collection of attributes and other compiler recognised constructs that inform our transformation pipeline.
-
-There should be a distinct combination of target related and target agnostic attributes that provide predictable behaviour in the transformation pipeline. Behaviours should **always** have toggles. And the compiler should **always** recognise these toggles and adjust accordingly. Crossing the bounds of generic types can always make this more difficult to apply correctly.
-
-The capacity to explicitly control transformation via attributes does not have to be as ergonomic as normal usage. We expect explicit control to be used in exception; however, we acknowledge that some libraries/authors/tools will use them in excess, so we will not attempt to deter users; instead, we will attempt to adjust the balance between implicit and explicit.
-
 ### Escape hatches
 
 | Toggle | What it changes |
@@ -163,13 +283,6 @@ The capacity to explicitly control transformation via attributes does not have t
 ### Emit templates
 
 `$N!` in an `[<Emit>]` template writes string literal argument `N` as raw code, as in `let $0! = $1`. When argument `N` is anything other than a string literal, Fable prints nothing for it; Fickl reports an error instead. For a TypeScript non-null assertion on an argument, write `($N)!`.
-
-## Transparency
-
-Development loops are increasingly becoming agentic, and workflows are increasingly being inhibited/obstructed by the lack of machine readable diagnostics/logs/information.
-
-An agent developing bindings for you should be able to run a daemon and iterate over types/methods and see their output in real time, and in isolation.
-Where possible, we will endeavour towards this, where it does not overly diverge the FCS or underlying Fable compiler implementation.
 
 ---
 
