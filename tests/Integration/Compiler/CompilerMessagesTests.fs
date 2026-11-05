@@ -308,6 +308,40 @@ type Invalid() = class end
       |> Assert.Exists.errorWith "JsDecorator requires a concrete emitted class"
       |> ignore
 
+    testCase "Erased class constructor call is a compile error" <| fun _ ->
+      compile """
+open Fable.Core
+[<Erase>]
+type X(a: string) =
+  member _.GetA() = a
+let create() = X("a")
+"""
+      |> Assert.Exists.errorWith "Cannot call the constructor of erased type"
+      |> ignore
+
+    testCase "Erased class constructor call via base call is a compile error" <| fun _ ->
+      compile """
+open Fable.Core
+[<Erase>]
+type Base() =
+  member _.Value = 1
+type Derived() =
+  inherit Base()
+"""
+      |> Assert.Exists.errorWith "Cannot call the constructor of erased type"
+      |> ignore
+
+    testCase "Global erased class constructor call is allowed" <| fun _ ->
+      compile """
+open Fable.Core
+[<Erase; Global>]
+type X(a: string) =
+  member _.GetA() = a
+let create() = X("a")
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
     testCase "Native decorators reject constructor-dependent property initializers" <| fun _ ->
       compile """
 open Fickl.Core

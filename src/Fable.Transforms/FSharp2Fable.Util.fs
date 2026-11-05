@@ -4108,6 +4108,17 @@ module Util =
 
             memberIdent com ctx r membTyp memb membRef |> makeCall r typ callInfo
 
+        // [<Erase>] classes have no constructor at runtime; calling one would emit a call to a ctor that does not exist.
+        // Global/imported erased types keep their JavaScript class, so they are supported.
+        | _, Some entity when
+            memb.IsConstructor
+            && not entity.IsFSharpUnion
+            && hasAttrib Atts.erase entity.Attributes
+            && not (isGlobalOrImportedFSharpEntity entity)
+            ->
+            $"Cannot call the constructor of erased type '{entity.FullName}'"
+            |> addErrorAndReturnNull com ctx.InlinePath r
+
         | Emitted com ctx r typ (Some callInfo) emitted, _ -> emitted
         | Imported com ctx r typ (Some callInfo) imported -> imported
         | Replaced com ctx r typ callInfo replaced -> replaced
