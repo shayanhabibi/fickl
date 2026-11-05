@@ -1121,6 +1121,10 @@ module PrinterExtensions =
                 printer.PrintJsDoc(doc)
                 printer.PrintObjectProperty(key, value, isComputed)
 
+            | ObjectSpread(argument) ->
+                printer.Print("...")
+                printer.ComplexExpressionWithParens(argument)
+
             | ObjectMethod(kind, key, parameters, body, isComputed, returnType, typeParameters, loc, doc) ->
                 printer.PrintJsDoc(doc)
 

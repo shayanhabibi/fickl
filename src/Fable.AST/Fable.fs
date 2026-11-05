@@ -409,6 +409,8 @@ type ObjectExprMember =
         Body: Expr
         MemberRef: MemberRef
         IsMangled: bool
+        /// fickl: a `...source` spread element (from jsSpread/jsMerge); Name/Args/MemberRef are unused
+        SpreadSource: Expr option
     }
 
 type MemberDecl =

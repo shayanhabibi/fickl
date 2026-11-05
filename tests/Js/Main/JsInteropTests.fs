@@ -1544,6 +1544,39 @@ let tests =
         opts.foo |> equal "bar"
         opts.bar |> equal 10
 
+    testCase "jsSpread copies source and applies setters" <| fun () ->
+        let base = jsOptions<JsOptions>(fun o -> o.foo <- "base"; o.bar <- 1)
+        let spread = Fickl.Core.JsInterop.jsSpread base (fun o -> o.bar <- 2)
+        spread.foo |> equal "base"
+        spread.bar |> equal 2
+        base.bar |> equal 1
+
+    testCase "jsSpread keeps unknown properties of source" <| fun () ->
+        let source: obj = emitJsExpr () "{ foo: 'x', bar: 3, extra: 42 }"
+        let spread = Fickl.Core.JsInterop.jsSpread (unbox<JsOptions> source) (fun o -> o.bar <- 4)
+        spread.bar |> equal 4
+        (box spread)?extra |> equal 42
+
+    testCase "jsSpread with non-inlinable setters still applies them" <| fun () ->
+        let base = jsOptions<JsOptions>(fun o -> o.foo <- "base"; o.bar <- 1)
+        let data = [| "bar", 9 |]
+        let spread =
+            Fickl.Core.JsInterop.jsSpread base (fun o ->
+                o.foo <- "changed"
+                for key, value in data do
+                    o?(key) <- value
+            )
+        spread.foo |> equal "changed"
+        spread.bar |> equal 9
+        base.bar |> equal 1
+
+    testCase "jsMerge merges left to right" <| fun () ->
+        let a = jsOptions<JsOptions>(fun o -> o.foo <- "a"; o.bar <- 1)
+        let b = jsOptions<JsOptions>(fun o -> o.foo <- "b"; o.bar <- 2)
+        let merged = Fickl.Core.JsInterop.jsMerge<JsOptions> [ a; b ]
+        merged.foo |> equal "b"
+        merged.bar |> equal 2
+
     testCase "Stringifying a JS object works" <| fun () ->
         let fooOptional = importMember "./js/1foo.js"
         string fooOptional |> equal "much foo, much awesome"

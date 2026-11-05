@@ -196,6 +196,17 @@ let objValue (k, v) : ObjectExprMember =
         Body = v
         IsMangled = false
         MemberRef = GeneratedMember.Value(k, v.Type)
+        SpreadSource = None
+    }
+
+let objSpread (source: Expr) : ObjectExprMember =
+    {
+        Name = ""
+        Args = []
+        Body = source
+        IsMangled = false
+        MemberRef = GeneratedMember.Value("", source.Type)
+        SpreadSource = Some source
     }
 
 let typedObjExpr t kvs =

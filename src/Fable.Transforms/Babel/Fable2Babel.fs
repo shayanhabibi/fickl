@@ -3094,110 +3094,114 @@ module Util =
         let members =
             members
             |> List.collect (fun (memb, info) ->
-                let entOpt = info.DeclaringEntity |> Option.bind (fun e -> com.TryGetEntity(e))
+                match memb.SpreadSource with
+                | Some source ->
+                    [ ObjectMember.ObjectSpread(com.TransformAsExpr(ctx, source)) ]
+                | None ->
+                    let entOpt = info.DeclaringEntity |> Option.bind (fun e -> com.TryGetEntity(e))
 
-                let prop, isComputed = SymbolKeys.memberKey com ctx info memb.Name
+                    let prop, isComputed = SymbolKeys.memberKey com ctx info memb.Name
 
-                let makeMethod kind =
-                    let args = memb.Args
+                    let makeMethod kind =
+                        let args = memb.Args
 
-                    let unwrappedType, body =
-                        match kind with
-                        | ObjectGetter -> unwrapOptionalReturn com memb.Body
-                        | _ -> None, memb.Body
+                        let unwrappedType, body =
+                            match kind with
+                            | ObjectGetter -> unwrapOptionalReturn com memb.Body
+                            | _ -> None, memb.Body
 
-                    let args, body, returnType, typeParams =
-                        getMemberArgsAndBodyWithReturnType
-                            com
-                            ctx
-                            (Attached(isStatic = false))
-                            entOpt
-                            info
-                            args
-                            (defaultArg unwrappedType body.Type)
-                            body
+                        let args, body, returnType, typeParams =
+                            getMemberArgsAndBodyWithReturnType
+                                com
+                                ctx
+                                (Attached(isStatic = false))
+                                entOpt
+                                info
+                                args
+                                (defaultArg unwrappedType body.Type)
+                                body
 
-                    let returnType =
-                        if Option.isSome unwrappedType then
-                            returnType
-                            |> Option.map (fun t -> UnionTypeAnnotation [| t; UndefinedTypeAnnotation |])
-                        else
-                            returnType
+                        let returnType =
+                            if Option.isSome unwrappedType then
+                                returnType
+                                |> Option.map (fun t -> UnionTypeAnnotation [| t; UndefinedTypeAnnotation |])
+                            else
+                                returnType
 
-                    // fickl: a `[<ReturnsThis>]` slot returns `this` in a class; an object literal cannot say `this`,
-                    // so it returns the type of the object expression, which its `this` is checked as
-                    let returnType, body =
-                        if com.IsTypeScript && hasAttribute Atts.ficklReturnsThis info.Attributes then
-                            match compileAsClass, selfType with
-                            | true, _ -> Some ThisTypeAnnotation, castReturns ThisTypeAnnotation body
-                            | false, Some selfType when returnType <> Some selfType ->
-                                Some selfType, castReturns selfType body
-                            | false, _ -> returnType, body
-                        else
-                            returnType, body
+                        // fickl: a `[<ReturnsThis>]` slot returns `this` in a class; an object literal cannot say `this`,
+                        // so it returns the type of the object expression, which its `this` is checked as
+                        let returnType, body =
+                            if com.IsTypeScript && hasAttribute Atts.ficklReturnsThis info.Attributes then
+                                match compileAsClass, selfType with
+                                | true, _ -> Some ThisTypeAnnotation, castReturns ThisTypeAnnotation body
+                                | false, Some selfType when returnType <> Some selfType ->
+                                    Some selfType, castReturns selfType body
+                                | false, _ -> returnType, body
+                            else
+                                returnType, body
 
-                    ObjectMember.objectMethod (
-                        kind,
-                        prop,
-                        args,
-                        body,
-                        isComputed = isComputed,
-                        ?returnType = returnType,
-                        ?typeParameters = typeParams
-                    )
-
-                // If compileAsClass is false, it means getters don't have side effects
-                // and can be compiled as object fields (see condition above)
-                if not memb.IsMangled && (info.IsValue || (not compileAsClass && info.IsGetter)) then
-                    let _, body = unwrapOptionalReturn com memb.Body
-                    let value = com.TransformAsExpr(ctx, body)
-
-                    if info.IsValue && isUndefinedPropertyValue com body value then
-                        []
-                    else
-                        [ ObjectMember.objectProperty (prop, value, isComputed = isComputed) ]
-
-                elif not memb.IsMangled && info.IsGetter then
-                    [ makeMethod ObjectGetter ]
-
-                elif not memb.IsMangled && info.IsSetter then
-                    [ makeMethod ObjectSetter ]
-
-                elif
-                    (info.FullName = "System.IDisposable.Dispose"
-                     && not (hasExplicitDisposal "Symbol.dispose"))
-                    || (info.FullName = "System.IAsyncDisposable.DisposeAsync"
-                        && not (hasExplicitDisposal "Symbol.asyncDispose"))
-                then
-                    let key, body, returnType =
-                        nativeDisposalBridge com ctx (info.FullName = "System.IAsyncDisposable.DisposeAsync")
-
-                    [
-                        makeMethod ObjectMeth
                         ObjectMember.objectMethod (
-                            ObjectMeth,
-                            key,
-                            [||],
+                            kind,
+                            prop,
+                            args,
                             body,
-                            isComputed = true,
-                            ?returnType = returnType
+                            isComputed = isComputed,
+                            ?returnType = returnType,
+                            ?typeParameters = typeParams
                         )
-                    ]
 
-                elif info.FullName = "System.Collections.Generic.IEnumerable.GetEnumerator" then
-                    let method = makeMethod ObjectMeth
+                    // If compileAsClass is false, it means getters don't have side effects
+                    // and can be compiled as object fields (see condition above)
+                    if not memb.IsMangled && (info.IsValue || (not compileAsClass && info.IsGetter)) then
+                        let _, body = unwrapOptionalReturn com memb.Body
+                        let value = com.TransformAsExpr(ctx, body)
 
-                    let iterator =
-                        let prop, isComputed = memberFromName "Symbol.iterator"
-                        let body = enumerableThisToIterator com ctx
+                        if info.IsValue && isUndefinedPropertyValue com body value then
+                            []
+                        else
+                            [ ObjectMember.objectProperty (prop, value, isComputed = isComputed) ]
 
-                        ObjectMember.objectMethod (ObjectMeth, prop, [||], body, isComputed = isComputed)
+                    elif not memb.IsMangled && info.IsGetter then
+                        [ makeMethod ObjectGetter ]
 
-                    [ method; iterator ]
+                    elif not memb.IsMangled && info.IsSetter then
+                        [ makeMethod ObjectSetter ]
 
-                else
-                    [ makeMethod ObjectMeth ]
-            )
+                    elif
+                        (info.FullName = "System.IDisposable.Dispose"
+                         && not (hasExplicitDisposal "Symbol.dispose"))
+                        || (info.FullName = "System.IAsyncDisposable.DisposeAsync"
+                            && not (hasExplicitDisposal "Symbol.asyncDispose"))
+                    then
+                        let key, body, returnType =
+                            nativeDisposalBridge com ctx (info.FullName = "System.IAsyncDisposable.DisposeAsync")
+
+                        [
+                            makeMethod ObjectMeth
+                            ObjectMember.objectMethod (
+                                ObjectMeth,
+                                key,
+                                [||],
+                                body,
+                                isComputed = true,
+                                ?returnType = returnType
+                            )
+                        ]
+
+                    elif info.FullName = "System.Collections.Generic.IEnumerable.GetEnumerator" then
+                        let method = makeMethod ObjectMeth
+
+                        let iterator =
+                            let prop, isComputed = memberFromName "Symbol.iterator"
+                            let body = enumerableThisToIterator com ctx
+
+                            ObjectMember.objectMethod (ObjectMeth, prop, [||], body, isComputed = isComputed)
+
+                        [ method; iterator ]
+
+                    else
+                        [ makeMethod ObjectMeth ]
+                )
 
         compileAsClass, overrideNames, members
 
@@ -3211,11 +3215,15 @@ module Util =
         =
 
         let members = members |> List.map (fun memb -> memb, com.GetMember(memb.MemberRef))
+        let hasSpread = members |> List.exists (fun (memb, _) -> Option.isSome memb.SpreadSource)
         let isOptionBag = members |> List.forall (fun (_, info) -> info.IsValue)
 
         // fickl: jsOptions and partial build option bags from generated members
+        // jsSpread/jsMerge members are generated values too, but `{ ...source }` already
+        // has the full shape of `T`, so it must not go through the `satisfies Partial<T>` path
         let isGeneratedBag =
             isOptionBag
+            && not hasSpread
             && not members.IsEmpty
             && members
                |> List.forall (fun (memb, _) ->
@@ -3272,6 +3280,10 @@ module Util =
                     | ObjectProperty(key, value, isComputed, doc) ->
                         ClassMember.classProperty (key, value, isComputed = isComputed, ?doc = doc)
                         |> Some
+                    | ObjectSpread _ ->
+                        // Spread cannot be a class member; jsSpread/jsMerge members are plain properties,
+                        // so this only happens if a getter/setter forced class compilation with a spread.
+                        None
                     | ObjectMethod(kind, key, parameters, body, isComputed, returnType, typeParameters, _, doc) ->
                         let kind =
                             match kind with
@@ -3332,6 +3344,7 @@ module Util =
             |> List.exists (
                 function
                 | ObjectMethod _ -> true
+                | ObjectSpread _ -> false
                 | ObjectProperty(key, _, isComputed, _) ->
                     match key with
                     | Expression.Identifier(Identifier(name, _))

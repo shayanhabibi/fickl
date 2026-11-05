@@ -468,6 +468,7 @@ type AbstractMember =
 
 type ObjectMember =
     | ObjectProperty of key: Expression * value: Expression * isComputed: bool * doc: string option
+    | ObjectSpread of argument: Expression
     | ObjectMethod of
         kind: ObjectMethodKind *
         key: Expression *

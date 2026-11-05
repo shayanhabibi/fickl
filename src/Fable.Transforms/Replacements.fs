@@ -5860,6 +5860,44 @@ let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
         match args with
         | [ arg ] -> TypeCast(arg, t) |> Some
         | _ -> None
+    | "jsSpread", _ ->
+        match args with
+        | [ source; setters ] ->
+            match makePojoFromLambda com setters with
+            | ObjectExpr(members, _, baseCall) ->
+                ObjectExpr(objSpread source :: members, t, baseCall)
+            | runtime ->
+                // Setters could not be inlined (e.g. a loop or dynamic set): copy then set
+                match setters with
+                | Lambda(arg, body, _) ->
+                    let copy : Expr = ObjectExpr([ objSpread source ], t, None)
+                    // Bind the spread copy to the setter argument, run the body, return the copy.
+                    // Rebind the body's uses of `arg` to a fresh mutable ident so the copy is a single
+                    // variable the body can mutate and the result can be returned.
+                    let arg2 = { arg with IsMutable = true }
+                    let body =
+                        body
+                        |> visitFromInsideOut (
+                            function
+                            | IdentExpr ident when ident.Name = arg.Name -> IdentExpr arg2
+                            | e -> e
+                        )
+                    let body = Let(arg2, copy, body)
+                    Sequential [ body; IdentExpr arg2 ]
+                | _ -> runtime
+            |> Some
+        | _ ->
+            "jsSpread requires a source object and a setter lambda"
+            |> addErrorAndReturnNull com ctx.InlinePath r
+            |> Some
+    | "jsMerge", _ ->
+        match args with
+        | [ ArrayOrListLiteral(sources, _) ] ->
+            ObjectExpr(List.map objSpread sources, t, None) |> Some
+        | _ ->
+            "jsMerge requires the objects as a list literal"
+            |> addErrorAndReturnNull com ctx.InlinePath r
+            |> Some
     | "jsFunction", Some(args, body, name) ->
         Delegate(args, body, name, [ "not-arrow"; "fickl-js-function" ])
         |> expose args.Length

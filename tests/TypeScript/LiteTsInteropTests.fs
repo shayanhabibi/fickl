@@ -108,6 +108,9 @@ module Partials =
     let relabel (label: string) : Partial<Counter> = partial (fun c -> c.label <- label)
     let freeze (counter: Counter) : Readonly<Counter> = !!(JS.Constructors.Object.freeze counter)
 
+    let spread (counter: Counter) (count: int) : Counter = jsSpread counter (fun c -> c.count <- count)
+    let merged (a: Counter) (b: Counter) : Counter = jsMerge [ a; b ]
+
 // TypeScript readonly arrays and maps must be accepted where F# only reads
 module Readonlys =
     open System.Collections.Generic
@@ -271,6 +274,14 @@ let tests =
         full.label |> equal "only"
         let frozen = Partials.freeze Partials.current
         JS.Constructors.Object.isFrozen frozen |> equal true
+
+    testCase "jsSpread and jsMerge emit object spread typed as T" <| fun () ->
+        let spread = Partials.spread Partials.current 10
+        spread.count |> equal 10
+        spread.label |> equal Partials.current.label
+        let merged = Partials.merged Partials.current (Partials.spread Partials.current 20)
+        merged.count |> equal 20
+        merged.label |> equal Partials.current.label
 
     testCase "Read-only collections accept readonly arrays and maps" <| fun () ->
         Readonlys.sum (Readonlys.frozenNumbers ()) |> equal 6

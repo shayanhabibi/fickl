@@ -710,6 +710,7 @@ let private transformObjExpr
                     Body = body
                     IsMangled = info.isMangled
                     MemberRef = info.memberRef
+                    SpreadSource = None
                 }
         }
 

@@ -34,6 +34,23 @@ module JsInterop =
     /// </code></example>
     let partial<'T> (setters: 'T -> unit) : Partial<'T> = nativeOnly
 
+    /// <summary>Copies <c>source</c> and applies <c>setters</c>, emitting <c>{ ...source, ...props }</c>.</summary>
+    /// <param name="source">The object whose own enumerable properties are copied, including ones <c>'T</c> does not declare.</param>
+    /// <param name="setters">A lambda that sets properties of the copy, as for <c>jsOptions</c>.</param>
+    /// <example><code lang="fsharp">
+    /// let o2 = jsSpread opts (fun o -> o.size <- 3)
+    /// // { ...opts, size: 3 }
+    /// </code></example>
+    let jsSpread<'T> (source: 'T) (setters: 'T -> unit) : 'T = nativeOnly
+
+    /// <summary>Merges objects left-to-right, emitting <c>{ ...a, ...b }</c>.</summary>
+    /// <param name="objects">The objects to copy, in order; later ones win.</param>
+    /// <example><code lang="fsharp">
+    /// let merged : IOpts = jsMerge [ defaults; opts ]
+    /// // { ...defaults, ...opts }
+    /// </code></example>
+    let jsMerge<'T> (objects: 'T list) : 'T = nativeOnly
+
     /// <summary>Imports a module dynamically with import attributes, <c>import(path, { with: { type: "json" } })</c>.</summary>
     /// <param name="path">The module path, as for <c>importDynamic</c>.</param>
     /// <param name="attributes">The attributes as a list literal of key and value pairs, such as <c>[ "type", "json" ]</c>; the keys must be constants.</param>
