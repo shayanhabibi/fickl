@@ -188,6 +188,44 @@ let tests =
         [ for g in m.Groups -> g.Value ] |> equal [ "" ]
         m.Groups |> Seq.cast<Group> |> Seq.skip 1 |> Seq.length |> equal 0
 
+    testCase "Match.NextMatch works" <| fun _ -> // See fickl#343
+        let all (m: Match) =
+            let rec loop acc (m: Match) =
+                if m.Success then
+                    loop ((m.Index, m.Value) :: acc) (m.NextMatch())
+                else
+                    List.rev acc
+            loop [] m
+        Regex("a").Match("aa") |> all |> equal [ 0, "a"; 1, "a" ]
+        Regex("a").Match("aaba", 1) |> all |> equal [ 1, "a"; 3, "a" ]
+        Regex.Match("xaya", "a") |> all |> equal [ 1, "a"; 3, "a" ]
+        Regex.Match("xAya", "a", RegexOptions.IgnoreCase) |> all |> equal [ 1, "A"; 3, "a" ]
+        Regex("a").Matches("aXaXa").[1] |> all |> equal [ 2, "a"; 4, "a" ]
+
+    testCase "Match.NextMatch returns a failed match when there are no more matches" <| fun _ ->
+        let m = Regex("a").Match("ab").NextMatch()
+        m.Success |> equal false
+        m.Index |> equal 0
+        m.Value |> equal ""
+        m.Groups.Count |> equal 1
+        // The next match of a failed match is a failed match too
+        m.NextMatch().Success |> equal false
+        Regex("z").Match("ab").NextMatch().Success |> equal false
+
+    testCase "Match.NextMatch keeps the groups" <| fun _ ->
+        let m = Regex(@"(\d)(?<letter>[a-z])").Match("1a 2b").NextMatch()
+        m.Value |> equal "2b"
+        m.Groups.[1].Value |> equal "2"
+        m.Groups.["letter"].Value |> equal "b"
+
+    testCase "Match.NextMatch doesn't fall in infinite loop with empty matches" <| fun _ ->
+        let mutable m = Regex("b*").Match("abc")
+        let res = ResizeArray()
+        while m.Success && res.Count < 10 do
+            res.Add((m.Index, m.Value))
+            m <- m.NextMatch()
+        res |> Seq.toList |> equal [ 0, ""; 1, "b"; 2, ""; 3, "" ]
+
     testCase "Match.Index works" <| fun _ ->
         let str = "For more information, see Chapter 3.4.5.1"
         let m = Regex.Match(str, "Chapter \d+(\.\d)*")
