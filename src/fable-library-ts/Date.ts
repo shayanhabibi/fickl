@@ -602,6 +602,29 @@ const recognizedDateWords = new Set([
   "am", "pm", "gmt", "utc", "ut", "t", "z",
 ]);
 
+// A trailing UTC designator, if the input carries one. The JS `Date` built-in
+// applies the offset but does not report whether there was one, and callers need
+// it: DateTimeOffset keeps the offset, and .NET gives a parsed DateTime Kind=Local
+// when an offset is present and Kind=Unspecified when it is not.
+//
+// The offset is only recognised after a time, so that the trailing "-11" of a
+// date like "2014-09-11" is not mistaken for one.
+function detectOffset(input: string): Offset {
+  const m = /\d\d:\d\d(?::\d\d)?(?:\.\d+)?\s*(Z|[+-]\d\d:?(?:\d\d)?)\s*$/i.exec(input);
+  if (m == null) {
+    return null;
+  }
+
+  const designator = m[1]!;
+  if (designator.toUpperCase() === "Z") {
+    return "Z";
+  }
+
+  const digits = designator.substring(1).replace(":", "");
+  const minutes = +digits.substring(0, 2) * 60 + (digits.length > 2 ? +digits.substring(2) : 0);
+  return designator[0] === "-" ? -minutes : minutes;
+}
+
 export function parseRaw(input: string): [Date, Offset] {
   function fail() {
     throw new Exception(`The string is not a valid Date: ${input}`);
@@ -620,7 +643,7 @@ export function parseRaw(input: string): [Date, Offset] {
     input += "T00:00:00";
   }
   let date = new Date(input);
-  let offset: Offset = null;
+  let offset: Offset = detectOffset(input);
 
   if (isNaN(date.getTime())) {
     // Try to check strings JS Date cannot parse (see #1045, #1422)

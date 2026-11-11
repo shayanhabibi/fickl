@@ -351,6 +351,24 @@ let tests =
         d.Year + d.Month + d.Day |> equal 2040
         d.Offset |> equal (TimeSpan.FromHours(-8.))
 
+    testCase "DateTimeOffset.Parse keeps the offset of an ISO string" <| fun () ->
+        let d = DateTimeOffset.Parse "2020-06-01T00:00:00+00:00"
+        d.Offset |> equal TimeSpan.Zero
+        d.Hour |> equal 0
+        d.Ticks |> equal 637265664000000000L
+        let d = DateTimeOffset.Parse "2020-06-01T10:30:00+02:00"
+        d.Offset |> equal (TimeSpan.FromHours 2.)
+        (d.Day, d.Hour, d.Minute) |> equal (1, 10, 30)
+        d.UtcDateTime.Hour |> equal 8
+        let d = DateTimeOffset.Parse "2020-06-01T10:30:00.123-0530"
+        d.Offset |> equal (TimeSpan(-5, -30, 0))
+        (d.Hour, d.Millisecond) |> equal (10, 123)
+        let d = DateTimeOffset.Parse "2020-06-01T23:15:00Z"
+        d.Offset |> equal TimeSpan.Zero
+        (d.Day, d.Hour) |> equal (1, 23)
+        (DateTimeOffset.Parse "0001-01-01T00:00:00+00:00").Year |> equal 1
+        (DateTimeOffset.Parse "9999-12-31T23:59:59.999+00:00").Year |> equal 9999
+
     testCase "DateTimeOffset.TryParse works" <| fun () ->
         let f (d: string) =
             match DateTimeOffset.TryParse(d) with
