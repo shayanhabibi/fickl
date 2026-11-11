@@ -1,0 +1,396 @@
+
+import { Record } from "./fable_modules/fable-library-ts.5.27.0/Types.ts";
+import type { float64, int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { int32ToString, type IComparable, type IEquatable } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+import { list_type, lambda_type, unit_type, option_type, record_type, bool_type, float64_type, string_type, int32_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.27.0/Option.ts";
+import { empty, map, type FSharpList } from "./fable_modules/fable-library-ts.5.27.0/List.ts";
+
+export class Below extends Record implements IEquatable<Below>, IComparable<Below> {
+    readonly Margin: int32;
+    readonly Border: int32;
+    readonly Colour: string;
+    readonly Height: int32;
+    readonly Length: int32;
+    readonly Weight: float64;
+    readonly Radius: int32;
+    readonly Shadow: boolean;
+    constructor(Margin: int32, Border: int32, Colour: string, Height: int32, Length: int32, Weight: float64, Radius: int32, Shadow: boolean) {
+        super();
+        this.Margin = (Margin | 0);
+        this.Border = (Border | 0);
+        this.Colour = Colour;
+        this.Height = (Height | 0);
+        this.Length = (Length | 0);
+        this.Weight = Weight;
+        this.Radius = (Radius | 0);
+        this.Shadow = Shadow;
+    }
+}
+
+export function Below_$reflection(): TypeInfo {
+    return record_type("RecordCopy.Below", [], Below, () => [["Margin", int32_type], ["Border", int32_type], ["Colour", string_type], ["Height", int32_type], ["Length", int32_type], ["Weight", float64_type], ["Radius", int32_type], ["Shadow", bool_type]]);
+}
+
+export class Above extends Record implements IEquatable<Above>, IComparable<Above> {
+    readonly Margin: int32;
+    readonly Border: int32;
+    readonly Colour: string;
+    readonly Height: int32;
+    readonly Length: int32;
+    readonly Weight: float64;
+    readonly Radius: int32;
+    readonly Shadow: boolean;
+    constructor(Margin: int32, Border: int32, Colour: string, Height: int32, Length: int32, Weight: float64, Radius: int32, Shadow: boolean) {
+        super();
+        this.Margin = (Margin | 0);
+        this.Border = (Border | 0);
+        this.Colour = Colour;
+        this.Height = (Height | 0);
+        this.Length = (Length | 0);
+        this.Weight = Weight;
+        this.Radius = (Radius | 0);
+        this.Shadow = Shadow;
+    }
+}
+
+export function Above_$reflection(): TypeInfo {
+    return record_type("RecordCopy.Above", [], Above, () => [["Margin", int32_type], ["Border", int32_type], ["Colour", string_type], ["Height", int32_type], ["Length", int32_type], ["Weight", float64_type], ["Radius", int32_type], ["Shadow", bool_type]]);
+}
+
+export function below1(r: Below): Below {
+    return new Below(1, r.Border, r.Colour, r.Height, r.Length, r.Weight, r.Radius, r.Shadow);
+}
+
+export function below2(r: Below): Below {
+    return new Below(r.Margin, r.Border, "red", r.Height, r.Length, r.Weight, r.Radius, r.Shadow);
+}
+
+export function below3(r: Below): Below {
+    return new Below(r.Margin, r.Border, r.Colour, r.Height, r.Length, 0.5, r.Radius, r.Shadow);
+}
+
+export function below4(r: Below): Below {
+    return new Below(r.Margin, r.Border, r.Colour, r.Height, r.Length, r.Weight, r.Radius, true);
+}
+
+export function above1(r: Above): Above {
+    return Above_$with(r, "Margin", 1);
+}
+
+export function above2(r: Above): Above {
+    return Above_$with(r, "Colour", "red");
+}
+
+export function above3(r: Above): Above {
+    return Above_$with(r, "Weight", 0.5);
+}
+
+export function above4(r: Above): Above {
+    return Above_$with(r, "Shadow", true);
+}
+
+export function above5(r: Above): Above {
+    return Above_$with(r, "Radius", r.Radius + 1);
+}
+
+export class Settings extends Record {
+    readonly Title: string;
+    readonly Width: int32;
+    readonly Height: int32;
+    readonly Visible: boolean;
+    readonly Opacity: float64;
+    readonly Parent: Option<string>;
+    readonly "z index": int32;
+    readonly OnClose: (() => void);
+    readonly Combine: ((arg0: int32, arg1: int32) => int32);
+    readonly Tags: FSharpList<string>;
+    constructor(Title: string, Width: int32, Height: int32, Visible: boolean, Opacity: float64, Parent: Option<string>, z$0020index: int32, OnClose: (() => void), Combine: ((arg0: int32, arg1: int32) => int32), Tags: FSharpList<string>) {
+        super();
+        this.Title = Title;
+        this.Width = (Width | 0);
+        this.Height = (Height | 0);
+        this.Visible = Visible;
+        this.Opacity = Opacity;
+        this.Parent = Parent;
+        this["z index"] = (z$0020index | 0);
+        this.OnClose = OnClose;
+        this.Combine = Combine;
+        this.Tags = Tags;
+    }
+}
+
+export function Settings_$reflection(): TypeInfo {
+    return record_type("RecordCopy.Settings", [], Settings, () => [["Title", string_type], ["Width", int32_type], ["Height", int32_type], ["Visible", bool_type], ["Opacity", float64_type], ["Parent", option_type(string_type)], ["z index", int32_type], ["OnClose", lambda_type(unit_type, unit_type)], ["Combine", lambda_type(int32_type, lambda_type(int32_type, int32_type))], ["Tags", list_type(string_type)]]);
+}
+
+export function rename(title: string, s: Settings): Settings {
+    return Settings_$with(s, "Title", title);
+}
+
+export function resize(width: int32, height: int32, s: Settings): Settings {
+    return Settings_$with(Settings_$with(s, "Width", width), "Height", height);
+}
+
+export function detach(s: Settings): Settings {
+    return Settings_$with(s, "Parent", undefined);
+}
+
+export function raise(s: Settings): Settings {
+    return Settings_$with(s, "z index", s["z index"] + 1);
+}
+
+export function onClose(f: (() => void), s: Settings): Settings {
+    return Settings_$with(s, "OnClose", f);
+}
+
+export function combine(s: Settings): Settings {
+    return Settings_$with(s, "Combine", (x_1: int32, y_1: int32): int32 => ((x_1 * y_1) | 0));
+}
+
+export function hideAll(xs: FSharpList<Settings>): FSharpList<Settings> {
+    return map<Settings, Settings>((s: Settings): Settings => Settings_$with(s, "Visible", false), xs);
+}
+
+export function fromCall(make: (() => Settings)): Settings {
+    const bind$0040: Settings = make();
+    return Settings_$with(bind$0040, "Opacity", 1);
+}
+
+export function nested(s: Settings): Settings {
+    const bind$0040: Settings = Settings_$with(s, "Title", "a");
+    return Settings_$with(bind$0040, "Tags", empty<string>());
+}
+
+export function reset(s: Settings): Settings {
+    return new Settings(s.Title, 0, 0, s.Visible, 0, s.Parent, s["z index"], s.OnClose, s.Combine, s.Tags);
+}
+
+export class Slot$1<T> extends Record implements IEquatable<Slot$1<T>>, IComparable<Slot$1<T>> {
+    readonly Content: T;
+    readonly Fallback: Option<T>;
+    readonly History: FSharpList<T>;
+    readonly Caption: string;
+    readonly Position: int32;
+    readonly Disabled: boolean;
+    constructor(Content: T, Fallback: Option<T>, History: FSharpList<T>, Caption: string, Position: int32, Disabled: boolean) {
+        super();
+        this.Content = Content;
+        this.Fallback = Fallback;
+        this.History = History;
+        this.Caption = Caption;
+        this.Position = (Position | 0);
+        this.Disabled = Disabled;
+    }
+}
+
+export function Slot$1_$reflection(gen0: TypeInfo): TypeInfo {
+    return record_type("RecordCopy.Slot`1", [gen0], Slot$1, () => [["Content", gen0], ["Fallback", option_type(gen0)], ["History", list_type(gen0)], ["Caption", string_type], ["Position", int32_type], ["Disabled", bool_type]]);
+}
+
+export function fill<T>(value: T, slot: Slot$1<T>): Slot$1<T> {
+    return Slot$1_$with(slot, "Content", value);
+}
+
+export function clear<T>(slot: Slot$1<T>): Slot$1<T> {
+    return Slot$1_$with(slot, "Fallback", undefined);
+}
+
+export function forget<T>(slot: Slot$1<T>): Slot$1<T> {
+    return Slot$1_$with(slot, "History", empty<T>());
+}
+
+export function caption(slot: Slot$1<int32>): Slot$1<int32> {
+    return Slot$1_$with(slot, "Caption", int32ToString(slot.Content));
+}
+
+export function move(slot: Slot$1<string>): Slot$1<string> {
+    return Slot$1_$with(slot, "Position", slot.Position + 1);
+}
+
+export function disable<T>(slot: Slot$1<T>): Slot$1<T> {
+    return Slot$1_$with(slot, "Disabled", true);
+}
+
+export class Bounds extends Record implements IEquatable<Bounds>, IComparable<Bounds> {
+    readonly Left: float64;
+    readonly Right: float64;
+    readonly Top: float64;
+    readonly Bottom: float64;
+    readonly Near: float64;
+    readonly Far: float64;
+    readonly Unit: string;
+    constructor(Left: float64, Right: float64, Top: float64, Bottom: float64, Near: float64, Far: float64, Unit: string) {
+        super();
+        this.Left = Left;
+        this.Right = Right;
+        this.Top = Top;
+        this.Bottom = Bottom;
+        this.Near = Near;
+        this.Far = Far;
+        this.Unit = Unit;
+    }
+}
+
+export function Bounds_$reflection(): TypeInfo {
+    return record_type("RecordCopy.Bounds", [], Bounds, () => [["Left", float64_type], ["Right", float64_type], ["Top", float64_type], ["Bottom", float64_type], ["Near", float64_type], ["Far", float64_type], ["Unit", string_type]]);
+}
+
+export function left(b: Bounds): Bounds {
+    const inputRecord: Bounds = b;
+    return Bounds_$with(inputRecord, "Left", 0);
+}
+
+export function right(b: Bounds): Bounds {
+    const inputRecord: Bounds = b;
+    return Bounds_$with(inputRecord, "Right", 0);
+}
+
+export function top(b: Bounds): Bounds {
+    const inputRecord: Bounds = b;
+    return Bounds_$with(inputRecord, "Top", 0);
+}
+
+export function bottom(b: Bounds): Bounds {
+    const inputRecord: Bounds = b;
+    return Bounds_$with(inputRecord, "Bottom", 0);
+}
+
+export function near(b: Bounds): Bounds {
+    const inputRecord: Bounds = b;
+    return Bounds_$with(inputRecord, "Near", 0);
+}
+
+export function far(b: Bounds): Bounds {
+    const inputRecord: Bounds = b;
+    return Bounds_$with(inputRecord, "Far", 0);
+}
+
+export function unit$0027(b: Bounds): Bounds {
+    const inputRecord: Bounds = b;
+    return Bounds_$with(inputRecord, "Unit", "px");
+}
+
+export class Counter extends Record implements IEquatable<Counter>, IComparable<Counter> {
+    Count: int32;
+    readonly Description: string;
+    readonly Minimum: int32;
+    readonly Maximum: int32;
+    readonly Increment: int32;
+    readonly Wraps: boolean;
+    constructor(Count: int32, Description: string, Minimum: int32, Maximum: int32, Increment: int32, Wraps: boolean) {
+        super();
+        this.Count = (Count | 0);
+        this.Description = Description;
+        this.Minimum = (Minimum | 0);
+        this.Maximum = (Maximum | 0);
+        this.Increment = (Increment | 0);
+        this.Wraps = Wraps;
+    }
+}
+
+export function Counter_$reflection(): TypeInfo {
+    return record_type("RecordCopy.Counter", [], Counter, () => [["Count", int32_type], ["Description", string_type], ["Minimum", int32_type], ["Maximum", int32_type], ["Increment", int32_type], ["Wraps", bool_type]]);
+}
+
+export function describe(c: Counter): Counter {
+    return Counter_$with(c, "Description", "counter");
+}
+
+export function minimum(c: Counter): Counter {
+    return Counter_$with(c, "Minimum", 0);
+}
+
+export function maximum(c: Counter): Counter {
+    return Counter_$with(c, "Maximum", 100);
+}
+
+export function increment(c: Counter): Counter {
+    return Counter_$with(c, "Increment", 1);
+}
+
+export function wraps(c: Counter): Counter {
+    return Counter_$with(c, "Wraps", true);
+}
+
+export function limit(next: ((arg0: Counter) => int32), c: Counter): Counter {
+    const Maximum: int32 = next(c) | 0;
+    return Counter_$with(c, "Maximum", Maximum);
+}
+
+export function recount(next: ((arg0: Counter) => int32), c: Counter): Counter {
+    return new Counter(next(c), c.Description, c.Minimum, c.Maximum, c.Increment, c.Wraps);
+}
+
+export class Point extends Record implements IEquatable<Point>, IComparable<Point> {
+    readonly X: float64;
+    readonly Y: float64;
+    readonly Z: float64;
+    constructor(X: float64, Y: float64, Z: float64) {
+        super();
+        this.X = X;
+        this.Y = Y;
+        this.Z = Z;
+    }
+}
+
+export function Point_$reflection(): TypeInfo {
+    return record_type("RecordCopy.Point", [], Point, () => [["X", float64_type], ["Y", float64_type], ["Z", float64_type]]);
+}
+
+export function x(p: Point): Point {
+    return new Point(0, p.Y, p.Z);
+}
+
+export function y(p: Point): Point {
+    return new Point(p.X, 0, p.Z);
+}
+
+export function z(p: Point): Point {
+    return new Point(p.X, p.Y, 0);
+}
+
+export function origin(p: Point): Point {
+    let bind$0040_1: Point;
+    const bind$0040: Point = new Point(0, p.Y, p.Z);
+    bind$0040_1 = (new Point(bind$0040.X, 0, bind$0040.Z));
+    return new Point(bind$0040_1.X, bind$0040_1.Y, 0);
+}
+
+export function mirror(p: Point): Point {
+    return new Point(-p.X, p.Y, p.Z);
+}
+
+export function flip(p: Point): Point {
+    return new Point(p.X, -p.Y, p.Z);
+}
+
+export function anonymous(r: { Border: int32, Colour: string, Height: int32, Margin: int32 }): { Border: int32, Colour: string, Height: int32, Margin: int32 } {
+    return {
+        Border: r.Border,
+        Colour: r.Colour,
+        Height: r.Height,
+        Margin: 1,
+    };
+}
+
+function Above_$with<K extends keyof Above>(r: Above, k: K, v: Above[K]): Above {
+    return new Above((k === "Margin") ? (v as Above["Margin"]) : r.Margin, (k === "Border") ? (v as Above["Border"]) : r.Border, (k === "Colour") ? (v as Above["Colour"]) : r.Colour, (k === "Height") ? (v as Above["Height"]) : r.Height, (k === "Length") ? (v as Above["Length"]) : r.Length, (k === "Weight") ? (v as Above["Weight"]) : r.Weight, (k === "Radius") ? (v as Above["Radius"]) : r.Radius, (k === "Shadow") ? (v as Above["Shadow"]) : r.Shadow);
+}
+
+function Settings_$with<K extends keyof Settings>(r: Settings, k: K, v: Settings[K]): Settings {
+    return new Settings((k === "Title") ? (v as Settings["Title"]) : r.Title, (k === "Width") ? (v as Settings["Width"]) : r.Width, (k === "Height") ? (v as Settings["Height"]) : r.Height, (k === "Visible") ? (v as Settings["Visible"]) : r.Visible, (k === "Opacity") ? (v as Settings["Opacity"]) : r.Opacity, (k === "Parent") ? (v as Settings["Parent"]) : r.Parent, (k === "z index") ? (v as Settings["z index"]) : r["z index"], (k === "OnClose") ? (v as Settings["OnClose"]) : r.OnClose, (k === "Combine") ? (v as Settings["Combine"]) : r.Combine, (k === "Tags") ? (v as Settings["Tags"]) : r.Tags);
+}
+
+function Slot$1_$with<T, K extends keyof Slot$1<T>>(r: Slot$1<T>, k: K, v: Slot$1<T>[K]): Slot$1<T> {
+    return new Slot$1((k === "Content") ? (v as Slot$1<T>["Content"]) : r.Content, (k === "Fallback") ? (v as Slot$1<T>["Fallback"]) : r.Fallback, (k === "History") ? (v as Slot$1<T>["History"]) : r.History, (k === "Caption") ? (v as Slot$1<T>["Caption"]) : r.Caption, (k === "Position") ? (v as Slot$1<T>["Position"]) : r.Position, (k === "Disabled") ? (v as Slot$1<T>["Disabled"]) : r.Disabled);
+}
+
+function Bounds_$with<K extends keyof Bounds>(r: Bounds, k: K, v: Bounds[K]): Bounds {
+    return new Bounds((k === "Left") ? (v as Bounds["Left"]) : r.Left, (k === "Right") ? (v as Bounds["Right"]) : r.Right, (k === "Top") ? (v as Bounds["Top"]) : r.Top, (k === "Bottom") ? (v as Bounds["Bottom"]) : r.Bottom, (k === "Near") ? (v as Bounds["Near"]) : r.Near, (k === "Far") ? (v as Bounds["Far"]) : r.Far, (k === "Unit") ? (v as Bounds["Unit"]) : r.Unit);
+}
+
+function Counter_$with<K extends keyof Counter>(r: Counter, k: K, v: Counter[K]): Counter {
+    return new Counter((k === "Count") ? (v as Counter["Count"]) : r.Count, (k === "Description") ? (v as Counter["Description"]) : r.Description, (k === "Minimum") ? (v as Counter["Minimum"]) : r.Minimum, (k === "Maximum") ? (v as Counter["Maximum"]) : r.Maximum, (k === "Increment") ? (v as Counter["Increment"]) : r.Increment, (k === "Wraps") ? (v as Counter["Wraps"]) : r.Wraps);
+}
+
