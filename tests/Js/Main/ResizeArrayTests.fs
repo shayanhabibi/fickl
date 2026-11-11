@@ -264,6 +264,18 @@ let tests =
         li2.Sort()
         equal 2 li2.[1]
 
+    testCase "ResizeArray.Sort orders strings like String.CompareTo" <| fun () -> // See fickl #271
+        let li = ResizeArray [ "b"; "A"; "a"; "B"; "_"; "1" ]
+        li.Sort()
+        Seq.toList li |> equal [ "_"; "1"; "a"; "A"; "b"; "B" ]
+        li.BinarySearch("B") |> equal 5
+        li.BinarySearch("a") |> equal 2
+        let li2 = ResizeArray [ "b"; "A"; "a"; "B"; "_"; "1" ]
+        li2.Sort(System.Collections.Generic.Comparer<string>.Default)
+        Seq.toList li2 |> equal [ "_"; "1"; "a"; "A"; "b"; "B" ]
+        // F# structural comparison stays ordinal
+        List.sort [ "b"; "A"; "a"; "B"; "_"; "1" ] |> equal [ "1"; "A"; "B"; "_"; "a"; "b" ]
+
     testCase "ResizeArray.SortInPlaceWith works" <| fun () ->
         let li = ResizeArray<_>()
         li.Add(3.); li.Add(6.); li.Add(5.); li.Add(4.); li.Add(8.)

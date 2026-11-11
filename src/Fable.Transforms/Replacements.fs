@@ -1001,6 +1001,23 @@ let makeDefaultEqualityComparer (com: ICompiler) ctx typArg =
             ]
     | _ -> makeEqualityComparer com ctx typArg
 
+/// Matches Comparer<T>.Default, which orders strings with String.CompareTo in .NET
+/// while F# structural comparison is ordinal
+let makeDefaultComparerFunction (com: ICompiler) ctx typArg =
+    match typArg with
+    | String ->
+        let x = makeUniqueIdent com ctx typArg "x"
+        let y = makeUniqueIdent com ctx typArg "y"
+
+        let body =
+            Helper.LibCall(com, "String", "compareTo", Int32.Number, [ IdentExpr x; IdentExpr y ])
+
+        Delegate([ x; y ], body, None, Tags.empty)
+    | _ -> makeComparerFunction com ctx typArg
+
+let makeDefaultComparer (com: ICompiler) ctx typArg =
+    objExpr [ "Compare", makeDefaultComparerFunction com ctx typArg ]
+
 // TODO: Try to detect at compile-time if the object already implements `Compare`?
 let inline makeComparerFromEqualityComparer e = e // leave it as is, if implementation supports it
 // Helper.LibCall(com, "Util", "comparerFromEqualityComparer", Any, [e])
@@ -2592,7 +2609,7 @@ let binarySearch (com: ICompiler) ctx r t rangeMeth (ar: Expr) args =
             | None
             | Some NullConst
             | Some(MaybeCasted(Call(Import({ Selector = "defaultOf" }, _, _), _, _, _))) ->
-                makeComparer com ctx (getElementType ar.Type)
+                makeDefaultComparer com ctx (getElementType ar.Type)
             | Some comparer -> comparer
 
         Helper.LibCall(com, "Array", meth, t, ar :: args @ [ comparer ], ?loc = r)
@@ -2709,7 +2726,8 @@ let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (this
     | "RemoveAt", Some ar, [ idx ] -> Helper.InstanceCall(ar, "splice", t, [ idx; makeIntConst 1 ], ?loc = r) |> Some
     | "Reverse", Some ar, [] -> Helper.InstanceCall(ar, "reverse", t, args, ?loc = r) |> Some
     | "Sort", Some ar, [] ->
-        let compareFn = (genArg com ctx r 0 i.GenericArgs) |> makeComparerFunction com ctx
+        let compareFn =
+            (genArg com ctx r 0 i.GenericArgs) |> makeDefaultComparerFunction com ctx
 
         Helper.InstanceCall(ar, "sort", t, [ compareFn ], ?loc = r) |> Some
     | "Sort", Some ar, [ ExprType(DelegateType _) ] -> Helper.InstanceCall(ar, "sort", t, args, ?loc = r) |> Some
@@ -2874,6 +2892,10 @@ let arrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: E
         Helper.LibCall(com, "Array", "indexOf", t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
         |> Some
     | "BinarySearch", None, ar :: args -> binarySearch com ctx r t "binarySearchRange" ar args
+    | "Sort", None, [ ExprType(Array(elemType, _)) as ar ] ->
+        let compareFn = makeDefaultComparerFunction com ctx elemType
+
+        Helper.InstanceCall(ar, "sort", t, [ compareFn ], ?loc = r) |> Some
     | "GetEnumerator", Some arg, _ -> getEnumerator com r t arg |> Some
     | "Resize", None, args ->
         let args =
