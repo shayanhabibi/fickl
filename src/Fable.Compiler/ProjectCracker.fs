@@ -44,6 +44,7 @@ type CacheInfo =
         SourceMaps: bool
         SourceMapsRoot: string option
         TreatWarningsAsErrors: bool
+        FileExtensions: Map<string, string>
     }
 
     static member GetPath(fableModulesDir: string, isDebug: bool) =
@@ -137,6 +138,7 @@ type CrackerOptions(cliArgs: CliArgs, evaluateOnly: bool) =
     member _.ProjFile: string = cliArgs.ProjectFile
     member _.SourceMaps: bool = cliArgs.SourceMaps
     member _.SourceMapsRoot: string option = cliArgs.SourceMapsRoot
+    member _.FileExtensions: Map<string, string> = cliArgs.FileExtensions
     member _.EvaluateOnly: bool = evaluateOnly
 
     member _.BuildDll(normalizedDllPath: string) =
@@ -1079,6 +1081,13 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
                 cacheInfo.FableOptions = opts.FableOptions
                 && cacheInfo.SourceMaps = opts.SourceMaps
                 && cacheInfo.SourceMapsRoot = opts.SourceMapsRoot
+                // fickl: a cache written before `--fileExtension` existed has no such field
+                && (if isNull (box cacheInfo.FileExtensions) then
+                        Map.empty
+                    else
+                        cacheInfo.FileExtensions)
+                    =
+                    opts.FileExtensions
 
             if not sameOptions then
                 Log.verbose (lazy "Won't reuse compiled files because last compilation used different options")
@@ -1102,7 +1111,11 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
                 isMostRecent
 
         // Update cached info with current options and the timestamp for the corresponding build mode (Debug/Release)
-        { cacheInfo with FableOptions = opts.FableOptions }.Write()
+        { cacheInfo with
+            FableOptions = opts.FableOptions
+            FileExtensions = opts.FileExtensions
+        }
+            .Write()
 
         let precompiledInfo, otherOptions, sourcePaths =
             loadPrecompiledInfo opts cacheInfo.FSharpOptions cacheInfo.SourcePaths
@@ -1223,6 +1236,7 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
                 SourceMaps = opts.SourceMaps
                 SourceMapsRoot = opts.SourceMapsRoot
                 TreatWarningsAsErrors = mainProj.TreatWarningsAsErrors
+                FileExtensions = opts.FileExtensions
             }
 
         if not opts.EvaluateOnly && not opts.NoCache then

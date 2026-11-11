@@ -29,12 +29,18 @@ type CliArgs =
         SourceMapsRoot: string option
         Exclude: string list
         Replace: Map<string, string>
+        /// fickl: the output extension of single source files (`--fileExtension`), by normalized full path
+        FileExtensions: Map<string, string>
         RunProcess: RunProcess option
         CompilerOptions: Fable.CompilerOptions
         Verbosity: Fable.Verbosity
     }
 
     member ProjectFileAsRelativePath: string
+
+    /// fickl: the extension of the output of a source file: its own (`--fileExtension`), or the one of the
+    /// compilation. Every output path and every import of another source file must go through it
+    member FileExtensionFor: sourcePath: string -> string
     member RunProcessEnv: (string * string) list
 
 [<RequireQualifiedAccess>]
@@ -115,6 +121,10 @@ module Imports =
     val isRootAbsolutePath: path: string -> bool
 
     val getRelativePath: path: string -> pathTo: string -> string
+
+    /// fickl: the extension to give an import of a source file, which can have its own (`--fileExtension`).
+    /// `importPath` is the path as written in the Fable AST: it names the source, relative to `sourceDir`
+    val getFileExtension: cliArgs: CliArgs -> sourceDir: string -> importPath: string -> string
 
     val getTargetAbsolutePath:
         pathResolver: PathResolver -> importPath: string -> projDir: string -> outDir: string -> string
