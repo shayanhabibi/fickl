@@ -282,7 +282,7 @@ let private binarySearchFrom (array: 'T[]) (index: int) (length: int) (value: 'T
 
     loop index (index + length - 1)
 
-let private checkBinarySearchRange (lengthName: string) (array: 'T[]) (index: int) (length: int) =
+let private checkRange (lengthName: string) (array: 'T[]) (index: int) (length: int) =
     if index < 0 then
         raise (System.ArgumentOutOfRangeException("index", "Non-negative number required."))
 
@@ -300,12 +300,12 @@ let binarySearch (array: 'T[]) (value: 'T) (comparer: IComparer<'T>) : int =
     binarySearchFrom array 0 array.Length value comparer
 
 let binarySearchRange (array: 'T[]) (index: int) (length: int) (value: 'T) (comparer: IComparer<'T>) : int =
-    checkBinarySearchRange "length" array index length
+    checkRange "length" array index length
     binarySearchFrom array index length value comparer
 
 // ResizeArray's range overload, which names its length "count"
 let binarySearchRangeCount (array: 'T[]) (index: int) (count: int) (value: 'T) (comparer: IComparer<'T>) : int =
-    checkBinarySearchRange "count" array index count
+    checkRange "count" array index count
     binarySearchFrom array index count value comparer
 
 let empty cons = allocateArrayFromCons cons 0
@@ -744,6 +744,56 @@ let sortInPlaceBy (projection: 'a -> 'b) (xs: 'a[]) ([<Inject>] comparer: ICompa
 
 let sortInPlace (xs: 'T[]) ([<Inject>] comparer: IComparer<'T>) =
     sortInPlaceWithImpl (fun x y -> comparer.Compare(x, y)) xs
+
+// Sorts a copy of the range and writes it back, which works for plain and typed arrays alike
+let private sortRangeInPlace (array: 'T[]) (index: int) (length: int) (comparer: IComparer<'T>) : unit =
+    if length > 1 then
+        let sorted = subArrayImpl array index length
+        sortInPlaceWithImpl (fun x y -> comparer.Compare(x, y)) sorted
+
+        for i = 0 to length - 1 do
+            array.[index + i] <- sorted.[i]
+
+// System.Array.Sort(array, index, length, comparer)
+let sortInPlaceRange (array: 'T[]) (index: int) (length: int) (comparer: IComparer<'T>) : unit =
+    checkRange "length" array index length
+    sortRangeInPlace array index length comparer
+
+// ResizeArray's range overload, which names its length "count"
+let sortInPlaceRangeCount (array: 'T[]) (index: int) (count: int) (comparer: IComparer<'T>) : unit =
+    checkRange "count" array index count
+    sortRangeInPlace array index count comparer
+
+// System.Array.Sort(keys, items, index, length, comparer): orders both arrays by the keys.
+// .NET accepts null items and then sorts the keys alone
+let sortInPlaceKeysItemsRange (keys: 'K[]) (items: 'V[]) (index: int) (length: int) (comparer: IComparer<'K>) : unit =
+    checkRange "length" keys index length
+
+    if isNull (box items) then
+        sortRangeInPlace keys index length comparer
+    else
+        checkRange "length" items index length
+
+        if length > 1 then
+            let order: int[] = Array.zeroCreate length
+
+            for i = 0 to length - 1 do
+                order.[i] <- index + i
+
+            sortInPlaceWithImpl (fun i j -> comparer.Compare(keys.[i], keys.[j])) order
+            let sortedKeys = subArrayImpl keys index length
+            let sortedItems = subArrayImpl items index length
+
+            for i = 0 to length - 1 do
+                sortedKeys.[i] <- keys.[order.[i]]
+                sortedItems.[i] <- items.[order.[i]]
+
+            for i = 0 to length - 1 do
+                keys.[index + i] <- sortedKeys.[i]
+                items.[index + i] <- sortedItems.[i]
+
+let sortInPlaceKeysItems (keys: 'K[]) (items: 'V[]) (comparer: IComparer<'K>) : unit =
+    sortInPlaceKeysItemsRange keys items 0 keys.Length comparer
 
 let inline internal sortInPlaceWith (comparer: 'T -> 'T -> int) (xs: 'T[]) =
     sortInPlaceWithImpl comparer xs

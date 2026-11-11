@@ -38,6 +38,7 @@ let allTests =
     Async.tests
     Task.tests
     Chars.tests
+    Complexes.tests
     Comparison.tests
     ConditionalWeakTable.tests
     Convert.tests
@@ -72,6 +73,7 @@ let allTests =
     Regex.tests
     ResizeArrays.tests
     Result.tests
+    Runes.tests
     SeqExpressions.tests
     Seqs.tests
     Sets.tests

@@ -175,6 +175,7 @@ let private jsSurface (Program body) =
         | ExportNamedReferences(specifiers, _) ->
             for ExportSpecifier(_, Identifier(exported, _)) in specifiers do
                 exports.Add(exported) |> ignore
+        | ExportNamespaceDeclaration(Identifier(exported, _), _) -> exports.Add(exported) |> ignore
         | ExportDefaultDeclaration declaration ->
             exports.Add("default") |> ignore
 
@@ -649,6 +650,7 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
                 declarationOf isPrivateValue decl
                 |> Option.map (Statement.Declaration >> PrivateModuleDeclaration)
             | ExportNamedReferences _
+            | ExportNamespaceDeclaration _
             | ExportAllDeclaration _
             | AugmentationDeclaration _ -> Some md
             | _ -> None
@@ -757,6 +759,7 @@ let print (writer: Writer) (Program body) : Async<unit> =
             match undecoratedModule md with
             | ImportDeclaration _
             | ExportNamedReferences _
+            | ExportNamespaceDeclaration _
             | ExportAllDeclaration _
             | AugmentationDeclaration _ -> p.Print(md)
             | ExportNamedDeclaration decl ->
@@ -781,6 +784,7 @@ let print (writer: Writer) (Program body) : Async<unit> =
             | ExportNamedDeclaration _
             | ExportAllDeclaration _
             | ExportDefaultDeclaration _
+            | ExportNamespaceDeclaration _
             | ExportNamedReferences _ -> true
             | _ -> false
 

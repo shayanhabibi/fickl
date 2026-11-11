@@ -1,7 +1,7 @@
-import { FOO } from "/env.js";
+
 import { BAR } from "/lib/bar.js";
 
-export const foo = FOO;
+export { FOO as foo } from "/env.js";
 
 export const barLength = BAR.length;
 

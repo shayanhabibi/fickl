@@ -10,6 +10,8 @@
     <Compile Include="PrivateMutableImport.fs" />
     <Compile Include="EmitJsStatementImportWithComment.fs" />
     <Compile Include="RootAbsoluteImport.fs" />
+    <Compile Include="ReExportImport.fs" />
+    <Compile Include="ReExportConsumer.fs" />
   </ItemGroup>
 
   <ItemGroup>

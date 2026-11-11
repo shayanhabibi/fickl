@@ -115,6 +115,9 @@ function charCodeAt(s: string, index: number) {
   }
 }
 
+// The category of a whole code point rather than of a UTF-16 code unit, for System.Text.Rune
+export const codePointCategory = (cp: number) => unicodeCategoryFunc(cp);
+
 export const getUnicodeCategory = (s: string) => getUnicodeCategory2(s, 0);
 export const isControl = (s: string) => isControl2(s, 0);
 export const isDigit = (s: string) => isDigit2(s, 0);

@@ -37,6 +37,7 @@
     <Compile Include="System.fs" />
     <Compile Include="System.Collections.Generic.fs" />
     <Compile Include="System.Text.fs" />
+    <Compile Include="System.Numerics.fs" />
     <TypeScriptCompile Include="Async.ts" />
     <TypeScriptCompile Include="AsyncBuilder.ts" />
     <TypeScriptCompile Include="BitConverter.ts" />
@@ -60,6 +61,7 @@
     <TypeScriptCompile Include="Option.ts" />
     <Content Include="package.json" />
     <TypeScriptCompile Include="Reflection.ts" />
+    <TypeScriptCompile Include="Rune.ts" />
     <TypeScriptCompile Include="RegExp.ts" />
     <TypeScriptCompile Include="String.ts" />
     <TypeScriptCompile Include="TimeOnly.ts" />

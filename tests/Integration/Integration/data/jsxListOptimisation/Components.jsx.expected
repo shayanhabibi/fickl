@@ -1,10 +1,10 @@
 
-import * as react from "react";
+import * as React from "react";
 import { empty, map, singleton, append, delay, toList } from "./fable_modules/fable-library-js.5.23.0/Seq.js";
 import { int32ToString } from "./fable_modules/fable-library-js.5.23.0/Util.js";
 import { rangeDouble } from "./fable_modules/fable-library-js.5.23.0/Range.js";
 
-export const React = react;
+export { React };
 
 export const divWithText = <div>
     Test 1

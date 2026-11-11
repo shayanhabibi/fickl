@@ -258,6 +258,8 @@ type ModuleDeclaration =
     /// Note: Having declaration populated with non-empty specifiers or non-null source results in an invalid state.
     | ExportNamedDeclaration of declaration: Declaration
     | ExportAllDeclaration of source: Literal * loc: SourceLocation option
+    /// fickl: `export * as name from "mod"`
+    | ExportNamespaceDeclaration of exported: Identifier * source: StringLiteral
     /// An export default declaration, e.g., export default function () {}; or export default 1;.
     | ExportDefaultDeclaration of declaration: Choice<Declaration, Expression>
     /// fickl: attributes are the key/value pairs of a `with { type: "json" }` clause
@@ -479,6 +481,8 @@ type ObjectMember =
         typeParameters: TypeParameter array *
         loc: SourceLocation option *
         doc: string option
+    /// fickl: `...argument` in an object literal, which copies the own enumerable properties of the argument
+    | ObjectSpread of argument: Expression
 
 //    let shorthand = defaultArg shorthand_ false
 //    member _.Shorthand: bool = shorthand

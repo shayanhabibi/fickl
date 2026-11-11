@@ -48,6 +48,7 @@
     <Compile Include="TaskTests.fs" />
     <Compile Include="CharTests.fs" />
     <Compile Include="ComparisonTests.fs" />
+    <Compile Include="ComplexTests.fs" />
     <Compile Include="ConditionalWeakTableTests.fs" />
     <Compile Include="ConvertTests.fs" />
     <Compile Include="CustomOperatorsTests.fs" />
@@ -109,6 +110,7 @@
     <Compile Include="RegexTests.fs" />
     <Compile Include="ResizeArrayTests.fs" />
     <Compile Include="ResultTests.fs" />
+    <Compile Include="RuneTests.fs" />
     <Compile Include="SeqExpressionTests.fs" />
     <Compile Include="SeqTests.fs" />
     <Compile Include="SetTests.fs" />

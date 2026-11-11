@@ -82,6 +82,9 @@ type IBabelCompiler =
     abstract GetImportExpr:
         Context * selector: string * path: string * range: SourceLocation option * ?noMangle: bool -> Expression
 
+    /// <summary>Registers a value import bound to exactly the given local name, for a re-exported module member.</summary>
+    abstract GetImportAs: selector: string * path: string * localName: string -> unit
+
     /// <summary>Runs an annotation builder; imports it requests are type-only unless also requested as values.</summary>
     abstract InTypePosition: (unit -> 'T) -> 'T
 
@@ -3460,6 +3463,7 @@ module Util =
                             ?doc = doc
                         )
                         |> Some
+                    | ObjectSpread _ -> None
                 )
 
             let baseExpr, classMembers =
@@ -3503,7 +3507,8 @@ module Util =
             members
             |> List.exists (
                 function
-                | ObjectMethod _ -> true
+                | ObjectMethod _
+                | ObjectSpread _ -> true
                 | ObjectProperty(key, _, isComputed, _) ->
                     match key with
                     | Expression.Identifier(Identifier(name, _))
@@ -3805,6 +3810,13 @@ module Util =
 
             emitExpression range macro args
 
+    /// The page that explains what the props list of `JSX.create` can contain
+    let jsxPropsDocsUrl =
+        "https://github.com/shayanhabibi/fickl/blob/main/docs/jsx-props.md"
+
+    /// Ends an error about the props list of `JSX.create` with a link to the page that explains it
+    let jsxPropsError (message: string) = $"%s{message}. See %s{jsxPropsDocsUrl}"
+
     [<RequireQualifiedAccess>]
     type JsxPropExpr =
         | KeyValue of key: string * value: Fable.Expr
@@ -3866,7 +3878,9 @@ module Util =
             if key <> "children" then
                 Some(JsxPropExpr.KeyValue(key, value) :: props, children)
             elif isConditional then
-                addError com [] range "JSX children cannot be set under a condition in the props list"
+                jsxPropsError "JSX children cannot be set under a condition in the props list"
+                |> addError com [] range
+
                 None
             else
                 match value with
@@ -3906,7 +3920,8 @@ module Util =
                                                               _,
                                                               _))) -> Some(JsxPropExpr.Spread value :: props, children)
                 | Some _, JsxPropSource.Single e ->
-                    addError com [] e.Range "Cannot detect JSX prop key at compile time"
+                    jsxPropsError "Cannot detect JSX prop key at compile time"
+                    |> addError com [] e.Range
 
                     None
             )
@@ -4219,11 +4234,11 @@ but thanks to the optimisation done below we get
         | Fable.Tags.Contains "jsx", componentOrTag :: JsxPropsGenerator props :: _ ->
             transformJsxEl com ctx componentOrTag props |> Some
         | Fable.Tags.Contains "jsx", _ ->
-            "Expecting a static list or array literal (no generator) for JSX props"
+            jsxPropsError "Expecting a static list or array literal (no generator) for JSX props"
             |> addErrorAndReturnNull com range
             |> Some
         | Fable.Tags.Contains "jsx-spread", _ ->
-            "JSX.spread can only be used as an element of the props list passed to JSX.create"
+            jsxPropsError "JSX.spread can only be used as an element of the props list passed to JSX.create"
             |> addErrorAndReturnNull com range
             |> Some
         | Fable.Tags.Contains "jsx-template", args ->
@@ -5783,7 +5798,7 @@ but thanks to the optimisation done below we get
             | Builtin BclTimeOnly when com.Options.JsTemporal ->
                 libCall com ctx None "TimeOnlyTemporal" "minValue" [] []
             | Builtin BclTimeSpan when com.Options.JsTemporal -> libCall com ctx None "TimeSpanTemporal" "zero" [] []
-            | Builtin(BclTimeSpan | BclTimeOnly) -> Expression.numericLiteral 0
+            | Builtin(BclTimeSpan | BclTimeOnly | BclRune) -> Expression.numericLiteral 0
             | Builtin BclGuid -> Expression.stringLiteral "00000000-0000-0000-0000-000000000000"
             | Builtin BclDateTime -> libCall com ctx None (JS.Replacements.dateTimeModule com) "minValue" [] []
             | Builtin BclDateTimeOffset ->
@@ -8114,6 +8129,85 @@ but thanks to the optimisation done below we get
         TypeAliasDeclaration(decl.Name, entParams, ta)
         |> asModuleDeclaration ent.IsPublic
 
+    /// Whether anything in the file may refer to a module member by its name: an identifier, or text
+    /// that is printed as code or read as a name (an Emit macro, a string, a template).
+    /// JSX counts as a use of every name: what it compiles to can need one in scope, like `React`.
+    let isNameUsedInFile (file: Fable.File) (name: string) =
+        let mentions (text: string) = text.Contains(name)
+
+        let refers =
+            function
+            | Fable.IdentExpr ident -> ident.Name = name
+            | Fable.Emit(info, _, _) -> mentions info.Macro
+            | Fable.Value(Fable.StringConstant text, _) -> mentions text
+            | Fable.Value(Fable.StringTemplate(_, parts, _), _) -> List.exists mentions parts
+            | Fable.Call(_, info, _, _) ->
+                info.Tags
+                |> List.exists (fun tag -> tag.StartsWith("jsx", StringComparison.Ordinal))
+            | _ -> false
+
+        let inMember (memb: Fable.MemberDecl) = deepExists refers memb.Body
+
+        let rec inDeclaration =
+            function
+            | Fable.ModuleDeclaration decl -> List.exists inDeclaration decl.Members
+            | Fable.ActionDeclaration decl -> deepExists refers decl.Body
+            | Fable.MemberDeclaration decl -> inMember decl
+            | Fable.ClassDeclaration decl ->
+                Option.exists inMember decl.Constructor
+                || Option.exists (deepExists refers) decl.BaseCall
+                || List.exists inMember decl.AttachedMembers
+
+        List.exists inDeclaration file.Declarations
+
+    /// fickl: a public immutable value that is exactly an import is re-exported rather than bound to a
+    /// new constant, so importers see the live binding of the module it comes from.
+    /// TypeScript output keeps the constant: its annotation is where the F# type is asserted.
+    let tryReExportImport
+        (com: IBabelCompiler)
+        ctx
+        (memb: Fable.MemberFunctionOrValue)
+        (decl: Fable.MemberDecl)
+        needsLocal
+        =
+        match decl.Body with
+        | MaybeCasted(Fable.Import({
+                                       Selector = selector
+                                       Path = path
+                                       Kind = Fable.UserImport _
+                                   },
+                                   _,
+                                   _)) when
+            not com.IsTypeScript
+            && memb.IsValue
+            && memb.IsPublic
+            && not memb.IsMutable
+            && List.isEmpty decl.Args
+            ->
+            let selector = selector.Trim()
+            let path = path.Trim()
+            let sourcePath, attributes = ImportAttributes.decode path
+            let exported = Identifier.identifier decl.Name
+
+            if not (Regex.IsMatch(selector, @"^(\*|[A-Za-z_$][\w$]*)$")) then
+                None
+            elif
+                needsLocal
+                || not (List.isEmpty attributes)
+                || isNameUsedInFile ctx.File decl.Name
+            then
+                com.GetImportAs(selector, path, decl.Name)
+                Some(ExportNamedReferences([| ExportSpecifier(exported, exported) |], None))
+            else
+                let source = StringLiteral.stringLiteral sourcePath
+
+                match selector with
+                | "*" -> Some(ExportNamespaceDeclaration(exported, source))
+                | _ ->
+                    ExportNamedReferences([| ExportSpecifier(Identifier.identifier selector, exported) |], Some source)
+                    |> Some
+        | _ -> None
+
     let rec transformDeclaration (com: IBabelCompiler) ctx decl =
         let withCurrentScope ctx (usedNames: Set<string>) f =
             let ctx =
@@ -8143,7 +8237,13 @@ but thanks to the optimisation done below we get
                         { decl with Body = passExplicitBaseArgs com ctx (com.GetEntity entRef) decl.Body }
                     | _ -> decl
 
-                let valueExpr =
+                let isDefaultExport =
+                    List.contains "export-default" decl.Tags
+                    || (com.TryGetMember(decl.MemberRef)
+                        |> Option.map (fun m -> hasAttribute Atts.exportDefault m.Attributes)
+                        |> Option.defaultValue false)
+
+                let valueExpr () =
                     match decl.Body with
                     // fickl: `export const x = await p;`, the one place JS.awaitTopLevel is allowed
                     | MaybeCasted(Fable.Emit(info, t, r)) when
@@ -8178,9 +8278,21 @@ but thanks to the optimisation done below we get
                         | _ -> None
                     | _ -> None
 
+                let reExport =
+                    if List.contains "remove-declaration" decl.Tags then
+                        None
+                    else
+                        tryReExportImport com ctx memb decl isDefaultExport
+
+                let valueExpr =
+                    match reExport with
+                    | Some _ -> None
+                    | None -> valueExpr ()
+
                 let decls =
-                    match valueExpr with
-                    | Some value ->
+                    match reExport, valueExpr with
+                    | Some reExport, _ -> [ reExport ]
+                    | None, Some value ->
                         ModuleDecl(
                             decl.Name,
                             isPublic = memb.IsPublic,
@@ -8190,7 +8302,7 @@ but thanks to the optimisation done below we get
                         )
                         |> declareModuleMember com ctx value
                         |> List.singleton
-                    | None ->
+                    | None, None ->
                         let expr = transformModuleFunction com ctx memb decl.Name decl.Args decl.Body
 
                         // Only the last file of the project has the entry point that runs: one in a
@@ -8220,12 +8332,6 @@ but thanks to the optimisation done below we get
                                     ModuleDecl(decl.Name, isPublic = memb.IsPublic, ?doc = decl.XmlDoc)
                                     |> declareModuleMember com ctx expr
                                 ]
-
-                let isDefaultExport =
-                    List.contains "export-default" decl.Tags
-                    || (com.TryGetMember(decl.MemberRef)
-                        |> Option.map (fun m -> hasAttribute Atts.exportDefault m.Attributes)
-                        |> Option.defaultValue false)
 
                 if List.contains "remove-declaration" decl.Tags then
                     []
@@ -8488,6 +8594,27 @@ module Compiler =
                     | Some localId -> Expression.identifier (localId)
                     | None -> Expression.nullLiteral ()
 
+            member _.GetImportAs(selector, path, localName) =
+                let cachedName = path + "::" + selector
+                let path, attributes = ImportAttributes.decode path
+
+                let i =
+                    {
+                        Selector = selector
+                        Path = path
+                        Attributes = attributes
+                        LocalIdent = Some localName
+                        IsTypeOnly = false
+                    }
+
+                match imports.TryGetValue(cachedName) with
+                | true, existing when existing.LocalIdent = Some localName ->
+                    imports[cachedName] <- { existing with IsTypeOnly = false }
+                // Already imported under another name: this one is a second specifier of the same import
+                | true, _ -> imports[cachedName + "::as::" + localName] <- i
+                // Later uses of the same import in the file share the name
+                | false, _ -> imports.Add(cachedName, i)
+
             member bcom.GetSymbolKey(ctx, expression, path, sourceFile) =
                 if String.IsNullOrWhiteSpace expression then
                     addError com [] None "SymbolKey requires a non-empty symbol expression"
@@ -8699,6 +8826,7 @@ module Compiler =
                 | ExportNamedDeclaration _
                 | ExportAllDeclaration _
                 | ExportDefaultDeclaration _
+                | ExportNamespaceDeclaration _
                 | ExportNamedReferences _ -> true
                 | _ -> false
 

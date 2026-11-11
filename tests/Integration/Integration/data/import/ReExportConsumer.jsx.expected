@@ -1,0 +1,8 @@
+
+import { casted, add, Nested_inner, my$002Dname, renamed, live, bump } from "./ReExportImport.jsx.actual";
+
+export function run() {
+    bump();
+    return (((((live + renamed) + my$002Dname) + Nested_inner) + add(1, 2)) + casted.value) | 0;
+}
+

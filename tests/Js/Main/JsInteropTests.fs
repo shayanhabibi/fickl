@@ -1784,6 +1784,61 @@ let tests =
         opts.foo |> equal "bar"
         opts.bar |> equal 10
 
+    // See https://github.com/shayanhabibi/fickl/issues/167
+    testCase "jsSpread copies a JS object with the properties F# does not know about" <| fun () ->
+        let source: JsOptions = emitJsExpr () "({ foo: 'a', bar: 1, extra: 'kept' })"
+        let copy = Fickl.Core.JsInterop.jsSpread source (fun o -> o.bar <- source.bar + 1)
+        copy.foo |> equal "a"
+        copy.bar |> equal 2
+        copy?extra |> equal "kept"
+        source.bar |> equal 1
+        emitJsExpr copy "Object.keys($0).join()" |> equal "foo,bar,extra"
+
+    testCase "jsSpread evaluates its source once" <| fun () ->
+        let mutable calls = 0
+
+        let make () : JsOptions =
+            calls <- calls + 1
+            emitJsExpr () "({ foo: 'a', bar: 1, extra: 'kept' })"
+
+        let copy =
+            Fickl.Core.JsInterop.jsSpread (make ()) (fun o ->
+                o.foo <- "b"
+                o.bar <- 5)
+
+        calls |> equal 1
+        copy.foo |> equal "b"
+        copy.bar |> equal 5
+        copy?extra |> equal "kept"
+
+    testCase "jsSpread works when the setters cannot be inlined" <| fun () ->
+        let source: JsOptions = emitJsExpr () "({ foo: 'a', bar: 1, extra: 'kept' })"
+        let data = [| "bar", 10 |]
+
+        let copy =
+            Fickl.Core.JsInterop.jsSpread source (fun o ->
+                for key, value in data do
+                    o?(key) <- value)
+
+        copy.foo |> equal "a"
+        copy.bar |> equal 10
+        copy?extra |> equal "kept"
+        source.bar |> equal 1
+
+    testCase "jsMerge merges JS objects and a later one wins" <| fun () ->
+        let defaults: JsOptions = emitJsExpr () "({ foo: 'default', bar: 1, extra: 'kept' })"
+        let opts = jsOptions<JsOptions> (fun o -> o.bar <- 2)
+        let merged = Fickl.Core.JsInterop.jsMerge [ defaults; opts ]
+        merged.foo |> equal "default"
+        merged.bar |> equal 2
+        merged?extra |> equal "kept"
+        defaults.bar |> equal 1
+        let all = [| defaults; opts; jsOptions<JsOptions> (fun o -> o.foo <- "last") |]
+        let merged = Fickl.Core.JsInterop.jsMerge all
+        merged.foo |> equal "last"
+        merged.bar |> equal 2
+        merged?extra |> equal "kept"
+
     testCase "Stringifying a JS object works" <| fun () ->
         let fooOptional = importMember "./js/1foo.js"
         string fooOptional |> equal "much foo, much awesome"
