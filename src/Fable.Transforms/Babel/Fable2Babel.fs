@@ -624,6 +624,8 @@ module Reflection =
             Expression.arrayExpression (generics)
             jsConstructor com ctx ent
             fields
+            if ent.IsValueType then
+                Expression.booleanLiteral true
         ]
         |> libReflectionCall com ctx None "record"
 
@@ -661,6 +663,8 @@ module Reflection =
             Expression.arrayExpression (generics)
             jsConstructor com ctx ent
             cases
+            if ent.IsValueType then
+                Expression.booleanLiteral true
         ]
         |> libReflectionCall com ctx None "union"
 
@@ -690,16 +694,35 @@ module Reflection =
             let resolved = resolveGenerics genArgs
             libReflectionCall com ctx None name resolved
 
-        let genericEntity (fullname: string) generics =
+        let genericEntityOfKind kind (fullname: string) generics =
+            libReflectionCall
+                com
+                ctx
+                None
+                kind
+                [
+                    Expression.stringLiteral (fullname)
+                    if not (Array.isEmpty generics) then
+                        Expression.arrayExpression (generics)
+                ]
+
+        let genericEntity fullname generics =
+            genericEntityOfKind "class" fullname generics
+
+        // A value type that has no constructor in JS, with the base type of a struct class
+        let genericValueTypeEntity (fullname: string) generics =
             libReflectionCall
                 com
                 ctx
                 None
                 "class"
                 [
-                    Expression.stringLiteral (fullname)
-                    if not (Array.isEmpty generics) then
-                        Expression.arrayExpression (generics)
+                    yield Expression.stringLiteral (fullname)
+                    match generics with
+                    | [||] -> yield Util.undefined None None
+                    | generics -> yield Expression.arrayExpression (generics)
+                    yield Util.undefined None None
+                    yield nonGenericTypeInfo Types.valueType
                 ]
 
         let genericGlobalOrImportedEntity generics (ent: Fable.Entity) =
@@ -858,8 +881,13 @@ module Reflection =
                 | ent ->
                     if FSharp2Fable.Util.isGlobalOrImportedEntity ent then
                         genericGlobalOrImportedEntity generics ent
-                    elif ent.IsInterface || FSharp2Fable.Util.isReplacementCandidate entRef then
-                        genericEntity ent.FullName generics
+                    elif ent.IsInterface then
+                        genericEntityOfKind "interface" ent.FullName generics
+                    elif FSharp2Fable.Util.isReplacementCandidate entRef then
+                        if ent.IsValueType then
+                            genericValueTypeEntity ent.FullName generics
+                        else
+                            genericEntity ent.FullName generics
                     elif ent.IsMeasure then
                         [ Expression.stringLiteral (ent.FullName) ]
                         |> libReflectionCall com ctx None "measure"
@@ -871,28 +899,106 @@ module Reflection =
 
                         Expression.callExpression (callee, generics)
 
+    /// A type from a .dll that has no Fable sources has no reflection info to refer to: as the type of a
+    /// parameter it is an object
+    let rec private withoutUnreflectableTypes (com: IBabelCompiler) (typ: Fable.Type) : Fable.Type =
+        match typ with
+        | Fable.DeclaredType(entRef, _) when
+            entRef.SourcePath.IsNone
+            && (let ent = com.GetEntity(entRef)
+
+                not (
+                    ent.IsInterface
+                    || ent.IsMeasure
+                    || FSharp2Fable.Util.isReplacementCandidate entRef
+                    || FSharp2Fable.Util.isGlobalOrImportedEntity ent
+                    || Util.hasAnyAttribute
+                        [ Atts.stringEnum; Atts.erase; Atts.tsTaggedUnion; Atts.pojoDefinedByConsArgs ]
+                        ent.Attributes
+                ))
+            ->
+            Fable.Any
+        | typ -> typ.MapGenerics(withoutUnreflectableTypes com)
+
+    /// The public constructors of a class, each as its parameters and the function it is compiled to. The
+    /// primary constructor has no function: it is the class constructor. None for a single primary constructor
+    /// without parameters, which is what the runtime takes a class to have
+    let private tryTransformConstructorsInfo (com: IBabelCompiler) ctx r (ent: Fable.Entity) genMap hasJsConstructor =
+        // In .NET every constructor of an F# type that is not public is itself public
+        let isPublic (memb: Fable.MemberFunctionOrValue) =
+            ent.IsPrivate || ent.IsInternal || not (memb.IsPrivate || memb.IsInternal)
+
+        let constructors =
+            ent.MembersFunctionsAndValues
+            |> Seq.filter (fun memb -> memb.IsConstructor && memb.CompiledName = ".ctor" && isPublic memb)
+            |> Seq.choose (fun memb ->
+                let parameters = List.concat memb.CurriedParameterGroups
+
+                if FSharp2Fable.Util.isPrimaryConstructor memb then
+                    Some(parameters, None)
+                else
+                    FSharp2Fable.Util.tryConstructorFunctionIdent com memb
+                    |> Option.map (fun fn -> parameters, Some(com.TransformAsExpr(ctx, fn)))
+            )
+            |> Seq.toList
+
+        match constructors with
+        | [ [], None ] when hasJsConstructor -> None
+        | constructors ->
+            constructors
+            |> List.mapToArray (fun (parameters, fn) ->
+                let parameters =
+                    parameters
+                    |> List.mapToArray (fun p ->
+                        Expression.arrayExpression (
+                            [|
+                                Expression.stringLiteral (defaultArg p.Name "")
+                                withoutUnreflectableTypes com p.Type
+                                |> transformTypeInfoFor Reflection com ctx r genMap
+                            |]
+                        )
+                    )
+                    |> Expression.arrayExpression
+
+                Expression.arrayExpression ([| parameters; yield! Option.toList fn |])
+            )
+            |> Expression.arrayExpression
+            |> fun constructors -> Expression.arrowFunctionExpression ([||], constructors)
+            |> Some
+
     let transformReflectionInfo com ctx r (ent: Fable.Entity) generics =
         if ent.IsFSharpRecord then
             transformRecordReflectionInfo com ctx r ent generics
         elif ent.IsFSharpUnion then
             transformUnionReflectionInfo com ctx r ent generics
         else
+            let genMap =
+                Seq.zip ent.GenericParameters generics
+                |> Seq.map (fun (p, e) -> p.Name, e)
+                |> Map
+                |> Some
+
+            let cons =
+                match tryJsConstructorFor Reflection com ctx ent with
+                | Some cons when not (com.IsTypeScript && ent.IsAbstractClass) -> Some cons
+                | _ -> None
+
+            let constructors =
+                if ent.IsInterface || ent.IsFSharpExceptionDeclaration then
+                    None
+                else
+                    tryTransformConstructorsInfo com ctx r ent genMap cons.IsSome
+
             [
                 yield Expression.stringLiteral (ent.FullName)
                 match generics with
                 | [||] -> yield Util.undefined None None
                 | generics -> yield Expression.arrayExpression (generics)
-                match tryJsConstructorFor Reflection com ctx ent with
-                | Some cons when not (com.IsTypeScript && ent.IsAbstractClass) -> yield cons
-                | _ -> yield Util.undefined None None
+                match cons with
+                | Some cons -> yield cons
+                | None -> yield Util.undefined None None
                 match ent.BaseType with
                 | Some d ->
-                    let genMap =
-                        Seq.zip ent.GenericParameters generics
-                        |> Seq.map (fun (p, e) -> p.Name, e)
-                        |> Map
-                        |> Some
-
                     let parent =
                         Fable.DeclaredType(d.Entity, d.GenericArgs)
                         |> transformTypeInfoFor Reflection com ctx r genMap
@@ -907,7 +1013,9 @@ module Reflection =
                         yield Expression.arrowFunctionExpression ([||], parent)
                     else
                         yield parent
+                | None when constructors.IsSome -> yield Util.undefined None None
                 | None -> ()
+                yield! Option.toList constructors
             ]
             |> libReflectionCall com ctx r "class"
 
