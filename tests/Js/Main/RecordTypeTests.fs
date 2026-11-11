@@ -82,6 +82,8 @@ let holdStructRecord (data: StructRecord) (path: int list) =
             Data = { data with Path = List.rev path }
         }
 
+let mutable mutableStructRecord: StructRecord = { Size = 1; Seed = 2; Path = [ 3 ] }
+
 let tests =
   testList "RecordTypes" [
 
@@ -177,6 +179,26 @@ let tests =
         equal 1 held.Data.Size
         equal 2 held.Data.Seed
         equal [ 8; 7 ] held.Data.Path
+
+    testCase "Copy-and-update of a mutable struct record works" <| fun () -> // See #254
+        let mutable local: StructRecord = { Size = 1; Seed = 2; Path = [ 3 ] }
+        local <- { local with Seed = 5 }
+        let updated = { local with Path = [ 4 ] }
+        equal 1 updated.Size
+        equal 5 updated.Seed
+        equal [ 4 ] updated.Path
+        mutableStructRecord <- { mutableStructRecord with Seed = 6 }
+        let updated = { mutableStructRecord with Size = 7 }
+        equal 7 updated.Size
+        equal 6 updated.Seed
+        equal [ 3 ] updated.Path
+
+    testCase "Fields of a struct record can be read through a byref local" <| fun () ->
+        let mutable local: StructRecord = { Size = 1; Seed = 2; Path = [ 3 ] }
+        let address = &local
+        address <- { Size = 8; Seed = 9; Path = [] }
+        equal 8 address.Size
+        equal 9 local.Seed
 
     testCase "Recursive record does not cause issues" <| fun () ->
         let r = { things = [ { things = [] } ] }
