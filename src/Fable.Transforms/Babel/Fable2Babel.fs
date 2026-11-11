@@ -51,6 +51,8 @@ type Context =
         TailCallOpportunity: ITailCallOpportunity option
         OptimizeTailCall: unit -> unit
         ScopedTypeParams: Set<string>
+        /// <summary>Type parameters of a PassGenerics function, with the argument holding the type info of each.</summary>
+        PassedGenerics: Map<string, Fable.Ident>
         BoundTypes: Map<string, Fable.Type>
         ForcedIdents: Set<string>
         IsNativeAsync: bool
@@ -736,10 +738,11 @@ module Reflection =
             match genMap with
             | None -> [ Expression.stringLiteral (name) ] |> libReflectionCall com ctx None "generic"
             | Some genMap ->
-                match Map.tryFind name genMap with
-                | Some t -> t
-                | None ->
-                    Replacements.Util.genericTypeInfoError name |> addError com [] r
+                match Map.tryFind name genMap, Map.tryFind name ctx.PassedGenerics with
+                | Some t, _ -> t
+                | None, Some ident -> Expression.identifier (ident.Name)
+                | None, None ->
+                    Replacements.Util.genericTypeInfoErrorFor com name |> addError com [] r
 
                     Expression.nullLiteral ()
         | Fable.Unit -> primitiveTypeInfo "unit"
@@ -2490,6 +2493,45 @@ module Util =
                     | _ -> false
             }
 
+        // fickl: the trailing arguments of a PassGenerics function hold the type info of its type parameters
+        let args, passedGenParams, typeInfoArgs =
+            if hasAttribute Atts.ficklPassGenerics info.Attributes then
+                // The type parameters of the class come first, when the member has them
+                let genParams =
+                    match info.DeclaringEntity |> Option.bind com.TryGetEntity with
+                    | Some ent when not ent.IsFSharpModule ->
+                        let ownGenParams =
+                            info.GenericParameters
+                            |> List.filter (fun g -> ent.GenericParameters |> List.forall (fun e -> e.Name <> g.Name))
+
+                        ent.GenericParameters @ ownGenParams
+                    | _ -> info.GenericParameters
+
+                let count = List.length genParams
+                let argCount = List.length args
+
+                if count > 0 && count <= argCount then
+                    let visibleArgs, typeInfoArgs = List.splitAt (argCount - count) args
+
+                    if
+                        typeInfoArgs
+                        |> List.forall (fun a -> a.Type = Fable.MetaType && a.IsCompilerGenerated)
+                    then
+                        visibleArgs, genParams, typeInfoArgs
+                    else
+                        args, [], []
+                else
+                    args, [], []
+            else
+                args, [], []
+
+        let ctx =
+            { ctx with
+                PassedGenerics =
+                    (passedGenParams, typeInfoArgs)
+                    ||> List.fold2 (fun acc p ident -> Map.add p.Name ident acc) ctx.PassedGenerics
+            }
+
         let funcName, args, body =
             match kind, args with
             | Attached(isStatic = false), (thisArg :: args) ->
@@ -2633,6 +2675,9 @@ module Util =
             | args when List.sameLength args parameters -> argsWithParams args
             | _ -> args |> List.map (fun a -> a, ParameterFlags())
 
+        let argsWithFlags =
+            argsWithFlags @ (typeInfoArgs |> List.map (fun a -> a, ParameterFlags()))
+
         let body =
             let replacements =
                 strictOptionalBindings
@@ -2654,10 +2699,38 @@ module Util =
                 Seq.zip args argsWithFlags
                 |> Seq.mapToArray (fun (a, (_, flags)) -> a.WithFlags(flags))
 
+        let args =
+            if com.IsTypeScript && not typeInfoArgs.IsEmpty then
+                let typeInfo = makeFableLibImportTypeAnnotation com ctx [] "Reflection" "TypeInfo"
+                let firstTypeInfoArg = args.Length - typeInfoArgs.Length
+
+                args
+                |> Array.mapi (fun i (Parameter.Parameter(name, annotation, flags) as arg) ->
+                    if i >= firstTypeInfoArg then
+                        Parameter.Parameter(name, Some typeInfo, flags)
+                    elif flags.IsOptional then
+                        // A required parameter cannot follow an optional one, and calls pass undefined
+                        let annotation =
+                            annotation
+                            |> Option.map (fun t -> UnionTypeAnnotation [| t; UndefinedTypeAnnotation |])
+
+                        Parameter.Parameter(
+                            name,
+                            annotation,
+                            ParameterFlags(?defVal = flags.DefVal, isNamed = flags.IsNamed)
+                        )
+                    else
+                        arg
+                )
+            else
+                args
+
         let returnType =
             match FSharp2Fable.TypeGuards.tryGetFromInfo com info with
             | Some guard when com.IsTypeScript ->
-                let index = guard.ParameterIndex + max 0 (args.Length - parameters.Length)
+                let index =
+                    guard.ParameterIndex
+                    + max 0 (args.Length - typeInfoArgs.Length - parameters.Length)
 
                 match Array.tryItem index args with
                 | Some(Parameter.Parameter(name, _, _)) ->
@@ -9236,6 +9309,7 @@ module Compiler =
                 TailCallOpportunity = None
                 OptimizeTailCall = fun () -> ()
                 ScopedTypeParams = Set.empty
+                PassedGenerics = Map.empty
                 BoundTypes = Map.empty
                 ForcedIdents = Set.empty
                 IsNativeAsync = false

@@ -178,6 +178,9 @@ module Atts =
     let ficklAttachMembers = "Fickl.Core.AttachMembersAttribute" // typeof<Fickl.Core.AttachMembersAttribute>.FullName
 
     [<Literal>]
+    let ficklPassGenerics = "Fickl.Core.PassGenericsAttribute" // typeof<Fickl.Core.PassGenericsAttribute>.FullName
+
+    [<Literal>]
     let stringEnum = "Fable.Core.StringEnumAttribute" // typeof<Fable.Core.StringEnumAttribute>.FullName
 
     [<Literal>]

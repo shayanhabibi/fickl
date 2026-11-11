@@ -2548,13 +2548,24 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
         applyOp com ctx r t i.CompiledName args |> Some
     // Type info
     | "TypeOf", _ ->
-        (genArg com ctx r 0 i.GenericArgs)
-        |> makeTypeInfo (changeRangeToCallSite ctx.InlinePath r)
-        |> Some
+        let genArg = genArg com ctx r 0 i.GenericArgs
+        let range = changeRangeToCallSite ctx.InlinePath r
+
+        if FSharp2Fable.Util.PassGenerics.dependsOnPassed com ctx genArg then
+            FSharp2Fable.Util.PassGenerics.makeTypeInfo range genArg |> Some
+        else
+            makeTypeInfo range genArg |> Some
     | "TypeDefOf", _ ->
-        (genArg com ctx r 0 i.GenericArgs)
-        |> makeTypeDefinitionInfo (changeRangeToCallSite ctx.InlinePath r)
-        |> Some
+        let range = changeRangeToCallSite ctx.InlinePath r
+
+        match genArg com ctx r 0 i.GenericArgs with
+        // fickl: the definition of a type passed with PassGenerics is only known at runtime
+        | GenericParam(name = name) as genArg when FSharp2Fable.Util.PassGenerics.isPassed com ctx name ->
+            let typeInfo = FSharp2Fable.Util.PassGenerics.makeTypeInfo range genArg
+
+            Helper.LibCall(com, "Reflection", "getGenericTypeDefinition", t, [ typeInfo ], ?loc = r)
+            |> Some
+        | genArg -> makeTypeDefinitionInfo range genArg |> Some
     | _ -> None
 
 /// The runtime module of a DateOnly, TimeOnly or TimeSpan
@@ -5988,9 +5999,12 @@ let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr optio
     let resolved =
         // Some optimizations when the type is known at compile time
         match thisArg with
+        // fickl: a type passed with PassGenerics is only known at runtime
+        | Some(Value(TypeInfo(exprType, _), _)) when FSharp2Fable.Util.PassGenerics.dependsOnPassed com ctx exprType ->
+            None
         | Some(Value(TypeInfo(exprType, _), exprRange) as thisArg) ->
             match exprType with
-            | GenericParam(name = name) -> genericTypeInfoError name |> addError com ctx.InlinePath exprRange
+            | GenericParam(name = name) -> genericTypeInfoErrorFor com name |> addError com ctx.InlinePath exprRange
             | _ -> ()
 
             match i.CompiledName with
@@ -7133,7 +7147,10 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
             |> Some
         | Some c, "get_Name" ->
             match c with
-            | Value(TypeInfo(exprType, _), loc) when not (hasAnonymousRecord exprType) ->
+            | Value(TypeInfo(exprType, _), loc) when
+                not (hasAnonymousRecord exprType)
+                && not (FSharp2Fable.Util.PassGenerics.dependsOnPassed com ctx exprType)
+                ->
                 getTypeName com ctx loc exprType |> StringConstant |> makeValue r |> Some
             | c -> Helper.LibCall(com, "Reflection", "name", t, [ c ], ?loc = r) |> Some
         | _ -> None

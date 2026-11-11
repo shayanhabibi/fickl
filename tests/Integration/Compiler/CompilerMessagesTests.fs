@@ -2021,4 +2021,76 @@ let run () =
 """
       |> Assert.Is.strictSuccess
       |> ignore
+
+    // fickl#292
+    testCase "typeof of a type parameter in a non-inline function suggests PassGenerics" <| fun _ ->
+      compile """
+let nameOf<'T> () = typeof<'T>.Name
+"""
+      |> Assert.Exists.errorWith "Cannot get type info of generic parameter T"
+      |> Assert.Exists.errorWith "add the Fickl.Core.PassGenerics attribute"
+      |> ignore
+
+    testCase "PassGenerics passes type arguments to a non-inline function" <| fun _ ->
+      compile """
+open Fickl.Core
+[<PassGenerics>]
+let nameOf<'T> () = typeof<'T>.Name
+[<PassGenerics>]
+let forward<'T> (x: 'T) = nameOf<'T list> ()
+let inline viaInline (x: 'T) = forward x
+type C<'T>() =
+  [<PassGenerics>]
+  member _.Name<'U>(?x: int) = typeof<'T>.Name + typeof<'U>.Name
+[<PassGenerics>]
+let typeFunction<'T> = typeof<'T>.Name
+let run () = typeFunction<int>, nameOf<int> (), forward 1, viaInline "a", C<int>().Name<string>(), List.map forward [ 1 ]
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
+    testCase "A generic caller of a PassGenerics function must pass its type arguments too" <| fun _ ->
+      compile """
+open Fickl.Core
+[<PassGenerics>]
+let nameOf<'T> () = typeof<'T>.Name
+let caller<'T> (x: 'T) = nameOf<'T> ()
+"""
+      |> Assert.Exists.errorWith "Cannot get type info of generic parameter T"
+      |> Assert.Exists.errorWith "add the Fickl.Core.PassGenerics attribute"
+      |> ignore
+
+    testCase "PassGenerics is rejected where the type arguments cannot be passed" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+type IDescribe =
+  abstract Name<'T> : unit -> string
+type Describe() =
+  interface IDescribe with
+    [<PassGenerics>]
+    member _.Name<'T>() = typeof<'T>.Name
+"""
+      |> Assert.Exists.errorWith "PassGenerics is not supported on abstract members, overrides and interface implementations"
+      |> ignore
+
+      compile """
+open Fable.Core
+open Fickl.Core
+[<AttachMembers>]
+type Attached() =
+  [<PassGenerics>]
+  member _.Name<'T>() = typeof<'T>.Name
+"""
+      |> Assert.Exists.errorWith "PassGenerics is not supported on members attached to the class prototype"
+      |> ignore
+
+      compile """
+open Fickl.Core
+type Rest =
+  [<PassGenerics>]
+  static member Name<'T>([<System.ParamArray>] xs: int[]) = typeof<'T>.Name
+"""
+      |> Assert.Exists.errorWith "PassGenerics is not supported on functions with a ParamArray"
+      |> ignore
   ]
