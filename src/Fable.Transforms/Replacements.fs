@@ -4652,9 +4652,11 @@ let regex com (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Exp
         Helper.LibCall(com, "RegExp", "options", t, [ thisArg.Value ], [ thisArg.Value.Type ], ?loc = r)
         |> Some
     // Capture
+    // A failed match is `null` in JS, while in .NET it's an empty match (Index = 0, Value = ""
+    // and a single unsuccessful group), so the members of a match must be null-safe
     | "get_Index" ->
         if not isGroup then
-            propStr "index" thisArg.Value |> Some
+            emitExpr r t [ thisArg.Value ] "$0?.index ?? 0" |> Some
         else
             "Accessing index of Regex groups is not supported"
             |> addErrorAndReturnNull com ctx.InlinePath r
@@ -4667,16 +4669,17 @@ let regex com (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Exp
             Operation(Logical(LogicalOr, thisArg.Value, makeStrConst ""), Tags.empty, t, r)
             |> Some
         else
-            propInt 0 thisArg.Value |> Some
+            emitExpr r t [ thisArg.Value ] "$0?.[0] ?? \"\"" |> Some
     | "get_Length" ->
         if isGroup then
-            propStr "length" thisArg.Value |> Some
+            // Same as get_Value, the group can be undefined
+            emitExpr r t [ thisArg.Value ] "($0 ?? \"\").length" |> Some
         else
-            propInt 0 thisArg.Value |> propStr "length" |> Some
+            emitExpr r t [ thisArg.Value ] "($0?.[0] ?? \"\").length" |> Some
     // Group
     | "get_Success" -> nullCheck r false thisArg.Value |> Some
     // Match
-    | "get_Groups" -> thisArg.Value |> Some
+    | "get_Groups" -> emitExpr r t [ thisArg.Value ] "$0 ?? [undefined]" |> Some
     // MatchCollection & GroupCollection
     | "get_Item" when i.DeclaringEntityFullName = Types.regexGroupCollection ->
         // can be group index or group name
