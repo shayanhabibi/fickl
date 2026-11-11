@@ -94,6 +94,59 @@ type private DateTimeRepresentation =
     | JsDate
     | Temporal
 
+/// Top-level test lists of tests/Js/Main that deal with dates and times.
+let private dateTimeTestLists =
+    [ "DateTime"; "DateTimeOffset"; "DateOnly"; "TimeOnly"; "TimeSpan" ]
+
+/// IANA zones the date/time tests are re-run under, since CI machines are on UTC.
+/// Each zone lists the tests left out of its run, as full names (test list, then
+/// test case) with the reason. Node reads the zone from the TZ environment variable.
+let private dateTimeTestZones: (string * (string * string) list) list =
+    [
+        // Negative offset, northern hemisphere DST
+        "America/New_York", []
+        // Offset that is not a whole number of hours, no DST
+        "Asia/Kolkata", []
+        // Far-east offset, southern hemisphere DST
+        "Pacific/Auckland",
+        [
+            // Expects 13:23 UTC to fall on the same local day, which is also false
+            // on .NET at +13:00
+            "DateTimeOffset DateTimeOffset.LocalDateTime works", "expectation depends on the zone"
+        ]
+    ]
+
+/// Runs the date/time tests of an already compiled Main test project once per
+/// zone of dateTimeTestZones. The .NET run is not repeated in those zones (.NET
+/// ignores TZ on Windows), so this only checks tests that pass on .NET in any zone.
+let private runDateTimeTestsInZones (destinationDir: string) =
+    let namePattern = dateTimeTestLists |> String.concat "|" |> sprintf "^(%s) "
+
+    for zone, skipped in dateTimeTestZones do
+        for name, reason in skipped do
+            printfn $"Skipping '%s{name}' in %s{zone}: %s{reason}"
+
+        let args =
+            CmdLine.empty
+            |> CmdLine.appendPrefix "--test-reporter" "dot"
+            |> CmdLine.appendPrefix "--test-timeout" "20000"
+            |> CmdLine.appendPrefix "--test-name-pattern" namePattern
+            |> List.foldBack
+                (fun (name: string, _) ->
+                    CmdLine.appendPrefix "--test-skip-pattern" $"^%s{Text.RegularExpressions.Regex.Escape name}$"
+                )
+                skipped
+            |> CmdLine.appendPrefix "--test" (destinationDir </> "Main.js")
+            |> CmdLine.toString
+
+        Command.Run(
+            "node",
+            args,
+            workingDirectory = destinationDir,
+            configureEnvironment = (fun env -> env["TZ"] <- zone),
+            echoPrefix = $"TZ=%s{zone}"
+        )
+
 let private runMainTests (representation: DateTimeRepresentation) (isWatch: bool) (noDotnet: bool) =
     let folderName = "Main"
     let sourceDir = Path.Resolve("tests", "Js", folderName)
@@ -153,6 +206,8 @@ let private runMainTests (representation: DateTimeRepresentation) (isWatch: bool
         |> ignore
     else
         Command.Fable(fableArgs, workingDirectory = destinationDir)
+
+        runDateTimeTestsInZones destinationDir
 
 let private handleMainTests (isWatch: bool) (noDotnet: bool) =
     if isWatch then
