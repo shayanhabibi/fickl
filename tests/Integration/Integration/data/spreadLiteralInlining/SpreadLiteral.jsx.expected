@@ -1,0 +1,93 @@
+
+import { class_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+import { defaultOf, createAtom } from "./fable_modules/fable-library-js.5.27.0/Util.js";
+import react from "react";
+import { toStringOrEmpty } from "./fable_modules/fable-library-js.5.27.0/Types.js";
+import { cons, singleton, ofArray } from "./fable_modules/fable-library-js.5.27.0/List.js";
+
+export class Lib {
+    constructor() {
+    }
+}
+
+export function Lib_$reflection() {
+    return class_type("SpreadLiteral.Lib", undefined, Lib);
+}
+
+export function Lib_Make_Z17053F5(tag, ...children) {
+    return [tag, children];
+}
+
+export let counter = createAtom(0);
+
+export function eff(s) {
+    counter(counter() + 1);
+    return s;
+}
+
+export function nestedInlineFunctions() {
+    return react.createElement("div", {}, react.createElement("div", {
+        id: "a",
+    }), react.createElement("span", {}));
+}
+
+export function arrayOfValues(r, props, a, b) {
+    return r.createElementArr("div", props, a, b);
+}
+
+export function listOfCalls(r, props) {
+    return r.createElement("div", props, eff("a"), eff("b"));
+}
+
+export function arrayOfCalls(props) {
+    return react.createElementArr("div", props, eff("a"), eff("b"));
+}
+
+export function nullProps() {
+    return react.createElement("div", defaultOf(), eff("a"), eff("b"));
+}
+
+export function pipeline(props) {
+    return react.createElement("div", props, eff("a"), eff("b"));
+}
+
+export function valuesAfterCall(a, b) {
+    return Lib_Make_Z17053F5(toStringOrEmpty(eff("tag")), a, b);
+}
+
+export function callBeforeCalls() {
+    const children = ofArray([eff("a"), eff("b")]);
+    return react.createElement(eff("tag"), defaultOf(), ...children);
+}
+
+export function mutableRead() {
+    const children = singleton(counter());
+    return react.createElement((counter(counter() + 1), "div"), defaultOf(), ...children);
+}
+
+export function getterCallee(h) {
+    const children = singleton(eff("a"));
+    return h.Factory.createElement("div", defaultOf(), ...children);
+}
+
+export function callBetween() {
+    const children = singleton(eff("a"));
+    const props = eff("props");
+    return react.createElement("div", props, ...children);
+}
+
+export function usedTwice(a, b) {
+    const children = ofArray([a, b]);
+    return react.createElement("div", children, ...children);
+}
+
+export function capturedByClosure() {
+    const children = singleton(eff("a"));
+    return () => react.createElement("div", defaultOf(), ...children);
+}
+
+export function notLiteral(xs) {
+    const children = cons(eff("a"), xs);
+    return react.createElement("div", defaultOf(), ...children);
+}
+

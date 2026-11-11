@@ -936,8 +936,157 @@ type ErasedWithOperators =
     static member (-)(ErasedNum x, ErasedNum y) = ErasedNum(x - y - 1000)
     static member (~-)(ErasedNum x) = ErasedNum(x + 100)
 
+// fickl #311: a literal bound to a name and only read by a spread is passed as direct arguments
+type ISpreadCollector =
+    abstract Collect: tag: string * [<ParamArray>] items: string[] -> string
+
+type SpreadCollector =
+    static member Collect(tag: string, [<ParamArray>] items: string[]) = tag + ":" + String.concat "," items
+
+let inline spreadNode (collector: ISpreadCollector) (tag: string) (children: string[]) =
+    collector.Collect(tag, children)
+
+module SpreadLiteral =
+    let onlyElements (collector: ISpreadCollector) (eff: string -> string) =
+        let items = [| eff "a"; eff "b" |]
+        collector.Collect("t", items)
+
+    let tagAfterElements (collector: ISpreadCollector) (eff: string -> string) =
+        let items = [| eff "c"; eff "d" |]
+        collector.Collect(eff "tag", items)
+
+    let receiverAfterElements (getCollector: unit -> ISpreadCollector) (eff: string -> string) =
+        let items = [| eff "e" |]
+        getCollector().Collect("t", items)
+
+    let staticTagAfterElements (eff: string -> string) =
+        let items = [| eff "f"; eff "g" |]
+        SpreadCollector.Collect(eff "static", items)
+
+    let bindingAfterElements (collector: ISpreadCollector) (eff: string -> string) =
+        let items = [| eff "h" |]
+        let tag = eff "between"
+        collector.Collect(tag, items)
+
+    let valuesBeforeTag (collector: ISpreadCollector) (eff: string -> string) (a: string) (b: string) =
+        let items = [| a; b |]
+        collector.Collect(eff "values", items)
+
+    let readBeforeChange (collector: ISpreadCollector) (count: int ref) (next: unit -> string) =
+        let items = [| string count.Value |]
+        collector.Collect(next (), items)
+
+    let changeBeforeRead (collector: ISpreadCollector) (count: int ref) (next: unit -> string) =
+        let items = [| next (); next () |]
+        collector.Collect(string count.Value, items)
+
+    let nested (collector: ISpreadCollector) (eff: string -> string) =
+        spreadNode collector "x" [| spreadNode collector "y" [| eff "1"; eff "2" |]; eff "3"; spreadNode collector "z" [||] |]
+
+#if FABLE_COMPILER
+type ISpreadListCollector =
+    abstract Collect: tag: string * [<ParamList>] items: string list -> string
+    abstract Count: tag: string * [<ParamList>] items: string list -> int
+
+let spreadListCollector: ISpreadListCollector =
+    emitJsExpr
+        ()
+        "({ Collect(tag, ...items) { return tag + ':' + items.join(',') }, Count(tag, ...items) { return items.length } })"
+
+module SpreadListLiteral =
+    let onlyElements (eff: string -> string) =
+        let items = [ eff "a"; eff "b" ]
+        spreadListCollector.Collect("t", items)
+
+    let tagAfterElements (eff: string -> string) =
+        let items = [ eff "c"; eff "d" ]
+        spreadListCollector.Collect(eff "tag", items)
+
+    let pipeline (eff: string -> string) =
+        [ eff "e"; eff "f" ] |> fun items -> spreadListCollector.Collect("t", items)
+
+    let count (eff: string -> string) =
+        let items = [ eff "g"; eff "h"; eff "i" ]
+        spreadListCollector.Count("t", items)
+
+    let countEmpty () =
+        let items: string list = []
+        spreadListCollector.Count("t", items)
+#endif
+
 let tests =
   testList "JsInterop" [
+    testCase "A literal bound to a name and read by a spread keeps the order of evaluation" <| fun _ -> // fickl #311
+        let log = ResizeArray<string>()
+
+        let eff (s: string) =
+            log.Add s
+            s
+
+        let collector =
+            { new ISpreadCollector with
+                member _.Collect(tag, items) = tag + ":" + String.concat "," items }
+
+        let getCollector () =
+            log.Add "collector"
+            collector
+
+        SpreadLiteral.onlyElements collector eff |> equal "t:a,b"
+        SpreadLiteral.tagAfterElements collector eff |> equal "tag:c,d"
+        SpreadLiteral.receiverAfterElements getCollector eff |> equal "t:e"
+        SpreadLiteral.staticTagAfterElements eff |> equal "static:f,g"
+        SpreadLiteral.bindingAfterElements collector eff |> equal "between:h"
+        SpreadLiteral.valuesBeforeTag collector eff "i" "j" |> equal "values:i,j"
+
+        List.ofSeq log
+        |> equal [ "a"; "b"; "c"; "d"; "tag"; "e"; "collector"; "f"; "g"; "static"; "h"; "between"; "values" ]
+
+    testCase "A literal that reads a mutable value is not moved after a change of the value" <| fun _ -> // fickl #311
+        let collector =
+            { new ISpreadCollector with
+                member _.Collect(tag, items) = tag + ":" + String.concat "," items }
+
+        let count = ref 0
+
+        let next () =
+            count.Value <- count.Value + 1
+            string count.Value
+
+        SpreadLiteral.readBeforeChange collector count next |> equal "1:0"
+        SpreadLiteral.changeBeforeRead collector count next |> equal "3:2,3"
+
+    testCase "Literals bound by inlining a function are spread in order" <| fun _ -> // fickl #311
+        let log = ResizeArray<string>()
+
+        let eff (s: string) =
+            log.Add s
+            s
+
+        let collector =
+            { new ISpreadCollector with
+                member _.Collect(tag, items) =
+                    log.Add tag
+                    tag + ":" + String.concat "," items }
+
+        SpreadLiteral.nested collector eff |> equal "x:y:1,2,3,z:"
+        List.ofSeq log |> equal [ "1"; "2"; "y"; "3"; "z"; "x" ]
+
+#if FABLE_COMPILER
+    testCase "A list literal bound to a name is passed to ParamList as separate arguments" <| fun _ -> // fickl #311
+        let log = ResizeArray<string>()
+
+        let eff (s: string) =
+            log.Add s
+            s
+
+        SpreadListLiteral.onlyElements eff |> equal "t:a,b"
+        SpreadListLiteral.tagAfterElements eff |> equal "tag:c,d"
+        SpreadListLiteral.pipeline eff |> equal "t:e,f"
+        SpreadListLiteral.count eff |> equal 3
+        SpreadListLiteral.countEmpty () |> equal 0
+        List.ofSeq log |> equal [ "a"; "b"; "c"; "d"; "tag"; "e"; "f"; "g"; "h"; "i" ]
+#endif
+
     testCase "Custom operators of an erased union are used with operands built by the case constructor" <| fun _ -> // fickl #280
         let unwrap (ErasedNum x) = x
         let addBoth (x: ErasedWithOperators) (y: ErasedWithOperators) = x + y
