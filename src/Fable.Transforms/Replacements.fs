@@ -1046,6 +1046,7 @@ let tryEntityIdent (com: Compiler) entFullName =
     // | BuiltinDefinition FSharpMap _ -> fail "Map" // TODO:
     | Types.matchFail -> makeImportLib com Any "MatchFailureException" "Types" |> Some
     | Types.exception_ -> makeImportLib com Any "Exception" "Util" |> Some
+    | "System.AggregateException" -> makeImportLib com Any "AggregateException" "Util" |> Some
     | "System.OperationCanceledException" -> makeImportLib com Any "OperationCanceledException" "AsyncBuilder" |> Some
     | "System.Collections.Generic.KeyNotFoundException" ->
         makeImportLib com Any "KeyNotFoundException" "System.Collections.Generic"
@@ -3912,6 +3913,17 @@ let exceptions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
 
             Helper.LibCall(com, "AsyncBuilder", "OperationCanceledException", t, args, isConstructor = true, ?loc = r)
             |> Some
+        // fickl: every overload becomes (message, errors), the shape of a JS AggregateError
+        | "System.AggregateException" ->
+            let args =
+                match i.SignatureArgTypes, args with
+                | [ String; DeclaredType({ FullName = Types.exception_ }, _) as exnType ], [ msg; inner ] ->
+                    [ msg; makeArray exnType [ inner ] ]
+                | String :: _, _ -> args
+                | _ -> makeNullTyped String :: args
+
+            Helper.LibCall(com, "Util", "AggregateException", t, args, isConstructor = true, ?loc = r)
+            |> Some
         | _ ->
             Helper.LibCall(com, "Util", "Exception", Any, args, isConstructor = true)
             |> Some
@@ -3923,7 +3935,10 @@ let exceptions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr 
             Helper.LibCall(com, "Util", "exceptionMessage", t, [ e ], ?loc = r) |> Some
         | _ -> getFieldWith r t e "message" |> Some
     | "get_StackTrace", Some e -> getFieldWith r t e "stack" |> Some
-    | "get_InnerException", Some e -> getFieldWith r t e "innerException" |> Some
+    // fickl: the `cause` of a JS error is its InnerException
+    | "get_InnerException", Some e -> Helper.LibCall(com, "Util", "innerException", t, [ e ], ?loc = r) |> Some
+    | "GetBaseException", Some e -> Helper.LibCall(com, "Util", "getBaseException", t, [ e ], ?loc = r) |> Some
+    | "get_InnerExceptions", Some e -> getFieldWith r t e "errors" |> Some
     | "get_ParamName", Some _ -> bclType com ctx r t i thisArg args
     | _ -> None
 
@@ -5607,6 +5622,8 @@ let private replacedModules =
             "System.CharEnumerator", enumerators
             Types.resizeArray, resizeArrays
             "System.Collections.Generic.IList`1", resizeArrays
+            // fickl: AggregateException.InnerExceptions, which is the `errors` array of a JS AggregateError
+            "System.Collections.ObjectModel.ReadOnlyCollection`1", resizeArrays
             "System.Collections.IList", resizeArrays
             Types.valueCollection, collections
             Types.keyCollection, collections
