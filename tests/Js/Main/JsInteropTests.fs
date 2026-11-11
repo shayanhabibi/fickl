@@ -167,6 +167,15 @@ let inline curryInline2 (f: 'a -> 'b -> 'c) = f
 
 type Curry<'T1, 'T2> = delegate of 'T1 -> 'T2
 
+type HandlerProps =
+    static member inline onConnectInline(handler: int -> string -> string) = "onConnect" ==> handler
+    static member onConnect(handler: int -> string -> string) = "onConnect" ==> handler
+    static member inline setOnConnectInline(o: obj, handler: int -> string -> string) = o?onConnect <- handler
+    static member setOnConnect(o: obj, handler: int -> string -> string) = o?onConnect <- handler
+
+[<Emit("$0.onConnect(1, 'x')")>]
+let callOnConnectFromJs (o: obj) : string = jsNative
+
 type IMyOptions =
     interface end
 
@@ -1069,6 +1078,30 @@ let tests =
 
         o?foo <- fun x y -> x / y
         o?foo(25, 5) |> equal 5
+
+    testCase "Functions passed through a member into ==> are uncurried" <| fun () ->
+        let format prefix = fun (a: int) (b: string) -> $"{prefix} {a} {b}"
+
+        createObj [ HandlerProps.onConnectInline (fun a b -> $"inline {a} {b}") ]
+        |> callOnConnectFromJs
+        |> equal "inline 1 x"
+
+        createObj [ HandlerProps.onConnect (fun a b -> $"member {a} {b}") ]
+        |> callOnConnectFromJs
+        |> equal "member 1 x"
+
+        let local a b = $"local {a} {b}"
+        createObj [ "onConnect" ==> local ] |> callOnConnectFromJs |> equal "local 1 x"
+        createObj [ HandlerProps.onConnectInline local ] |> callOnConnectFromJs |> equal "local 1 x"
+        createObj [ HandlerProps.onConnect local ] |> callOnConnectFromJs |> equal "local 1 x"
+        createObj [ HandlerProps.onConnect (format "partial") ] |> callOnConnectFromJs |> equal "partial 1 x"
+
+    testCase "Functions passed through a member into ?<- are uncurried" <| fun () ->
+        let o = createObj []
+        HandlerProps.setOnConnectInline (o, (fun a b -> $"inline {a} {b}"))
+        callOnConnectFromJs o |> equal "inline 1 x"
+        HandlerProps.setOnConnect (o, (fun a b -> $"member {a} {b}"))
+        callOnConnectFromJs o |> equal "member 1 x"
 
     testCase "Function returned by other functions kept curried" <| fun () -> // See #2840
         let o = createObj [
