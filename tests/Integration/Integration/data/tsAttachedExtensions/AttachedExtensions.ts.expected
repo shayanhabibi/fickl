@@ -1,0 +1,85 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+import { int32ToString } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+
+export class Counter {
+    readonly count: int32;
+    constructor(count: int32) {
+        this.count = (count | 0);
+    }
+    get Count(): int32 {
+        const _: Counter = this;
+        return _.count | 0;
+    }
+    get Next(): Counter {
+        const this$: Counter = this;
+        return new Counter(this$.Count + 1);
+    }
+    get Double(): int32 {
+        const this$: Counter = this;
+        return (this$.Count * 2) | 0;
+    }
+    Add(n: int32): Counter {
+        const this$: Counter = this;
+        return new Counter(this$.Count + n);
+    }
+    static get Zero(): Counter {
+        return new Counter(0);
+    }
+    static Of(n: int32): Counter {
+        return new Counter(n);
+    }
+}
+
+export function Counter_$reflection(): TypeInfo {
+    return class_type("AttachedExtensions.Counter", undefined, Counter);
+}
+
+export function Counter_$ctor_Z524259A4(count: int32): Counter {
+    return new Counter(count);
+}
+
+export class Box$1<T> {
+    "Item@": T;
+    constructor(item: T) {
+        this["Item@"] = item;
+    }
+    get Item(): T {
+        const __: Box$1<T> = this;
+        return __["Item@"];
+    }
+    set Item(v: T) {
+        const __: Box$1<T> = this;
+        __["Item@"] = v;
+    }
+    Map<U>(f: ((arg0: T) => U)): Box$1<U> {
+        const this$: Box$1<T> = this;
+        return new Box$1<U>(f(this$.Item));
+    }
+    get Content(): T {
+        const this$: Box$1<T> = this;
+        return this$.Item;
+    }
+    set Content(v: T) {
+        const this$: Box$1<T> = this;
+        this$.Item = v;
+    }
+}
+
+export function Box$1_$reflection(gen0: TypeInfo): TypeInfo {
+    return class_type("AttachedExtensions.Box`1", [gen0], Box$1);
+}
+
+export function Box$1_$ctor_2B595<T>(item: T): Box$1<T> {
+    return new Box$1(item);
+}
+
+export function System_String__String_get_Twice(this$: string): string {
+    return this$ + this$;
+}
+
+export const total: int32 = Counter.Of(2).Add(3).Double + Counter.Zero.Next.Count;
+
+export const content: string = System_String__String_get_Twice((new Box$1<int32>(1)).Map<string>(int32ToString).Content);
+

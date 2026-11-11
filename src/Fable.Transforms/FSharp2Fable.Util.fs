@@ -2932,6 +2932,40 @@ module Util =
         && memb.IsConstructor
         && not memb.IsImplicitConstructor
 
+    /// fickl: the [<AttachMembers>] class an optional type extension declared in the class's own file extends,
+    /// for JavaScript and TypeScript. Its members compile into the class body like the class's own members.
+    /// An extension in another file stays a module function: the class is already emitted there.
+    let tryAttachedExtensionEntity (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        if
+            memb.IsExtensionMember
+            && (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+        then
+            memb.ApparentEnclosingEntity
+            |> Option.filter (fun ent ->
+                isAttachMembersEntity com ent
+                && not (isGlobalOrImportedFSharpEntity ent)
+                && not (isErasedOrStringEnumFSharpEntity ent)
+                && ent.DeclarationLocation.FileName = memb.DeclarationLocation.FileName
+            )
+        else
+            None
+
+    /// fickl: F# compiles an optional extension member as `Type.Member`, and `Type.Member.Static` when static,
+    /// this is the name of the member alone
+    let extensionMemberName (memb: FSharpMemberOrFunctionOrValue) =
+        let name = memb.CompiledName
+
+        if memb.IsExtensionMember then
+            let name =
+                if not memb.IsInstanceMember && name.EndsWith(".Static", StringComparison.Ordinal) then
+                    name.Substring(0, name.Length - ".Static".Length)
+                else
+                    name
+
+            name.Substring(name.LastIndexOf('.') + 1)
+        else
+            name
+
     let isPojoDefinedByConsArgsEntity (entity: Fable.Entity) =
         entity |> hasAttribute Atts.pojoDefinedByConsArgs
 
@@ -3577,7 +3611,7 @@ module Util =
             then
                 getMemberDisplayName memb
             else
-                memb.CompiledName
+                extensionMemberName memb
 
         {|
             name = name
@@ -3946,6 +3980,21 @@ module Util =
 
         // The value/method is not imported, check if the declaring entity is
         | None, Some callInfo, Some e ->
+            // fickl: an extension attached to its class is called on the class or the instance, which F# passes
+            // as the first argument
+            let e, callInfo =
+                match tryAttachedExtensionEntity com memb with
+                | None -> e, callInfo
+                | Some ent ->
+                    match callInfo.ThisArg, callInfo.Args with
+                    | None, thisArg :: args when memb.IsInstanceMember ->
+                        ent,
+                        { callInfo with
+                            ThisArg = Some thisArg
+                            Args = args
+                        }
+                    | _ -> ent, callInfo
+
             let moduleOrClassExpr =
                 match tryGlobalOrImportedFSharpEntity com e with
                 | Some expr -> Some expr
