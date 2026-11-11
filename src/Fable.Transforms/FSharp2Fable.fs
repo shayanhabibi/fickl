@@ -3256,6 +3256,145 @@ let private checkNativeMemberCollisions (com: FableCompiler) ctx (ent: FSharpEnt
 
             checkBase ent
 
+/// Text and property names of a [<StructuredFormatDisplay>] format, None when .NET ignores it too
+let private tryParseStructuredFormat (format: string) =
+    let unescape (text: string) =
+        text.Replace("\\{", "{").Replace("\\}", "}")
+
+    let rec parse acc (text: string) =
+        let m =
+            System.Text.RegularExpressions.Regex.Match(
+                text,
+                @"^(.*?)(?<!\\)\{(.*?)(?<!\\)\}(.*)$",
+                System.Text.RegularExpressions.RegexOptions.Singleline
+            )
+
+        if m.Success then
+            parse (Choice2Of2 m.Groups[2].Value :: Choice1Of2(unescape m.Groups[1].Value) :: acc) m.Groups[3].Value
+        elif System.Text.RegularExpressions.Regex.IsMatch(text, @"(?<!\\)[{}]") then
+            None
+        else
+            Choice1Of2(unescape text) :: acc |> List.rev |> Some
+
+    if format = "" then
+        None
+    else
+        parse [] format
+
+/// fickl: a record or union prints its [<StructuredFormatDisplay>] wherever it prints, as its .NET ToString is `%A`.
+/// A type with its own ToString only prints it for `%A`, which looks for toStructuredString.
+let private attachStructuredFormatDisplay (com: FableCompiler) (ctx: Context) (fsEnt: FSharpEntity) =
+    let format =
+        if fsEnt.IsFSharpExceptionDeclaration || fsEnt.IsInterface then
+            None
+        else
+            tryFindAttrib "Microsoft.FSharp.Core.StructuredFormatDisplayAttribute" fsEnt.Attributes
+            |> Option.bind (fun att ->
+                match Seq.tryHead att.ConstructorArguments with
+                | Some(_, (:? string as format)) -> tryParseStructuredFormat format
+                | _ -> None
+            )
+
+    match format with
+    | None -> ()
+    | Some parts ->
+        let thisArg =
+            let ent = (com :> Compiler).GetEntity(FsEnt.Ref fsEnt)
+            { makeTypedIdent (getEntityType ent) "this$" with IsThisArgument = true }
+
+        let thisExpr = Fable.IdentExpr thisArg
+
+        let rec tryProperty (fsEnt: FSharpEntity) (name: string) =
+            let field =
+                fsEnt.FSharpFields
+                |> Seq.tryFind (fun field -> not field.IsStatic && field.Name = name)
+
+            match field with
+            | Some field ->
+                let typ = makeType Map.empty field.FieldType
+
+                let kind =
+                    Fable.FieldInfo.Create(FsField.FSharpFieldName field, fieldType = typ, isMutable = field.IsMutable)
+
+                Fable.Get(thisExpr, kind, typ, None) |> Some
+            | None ->
+                fsEnt.MembersFunctionsAndValues
+                |> Seq.tryFind (fun memb ->
+                    memb.IsInstanceMember
+                    && memb.IsPropertyGetterMethod
+                    && memb.CompiledName = "get_" + name
+                    && memb.CurriedParameterGroups |> Seq.forall (fun group -> group.Count = 0)
+                )
+                |> Option.map (fun memb ->
+                    let typ = makeType Map.empty memb.ReturnParameter.Type
+                    makeCallFrom com ctx None typ [] (Some thisExpr) [] memb
+                )
+                |> Option.orElseWith (fun () ->
+                    tryGetBaseEntity fsEnt
+                    |> Option.bind (fun (baseEnt, _) -> tryProperty baseEnt name)
+                )
+
+        let parts =
+            parts
+            |> List.map (
+                function
+                | Choice1Of2 text -> Some(makeStrConst text)
+                | Choice2Of2 name ->
+                    tryProperty fsEnt name
+                    |> Option.map (fun value ->
+                        match value.Type with
+                        | Fable.String -> value
+                        | _ -> Replacements.Util.Helper.LibCall(com, "Types", "toString", Fable.String, [ value ])
+                    )
+            )
+
+        // .NET prints an error in place of a property it cannot find, here the type prints as if it had no attribute
+        if List.forall Option.isSome parts then
+            let body =
+                parts
+                |> List.choose id
+                |> List.filter (
+                    function
+                    | Fable.Value(Fable.StringConstant "", _) -> false
+                    | _ -> true
+                )
+                |> function
+                    | [] -> makeStrConst ""
+                    | parts ->
+                        parts
+                        |> List.reduce (fun left right -> makeBinOp None Fable.String left right BinaryPlus)
+
+            let hasToString =
+                fsEnt.MembersFunctionsAndValues
+                |> Seq.exists (fun memb ->
+                    memb.IsInstanceMember
+                    && memb.IsOverrideOrExplicitInterfaceImplementation
+                    && memb.CompiledName = "ToString"
+                )
+
+            let name =
+                if (fsEnt.IsFSharpRecord || fsEnt.IsFSharpUnion) && not hasToString then
+                    "toString"
+                else
+                    "toStructuredString"
+
+            com.AddAttachedMember(
+                fsEnt.FullName,
+                isMangled = false,
+                memb =
+                    {
+                        Name = name
+                        Args = [ thisArg ]
+                        Body = body
+                        IsMangled = false
+                        UsedNames = set [ thisArg.Name ]
+                        MemberRef = Fable.GeneratedMember.Function(name, [], Fable.String, entRef = FsEnt.Ref fsEnt)
+                        ImplementedSignatureRef = None
+                        Tags = Fable.Tags.empty
+                        XmlDoc = None
+                    }
+            )
+
 let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
     fsDecls
     |> List.collect (fun fsDecl ->
@@ -3343,6 +3482,11 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
                     match getEntityDeclarationName com entRef with
                     | s when System.String.IsNullOrEmpty(s) -> []
                     | name ->
+                        match (com :> Compiler).Options.Language with
+                        | JavaScript
+                        | TypeScript -> attachStructuredFormatDisplay com ctx fsEnt
+                        | _ -> ()
+
                         [
                             Fable.ClassDeclaration
                                 {

@@ -39,6 +39,50 @@ type B() =
             a <- a + 1
             $"a=%O{a}"
 
+[<StructuredFormatDisplay("{Display}")>]
+type SfdRecord =
+    { sfdA: int }
+    member this.Display = $"Foo {{ a = {this.sfdA} }}"
+
+[<StructuredFormatDisplay("U<{Display}>!")>]
+type SfdUnion =
+    | SfdA of int
+    | SfdB
+    member this.Display =
+        match this with
+        | SfdA i -> $"A{i}"
+        | SfdB -> "B"
+
+[<Struct; StructuredFormatDisplay("{Display}")>]
+type SfdStructRecord =
+    { sfdE: int }
+    member this.Display = $"struct {this.sfdE}"
+
+[<StructuredFormatDisplay("x{sfdN}-{Inner}-{Items}\{z\}")>]
+type SfdFields<'T> =
+    { sfdN: int; Inner: SfdRecord; Extra: 'T }
+    member this.Items = [ this.Extra; this.Extra ]
+
+[<StructuredFormatDisplay("no braces")>]
+type SfdLiteral = { sfdC: int }
+
+[<StructuredFormatDisplay("x{sfdD} oops { d")>]
+type SfdIllFormed = { sfdD: int }
+
+[<StructuredFormatDisplay("{Display}")>]
+type SfdRecordWithToString =
+    { sfdB: int }
+    member this.Display = "disp"
+    override this.ToString() = "tostr"
+
+[<StructuredFormatDisplay("C({Display})")>]
+type SfdClass(x: int) =
+    member _.Display = x
+    override _.ToString() = "tostr"
+
+type SfdDerived() =
+    inherit SfdClass(7)
+
 let spr fmt =
     let fmt = Printf.StringFormat<_>(fmt)
     sprintf fmt
@@ -345,6 +389,42 @@ let tests = testList "Strings" [
 
     testCase "Fix #2398: Exception when two successive string format placeholders and value of first one ends in `%`" <| fun () ->
         sprintf "%c%s" '%' "text" |> equal "%text"
+
+    testCase "StructuredFormatDisplay is how a record or union prints" <| fun () ->
+        let r = { sfdA = 1337 }
+        sprintf "%A" r |> equal "Foo { a = 1337 }"
+        sprintf "%O" r |> equal "Foo { a = 1337 }"
+        string r |> equal "Foo { a = 1337 }"
+        $"{r}" |> equal "Foo { a = 1337 }"
+        r.ToString() |> equal "Foo { a = 1337 }"
+        sprintf "%A" (SfdA 1) |> equal "U<A1>!"
+        string SfdB |> equal "U<B>!"
+        $"{SfdA 2}" |> equal "U<A2>!"
+        sprintf "%A" { sfdE = 3 } |> equal "struct 3"
+        string { sfdE = 3 } |> equal "struct 3"
+        sprintf "%A" [ { sfdA = 1 }; { sfdA = 2 } ] |> equal "[Foo { a = 1 }; Foo { a = 2 }]"
+        string [ SfdA 1; SfdB ] |> equal "[U<A1>!; U<B>!]"
+
+    testCase "StructuredFormatDisplay prints text, fields and properties" <| fun () ->
+        let x = { sfdN = 1; Inner = { sfdA = 2 }; Extra = 3 }
+        sprintf "%A" x |> equal "x1-Foo { a = 2 }-[3; 3]{z}"
+        string x |> equal "x1-Foo { a = 2 }-[3; 3]{z}"
+        string { sfdC = 1 } |> equal "no braces"
+        // A format with a stray brace is ignored
+        string { sfdD = 1 } |> equal "{ sfdD = 1 }"
+
+    testCase "StructuredFormatDisplay only changes %A for a type with its own ToString" <| fun () ->
+        let r = { sfdB = 1 }
+        sprintf "%A" r |> equal "disp"
+        sprintf "%O" r |> equal "tostr"
+        string r |> equal "tostr"
+        $"{r}" |> equal "tostr"
+        let c = SfdClass 5
+        sprintf "%A" c |> equal "C(5)"
+        sprintf "%O" c |> equal "tostr"
+        string c |> equal "tostr"
+        sprintf "%A" (SfdDerived()) |> equal "C(7)"
+        string (SfdDerived()) |> equal "tostr"
 
     // See https://github.com/fable-compiler/Fable/issues/4732
     testCase "sprintf \"%A\" quotes strings" <| fun () ->
