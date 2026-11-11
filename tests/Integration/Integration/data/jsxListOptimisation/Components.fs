@@ -42,6 +42,8 @@ type prop =
 
     static member inline title (value : string) : JSX_IReactProperty = "title", value
 
+    static member inline testId (value : string) : JSX_IReactProperty = "data-testid", value
+
 [<Erase>]
 type Html =
 
@@ -216,3 +218,62 @@ let divWithTwoSpreads =
 
 let divWithSpreadAndChildren =
     Html.div [ JSX.spread spreadProps; prop.children [ Html.div "Child" ] ]
+
+let divWithConditionalProp (isActive: bool) =
+    Html.div [
+        prop.testId "target"
+        if isActive then
+            prop.className "active"
+        prop.title "always"
+    ]
+
+let divWithConditionalPropAfterProp (isActive: bool) =
+    Html.div [
+        prop.testId "target"
+        prop.title "always"
+        if isActive then
+            prop.title "active"
+    ]
+
+let divWithConditionalPropWithElseBranch (isActive: bool) =
+    Html.div [
+        prop.testId "target"
+        if isActive then
+            prop.className "active"
+        else
+            prop.title "inactive"
+    ]
+
+let divWithSeveralConditionalProps (isActive: bool) =
+    Html.div [
+        prop.testId "target"
+        if isActive then
+            prop.className "active"
+            prop.title "active"
+        prop.children [ Html.div "Child" ]
+    ]
+
+let divWithNestedConditionalProps (isActive: bool) (isFirst: bool) =
+    Html.div [
+        prop.testId "target"
+        if isActive then
+            prop.className "active"
+            JSX.spread spreadProps
+            if isFirst then
+                prop.title "first"
+    ]
+
+let divWithConditionalSpread (isActive: bool) =
+    Html.div [
+        prop.testId "target"
+        prop.title "before"
+        if isActive then
+            JSX.spread spreadProps
+    ]
+
+let divWithYieldBangProps =
+    Html.div [
+        prop.testId "target"
+        prop.className "header"
+        yield! [ prop.title "yielded"; unbox<JSX_IReactProperty> ("id", "myid") ]
+    ]
