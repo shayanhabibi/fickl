@@ -18,3 +18,6 @@ let findOrNull (index: int) (list: 'T list) : 'T | null when 'T: not struct =
     | None -> null
 
 let nullableInt (x: System.Nullable<int>) = x
+
+// #272: .NET concatenation takes a null string as empty. Only the `string | null` operands are guarded
+let greet (title: string) (name: string | null) : string = title + " " + name + "!"
