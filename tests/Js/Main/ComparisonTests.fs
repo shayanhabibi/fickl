@@ -120,6 +120,12 @@ type FuzzyInt =
             x - 2 <= y && y <= x + 2
         | _ -> false
 
+// Same names, cases and fields as the types above, but different types
+module SameShape =
+    type UTest = A of int | B of int
+    type RTest = { a: int; b: int }
+    exception Ex of int
+
 let genericEquals (a: 'T) (b: 'T) : bool =
     let cmp = EqualityComparer<'T>.Default
     cmp.Equals(a, b)
@@ -190,6 +196,16 @@ let tests =
     testCase "NoEquality struct record compares structurally when boxed" <| fun () ->
         equal true ((box { s2 = 1 }).Equals(box { s2 = 1 }))
         equal false ((box { s2 = 1 }).Equals(box { s2 = 2 }))
+
+    testCase "Values of different types with the same shape are not equal" <| fun () ->
+        equal true (box (A 1) = box (A 1))
+        equal false (box (A 1) = box (SameShape.A 1))
+        equal false ((box (A 1)).Equals(box (SameShape.A 1)))
+        equal true (box { a = 1; b = 2 } = box { a = 1; b = 2 })
+        equal false (box { a = 1; b = 2 } = box ({ a = 1; b = 2 }: SameShape.RTest))
+        equal false ((box { a = 1; b = 2 }).Equals(box ({ a = 1; b = 2 }: SameShape.RTest)))
+        equal true (box (Ex 1) = box (Ex 1))
+        equal false (box (Ex 1) = box (SameShape.Ex 1))
 
     testCase "Typed array equality works" <| fun () ->
         let xs1 = [| 1; 2; 3 |]

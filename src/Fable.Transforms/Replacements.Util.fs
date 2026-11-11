@@ -829,6 +829,9 @@ let compose (com: ICompiler) ctx r t (f1: Expr) (f2: Expr) =
 
     Let(capturedFun1Var, f1, Let(capturedFun2Var, f2, Lambda(arg, body, None)))
 
+/// fable-library-ts has `curry2..curry20` and `uncurry2..uncurry20`; above that JS/TS call `curryN`/`uncurryN`.
+let private maxFixedCurryArity = 20
+
 let partialApplyAtRuntime (com: Compiler) t arity (expr: Expr) (partialArgs: Expr list) =
     match com.Options.Language with
     | JavaScript
@@ -844,6 +847,9 @@ let partialApplyAtRuntime (com: Compiler) t arity (expr: Expr) (partialArgs: Exp
                 match com.Options.Language with
                 | Python ->
                     Helper.LibCall(com, "Curry", "curry", curriedType, [ makeNativeIntConst argTypes.Length; expr ])
+                | JavaScript
+                | TypeScript when argTypes.Length > maxFixedCurryArity ->
+                    Helper.LibCall(com, "Util", "curryN", curriedType, [ makeIntConst argTypes.Length; expr ])
                 | _ -> Helper.LibCall(com, "Util", $"curry%d{argTypes.Length}", curriedType, [ expr ])
 
             match partialArgs with
@@ -897,6 +903,9 @@ let uncurryExprAtRuntime (com: Compiler) arity (expr: Expr) =
 
             match com.Options.Language with
             | Python -> Helper.LibCall(com, "Curry", "uncurry", uncurriedType, [ makeNativeIntConst arity; expr ])
+            | JavaScript
+            | TypeScript when arity > maxFixedCurryArity ->
+                Helper.LibCall(com, "Util", "uncurryN", uncurriedType, [ makeIntConst arity; expr ])
             | _ -> Helper.LibCall(com, "Util", $"uncurry%d{arity}", uncurriedType, [ expr ])
         | _ ->
             // let makeArgIdent typ = makeTypedIdent typ $"a{com.IncrementCounter()}$"

@@ -164,8 +164,9 @@ let private compileCase (testCaseDir: string) =
             | [| project |] -> project
             | [||] -> Path.Combine(testCaseDir, "main.fsx")
             | projects -> failwith $"Expected one project in {testCaseDir}, found {projects.Length}"
-        // clean up old actual files
-        for f in Directory.GetFileSystemEntries(testCaseDir, "*.actual") do
+        // clean up old actual files, also those of a referenced project in a subfolder: one left behind
+        // makes the next run skip the compilation as up-to-date
+        for f in Directory.GetFiles(testCaseDir, "*.actual", SearchOption.AllDirectories) do
             File.Delete f
 
         let libraryDir = Path.Combine(testCaseDir, "library")

@@ -392,8 +392,18 @@ export function defaultOf<T>(): T {
   return null as T;
 }
 
+// Debug builds store the F# full name of a union, record or exception under this key of its class.
+// A hot-module reload evaluates the module again, so one F# type gets a second class object.
+export const typeIdSymbol: unique symbol = Symbol.for("fickl.type.id");
+
 export function sameConstructor<T>(x: T, y: T) {
-  return Object.getPrototypeOf(x)?.constructor === Object.getPrototypeOf(y)?.constructor;
+  const xCons = Object.getPrototypeOf(x)?.constructor;
+  const yCons = Object.getPrototypeOf(y)?.constructor;
+  if (xCons === yCons) {
+    return true;
+  }
+  const xId = xCons?.[typeIdSymbol];
+  return xId !== undefined && xId === yCons?.[typeIdSymbol];
 }
 
 export interface IEnumerator<T> extends IDisposable {
@@ -1392,6 +1402,29 @@ export function curry20<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, 
   if (f == null) { return null as never; }
   return getCurried(f) as (a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => (a19: T19) => (a20: T20) => TResult
     ?? ((a1: T1) => (a2: T2) => (a3: T3) => (a4: T4) => (a5: T5) => (a6: T6) => (a7: T7) => (a8: T8) => (a9: T9) => (a10: T10) => (a11: T11) => (a12: T12) => (a13: T13) => (a14: T14) => (a15: T15) => (a16: T16) => (a17: T17) => (a18: T18) => (a19: T19) => (a20: T20) => f(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20));
+}
+
+// Arities above the fixed helpers (the compiler emits these from 21 arguments up). Same contract as
+// uncurry2..20/curry2..20: null passes through, exactly `arity` arguments are forwarded, and the adapter
+// remembers the curried function it wraps so currying it again hands the original back.
+export function uncurryN(arity: number, f: Function | null | undefined): any {
+  if (f == null) { return null; }
+  const f2 = (...args: unknown[]) => {
+    let res: any = f;
+    for (let i = 0; i < arity; i++) {
+      res = res(args[i]);
+    }
+    return res;
+  };
+  (f2 as CurriedAdapter)[curriedKey] = f;
+  return f2;
+}
+
+export function curryN(arity: number, f: Function | null | undefined): any {
+  if (f == null) { return null; }
+  const curryFrom = (args: unknown[]) => (arg: unknown): unknown =>
+    args.length + 1 >= arity ? f(...args, arg) : curryFrom([...args, arg]);
+  return getCurried(f) ?? curryFrom([]);
 }
 
 // More performant method to copy arrays, see #2352

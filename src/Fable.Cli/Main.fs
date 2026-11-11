@@ -778,7 +778,9 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                                     Array.concat
                                         [
                                             state.FSharpLogs
-                                            CodeServices.getFSharpDiagnostics results.Diagnostics
+                                            CodeServices.getProjectFSharpDiagnostics
+                                                projCracked.ProjectOptions.SourceFiles
+                                                results.Diagnostics
                                             CodeServices.getAssemblyAutoOpenHints results
                                         ]
                                 HasFSharpCompilationFinished = true
@@ -2031,11 +2033,23 @@ let startCompilationAsync state =
                                                         $"""Changes:{Log.newLine}    {changes |> String.concat $"{Log.newLine}    "}"""
                                                 )
 
-                                            let! compilationResult = compilationCycle state changes
+                                            // fickl: once the watcher runs, a failed cycle (say a source file another
+                                            // process keeps locked) is reported and the next change starts over, as the
+                                            // compiler doesn't outlive the error
+                                            let! state =
+                                                async {
+                                                    try
+                                                        let! compilationResult = compilationCycle state changes
+                                                        return compilationResult.State
+                                                    with Fable.FableError e when w.StartedAt > DateTime.MinValue ->
+                                                        Log.error e
+
+                                                        return { state with ProjectCrackedAndFableCompiler = None }
+                                                }
 
                                             Log.always $"Watching {File.relPathToCurDir w.Watcher.BasePath}"
 
-                                            return! loop compilationResult.State
+                                            return! loop state
                                         | _ -> return! loop state
                                 }
 

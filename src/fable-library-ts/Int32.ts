@@ -93,11 +93,37 @@ export function getRadix(prefix: string | undefined, style: number) {
   }
 }
 
+// Not a NumberStyles value. The compiler adds it for the F# conversion functions (`int "0x1F"`),
+// whose strings are F# literals: an optional "-" before a 0x, 0o or 0b prefix, and underscores
+// between the digits. Int32.Parse and its siblings take none of those.
+export const FSharpLiteral = 0x00010000;
+
+const AllowLeadingWhite = 0x00000001;
+const AllowTrailingWhite = 0x00000002;
+
 export function isValid(str: string, style: number, radix?: number) {
+  if (radix == null && style & NumberStyles.AllowHexSpecifier) {
+    // .NET takes neither a sign nor a prefix here, so "0b11" is the hexadecimal number B11
+    const res = /^(\s*)([0-9a-fA-F]+)(\s*)$/.exec(str);
+    if (res == null
+      || (res[1] !== "" && !(style & AllowLeadingWhite))
+      || (res[3] !== "" && !(style & AllowTrailingWhite))) {
+      return null;
+    }
+    return { sign: "", prefix: "", digits: res[2]!, radix: 16 };
+  }
+  if (radix == null && !(style & FSharpLiteral)) {
+    const res = /^\s*([\+\-])?()([0-9]+)\s*$/.exec(str);
+    return res != null ? validResponse(res, 10) : null;
+  }
   const integerRegex = /^\s*([\+\-])?(0[xXoObB])?([0-9a-fA-F]+)\s*$/;
   const res = integerRegex.exec(str.replace(/_/g, ""));
   if (res != null) {
-    const [/*all*/, /*sign*/, prefix, digits] = res;
+    const [/*all*/, sign, prefix, digits] = res;
+    // F# reads the prefix only at the start or after "-", so "+0x1F" is not a number
+    if (radix == null && sign === "+" && prefix != null) {
+      return null;
+    }
     radix = radix || getRadix(prefix, style);
     const invalidDigits = getInvalidDigits(radix);
     if (!invalidDigits.test(digits!)) {

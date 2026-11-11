@@ -1646,6 +1646,52 @@ module Curry =
                 equal expected actual
         ]
 
+// See #291: arities above the fixed curry20/uncurry20 helpers
+module Arity22 =
+    type Fn22 = int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int list
+
+    type Fn22Holder = { Fn: Fn22 }
+
+    let list22 (a1: int) (a2: int) (a3: int) (a4: int) (a5: int) (a6: int) (a7: int) (a8: int) (a9: int) (a10: int) (a11: int) (a12: int) (a13: int) (a14: int) (a15: int) (a16: int) (a17: int) (a18: int) (a19: int) (a20: int) (a21: int) (a22: int) : int list =
+        [ a1; a2; a3; a4; a5; a6; a7; a8; a9; a10; a11; a12; a13; a14; a15; a16; a17; a18; a19; a20; a21; a22; ]
+
+    let getFn22 (direct: bool) : Fn22 =
+        if direct then list22 else (fun a1 -> list22 a1)
+
+    let apply22 (f: Fn22) = f 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22
+
+    let applyPartially22 (f: Fn22) =
+        let g = f 1
+        let h = g 2
+        g 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22, h 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22, h 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22
+
+    let applyOption22 (f: Fn22 option) =
+        match f with
+        | Some f -> f 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22
+        | None -> []
+
+    let tests =
+        [
+            testCase "uncurry function of arity 22 works" <| fun _ ->
+                apply22 (getFn22 true) |> equal [ 1..22 ]
+                apply22 (getFn22 false) |> equal [ 1..22 ]
+
+            testCase "curried function of arity 22 can be partially applied" <| fun _ ->
+                let expected = [ 1..22 ]
+                applyPartially22 (getFn22 true) |> equal (expected, expected, expected)
+                applyPartially22 (getFn22 false) |> equal (expected, expected, expected)
+
+            testCase "function of arity 22 works in a record field" <| fun _ ->
+                let holder = { Fn = getFn22 false }
+                apply22 holder.Fn |> equal [ 1..22 ]
+                let g = holder.Fn 1 2 3
+                g 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 |> equal [ 1..22 ]
+
+            testCase "optional function of arity 22 works" <| fun _ ->
+                applyOption22 (Some(getFn22 true)) |> equal [ 1..22 ]
+                applyOption22 None |> equal []
+        ]
+
 module Uncurry =
     // Wrap everything into a compiler directives because we are using JS interop
     // to provoke the behavior we want
@@ -1929,6 +1975,7 @@ let tests =
         @ tests7
         @ CurriedApplicative.tests
         @ Curry.tests
+        @ Arity22.tests
         @ Uncurry.tests
         @ MultipleInlines.tests
         @ AccessorFunctionShorthand.tests

@@ -6041,6 +6041,21 @@ but thanks to the optimisation done below we get
                             isStatic = true,
                             isComputed = true
                         )
+                // fickl: a hot-module reload gives the type a new class, so equality needs an identity that survives it
+                if
+                    com.Options.DebugMode
+                    && (ent.IsFSharpRecord
+                        || ent.IsValueType
+                        || ent.IsFSharpUnion
+                        || ent.IsFSharpExceptionDeclaration)
+                then
+                    yield
+                        ClassMember.classProperty (
+                            libValue com ctx "Util" "typeIdSymbol",
+                            value = Expression.stringLiteral ent.FullName,
+                            isStatic = true,
+                            isComputed = true
+                        )
                 yield classCons
                 yield! classMembers
                 for interfaceName, symbolName, isAsync in
@@ -7820,7 +7835,12 @@ but thanks to the optimisation done below we get
                     | None ->
                         let expr = transformModuleFunction com ctx memb decl.Name decl.Args decl.Body
 
-                        if hasAttribute Atts.entryPoint memb.Attributes then
+                        // Only the last file of the project has the entry point that runs: one in a
+                        // referenced project is compiled as a plain function
+                        if
+                            hasAttribute Atts.entryPoint memb.Attributes
+                            && com.CurrentFile = Array.last com.SourceFiles
+                        then
                             [ declareEntryPoint com ctx expr ]
                         else
                             match tryUnknownSignature com ctx memb decl.Args expr with
