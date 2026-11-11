@@ -1844,10 +1844,13 @@ module TypeHelpers =
 
     let makeTypeFromDef withConstraints ctxTypeArgs (genArgs: IList<FSharpType>) (tdef: FSharpEntity) =
         if tdef.IsArrayType then
-            Fable.Array(
-                makeTypeGenArgsWithConstraints withConstraints ctxTypeArgs genArgs |> List.head,
-                Fable.MutableArray
-            )
+            let genArg =
+                makeTypeGenArgsWithConstraints withConstraints ctxTypeArgs genArgs |> List.head
+
+            match Compiler.Language, tdef.ArrayRank with
+            // fickl: a `'T[,]` is an array of rows, and each row is a plain JS array whatever the element type
+            | (JavaScript | TypeScript), 2 -> Fable.Array(Fable.Array(genArg, Fable.ResizeArray), Fable.MutableArray)
+            | _ -> Fable.Array(genArg, Fable.MutableArray)
         elif tdef.IsDelegate then
             makeTypeFromDelegate withConstraints ctxTypeArgs genArgs tdef
         elif tdef.IsEnum then
@@ -4270,6 +4273,44 @@ module Util =
             let fableMember = FsMemberFunctionOrValue(memb)
             // TODO: Move plugin application to FableTransforms
             com.ApplyMemberCallPlugin(fableMember, callExpr)
+
+    /// fickl: a `System.Array` member called on a `'T[,]`. The Fable type of a `'T[,]` is that of a jagged array,
+    /// where `Length` is the number of rows, so only the F# type of the callee tells the two apart.
+    let isMultiDimArrayMember (com: IFableCompiler) (fsCallee: FSharpExpr) (memb: FSharpMemberOrFunctionOrValue) =
+        match com.Options.Language, memb.DeclaringEntity, fsCallee.Type with
+        | (JavaScript | TypeScript), Some ent, NonAbbreviatedType calleeType ->
+            calleeType.HasTypeDefinition
+            && calleeType.TypeDefinition.IsArrayType
+            && calleeType.TypeDefinition.ArrayRank > 1
+            && FsEnt.FullName ent = Types.array
+        | _ -> false
+
+    /// Replaces the member as one of `System.Array` followed by the rank, as in "System.Array`2"
+    let makeMultiDimArrayMemberCall
+        (com: IFableCompiler)
+        (ctx: Context)
+        r
+        typ
+        (NonAbbreviatedType calleeType: FSharpType)
+        (callee: Fable.Expr)
+        (args: Fable.Expr list)
+        (memb: FSharpMemberOrFunctionOrValue)
+        =
+        let info: Fable.ReplaceCallInfo =
+            {
+                SignatureArgTypes = getArgTypes com memb
+                DeclaringEntityFullName = FsEnt.FullName calleeType.TypeDefinition
+                HasSpread = false
+                IsModuleValue = false
+                IsInterface = false
+                CompiledName = memb.CompiledName
+                OverloadSuffix = ""
+                GenericArgs = []
+            }
+
+        match com.TryReplace(ctx, r, typ, info, Some callee, args) with
+        | Some e -> e
+        | None -> failReplace com ctx r info (Some callee)
 
     let makeCallFrom
         (com: IFableCompiler)

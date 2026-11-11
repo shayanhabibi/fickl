@@ -1761,16 +1761,16 @@ let (|PrintfNoFormatSpecifiers|_|) (arg: Expr) =
         | _ -> None
     | _ -> None
 
+let rec private canRepeat e =
+    match e with
+    | IdentExpr _
+    | Value((StringConstant _ | NumberConstant _ | CharConstant _ | BoolConstant _), _) -> true
+    | TypeCast(e, _) -> canRepeat e
+    | Get(e, FieldGet info, _, _) -> not info.CanHaveSideEffects && canRepeat e
+    | _ -> false
+
 // The fallback only runs for a nullish read, and every out-of-bounds read is nullish
 let readAtCallSite (com: ICompiler) r t container idx (fallback: Expr) =
-    let rec canRepeat e =
-        match e with
-        | IdentExpr _
-        | Value((StringConstant _ | NumberConstant _ | CharConstant _ | BoolConstant _), _) -> true
-        | TypeCast(e, _) -> canRepeat e
-        | Get(e, FieldGet info, _, _) -> not info.CanHaveSideEffects && canRepeat e
-        | _ -> false
-
     if canRepeat container && canRepeat idx then
         emitExpr r t [ getExpr None t container idx; fallback ] "$0 ?? $1"
     else
@@ -1894,6 +1894,14 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     | "CreateSequence", [ xs ] -> TypeCast(xs, t) |> Some
     | ("CreateDictionary" | "CreateReadOnlyDictionary"), [ arg ] -> makeDictionary com ctx r t arg |> Some
     | "CreateSet", _ -> (genArg com ctx r 0 i.GenericArgs) |> makeSet com ctx r t "OfSeq" args |> Some
+    | "CreateArray2D", [ rows ] ->
+        let genArgs =
+            match t with
+            | Array(Array(itemType, _), _) -> [ itemType ]
+            | _ -> []
+
+        Helper.LibCall(com, "Array2D", "ofRows", t, [ rows ], genArgs = genArgs, ?loc = r)
+        |> Some
     // Ranges
     | ("op_Range" | "op_RangeStep"), _ ->
         let genArg = genArg com ctx r 0 i.GenericArgs
@@ -2592,6 +2600,67 @@ let arrayGetItem (com: ICompiler) r (t: Type) (args: Expr list) (signatureArgTyp
     // V8 cannot specialise the read inside the shared `item` once it sees many array kinds
     | [ idx; ar ] -> readAtCallSite com r t ar idx item |> Some
     | _ -> Some item
+
+// fickl: a `'T[,]` is an array of rows. As with `readAtCallSite`, the checked read only runs for a nullish result
+let array2DGetItem (com: ICompiler) r (t: Type) (ar: Expr) (idx1: Expr) (idx2: Expr) =
+    let item =
+        Helper.LibCall(com, "Array2D", "item", t, [ ar; idx1; idx2 ], genArgs = [ t ], ?loc = r)
+
+    if canRepeat ar && canRepeat idx1 && canRepeat idx2 then
+        emitExpr r t [ ar; idx1; idx2; item ] "$0[$1]?.[$2] ?? $3"
+    else
+        item
+
+let array2DSetItem r (ar: Expr) (idx1: Expr) (idx2: Expr) (value: Expr) =
+    let rowType =
+        match ar.Type with
+        | Array(rowType, _) -> rowType
+        | _ -> Any
+
+    setExpr r (getExpr None rowType ar idx1) idx2 value
+
+let array2DLength (com: ICompiler) r (t: Type) (ar: Expr) (dimension: Expr) =
+    match dimension with
+    | Value(NumberConstant(NumberValue.Int32 0, _), _) -> getFieldWith r t ar "length"
+    | Value(NumberConstant(NumberValue.Int32 1, _), _) -> Helper.LibCall(com, "Array2D", "length2", t, [ ar ], ?loc = r)
+    | _ -> Helper.LibCall(com, "Array2D", "getLength", t, [ ar; dimension ], ?loc = r)
+
+/// `System.Array` members called on a `'T[,]`, which FSharp2Fable tells apart from the ones called on a `'T[]`
+let arrays2D (com: ICompiler) (_: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    match i.CompiledName, thisArg, args with
+    | "get_Length", Some ar, _ -> Helper.LibCall(com, "Array2D", "length", t, [ ar ], ?loc = r) |> Some
+    | "get_Rank", Some _, _ -> makeIntConst 2 |> Some
+    | "GetLength", Some ar, [ dimension ] -> array2DLength com r t ar dimension |> Some
+    | "Clone", Some ar, _ -> Helper.LibCall(com, "Array2D", "copy", t, [ ar ], ?loc = r) |> Some
+    | _ -> None
+
+let array2DModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Expr option) (args: Expr list) =
+    let libCall name =
+        Helper.LibCall(com, "Array2D", name, t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
+        |> Some
+
+    match i.CompiledName, args with
+    | "ZeroCreate", [ length1; length2 ] ->
+        // Unlike a `'T[]`, where a string starts as "", the items start as on .NET
+        let zero = genArg com ctx r 0 i.GenericArgs |> defaultof com ctx None
+
+        Helper.LibCall(com, "Array2D", "create", t, [ length1; length2; zero ], genArgs = i.GenericArgs, ?loc = r)
+        |> Some
+    | "Create", _ -> libCall "create"
+    | "Initialize", _ -> libCall "initialize"
+    | "Length1", [ ar ] -> array2DLength com r t ar (makeIntConst 0) |> Some
+    | "Length2", [ ar ] -> array2DLength com r t ar (makeIntConst 1) |> Some
+    // Arrays with a base other than zero cannot be created
+    | ("Base1" | "Base2"), [ _ ] -> makeIntConst 0 |> Some
+    | "Get", [ ar; idx1; idx2 ] -> array2DGetItem com r t ar idx1 idx2 |> Some
+    | "Set", [ _; _; _; _ ] -> libCall "setItem"
+    | "Map", _ -> libCall "map"
+    | "MapIndexed", _ -> libCall "mapIndexed"
+    | "Iterate", _ -> libCall "iterate"
+    | "IterateIndexed", _ -> libCall "iterateIndexed"
+    | ("Copy" | "Rebase"), [ _ ] -> libCall "copy"
+    | "CopyTo", _ -> libCall "blit"
+    | _ -> None
 
 let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
@@ -3601,6 +3670,8 @@ let intrinsicFunctions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisAr
         |> Some
     | "GetArray", _, [ ar; idx ] -> arrayGetItem com r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
     | "SetArray", _, [ ar; idx; value ] -> setExpr r ar idx value |> Some
+    | "GetArray2D", _, [ ar; idx1; idx2 ] -> array2DGetItem com r t ar idx1 idx2 |> Some
+    | "SetArray2D", _, [ ar; idx1; idx2; value ] -> array2DSetItem r ar idx1 idx2 value |> Some
     | ("GetArraySlice" | "GetStringSlice"), None, [ ar; lower; upper ] ->
         // JS slice counts a negative index from the end, .NET clamps it to 0
         let clampToZero (index: Expr) =
@@ -5578,6 +5649,8 @@ let private replacedModules =
             "System.Runtime.CompilerServices.FormattableStringFactory", formattableString
             "System.Text.StringBuilder", bclType
             Types.array, arrays
+            Types.array + "`2", arrays2D
+            "Microsoft.FSharp.Collections.Array2DModule", array2DModule
             Types.list, lists
             // JS cannot parallelize synchronous actions so for now redirect to "standard" array module
             // TODO: Other languages may want to implement it
