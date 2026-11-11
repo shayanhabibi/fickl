@@ -259,7 +259,7 @@ and private addAbstractMemberNames names (memb: AbstractMember) =
         addParameterNames names parameters
         addTypeNames names returnType
         addTypeParameterNames names typeParameters
-    | AbstractProperty(_, returnType, _, _, _) -> addTypeNames names returnType
+    | AbstractProperty(_, returnType, _, _, _, _) -> addTypeNames names returnType
     | AbstractMethod(_, _, parameters, returnType, typeParameters, _, _) ->
         addParameterNames names parameters
         addTypeNames names returnType
