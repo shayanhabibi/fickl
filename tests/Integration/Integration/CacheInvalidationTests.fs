@@ -99,4 +99,21 @@ let tests =
                             (File.Exists(Path.Combine(outDir, "Scalars.js")))
                             "The file added through the imported .props should have been generated"
                     )
+
+            // A failed compilation still writes its outputs, so the next run used to find them up to date
+            testCase "A run after a failed compilation fails again instead of being skipped"
+            <| fun () ->
+                withTempProject
+                    "failed"
+                    (fun dir outDir ->
+                        let libPath = Path.Combine(dir, "Lib.fs")
+                        File.WriteAllText(libPath, "module Lib\n\nlet greeting: string = Undefined.thing\n")
+
+                        Expect.notEqual (compile dir outDir) 0 "First compilation should fail"
+                        Expect.notEqual (compile dir outDir) 0 "Second compilation should fail too"
+
+                        writeNewer libPath "module Lib\n\nlet greeting = \"hello\"\n"
+                        Expect.equal (compile dir outDir) 0 "Compilation should succeed once the error is fixed"
+                        Expect.equal (compile dir outDir) 0 "A run after a successful compilation should succeed"
+                    )
         ]
