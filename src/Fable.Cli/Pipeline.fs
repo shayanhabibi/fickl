@@ -137,7 +137,10 @@ module Js =
                     | None -> path
 
                 let path =
-                    Imports.getImportPath pathResolver sourcePath targetPath projDir cliArgs.OutDir path
+                    if Imports.isRootAbsolutePath path then
+                        path
+                    else
+                        Imports.getImportPath pathResolver sourcePath targetPath projDir cliArgs.OutDir path
 
                 if
                     path.EndsWith(".fs", StringComparison.Ordinal)

@@ -1,0 +1,8 @@
+import { FOO } from "/env.js";
+import { BAR } from "/lib/bar.js";
+
+export const foo = FOO;
+
+export const barLength = BAR.length;
+
+export const lazyEnv = import("/env.js");
