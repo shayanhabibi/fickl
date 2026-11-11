@@ -60,6 +60,72 @@ let tests =
             | Some(:? exn as e) -> equal false (isNull e.StackTrace)
             | _ -> failwith "expected an exception"
 
+        testCase "Built-in exceptions keep their inner exception" <| fun () ->
+            let inner = exn "inner"
+            let error = System.InvalidOperationException("load failed", inner)
+            error.Message |> equal "load failed"
+            obj.ReferenceEquals(error.InnerException, inner) |> equal true
+            System.NotSupportedException("no", inner).InnerException.Message |> equal "inner"
+            System.Collections.Generic.KeyNotFoundException("missing", inner).InnerException.Message |> equal "inner"
+            System.ArgumentNullException("null", inner).InnerException.Message |> equal "inner"
+            System.ArgumentNullException("null", inner).Message |> equal "null"
+            System.ArgumentOutOfRangeException("range", inner).InnerException.Message |> equal "inner"
+            isNull (System.InvalidOperationException("alone")).InnerException |> equal true
+            isNull (System.InvalidOperationException()).InnerException |> equal true
+            isNull (exn "alone").InnerException |> equal true
+
+            let caught =
+                try
+                    raise error
+                with
+                | :? System.InvalidOperationException as e -> e.InnerException.Message
+                | _ -> "other"
+
+            caught |> equal "inner"
+
+        testCase "GetBaseException follows the inner exceptions" <| fun () ->
+            let inner = exn "inner"
+            let error = System.Exception("outer", System.InvalidOperationException("middle", inner))
+            obj.ReferenceEquals(error.GetBaseException(), inner) |> equal true
+            obj.ReferenceEquals(inner.GetBaseException(), inner) |> equal true
+
+        testCase "AggregateException holds its inner exceptions" <| fun () ->
+            let first = exn "a"
+            let error = System.AggregateException("many", [| first; exn "b" |])
+            error.InnerExceptions.Count |> equal 2
+            error.InnerExceptions[1].Message |> equal "b"
+            error.InnerExceptions |> Seq.map _.Message |> String.concat "," |> equal "a,b"
+            error.Message |> equal "many (a) (b)"
+            obj.ReferenceEquals(error.InnerException, first) |> equal true
+            System.AggregateException("many", exn "a", exn "b").InnerExceptions.Count |> equal 2
+            System.AggregateException("one", first).InnerExceptions.Count |> equal 1
+            System.AggregateException("one", first).InnerException.Message |> equal "a"
+            System.AggregateException("list", [ exn "a"; exn "b" ]).Message |> equal "list (a) (b)"
+            System.AggregateException(seq { exn "a" }).Message |> equal "One or more errors occurred. (a)"
+            System.AggregateException([| exn "a"; exn "b" |]).InnerExceptions.Count |> equal 2
+            System.AggregateException("none").InnerExceptions.Count |> equal 0
+            System.AggregateException("none").Message |> equal "none"
+            isNull (System.AggregateException()).InnerException |> equal true
+
+        testCase "AggregateException is caught by type" <| fun () ->
+            let classify (error: exn) =
+                try
+                    raise error
+                with
+                | :? System.AggregateException as e -> e.InnerExceptions |> Seq.map _.Message |> String.concat ","
+                | e -> "other: " + e.Message
+
+            classify (System.AggregateException("many", exn "a", exn "b")) |> equal "a,b"
+            classify (exn "plain") |> equal "other: plain"
+            classify (System.InvalidOperationException("op", exn "inner")) |> equal "other: op"
+
+        testCase "AggregateException.GetBaseException stops at several errors" <| fun () ->
+            let leaf = exn "leaf"
+            let nested = System.AggregateException("outer", System.AggregateException("inner", leaf))
+            obj.ReferenceEquals(nested.GetBaseException(), leaf) |> equal true
+            let several = System.AggregateException("outer", exn "a", exn "b")
+            obj.ReferenceEquals(several.GetBaseException(), several) |> equal true
+
 #if FABLE_COMPILER
         testCase "JsError exceptions are native Errors" <| fun () ->
             let error = Boom 3 :> exn
@@ -151,5 +217,58 @@ let tests =
         testCase "Other F# exceptions are not native Errors by default" <| fun () ->
             emitJsExpr (Plain 3 :> exn) "$0 instanceof Error" |> equal false
             emitJsExpr (exn "message") "$0 instanceof Error" |> equal false
+
+        testCase "An inner exception is the cause of the JS error" <| fun () ->
+            let inner = exn "inner"
+            emitJsExpr (exn ("outer", inner), inner) "$0.cause === $1" |> equal true
+            emitJsExpr (System.InvalidOperationException("outer", inner), inner) "$0.cause === $1" |> equal true
+            emitJsExpr (System.ArgumentException("outer", inner), inner) "$0.cause === $1" |> equal true
+            emitJsExpr (exn "alone") "'cause' in $0" |> equal false
+            emitJsExpr (exn ("outer", inner)) "Object.keys($0).includes('cause')" |> equal false
+
+        testCase "The cause of a JS error is its InnerException" <| fun () ->
+            let inner statement =
+                try
+                    throwJs statement
+                    "none"
+                with e ->
+                    if isNull e.InnerException then
+                        "null"
+                    else
+                        e.InnerException.Message
+
+            inner "throw new Error('outer', { cause: new TypeError('inner') })" |> equal "inner"
+            inner "throw new Error('outer')" |> equal "null"
+            inner "throw 'boom'" |> equal "null"
+            inner "throw undefined" |> equal "null"
+
+            let baseMessage =
+                try
+                    throwJs "throw new Error('a', { cause: new Error('b', { cause: new Error('c') }) })"
+                    "none"
+                with e ->
+                    e.GetBaseException().Message
+
+            baseMessage |> equal "c"
+
+        testCase "A JS AggregateError is caught as an AggregateException" <| fun () ->
+            let messages statement =
+                try
+                    throwJs statement
+                    "none"
+                with
+                | :? System.AggregateException as e ->
+                    let messages = e.InnerExceptions |> Seq.map _.Message |> String.concat ","
+                    $"{e.Message}: {messages} ({e.InnerExceptions.Count})"
+                | e -> "other: " + e.Message
+
+            messages "throw new AggregateError([new Error('x'), new TypeError('y')], 'agg')" |> equal "agg: x,y (2)"
+            messages "throw new Error('plain')" |> equal "other: plain"
+
+        testCase "AggregateException has the errors of an AggregateError" <| fun () ->
+            let first = exn "a"
+            let error = System.AggregateException("many", first, exn "b")
+            emitJsExpr error "$0.errors.length" |> equal 2
+            emitJsExpr (error, first) "$0.errors[0] === $1 && $0.cause === $1" |> equal true
 #endif
     ]

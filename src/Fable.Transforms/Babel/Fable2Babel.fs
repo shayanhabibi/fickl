@@ -967,6 +967,10 @@ module Reflection =
             | Types.exception_ ->
                 [ com.TransformAsExpr(ctx, expr) ]
                 |> libCall com ctx range "Util" "isException" []
+            // fickl: a JS AggregateError is an AggregateException too
+            | "System.AggregateException" ->
+                [ com.TransformAsExpr(ctx, expr) ]
+                |> libCall com ctx range "Util" "isAggregateException" []
             // fickl: a symbol is a primitive, not an instance of Symbol
             | "Fickl.Core.JS.Symbol" -> jsTypeof "symbol" expr
             | _ ->
@@ -1344,7 +1348,9 @@ module Annotation =
         | Types.iobservableGeneric ->
             makeFableLibImportTypeAnnotation com ctx genArgs "Observable" "IObservable"
             |> Some
-        | Types.ilistGeneric -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "MutableArray" |> Some
+        | Types.ilistGeneric
+        | "System.Collections.ObjectModel.ReadOnlyCollection`1" ->
+            makeFableLibImportTypeAnnotation com ctx genArgs "Util" "MutableArray" |> Some
         | "Microsoft.FSharp.Control.IEvent`1" ->
             makeFableLibImportTypeAnnotation com ctx genArgs "Event" "IEvent" |> Some
         | Types.ievent2 -> makeFableLibImportTypeAnnotation com ctx genArgs "Event" "IEvent$2" |> Some
