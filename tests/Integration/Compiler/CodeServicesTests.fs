@@ -43,6 +43,7 @@ module private Fixture =
             Exclude = [ "Fable.Core" ]
             Replace = Map.empty
             FileExtensions = Map.empty
+            Redirect = Map.empty
             RunProcess = None
             CompilerOptions = CompilerOptionsHelper.Make()
             Verbosity = Verbosity.Silent
@@ -57,6 +58,7 @@ module private Fixture =
     let private pathResolver =
         { new PathResolver with
             member _.TryPrecompiledOutPath(_sourceDir, _relativePath) = None
+            member _.TryRedirectedImport(_sourceDir, _relativePath) = None
             member _.GetOrAddDeduplicateTargetDir(_importDir, _addTargetDir) = ""
         }
 

@@ -133,27 +133,35 @@ module Js =
                 // still names the source here, relative to this one; below it becomes a path between outputs
                 let fileExt = Imports.getFileExtension cliArgs sourceDir path
 
-                let path =
-                    // TODO: Check precompiled out path for other languages too
-                    match pathResolver.TryPrecompiledOutPath(sourceDir, path) with
-                    | Some path -> Imports.getRelativePath sourceDir path
-                    | None -> path
+                // fickl: a source of a `--redirect` reference is imported from its package
+                match pathResolver.TryRedirectedImport(sourceDir, path) with
+                | Some specifier -> Path.ChangeExtension(specifier, fileExt)
+                | None ->
+                    let path =
+                        // TODO: Check precompiled out path for other languages too
+                        match pathResolver.TryPrecompiledOutPath(sourceDir, path) with
+                        | Some path -> Imports.getRelativePath sourceDir path
+                        | None -> path
 
-                let path =
-                    if Imports.isRootAbsolutePath path then
-                        path
+                    let path =
+                        if Imports.isRootAbsolutePath path then
+                            path
+                        else
+                            Imports.getImportPath pathResolver sourcePath targetPath projDir cliArgs.OutDir path
+
+                    if
+                        path.EndsWith(".fs", StringComparison.Ordinal)
+                        || path.EndsWith(".fsx", StringComparison.Ordinal)
+                    then
+                        let isInFableModules = Path.Combine(targetDir, path) |> Naming.isInFableModules
+
+                        File.changeExtensionButUseDefaultExtensionInFableModules
+                            JavaScript
+                            isInFableModules
+                            path
+                            fileExt
                     else
-                        Imports.getImportPath pathResolver sourcePath targetPath projDir cliArgs.OutDir path
-
-                if
-                    path.EndsWith(".fs", StringComparison.Ordinal)
-                    || path.EndsWith(".fsx", StringComparison.Ordinal)
-                then
-                    let isInFableModules = Path.Combine(targetDir, path) |> Naming.isInFableModules
-
-                    File.changeExtensionButUseDefaultExtensionInFableModules JavaScript isInFableModules path fileExt
-                else
-                    path
+                        path
 
             member _.AddLog(msg, severity, ?range) =
                 com.AddLog(msg, severity, ?range = range, fileName = com.CurrentFile)

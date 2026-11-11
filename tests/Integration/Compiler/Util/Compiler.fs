@@ -64,6 +64,7 @@ module Compiler =
               Exclude = ["Fable.Core"]
               Replace = Map.empty
               FileExtensions = Map.empty
+              Redirect = Map.empty
               RunProcess = None
               CompilerOptions = compilerOptions
               Verbosity = Verbosity.Normal }
