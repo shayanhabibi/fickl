@@ -55,6 +55,7 @@
     <Compile Include="DateTimeOffsetTests.fs" />
     <Compile Include="DateTimeTests.fs" />
     <Compile Include="DateOnlyTests.fs" />
+    <Compile Include="DecimalTests.fs" />
     <Compile Include="DictionaryTests.fs" />
     <Compile Include="ElmishParserTests.fs" />
     <Compile Include="EnumerableTests.fs" />
