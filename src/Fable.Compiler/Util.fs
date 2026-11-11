@@ -159,14 +159,31 @@ module File =
         else
             Path.GetRelativePath(Directory.GetCurrentDirectory(), path)
 
+    /// fickl: an editor saving a file can hold it exclusively for a moment, so a read that fails
+    /// is tried again for a couple of seconds before the error is let through
+    let retryOnIOException (read: unit -> 'T) : 'T =
+        let retryUntil = DateTime.UtcNow + TimeSpan.FromSeconds 2.
+
+        let mutable result = ValueNone
+
+        while result.IsNone do
+            try
+                result <- ValueSome(read ())
+            with :? IOException when DateTime.UtcNow < retryUntil ->
+                Thread.Sleep 100
+
+        result.Value
+
     /// File.ReadAllText fails with locked files. See https://stackoverflow.com/a/1389172
     let readAllTextNonBlocking (path: string) =
         if File.Exists(path) then
-            use fileStream =
-                new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+            retryOnIOException (fun () ->
+                use fileStream =
+                    new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
 
-            use textReader = new StreamReader(fileStream)
-            textReader.ReadToEnd()
+                use textReader = new StreamReader(fileStream)
+                textReader.ReadToEnd()
+            )
         else
             Log.always ("File does not exist: " + path)
             ""

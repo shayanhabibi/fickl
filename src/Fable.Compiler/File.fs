@@ -8,11 +8,13 @@ type File(normalizedFullPath: string) =
 
     let readAllTextNonBlocking (path: string) =
         if File.Exists(path) then
-            use fileStream =
-                new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+            Util.File.retryOnIOException (fun () ->
+                use fileStream =
+                    new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
 
-            use textReader = new StreamReader(fileStream)
-            textReader.ReadToEnd()
+                use textReader = new StreamReader(fileStream)
+                textReader.ReadToEnd()
+            )
         else
             // Log.always("File does not exist: " + path)
             ""

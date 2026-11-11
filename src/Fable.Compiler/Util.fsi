@@ -59,6 +59,9 @@ module File =
         lang: Fable.Language -> isInFableModules: bool -> filePath: string -> fileExt: string -> string
 
     val relPathToCurDir: path: string -> string
+    /// Tries a read again for a couple of seconds while it fails with an IOException, as a file
+    /// being saved by an editor can be locked for a moment.
+    val retryOnIOException: read: (unit -> 'T) -> 'T
     /// File.ReadAllText fails with locked files. See https://stackoverflow.com/a/1389172
     val readAllTextNonBlocking: path: string -> string
 
