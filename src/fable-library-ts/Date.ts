@@ -11,6 +11,7 @@
 import { type int64, toInt64, toFloat64 } from "./BigInt.ts";
 import { FSharpRef } from "./Types.ts";
 import { Exception, compareDates, DateTimeKind, dateOffset, type IDateTime, type IDateTimeOffset, padWithZeros } from "./Util.ts";
+import { hasValidDateParts } from "./DateTimeFormat.ts";
 
 export type OffsetInMinutes = number;
 export type Offset = "Z" | OffsetInMinutes | null;
@@ -635,6 +636,10 @@ export function parseRaw(input: string): [Date, Offset] {
   }
 
   if ((input.match(/[a-z]+/gi) ?? []).some(word => !recognizedDateWords.has(word.toLowerCase()))) {
+    fail();
+  }
+
+  if (!hasValidDateParts(input)) {
     fail();
   }
 
