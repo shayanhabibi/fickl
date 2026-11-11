@@ -336,6 +336,18 @@ let isReferencedInsideQuote identName body =
         | _ -> false
     )
 
+/// fickl: the value of a binding marked with `JsInterop.keepBinding`, which stays a named binding
+[<return: Struct>]
+let (|KeptBinding|_|) expr =
+    match expr with
+    | Emit({
+               Macro = "$0"
+               CallInfo = { Args = [ value ] } as info
+           },
+           _,
+           _) when List.contains "fickl-keep-binding" info.Tags -> ValueSome value
+    | _ -> ValueNone
+
 let canInlineArg (com: Compiler) identName value body =
     if isReferencedInsideQuote identName body then
         false
@@ -550,6 +562,7 @@ module private Transforms =
 
         let canInlineBinding =
             match value with
+            | KeptBinding _ -> false
             | Import(i, _, _) -> i.IsCompilerGenerated
             // fickl: reading a mutable value of another file is a call of an import, which tells nothing about the
             // value changing, so it must not be moved past side effects
@@ -653,6 +666,7 @@ module private Transforms =
             (not com.Options.DebugMode) || ident.IsCompilerGenerated
 
         match e with
+        | Let(_, KeptBinding _, _) -> e
         | Let(ident, value, letBody) when
             (not ident.IsMutable)
             && isErasingCandidate ident
@@ -680,6 +694,12 @@ module private Transforms =
                     ->
                     replaceValues (Map [ ident.Name, value ]) letBody
                 | _ -> e
+        | e -> e
+
+    /// Once no pass can inline the binding any more, the marker has done its job
+    let unwrapKeptBinding (_com: Compiler) e =
+        match e with
+        | KeptBinding value -> value
         | e -> e
 
     let typeEqualsAtCompileTime t1 t2 =
@@ -1291,6 +1311,7 @@ let getTransformations (_com: Compiler) =
         fun com e -> visitFromOutsideIn (lambdaBetaReduction com) e
         // Make a new binding beta reduction pass after applying lambdas
         fun com e -> visitFromInsideOut (bindingBetaReduction com) e
+        fun com e -> visitFromInsideOut (unwrapKeptBinding com) e
         fun com e -> visitFromInsideOut (operationReduction com) e
         // Then apply uncurry optimizations
         // Functions passed as arguments in calls (but NOT in curried applications) are being uncurried so we have to re-curry them

@@ -640,6 +640,12 @@ let private effectInThrownValue (log: ResizeArray<string>) : int =
     let v = effect log "v" 1
     raise (EffectFailed(effect log "w" 2, v))
 
+let private effectsKept (log: ResizeArray<string>) (threshold: int) =
+    let a = effect log "a" true
+    let b = Fickl.Core.JsInterop.keepBinding (effect log "b" 1)
+    let c = Fickl.Core.JsInterop.keepBinding (effect log "c" (threshold > b))
+    c && a
+
 let tests =
   testList "Miscellaneous" [
     testCase "Hoisted vars don't conflict with while loop" <| fun () -> // see #4031
@@ -2029,4 +2035,10 @@ let tests =
     testCase "A binding with effects is not moved after a throw" <| fun () -> // See #309
         effectsOf effectAfterThrow |> equal [ "v"; "threw" ]
         effectsOf effectInThrownValue |> equal [ "v"; "w"; "threw" ]
+
+    testCase "keepBinding returns its value and keeps the order of effects" <| fun () -> // See #309
+        effectsKept (ResizeArray()) 5 |> equal true
+        effectsKept (ResizeArray()) 0 |> equal false
+        effectsOf (fun log -> effectsKept log 5) |> equal [ "a"; "b"; "c" ]
+        Fickl.Core.JsInterop.keepBinding (1 + 1) |> equal 2
   ]

@@ -1,0 +1,75 @@
+
+import { FSharpException } from "./fable_modules/fable-library-js.5.27.0/Types.js";
+import { class_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+import { Exception } from "./fable_modules/fable-library-js.5.27.0/Util.js";
+
+export function useA() {
+    return true;
+}
+
+export function useCtx() {
+    return 1;
+}
+
+export function useScroll(threshold, scrollRef) {
+    return threshold > scrollRef;
+}
+
+export function inlined(threshold) {
+    const smOrAbove = useA();
+    if (useScroll(threshold, useCtx())) {
+        return smOrAbove;
+    }
+    else {
+        return false;
+    }
+}
+
+export function kept(threshold) {
+    const smOrAbove = useA();
+    const scrollRef = useCtx() | 0;
+    const isThreshold = useScroll(threshold, scrollRef);
+    if (isThreshold) {
+        return smOrAbove;
+    }
+    else {
+        return false;
+    }
+}
+
+export function keptValues(x) {
+    const y = (x + 1) | 0;
+    const unused = useCtx() | 0;
+    const add = (a, b) => (((a + b) + y) | 0);
+    return add(1, 2) | 0;
+}
+
+export function notABinding(x) {
+    return ((x + 1) + 2) | 0;
+}
+
+export class Failed extends FSharpException {
+    constructor(Data0, Data1) {
+        super();
+        this.Data0 = (Data0 | 0);
+        this.Data1 = (Data1 | 0);
+    }
+}
+
+export function Failed_$reflection() {
+    return class_type("KeepBinding.Failed", undefined, Failed, class_type("System.Exception"));
+}
+
+export function throwArgs() {
+    const first = useCtx() | 0;
+    throw new Failed(useCtx(), first);
+}
+
+export function afterThrow() {
+    const first = useCtx() | 0;
+    (() => {
+        throw new Exception("thrown");
+    })();
+    return first | 0;
+}
+
