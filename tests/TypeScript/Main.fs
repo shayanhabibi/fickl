@@ -41,6 +41,7 @@ let allTests =
     DateTimeOffset.tests
     DateTime.tests
     DateOnly.tests
+    Decimals.tests
     Dictionaries.tests
 #if FABLE_COMPILER
     ElmishParser.tests
