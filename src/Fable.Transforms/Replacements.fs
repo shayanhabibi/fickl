@@ -612,6 +612,23 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
         | Operators.addition, [ left; right ] ->
             match argTypes with
             | Char :: _ -> binOpChar BinaryPlus left right
+            // fickl: .NET concatenation takes a null string as empty, JS prints it as "null". Only an
+            // operand typed `string | null` is guarded, so the output of other code doesn't change
+            | _ when
+                argTypes
+                |> List.exists (
+                    function
+                    | Nullable(String, _) -> true
+                    | _ -> false
+                )
+                ->
+                let nullAsEmpty (expr: Expr) =
+                    match expr.Type with
+                    | Nullable(String, _) ->
+                        Operation(Logical(LogicalOr, expr, makeStrConst ""), Tags.empty, String, None)
+                    | _ -> expr
+
+                binOp BinaryPlus (nullAsEmpty left) (nullAsEmpty right)
             | _ -> binOp BinaryPlus left right
         | Operators.subtraction, [ left; right ] ->
             match argTypes with
