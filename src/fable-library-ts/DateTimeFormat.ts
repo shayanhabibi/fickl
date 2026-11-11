@@ -507,6 +507,52 @@ function detectOffset(input: string): Offset {
   return designator[0] === "-" ? -minutes : minutes;
 }
 
+const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+// The JS `Date` built-in rolls an out-of-range day over into the next month
+// ("2020-02-30" becomes March 1st) and reads hour 24 as the next day, where .NET
+// rejects the string. Checks the date and time components written in the input.
+export function hasValidDateParts(input: string): boolean {
+  const timeRegex = /(\d+):(\d+)(?::(\d+)(?:\.\d+)?)?/;
+  const time = timeRegex.exec(input);
+  if (time != null && (+time[1]! > 23 || +time[2]! > 59 || +(time[3] ?? 0) > 59)) {
+    return false;
+  }
+
+  // Leave only the date: drop the time, and the offset that may follow it
+  const dateText = input.replace(new RegExp(timeRegex.source + ".*"), " ");
+  let year: string, month: number, day: number;
+
+  const numeric = /(\d+)\s*([-/.])\s*(\d+)\s*\2\s*(\d+)/.exec(dateText);
+  if (numeric != null) {
+    // yyyy-MM-dd, otherwise MM/dd/yyyy as the JS built-in reads it
+    const yearFirst = numeric[1]!.length > 2;
+    year = numeric[yearFirst ? 1 : 4]!;
+    month = +numeric[yearFirst ? 3 : 1]!;
+    day = +numeric[yearFirst ? 4 : 3]!;
+  } else {
+    // "February 30, 2020", "30 Feb 2020": a month name, a day and a 4-digit year
+    const word = /[a-z]{3,}/gi;
+    let m: RegExpExecArray | null;
+    month = 0;
+    while (month === 0 && (m = word.exec(dateText)) != null) {
+      month = monthNames.indexOf(m[0].substring(0, 3).toLowerCase()) + 1;
+    }
+    const numbers = dateText.match(/\d+/g) ?? [];
+    if (month === 0 || numbers.length !== 2 || (numbers[0]!.length > 2) === (numbers[1]!.length > 2)) {
+      return true;
+    }
+    year = numbers[0]!.length > 2 ? numbers[0]! : numbers[1]!;
+    day = +(numbers[0]!.length > 2 ? numbers[1]! : numbers[0]!);
+  }
+
+  // A two-digit year is in 1950-2049 for the JS built-in
+  const y = year.length > 2 ? +year : +year + (+year < 50 ? 2000 : 1900);
+  const isLeapYear = y % 4 === 0 && y % 100 !== 0 || y % 400 === 0;
+  const daysInMonth = month === 2 ? (isLeapYear ? 29 : 28) : (month === 4 || month === 6 || month === 9 || month === 11 ? 30 : 31);
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth;
+}
+
 // Lenient .NET-compatible parse. Returns a JS Date (the parsed instant) and the
 // detected offset, if any. Callers read the wall-clock fields and build the
 // appropriate Temporal value.
@@ -520,6 +566,10 @@ export function parseRaw(input: string): [Date, Offset] {
   }
 
   if ((input.match(/[a-z]+/gi) ?? []).some(word => !recognizedDateWords.has(word.toLowerCase()))) {
+    fail();
+  }
+
+  if (!hasValidDateParts(input)) {
     fail();
   }
 

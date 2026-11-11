@@ -2,7 +2,7 @@ import { FSharpRef } from "./Types.ts";
 import { type int8, type uint8, type int16, type uint16, type int32, type uint32, type float16, type float32, type float64 } from "./Int32.ts";
 import { type decimal, fromParts, truncate } from "./Decimal.ts";
 import { Exception, bigintHash } from "./Util.ts";
-import { ArgumentNullException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5 } from "./System.ts";
+import { ArgumentException_$ctor_Z384F8060, ArgumentNullException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5 } from "./System.ts";
 
 const isBigEndian = false;
 
@@ -196,27 +196,56 @@ export function toChar(x: bigint): string {
 
 export function toString(x: bigint): string { return x.toString(); }
 
-// .NET's Integer style: white space, a sign and decimal digits, then NULs
-const integerRegex = /^[\t-\r ]*([+-]?\d+)[\t-\r ]*\0*$/;
+// The NumberStyles flags this parser honours. A string that needs any other flag (a trailing sign,
+// parentheses, a decimal point, thousands separators, an exponent or a currency symbol) is rejected.
+const AllowLeadingWhite = 0x1;
+const AllowTrailingWhite = 0x2;
+const AllowLeadingSign = 0x4;
+const AllowHexSpecifier = 0x200;
+const AllowBinarySpecifier = 0x400;
+const IntegerStyle = AllowLeadingWhite | AllowTrailingWhite | AllowLeadingSign;
 
-export function tryParse(s: string, res: FSharpRef<bigint>): boolean {
-    const m = s == null ? null : integerRegex.exec(s);
-    if (m != null) {
-        res.contents = BigInt(m[1]!);
-        return true;
+const whiteSpace = "[\\t-\\r ]*";
+
+function parseStyled(s: string, style: int32): bigint | undefined {
+    const radixStyle = style & (AllowHexSpecifier | AllowBinarySpecifier);
+    if (radixStyle !== 0 && (style & ~(AllowLeadingWhite | AllowTrailingWhite)) !== radixStyle) {
+        throw ArgumentException_$ctor_Z384F8060(
+            "With the AllowHexSpecifier or AllowBinarySpecifier bit set, the only other valid bits are AllowLeadingWhite and AllowTrailingWhite.", "style");
     }
-    return false;
+    const leading = style & AllowLeadingWhite ? whiteSpace : "";
+    const trailing = style & AllowTrailingWhite ? whiteSpace : "";
+    if (radixStyle === 0) {
+        // .NET ignores NULs after a decimal number
+        const sign = style & AllowLeadingSign ? "[+-]?" : "";
+        const m = new RegExp(`^${leading}(${sign}\\d+)${trailing}\\0*$`).exec(s);
+        return m == null ? undefined : BigInt(m[1]!);
+    }
+    // Hexadecimal and binary digits are two's complement: the first digit carries the sign
+    const isHex = radixStyle === AllowHexSpecifier;
+    const m = new RegExp(`^${leading}(${isHex ? "[0-9A-Fa-f]+" : "[01]+"})${trailing}$`).exec(s);
+    if (m == null) {
+        return undefined;
+    }
+    const digits = m[1]!;
+    return BigInt.asIntN(digits.length * (isHex ? 4 : 1), BigInt((isHex ? "0x" : "0b") + digits));
 }
 
-export function parse(s: string): bigint {
-    const res = new FSharpRef(zero);
-    if (tryParse(s, res)) {
-        return res.contents;
-    } else if (s == null) {
+export function tryParse(s: string, style: int32, res: FSharpRef<bigint>): boolean {
+    const value = s == null ? undefined : parseStyled(s, style);
+    res.contents = value ?? zero;
+    return value !== undefined;
+}
+
+export function parse(s: string, style: int32 = IntegerStyle): bigint {
+    if (s == null) {
         throw ArgumentNullException_$ctor_Z721C83C5("value");
-    } else {
+    }
+    const value = parseStyled(s, style);
+    if (value === undefined) {
         throw FormatException_$ctor_Z721C83C5("The value could not be parsed.");
     }
+    return value;
 }
 
 export function pow(x: bigint, n: int32): bigint {

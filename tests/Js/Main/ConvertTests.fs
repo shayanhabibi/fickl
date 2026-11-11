@@ -248,6 +248,76 @@ let tests =
         tryParse bigint.TryParse 0I "0x10" |> equal (false, 0I)
         tryParse bigint.TryParse 0I " 12 " |> equal (true, 12I)
 
+    testCase "BigInteger.TryParse works with NumberStyles and a provider" <| fun () -> // See #262
+        let tryParse (s: string) (style: NumberStyles) =
+            let mutable n = 77I
+            let ok = bigint.TryParse(s, style, CultureInfo.InvariantCulture, &n)
+            ok, n
+        tryParse "1234567890123456" NumberStyles.Any |> equal (true, 1234567890123456I)
+        tryParse " -12 " NumberStyles.Any |> equal (true, -12I)
+        tryParse " +12\u0000" NumberStyles.Integer |> equal (true, 12I)
+        tryParse "1F" NumberStyles.HexNumber |> equal (true, 31I)
+        tryParse "1F" NumberStyles.Integer |> equal (false, 0I)
+        tryParse "abc" NumberStyles.Any |> equal (false, 0I)
+        tryParse "FG" NumberStyles.HexNumber |> equal (false, 0I)
+        tryParse null NumberStyles.HexNumber |> equal (false, 0I)
+        let mutable n = 77I
+        bigint.TryParse("12", CultureInfo.InvariantCulture, &n) |> equal true
+        n |> equal 12I
+        bigint.TryParse("x", &n) |> equal false
+        n |> equal 0I
+
+    testCase "BigInteger.Parse honours white space and sign styles" <| fun () ->
+        let parse (s: string) (style: NumberStyles) = bigint.Parse(s, style, CultureInfo.InvariantCulture)
+        bigint.Parse(" -12 ", NumberStyles.Integer) |> equal -12I
+        bigint.Parse("12", CultureInfo.InvariantCulture) |> equal 12I
+        parse "\t+12\n" NumberStyles.Any |> equal 12I
+        parse "12" NumberStyles.None |> equal 12I
+        parse "-12" NumberStyles.AllowLeadingSign |> equal -12I
+        parse " 12" NumberStyles.AllowLeadingWhite |> equal 12I
+        parse "12 " NumberStyles.AllowTrailingWhite |> equal 12I
+        for s, style in
+            [ " 12", NumberStyles.None
+              "12 ", NumberStyles.None
+              "-12", NumberStyles.None
+              " 12", NumberStyles.AllowLeadingSign
+              "12 ", NumberStyles.AllowLeadingWhite
+              "-12", NumberStyles.AllowLeadingWhite
+              " 12", NumberStyles.AllowTrailingWhite
+              "- 12", NumberStyles.Any
+              "0x10", NumberStyles.Any
+              "", NumberStyles.Any ] do
+            raisedExceptionType (fun () -> parse s style) |> equal "FormatException"
+
+    testCase "BigInteger.Parse reads hexadecimal digits as two's complement" <| fun () ->
+        let parse (s: string) = bigint.Parse(s, NumberStyles.HexNumber)
+        parse "1F" |> equal 31I
+        parse "1f" |> equal 31I
+        parse "FF" |> equal -1I
+        parse "0FF" |> equal 255I
+        parse "80" |> equal -128I
+        parse "7F" |> equal 127I
+        parse "8" |> equal -8I
+        parse "08" |> equal 8I
+        parse "0" |> equal 0I
+        parse " F0\n" |> equal -16I
+        parse "8000000000000000" |> equal -9223372036854775808I
+        parse "0123456789ABCDEF0123456789ABCDEF" |> equal 1512366075204170929049582354406559215I
+        bigint.Parse("FF", NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture) |> equal -1I
+        bigint.Parse("7F", NumberStyles.AllowHexSpecifier) |> equal 127I
+        for s in [ "-FF"; "+FF"; "0xFF"; "FG"; ""; " " ] do
+            raisedExceptionType (fun () -> parse s) |> equal "FormatException"
+        for s in [ " FF"; "FF " ] do
+            raisedExceptionType (fun () -> bigint.Parse(s, NumberStyles.AllowHexSpecifier)) |> equal "FormatException"
+        raisedExceptionType (fun () -> bigint.Parse(null, NumberStyles.HexNumber)) |> equal "ArgumentNullException"
+
+    testCase "BigInteger.Parse reads binary digits as two's complement" <| fun () ->
+        let parse (s: string) = bigint.Parse(s, NumberStyles.BinaryNumber)
+        parse "011" |> equal 3I
+        parse "11" |> equal -1I
+        parse " 101 " |> equal -3I
+        raisedExceptionType (fun () -> parse "12") |> equal "FormatException"
+
     testCase "Parsing numbers raises .NET's exception types" <| fun () ->
         raisedExceptionType (fun () -> Double.Parse("1e", CultureInfo.InvariantCulture)) |> equal "FormatException"
         raisedExceptionType (fun () -> Double.Parse(null, CultureInfo.InvariantCulture)) |> equal "ArgumentNullException"

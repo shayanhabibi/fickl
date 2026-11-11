@@ -3359,6 +3359,15 @@ let decimals (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg:
     | ("Compare" | "CompareTo" | "Equals" | "GetHashCode"), _ -> valueTypes com ctx r t i thisArg args
     | _, _ -> None
 
+/// The `NumberStyles` flags `BigInt.parse` honours: white space, a leading sign and the hexadecimal
+/// and binary specifiers. It rejects a string that needs any other flag.
+let private bigintParseStyles =
+    int (
+        System.Globalization.NumberStyles.Integer
+        ||| System.Globalization.NumberStyles.AllowHexSpecifier
+        ||| System.Globalization.NumberStyles.AllowBinarySpecifier
+    )
+
 let bigints (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg with
     | ".ctor", None ->
@@ -3393,6 +3402,35 @@ let bigints (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: 
             |> Some
     | "Log2", None ->
         Helper.LibCall(com, "BigInt", "ilog2", t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
+        |> Some
+    | ("Parse" | "TryParse") as meth, None when not args.IsEmpty ->
+        // Every overload is (string, [NumberStyles], [IFormatProvider]), and TryParse ends with the result
+        let str, rest = args.Head, args.Tail
+
+        let style, rest =
+            match rest with
+            | (ExprType(Number(Int32, _)) as style) :: rest ->
+                match style with
+                | NumberConst(NumberValue.Int32 flags, _) when flags &&& ~~~bigintParseStyles <> 0 ->
+                    WarningCodes.numberStylesIgnored flags
+                    |> addWarningWithCode com ctx.InlinePath r
+                | _ -> ()
+
+                style, rest
+            | _ -> makeIntConst (int System.Globalization.NumberStyles.Integer), rest
+
+        let provider, outValue =
+            if meth = "TryParse" then
+                List.truncate (rest.Length - 1) rest, List.skip (rest.Length - 1) rest
+            else
+                rest, []
+
+        match provider with
+        | []
+        | [ InvariantCulture ] -> ()
+        | _ -> WarningCodes.formatProviderIgnored |> addWarningWithCode com ctx.InlinePath r
+
+        Helper.LibCall(com, "BigInt", Naming.lowerFirst meth, t, [ str; style ] @ outValue, ?loc = r)
         |> Some
     | meth, callee ->
         let args =
@@ -4652,9 +4690,11 @@ let regex com (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Exp
         Helper.LibCall(com, "RegExp", "options", t, [ thisArg.Value ], [ thisArg.Value.Type ], ?loc = r)
         |> Some
     // Capture
+    // A failed match is `null` in JS, while in .NET it's an empty match (Index = 0, Value = ""
+    // and a single unsuccessful group), so the members of a match must be null-safe
     | "get_Index" ->
         if not isGroup then
-            propStr "index" thisArg.Value |> Some
+            emitExpr r t [ thisArg.Value ] "$0?.index ?? 0" |> Some
         else
             "Accessing index of Regex groups is not supported"
             |> addErrorAndReturnNull com ctx.InlinePath r
@@ -4667,16 +4707,17 @@ let regex com (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Exp
             Operation(Logical(LogicalOr, thisArg.Value, makeStrConst ""), Tags.empty, t, r)
             |> Some
         else
-            propInt 0 thisArg.Value |> Some
+            emitExpr r t [ thisArg.Value ] "$0?.[0] ?? \"\"" |> Some
     | "get_Length" ->
         if isGroup then
-            propStr "length" thisArg.Value |> Some
+            // Same as get_Value, the group can be undefined
+            emitExpr r t [ thisArg.Value ] "($0 ?? \"\").length" |> Some
         else
-            propInt 0 thisArg.Value |> propStr "length" |> Some
+            emitExpr r t [ thisArg.Value ] "($0?.[0] ?? \"\").length" |> Some
     // Group
     | "get_Success" -> nullCheck r false thisArg.Value |> Some
     // Match
-    | "get_Groups" -> thisArg.Value |> Some
+    | "get_Groups" -> emitExpr r t [ thisArg.Value ] "$0 ?? [undefined]" |> Some
     // MatchCollection & GroupCollection
     | "get_Item" when i.DeclaringEntityFullName = Types.regexGroupCollection ->
         // can be group index or group name
