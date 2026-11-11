@@ -150,6 +150,72 @@ module CodeServices =
             LogEntry.Make(severity, msg, fileName = Path.normalizePath er.FileName, range = range, tag = "FSHARP")
         )
 
+    // fickl: a referenced project is compiled as part of the same F# project as its consumer, and
+    // `[<assembly: AutoOpen "Ns">]` only opens `Ns` for other assemblies
+    let getAssemblyAutoOpenHints (results: FSharpCheckProjectResults) =
+        let isUndefinedName (er: FSharpDiagnostic) =
+            er.Severity = FSharpDiagnosticSeverity.Error && er.ErrorNumber = 39
+
+        match Array.tryFind isUndefinedName results.Diagnostics with
+        | None -> [||]
+        | Some er ->
+            let namespaces =
+                try
+                    results.AssemblySignature.Attributes
+                    |> Seq.filter (fun att ->
+                        att.AttributeType.TryFullName = Some "Microsoft.FSharp.Core.AutoOpenAttribute"
+                    )
+                    |> Seq.choose (fun att ->
+                        match Seq.tryHead att.ConstructorArguments with
+                        | Some(_, (:? string as path)) when path <> "" -> Some path
+                        | _ -> None
+                    )
+                    |> Seq.distinct
+                    |> Seq.toList
+                with _ ->
+                    []
+
+            match namespaces with
+            | [] -> [||]
+            | namespaces ->
+                let opens =
+                    namespaces |> List.map (fun ns -> $"`open %s{ns}`") |> String.concat ", "
+
+                let attributes =
+                    namespaces
+                    |> List.map (fun ns -> $"[<assembly: AutoOpen \"%s{ns}\">]")
+                    |> String.concat ", "
+
+                let msg =
+                    $"A name is not defined, and this compilation contains %s{attributes}. "
+                    + "Fable compiles referenced projects and Fable packages from source as part of the same assembly "
+                    + "as the project using them, so an assembly-level AutoOpen has no effect. "
+                    + $"If the name comes from such a namespace, add an explicit %s{opens} to the files that need it."
+
+                let range =
+                    AST.SourceLocation.Create(
+                        start =
+                            {
+                                line = er.StartLine
+                                column = er.StartColumn + 1
+                            },
+                        ``end`` =
+                            {
+                                line = er.EndLine
+                                column = er.EndColumn + 1
+                            }
+                    )
+
+                [|
+                    LogEntry.Make(
+                        Severity.Warning,
+                        msg,
+                        fileName = Path.normalizePath er.FileName,
+                        range = range,
+                        tag = "FABLE"
+                    )
+                |]
+
     let compileFileToJs
         (com: Compiler)
         (pathResolver: PathResolver)

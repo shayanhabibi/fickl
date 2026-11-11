@@ -15,6 +15,41 @@ let private compileWithSignedLibrary signature library source =
 
 let tests =
   testList "Compiler Messages" [
+    // fickl#279: sources of a referenced project are compiled into the consumer's assembly
+    testCase "An undefined name hints at an assembly-level AutoOpen that cannot apply" <| fun _ ->
+      let library = """
+namespace MyLib
+
+type MyType = A | B
+
+module AssemblyInfo =
+    [<assembly: AutoOpen "MyLib">]
+    do ()
+"""
+      compileWithLibrary library """
+let x : MyType = A
+"""
+      |> Assert.Exists.errorWith "The type 'MyType' is not defined"
+      |> Assert.Exists.warningWith "add an explicit `open MyLib`"
+      |> ignore
+
+    testCase "An assembly-level AutoOpen is not mentioned when every name is defined" <| fun _ ->
+      let library = """
+namespace MyLib
+
+type MyType = A | B
+
+module AssemblyInfo =
+    [<assembly: AutoOpen "MyLib">]
+    do ()
+"""
+      compileWithLibrary library """
+open MyLib
+let x : MyType = A
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
     testCase "Native async payload validation rejects generic yielded promises" <| fun _ ->
       compile """
 open Fable.Core
