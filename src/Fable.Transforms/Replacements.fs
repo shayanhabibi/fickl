@@ -549,7 +549,44 @@ let toList com returnType expr =
 let stringToCharArray e =
     Helper.InstanceCall(e, "split", Array(Char, MutableArray), [ makeStrConst "" ])
 
+/// fickl: under --checkedDivision, the divisor of an integer or decimal division or remainder wrapped in a check
+/// that raises DivideByZeroException when it is zero. A constant other than zero needs none
+let private checkDivisor (com: ICompiler) (dividend: Expr) (divisor: Expr) =
+    let isZero =
+        function
+        | NumberValue.Int8 0y
+        | NumberValue.UInt8 0uy
+        | NumberValue.Int16 0s
+        | NumberValue.UInt16 0us
+        | NumberValue.Int32 0
+        | NumberValue.UInt32 0u
+        | NumberValue.Int64 0L
+        | NumberValue.UInt64 0UL -> true
+        | NumberValue.Decimal value -> value = 0M
+        | NumberValue.BigInt value -> value.IsZero
+        | _ -> false
+
+    if not (List.contains Fickl.Options.checkedDivisionDefine com.Options.Define) then
+        divisor
+    else
+        match divisor with
+        | Value(NumberConstant(value, _), _) when not (isZero value) -> divisor
+        | _ ->
+            // The dividend decides: DivideByInt divides a float by an int, which gives infinity on .NET too
+            match dividend.Type, divisor.Type with
+            | Number(Decimal, _), Number(Decimal, _) ->
+                Helper.LibCall(com, "Decimal", "nonZero", divisor.Type, [ divisor ])
+            | Number((Decimal | Integers _ | BigIntegers _), _), Number((Integers _ | BigIntegers _), _) ->
+                Helper.LibCall(com, "Int32", "nonZero", divisor.Type, [ divisor ])
+            | _ -> divisor
+
 let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
+    let args =
+        match opName, args with
+        | (Operators.division | Operators.divideByInt | Operators.modulus), [ left; right ] ->
+            [ left; checkDivisor com left right ]
+        | _ -> args
+
     let unOp operator operand =
         Operation(Unary(operator, operand), Tags.empty, t, r)
 
@@ -1909,6 +1946,11 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
         Helper.LibCall(com, "Util", "sign", t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
     | "DivRem", _ ->
+        let args =
+            match args with
+            | left :: right :: rest -> left :: checkDivisor com left right :: rest
+            | _ -> args
+
         match i.SignatureArgTypes with
         | Number(BigIntegers _, _) :: _ ->
             Helper.LibCall(com, "BigInt", "divRem", t, args, i.SignatureArgTypes, ?loc = r)
