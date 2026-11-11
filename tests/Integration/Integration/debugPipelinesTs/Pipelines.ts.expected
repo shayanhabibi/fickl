@@ -1,0 +1,122 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { length, reverse, sum, map, type FSharpList, filter } from "./fable_modules/fable-library-ts.5.27.0/List.ts";
+import { max } from "./fable_modules/fable-library-ts.5.27.0/Double.ts";
+import { type Async, singleton } from "./fable_modules/fable-library-ts.5.27.0/AsyncBuilder.ts";
+
+export function increment(x: int32): int32 {
+    return (x + 1) | 0;
+}
+
+export function double(x: int32): int32 {
+    return (x * 2) | 0;
+}
+
+/**
+ * One binding for each stage but the last, which is returned
+ */
+export function chain(xs: FSharpList<int32>): int32 {
+    const pipe: FSharpList<int32> = filter<int32>((x: int32): boolean => ((x % 2) === 0), xs);
+    const pipe_1: FSharpList<int32> = map<int32, int32>((x_1: int32): int32 => ((x_1 * x_1) | 0), pipe);
+    return sum<int32>(pipe_1, {
+        GetZero: (): int32 => 0,
+        Add: (x_2: int32, y: int32): int32 => ((x_2 + y) | 0),
+    }) | 0;
+}
+
+/**
+ * A first value that is a call is bound like a stage
+ */
+export function fromCall(x: int32): int32 {
+    const pipe: int32 = increment(x) | 0;
+    const pipe_1: int32 = double(pipe) | 0;
+    return increment(pipe_1) | 0;
+}
+
+/**
+ * A name or a constant is piped as it is
+ */
+export function fromName(x: int32): int32 {
+    return increment(x) | 0;
+}
+
+/**
+ * The values of `||>` and `|||>` are bound from left to right
+ */
+export function two(a: int32, b: int32): int32 {
+    const pipe: int32 = increment(a) | 0;
+    const pipe_1: int32 = double(b) | 0;
+    const pipe_2: int32 = max(pipe, pipe_1) | 0;
+    return double(pipe_2) | 0;
+}
+
+export function three(a: int32): int32 {
+    const pipe: int32 = increment(a) | 0;
+    const pipe_1: int32 = double(a) | 0;
+    return ((pipe + pipe_1) + a) | 0;
+}
+
+/**
+ * Where a statement cannot stand the stages are assignments in a sequence
+ */
+export function inCondition(xs: FSharpList<int32>): string {
+    let pipe: FSharpList<int32> = undefined as any;
+    if (((pipe = map<int32, int32>((x: int32): int32 => (increment(x) | 0), xs), sum<int32>(pipe, {
+        GetZero: (): int32 => 0,
+        Add: (x_1: int32, y: int32): int32 => ((x_1 + y) | 0),
+    }))) > 10) {
+        return "big";
+    }
+    else {
+        return "small";
+    }
+}
+
+export function inArgument(xs: FSharpList<int32>): int32 {
+    let pipe: FSharpList<int32> = undefined as any;
+    return double((pipe = map<int32, int32>((x: int32): int32 => (increment(x) | 0), xs), sum<int32>(pipe, {
+        GetZero: (): int32 => 0,
+        Add: (x_1: int32, y: int32): int32 => ((x_1 + y) | 0),
+    }))) | 0;
+}
+
+/**
+ * A lambda as the last stage is applied to the binding
+ */
+export function lambdaStage(xs: FSharpList<int32>): int32 {
+    const pipe: FSharpList<int32> = reverse<int32>(xs);
+    return (length(pipe) + 1) | 0;
+}
+
+export function inAsync(xs: FSharpList<int32>): Async<int32> {
+    return singleton.Delay<int32>((): Async<int32> => singleton.Bind<int32, int32>(singleton.Delay<int32>((): Async<int32> => {
+        let pipe: FSharpList<int32> = undefined as any;
+        return singleton.Return<int32>((pipe = map<int32, int32>((x: int32): int32 => (increment(x) | 0), xs), sum<int32>(pipe, {
+            GetZero: (): int32 => 0,
+            Add: (x_1: int32, y: int32): int32 => ((x_1 + y) | 0),
+        })));
+    }), (_arg: int32): Async<int32> => {
+        let pipe_1: int32 = undefined as any;
+        return singleton.Return<int32>((pipe_1 = (double(_arg) | 0), increment(pipe_1)));
+    }));
+}
+
+/**
+ * The name of a binding does not clash with one of the user's
+ */
+export function userNamed(x: int32): int32 {
+    const pipe: int32 = increment(x) | 0;
+    const pipe_2: int32 = (pipe + double(pipe)) | 0;
+    const pipe_3: int32 = increment(pipe_2) | 0;
+    return double(pipe_3) | 0;
+}
+
+/**
+ * `<|` and `>>` are left as they are
+ */
+export function backward(x: int32): int32 {
+    return double(increment(double(x))) | 0;
+}
+
+export const composed = (arg_1: int32): int32 => (increment(double(increment(arg_1))) | 0);
+

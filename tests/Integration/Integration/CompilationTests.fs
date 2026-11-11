@@ -178,8 +178,9 @@ let private langVersionTest name project shouldCompile =
                     Directory.Delete(outDir, true)
         })
 
-/// Compiles the project in one snapshot case and compares each `.expected` file with what it produced
-let private compileCase (testCaseDir: string) =
+/// Compiles the project in one snapshot case, with `extraArgs` after the arguments every case gets, and compares each
+/// `.expected` file with what it produced
+let private compileCaseWith (extraArgs: string array) (testCaseDir: string) =
     async {
         let project =
             match Directory.GetFileSystemEntries(testCaseDir, "*.fsproj") with
@@ -227,6 +228,7 @@ let private compileCase (testCaseDir: string) =
                     outputArgs
                     [| "--exclude"; "Fable.Core" |]
                     precompiledLibArgs
+                    extraArgs
                 ]
             |> Fable.Cli.Entry.main
 
@@ -251,6 +253,13 @@ let private compileCase (testCaseDir: string) =
         return ()
     }
 
+/// Compiles the project in one snapshot case and compares each `.expected` file with what it produced
+let private compileCase (testCaseDir: string) = compileCaseWith [||] testCaseDir
+
+/// fickl: a snapshot case compiled with `--debugPipelines`, which the cases under `data` cannot pass (#305)
+let private debugPipelinesTest name folder =
+    testCaseAsync name (compileCaseWith [| "--debugPipelines" |] (Path.Combine(__SOURCE_DIRECTORY__, folder)))
+
 let tests =
     Directory.EnumerateDirectories(data)
     |> Seq.map (fun testCaseDir -> testCaseAsync testCaseDir (compileCase testCaseDir))
@@ -261,6 +270,8 @@ let tests =
             precompiledBaseTest "Inheriting a precompiled class with a static let binding compiles" "staticInit" true
             langVersionTest "An F# 11 feature is an error under LangVersion 10.0" "lang10" false
             langVersionTest "An F# 11 feature compiles under LangVersion 11.0" "lang11" true
+            debugPipelinesTest "--debugPipelines binds each pipeline stage in JavaScript" "debugPipelines"
+            debugPipelinesTest "--debugPipelines binds each pipeline stage in TypeScript" "debugPipelinesTs"
         ]
     |> testList "Compilation"
 

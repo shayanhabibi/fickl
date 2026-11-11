@@ -680,6 +680,13 @@ module private Transforms =
             match letBody with
             | Sequential exprs -> Sequential(value :: exprs)
             | letBody -> Sequential [ value; letBody ]
+        // fickl: --debugPipelines binds the result of a pipeline stage so that it stays a statement. A result
+        // that nothing reads, as in `f x |> ignore`, is treated like any other binding
+        | Let(ident, _, letBody) when
+            Fickl.Options.isPipelineStage com.Options.Define ident.IsCompilerGenerated ident.Name
+            && countReferencesUntil 1 ident.Name letBody > 0
+            ->
+            e
         | Let(ident, value, letBody) when (not ident.IsMutable) && isErasingCandidate ident ->
             match tryInlineBinding com ident value letBody with
             | Some(ident, value) ->
