@@ -2179,4 +2179,14 @@ let find () = typeof<Calc>.GetMethod("Add", BindingFlags.NonPublic ||| BindingFl
 """
       |> Assert.Exists.errorWith "Type.GetMethod only supports the binding flags Public, Instance and Static"
       |> ignore
+
+    // fickl#417: the library is imported with a .ts extension when compiling to TypeScript
+    testCase "A JSX template with one interpolated value compiles to TypeScript" <| fun _ ->
+      Compiler.Cached.compileForLanguage Fable.TypeScript Compiler.Settings.standard """
+open Fable.Core
+let label (text: string) = JSX.jsx $"<label>{text}</label>"
+let both (a: string) (b: int) = JSX.jsx $"<p>{a} and {b}</p>"
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
   ]
