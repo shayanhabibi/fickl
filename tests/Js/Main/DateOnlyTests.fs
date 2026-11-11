@@ -208,4 +208,23 @@ let tests =
             let m = [ DateOnly (2000, 1, 2), () ] |> Map.ofList
             equal true (Map.containsKey (DateOnly(2000, 1, 1).AddDays(1)) m)
             equal false (Map.containsKey (DateOnly (1999, 1, 1)) m)
+
+        testCase "DateOnly.Equals works" <| fun () ->
+            let x = DateOnly(2000, 1, 2)
+            x.Equals(DateOnly(2000, 1, 2)) |> equal true
+            x.Equals(DateOnly(2000, 1, 3)) |> equal false
+            x.Equals(box (DateOnly(2000, 1, 2))) |> equal true
+            x.Equals(box (DateOnly(2000, 1, 3))) |> equal false
+            x.Equals(box "2000-01-02") |> equal false
+            x.Equals(null: obj) |> equal false
+
+        testCase "DateOnly.CompareTo works" <| fun () ->
+            let x = DateOnly(2000, 1, 2)
+            x.CompareTo(DateOnly(2000, 1, 2)) |> equal 0
+            x.CompareTo(DateOnly(2000, 1, 3)) |> equal -1
+            x.CompareTo(DateOnly(2000, 1, 1)) |> equal 1
+            x.CompareTo(box (DateOnly(2000, 1, 2))) |> equal 0
+            x.CompareTo(box (DateOnly(2000, 1, 3))) |> equal -1
+            x.CompareTo(box (DateOnly(2000, 1, 1))) |> equal 1
+            x.CompareTo(null: obj) |> equal 1
     ]
