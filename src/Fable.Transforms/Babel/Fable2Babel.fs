@@ -82,6 +82,12 @@ type IBabelCompiler =
     abstract GetSymbolKey: Context * expression: string * path: string * sourceFile: string option -> Expression
     /// <summary>Returns generated symbol bindings to emit before declarations that reference them.</summary>
     abstract GetSymbolDeclarations: unit -> ModuleDeclaration list
+    /// <summary>Whether this file's copies of the record are smaller through a copier, see <c>RecordCopy</c>.</summary>
+    abstract UsesRecordCopier: Fable.Entity -> bool
+    /// <summary>The file's copier of a record, declared on first use.</summary>
+    abstract GetRecordCopier: Context * Fable.Entity -> Expression option
+    /// <summary>Returns the record copiers the file uses, to emit after its declarations.</summary>
+    abstract GetRecordCopierDeclarations: unit -> ModuleDeclaration list
 
     abstract GetImportExpr:
         Context * selector: string * path: string * range: SourceLocation option * ?noMangle: bool -> Expression
@@ -3289,17 +3295,20 @@ module Util =
         | Fable.NewRecord(values, ent, genArgs) ->
             let ent = com.GetEntity(ent)
 
-            let values = List.mapToArray (fun x -> com.TransformAsExpr(ctx, x)) values
+            match RecordCopy.tryTransform com ctx r ent genArgs values with
+            | Some copy -> copy
+            | None ->
+                let values = List.mapToArray (fun x -> com.TransformAsExpr(ctx, x)) values
 
-            let consRef = ent |> jsConstructor com ctx
+                let consRef = ent |> jsConstructor com ctx
 
-            let typeParamInst =
-                if com.IsTypeScript && (ent.FullName = Types.refCell) then
-                    makeTypeParamInstantiation com ctx genArgs |> Some
-                else
-                    None
+                let typeParamInst =
+                    if com.IsTypeScript && (ent.FullName = Types.refCell) then
+                        makeTypeParamInstantiation com ctx genArgs |> Some
+                    else
+                        None
 
-            Expression.newExpression (consRef, values, ?typeArguments = typeParamInst, ?loc = r)
+                Expression.newExpression (consRef, values, ?typeArguments = typeParamInst, ?loc = r)
         | Fable.NewAnonymousRecord(values, fieldNames, _genArgs, _isStruct) ->
             let values =
                 List.mapToArray (unwrapOptionalReturn com >> snd >> transformAsExpr com ctx) values
@@ -9293,6 +9302,261 @@ module StaticFieldInits =
 
             declarations, plans
 
+/// fickl: a copy-and-update, `{ r with X = 1 }`, is a constructor call that reads every other field from the source,
+/// so each copy of a record with many fields repeats all its field names (#304). A file that copies a record often
+/// enough declares a copier for it instead, which takes the source, the name of one field and its new value:
+///
+///     function R_$with(r, k, v) { return new R(k === "A" ? v : r.A, k === "B" ? v : r.B, ...); }
+///
+/// The copier still builds the record through its constructor, so the copy has the shape and the speed of any other
+/// instance, which a generic helper over `Object.assign` does not give. It is local to the file: only the files
+/// that gain from it pay for it, and it works the same for a record declared in another file.
+module RecordCopy =
+    open Annotation
+    open Util
+
+    /// A copy changing more fields than this stays a constructor call: each changed field is one more copy
+    [<Literal>]
+    let MaxChangedFields = 2
+
+    type private Site =
+        {
+            Source: Fable.Ident
+            Kept: Fable.Field list
+            Changed: (Fable.Field * Fable.Expr) list
+        }
+
+    // The sizes are those of minified output, where the gain is the smallest: `r.Field,` for a field read from
+    // the source, `f(r,"Field",value)` for a call of the copier and `k==="Field"?v:r.Field,` for a field in it
+
+    let private keptSize (field: Fable.Field) = field.Name.Length + 3
+
+    let private callSize (field: Fable.Field) = field.Name.Length + 10
+
+    let private copierSize (ent: Fable.Entity) =
+        30 + (ent.FSharpFields |> List.sumBy (fun field -> 2 * field.Name.Length + 10))
+
+    /// What the copier saves at a copy, in characters
+    let private saving (site: Site) =
+        List.sumBy keptSize site.Kept - List.sumBy (fst >> callSize) site.Changed
+
+    /// The property a field is stored in, which names the field for the copier, unless its key is not a name
+    let private tryPropertyName (field: Fable.Field) =
+        if field.IsStatic || Option.isSome (FSharp2Fable.FsField.TrySymbolKey field) then
+            None
+        else
+            match memberFromName field.Name with
+            | Expression.Identifier(Identifier(name = name)), false -> Some name
+            | Literal(Literal.StringLiteral(StringLiteral(value = name))), _ -> Some name
+            | _ -> None
+
+    let private isCopiable (ent: Fable.Entity) =
+        ent.IsFSharpRecord
+        && ent.FSharpFields |> List.forall (tryPropertyName >> Option.isSome)
+
+    /// The constructor reads a field of the source where it is listed and the copier reads them all after the new
+    /// values are evaluated, which only differs when evaluating a new value can change the source
+    let private keepsEvaluationOrder (com: Compiler) (ent: Fable.Entity) (site: Site) =
+        let isSourceImmutable =
+            not site.Source.IsMutable
+            && ent.FSharpFields |> List.forall (fun field -> not field.IsMutable)
+
+        isSourceImmutable
+        || site.Changed |> List.forall (snd >> canHaveSideEffects com >> not)
+
+    let private trySite (com: Compiler) (ent: Fable.Entity) genArgs (values: Fable.Expr list) =
+        let fields = ent.FSharpFields
+        let recordType = Fable.DeclaredType(ent.Ref, genArgs)
+
+        if not (isCopiable ent) || List.length fields <> List.length values then
+            None
+        else
+            let sources, kept, changed =
+                (List.zip fields values, ([], [], []))
+                ||> List.foldBack (fun (field, value) (sources, kept, changed) ->
+                    match value with
+                    // The local F# generates for the source of a struct copy is typed as a byref of the struct
+                    | Fable.Get(Fable.IdentExpr source, Fable.FieldGet info, _, _) when
+                        info.Name = field.Name
+                        && Replacements.Util.getIdentValueType com source source.Type = recordType
+                        ->
+                        source :: sources, field :: kept, changed
+                    | _ -> sources, kept, (field, value) :: changed
+                )
+
+            match sources with
+            | source :: others when
+                others |> List.forall (fun other -> other.Name = source.Name)
+                && not (List.isEmpty changed)
+                && List.length changed <= MaxChangedFields
+                ->
+                let site =
+                    {
+                        Source = source
+                        Kept = kept
+                        Changed = changed
+                    }
+
+                if saving site > 0 && keepsEvaluationOrder com ent site then
+                    Some site
+                else
+                    None
+            | _ -> None
+
+    /// The records whose copies in the file save more than a copier costs
+    let findRecords (com: Compiler) (file: Fable.File) =
+        let savings = Dictionary<string, Fable.Entity * int>()
+
+        let visit (expr: Fable.Expr) =
+            let pending = Stack [ expr ]
+
+            while pending.Count > 0 do
+                let expr = pending.Pop()
+
+                match expr with
+                | Fable.Value(Fable.NewRecord(values, entRef, genArgs), _) ->
+                    com.TryGetEntity entRef
+                    |> Option.iter (fun ent ->
+                        trySite com ent genArgs values
+                        |> Option.iter (fun site ->
+                            let total =
+                                match savings.TryGetValue ent.FullName with
+                                | true, (_, total) -> total
+                                | _ -> 0
+
+                            savings[ent.FullName] <- (ent, total + saving site)
+                        )
+                    )
+                | _ -> ()
+
+                getSubExpressions expr |> List.iter pending.Push
+
+        let rec visitDeclaration (decl: Fable.Declaration) =
+            match decl with
+            | Fable.ModuleDeclaration decl -> List.iter visitDeclaration decl.Members
+            | Fable.ActionDeclaration decl -> visit decl.Body
+            | Fable.MemberDeclaration decl -> visit decl.Body
+            | Fable.ClassDeclaration decl ->
+                decl.Constructor |> Option.iter (fun cons -> visit cons.Body)
+                decl.BaseCall |> Option.iter visit
+                decl.AttachedMembers |> List.iter (fun memb -> visit memb.Body)
+
+        List.iter visitDeclaration file.Declarations
+
+        savings.Values
+        |> Seq.filter (fun (ent, total) -> total > copierSize ent)
+        |> Seq.map (fun (ent, _) -> ent.FullName)
+        |> HashSet
+
+    /// `function R_$with(r, k, v) { return new R(k === "A" ? v : r.A, ...); }`
+    let declare (com: IBabelCompiler) ctx (ent: Fable.Entity) (consRef: Expression) (name: string) =
+        let source = Expression.identifier "r"
+        let key = Expression.identifier "k"
+        let value = Expression.identifier "v"
+
+        // In TypeScript: `function R_$with<K extends keyof R>(r: R, k: K, v: R[K]): R`
+        let typeParams, recordType, keyType =
+            if com.IsTypeScript then
+                let genArgs = FSharp2Fable.Util.getEntityGenArgs ent
+                let typeParams = makeTypeParamDecl com ctx genArgs
+                let recordType = Fable.DeclaredType(ent.Ref, genArgs) |> makeTypeAnnotation com ctx
+
+                let keyName =
+                    let used = typeParams |> Array.map (fun (TypeParameter(name = name)) -> name)
+
+                    Seq.initInfinite (fun i ->
+                        if i = 0 then
+                            "K"
+                        else
+                            "K" + string<int> i
+                    )
+                    |> Seq.find (fun name -> not (Array.contains name used))
+
+                let keyParam =
+                    TypeParameter.typeParameter (keyName, bound = KeyofTypeAnnotation recordType)
+
+                Array.append typeParams [| keyParam |], Some recordType, Some(makeAliasTypeAnnotation com ctx keyName)
+            else
+                [||], None, None
+
+        let args =
+            ent.FSharpFields
+            |> List.mapToArray (fun field ->
+                let fieldName =
+                    tryPropertyName field |> Option.defaultValue field.Name |> Literal.stringLiteral
+
+                let value =
+                    match recordType with
+                    | Some recordType ->
+                        AsExpression(value, IndexedTypeAnnotation(recordType, LiteralTypeAnnotation fieldName))
+                    | None -> value
+
+                Expression.conditionalExpression (
+                    Expression.binaryExpression (BinaryEqual, key, Literal fieldName),
+                    value,
+                    SymbolKeys.fieldAccess com ctx None field source
+                )
+            )
+
+        let parameters =
+            [|
+                Parameter.parameter ("r", ?typeAnnotation = recordType)
+                Parameter.parameter ("k", ?typeAnnotation = keyType)
+                Parameter.parameter (
+                    "v",
+                    ?typeAnnotation =
+                        (match recordType, keyType with
+                         | Some recordType, Some keyType -> Some(IndexedTypeAnnotation(recordType, keyType))
+                         | _ -> None)
+                )
+            |]
+
+        let body =
+            BlockStatement [| Statement.returnStatement (Expression.newExpression (consRef, args)) |]
+
+        Declaration.functionDeclaration (
+            parameters,
+            body,
+            Identifier.identifier name,
+            ?returnType = recordType,
+            typeParameters = typeParams
+        )
+        |> Declaration
+        |> PrivateModuleDeclaration
+
+    /// A copy-and-update as calls of the file's copier, one for each changed field
+    let tryTransform (com: IBabelCompiler) ctx range (ent: Fable.Entity) genArgs (values: Fable.Expr list) =
+        if com.UsesRecordCopier ent then
+            trySite com ent genArgs values
+            |> Option.bind (fun site ->
+                com.GetRecordCopier(ctx, ent)
+                |> Option.map (fun copier ->
+                    let lastIndex = List.length site.Changed - 1
+
+                    (identAsExpr site.Source, List.indexed site.Changed)
+                    ||> List.fold (fun source (i, (field, value)) ->
+                        let fieldName = tryPropertyName field |> Option.defaultValue field.Name
+
+                        let args =
+                            [|
+                                source
+                                Expression.stringLiteral fieldName
+                                com.TransformAsExpr(ctx, value)
+                            |]
+
+                        let range =
+                            if i = lastIndex then
+                                range
+                            else
+                                None
+
+                        Expression.callExpression (copier, args, ?loc = range)
+                    )
+                )
+            )
+        else
+            None
+
 module Compiler =
     open Util
 
@@ -9304,6 +9568,13 @@ module Compiler =
         let symbolDeclarations = ResizeArray<ModuleDeclaration>()
         let topDirectivesPrologue = HashSet<string>()
         let isTypeScript = com.Options.Language = TypeScript
+        let recordCopiers = Dictionary<string, Expression option>()
+        let recordCopierDeclarations = ResizeArray<ModuleDeclaration>()
+        let mutable copiedRecords = HashSet<string>()
+
+        /// <summary>Finds the records the file copies often enough to declare a copier for.</summary>
+        member _.FindRecordsToCopy(file: Fable.File) =
+            copiedRecords <- RecordCopy.findRecords com file
 
         interface IBabelCompiler with
             member _.IsTypeScript = isTypeScript
@@ -9421,6 +9692,24 @@ module Compiler =
                             key
 
             member _.GetSymbolDeclarations() = List.ofSeq symbolDeclarations
+            member _.UsesRecordCopier(ent) = copiedRecords.Contains ent.FullName
+
+            member bcom.GetRecordCopier(ctx, ent) =
+                match recordCopiers.TryGetValue ent.FullName with
+                | true, copier -> copier
+                | _ ->
+                    let copier =
+                        match Lib.jsConstructor bcom ctx ent with
+                        | Expression.Identifier(Identifier(name = consName)) as consRef ->
+                            let name = getUniqueNameInRootScope ctx (consName + "_$with")
+                            recordCopierDeclarations.Add(RecordCopy.declare bcom ctx ent consRef name)
+                            Some(Expression.identifier name)
+                        | _ -> None
+
+                    recordCopiers.Add(ent.FullName, copier)
+                    copier
+
+            member _.GetRecordCopierDeclarations() = List.ofSeq recordCopierDeclarations
             member _.GetAllImports() = imports.Values :> _
             member bcom.TransformAsExpr(ctx, e) = transformAsExpr bcom ctx e
 
@@ -9481,7 +9770,9 @@ module Compiler =
     let makeCompiler com = BabelCompiler(com)
 
     let transformFile (com: Compiler) (file: Fable.File) =
-        let com = makeCompiler com :> IBabelCompiler
+        let com = makeCompiler com
+        com.FindRecordsToCopy file
+        let com = com :> IBabelCompiler
 
         let declScopes =
             let hs = HashSet()
@@ -9570,7 +9861,11 @@ module Compiler =
         let importDecls = com.GetAllImports() |> transformImports com.IsTypeScript
 
         let body =
-            topDirectivesPrologue @ importDecls @ com.GetSymbolDeclarations() @ rootDecls
+            topDirectivesPrologue
+            @ importDecls
+            @ com.GetSymbolDeclarations()
+            @ rootDecls
+            @ com.GetRecordCopierDeclarations()
             |> List.toArray
 
         // fickl: TypeScript only allows augmentations in a module, so a file that imports and exports nothing
