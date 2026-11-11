@@ -1,7 +1,7 @@
 import Decimal, { type BigSource } from "./lib/big.js";
 import { type Numeric, symbol } from "./Numeric.ts";
 import { FSharpRef } from "./Types.ts";
-import { Exception, combineHashCodes } from "./Util.ts";
+import { Exception, MidpointRounding, combineHashCodes } from "./Util.ts";
 import { NumberStyles, splitNumber } from "./NumberStyles.ts";
 import { ArgumentNullException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
 import { type int8, type uint8, type int16, type uint16, type int32, type uint32, type float16, type float32, type float64 } from "./Int32.ts";
@@ -73,15 +73,22 @@ export function round(x: Decimal, digits: number = 0) {
   return x.round(digits, 2 /* ROUND_HALF_EVEN */);
 }
 
-// Math.Round with a MidpointRounding: ToEven 0, AwayFromZero 1, ToZero 2, ToNegativeInfinity 3, ToPositiveInfinity 4
-export function roundWith(x: Decimal, digits: number, mode: number) {
-  const positive = x.cmp(0) >= 0;
-  const bigMode = mode === 1 ? 1 /* ROUND_HALF_UP */
-    : mode === 2 ? 0 /* ROUND_DOWN */
-    : mode === 3 ? (positive ? 0 : 3 /* ROUND_UP */)
-    : mode === 4 ? (positive ? 3 : 0)
-    : 2 /* ROUND_HALF_EVEN */;
-  return x.round(digits, bigMode);
+export function roundToMode(x: Decimal, digits: number, mode: number) {
+  if (!(digits >= 0 && digits <= 28)) {
+    throw new Exception("Decimal can only round to between 0 and 28 digits of precision. (Parameter 'decimals')");
+  }
+  switch (mode) {
+    case MidpointRounding.ToEven: return x.round(digits, 2 /* ROUND_HALF_EVEN */);
+    case MidpointRounding.AwayFromZero: return x.round(digits, 1 /* ROUND_HALF_UP */);
+    case MidpointRounding.ToZero: return x.round(digits, 0 /* ROUND_DOWN */);
+    case MidpointRounding.ToNegativeInfinity: return x.round(digits, x.cmp(0) >= 0 ? 0 /* ROUND_DOWN */ : 3 /* ROUND_UP */);
+    case MidpointRounding.ToPositiveInfinity: return x.round(digits, x.cmp(0) >= 0 ? 3 /* ROUND_UP */ : 0 /* ROUND_DOWN */);
+    default: throw new Exception(`The value '${mode}' is not valid for this usage of the type MidpointRounding. (Parameter 'mode')`);
+  }
+}
+
+export function roundMode(x: Decimal, mode: number) {
+  return roundToMode(x, 0, mode);
 }
 
 export function truncate(x: Decimal) {

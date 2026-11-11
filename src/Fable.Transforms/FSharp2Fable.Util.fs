@@ -2183,6 +2183,36 @@ module Identifiers =
     let tryGetIdentFromScope (ctx: Context) r typ (fsRef: FSharpMemberOrFunctionOrValue) =
         tryGetIdentFromScopeIf ctx r typ fsRef.Equals
 
+    let getDeclaredIdentNames (expr: Fable.Expr) =
+        let names = HashSet<string>()
+
+        let rec loop (e: Fable.Expr) =
+            let declared: Fable.Ident list =
+                match e with
+                | Fable.Let(i, _, _)
+                | Fable.Lambda(i, _, _)
+                | Fable.ForLoop(i, _, _, _, _, _)
+                | Fable.TryCatch(_, Some(i, _), _, _) -> [ i ]
+                | Fable.LetRec(bindings, _) -> List.map fst bindings
+                | Fable.Delegate(args, _, _, _) -> args
+                | Fable.DecisionTree(_, targets) -> List.collect fst targets
+                | Fable.ObjectExpr(members, _, _) -> List.collect (fun (m: Fable.ObjectExprMember) -> m.Args) members
+                | _ -> []
+
+            for i in declared do
+                names.Add(i.Name) |> ignore
+
+            match e with
+            | Fable.Unresolved(Fable.UnresolvedTraitCall(argExprs = argExprs), _, _) -> argExprs
+            | Fable.Unresolved(Fable.UnresolvedInlineCall(_, _, callee, info), _, _) ->
+                Option.toList callee @ Option.toList info.ThisArg @ info.Args
+            | Fable.Unresolved(Fable.UnresolvedReplaceCall(thisArg, args, _, _), _, _) -> Option.toList thisArg @ args
+            | e -> getSubExpressions e
+            |> List.iter loop
+
+        loop expr
+        set names
+
 module Util =
     open Helpers
     open Patterns
@@ -2981,6 +3011,14 @@ module Util =
     // fickl: JavaScript and TypeScript pass the base arguments through getExplicitBaseParams in Fable2Babel
     let supportsCompilerGeneratedBaseCall (com: Compiler) =
         match com.Options.Language with
+        | Python -> true
+        | _ -> false
+
+    // fickl: upstream gates this on supportsCompilerGeneratedBaseCall, which the fork keeps for Python only
+    let supportsExplicitConstructorThen (com: Compiler) =
+        match com.Options.Language with
+        | JavaScript
+        | TypeScript
         | Python -> true
         | _ -> false
 

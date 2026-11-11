@@ -1,9 +1,10 @@
 
-import { type IMap, type MutableArray, doubleToString } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { float64ToString } from "./fable_modules/fable-library-ts.5.25.0/String.ts";
 import { ofArray, type FSharpList, sumBy } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
 import type { float64 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
 import { tryHead } from "./fable_modules/fable-library-ts.5.25.0/Array.ts";
 import type { Option } from "./fable_modules/fable-library-ts.5.25.0/Option.ts";
+import type { IMap, MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
 
 /**
  * Parses JSON; TypeScript callers must narrow the result.
@@ -31,7 +32,7 @@ export function describe(value: any): string {
         return "string " + value;
     }
     else if (typeof value === "number") {
-        return "number " + doubleToString(value);
+        return "number " + float64ToString(value);
     }
     else {
         return "other";
