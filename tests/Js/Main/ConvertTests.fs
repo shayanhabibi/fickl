@@ -487,6 +487,52 @@ let tests =
         equal -17L (int64 "-0x11")
         equal -11 (int "-1_1")
 
+    testCase "F# integer conversions take no plus sign before a radix specifier" <| fun () -> // See #261
+        equal 5 (int "+5")
+        equal 5L (int64 "+5")
+        equal 5u (uint32 " +5 ")
+
+        for s in [ "+0x11"; "+0o11"; "+0b11"; " +0X11 " ] do
+            (fun () -> int s) |> throwsAnyError
+            (fun () -> int16 s) |> throwsAnyError
+            (fun () -> uint32 s) |> throwsAnyError
+            (fun () -> int64 s) |> throwsAnyError
+            (fun () -> uint64 s) |> throwsAnyError
+
+    testCase "Integer Parse with HexNumber takes neither a sign nor a prefix" <| fun () -> // See #261
+        Int32.Parse(" 1F ", NumberStyles.HexNumber) |> equal 31
+        Int64.Parse(" 1F ", NumberStyles.HexNumber) |> equal 31L
+        // Without a prefix to read, these are plain hexadecimal digits
+        Int32.Parse("0b11", NumberStyles.HexNumber) |> equal 0xB11
+        UInt64.Parse("0b11", NumberStyles.HexNumber) |> equal 0xB11UL
+        Int32.Parse("1F", NumberStyles.AllowHexSpecifier) |> equal 31
+
+        for s in [ "0x1F"; "0X1f"; "+1F"; "-1F"; "+0x1F"; "-0x1F"; "+5"; "-5"; "0o17"; "1_0"; "" ] do
+            (fun () -> Int32.Parse(s, NumberStyles.HexNumber)) |> throwsAnyError
+            (fun () -> SByte.Parse(s, NumberStyles.HexNumber)) |> throwsAnyError
+            (fun () -> UInt32.Parse(s, NumberStyles.HexNumber)) |> throwsAnyError
+            (fun () -> Int64.Parse(s, NumberStyles.HexNumber)) |> throwsAnyError
+            (fun () -> UInt64.Parse(s, NumberStyles.HexNumber)) |> throwsAnyError
+            Int32.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture) |> equal (false, 0)
+            Int64.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture) |> equal (false, 0L)
+
+        // AllowHexSpecifier alone allows no white space
+        for s in [ " 1F"; "1F "; "-1F"; "0x1F" ] do
+            (fun () -> Int32.Parse(s, NumberStyles.AllowHexSpecifier)) |> throwsAnyError
+
+    testCase "Integer Parse takes no radix specifier or underscore" <| fun () -> // See #261
+        Int32.Parse(" +11 ") |> equal 11
+        Int64.Parse(" -11 ") |> equal -11L
+
+        for s in [ "0x1F"; "-0x1F"; "+0x1F"; "0b11"; "0o17"; "1_0"; "1F" ] do
+            (fun () -> Int32.Parse s) |> throwsAnyError
+            (fun () -> Int32.Parse(s, NumberStyles.Integer)) |> throwsAnyError
+            (fun () -> Byte.Parse s) |> throwsAnyError
+            (fun () -> Int64.Parse s) |> throwsAnyError
+            (fun () -> UInt64.Parse s) |> throwsAnyError
+            tryParse Int32.TryParse 0 s |> equal (false, 0)
+            tryParse Int64.TryParse 0L s |> equal (false, 0L)
+
     testCase "System.Int32.TryParse works" <| fun () ->
         tryParse Int32.TryParse 0 "1" |> equal (true, 1)
         tryParse Int32.TryParse 0 "    1     " |> equal (true, 1)
