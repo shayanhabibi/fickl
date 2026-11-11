@@ -16,6 +16,22 @@ let ComponentAcceptingCurriedFunction fn _oneMoreParam =
         prop.text (value.ToString())
     ]
 
+// A release build moves `scrollRef` and `isThreshold` into the condition; `keepBinding` keeps each
+// hook call as a statement of its own at the top level of the hook (#309)
+let useKeptBindings (threshold: int) =
+    let (smOrAbove, _) = Feliz.React.useState true
+    let scrollRef = Fickl.Core.JsInterop.keepBinding (Feliz.React.useRef 3)
+    let isThreshold = Fickl.Core.JsInterop.keepBinding (Feliz.React.useMemo ((fun () -> threshold > scrollRef.current), [| box threshold |]))
+    isThreshold && smOrAbove
+
+[<ReactComponent>]
+let ComponentWithKeptBindings (threshold: int) =
+    let above = useKeptBindings threshold
+    Html.p [
+        prop.testId "kept"
+        prop.text (if above then "above" else "below")
+    ]
+
 Jest.describe("React tests", (fun () ->
 
     Jest.test("Counter renders correctly", (fun () ->
@@ -83,6 +99,17 @@ Jest.describe("React tests", (fun () ->
         let elem = RTL.render(Counter.MultiHoleJSX("John") ("Doe") |> unbox)
         let node = elem.getByTestId "multi-hole"
         Jest.expect(node).toHaveTextContent("John Doe")
+    ))
+
+    Jest.test("keepBinding keeps hook calls as top-level statements", (fun () ->
+        let source: string = emitJsExpr useKeptBindings "String($0)"
+        Jest.expect(source.Contains("const scrollRef =")).toBe(true)
+        Jest.expect(source.Contains("const isThreshold =")).toBe(true)
+
+        let elem = RTL.render(ComponentWithKeptBindings 5)
+        Jest.expect(elem.getByTestId "kept").toHaveTextContent("above")
+        elem.rerender(ComponentWithKeptBindings 1)
+        Jest.expect(elem.getByTestId "kept").toHaveTextContent("below")
     ))
 
     Jest.test("JSX format specifier hole renders correctly", (fun () ->

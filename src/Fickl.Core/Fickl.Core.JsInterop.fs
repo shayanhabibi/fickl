@@ -81,3 +81,19 @@ module JsInterop =
     /// <summary>Treats a <c>Partial&lt;T></c> as a complete <c>'T</c>; TypeScript sees the cast.</summary>
     /// <param name="value">An object that the caller knows has every property of <c>'T</c>.</param>
     let full (value: Partial<'T>) : 'T = nativeOnly
+
+    /// <summary>Keeps the <c>let</c> binding this value is bound to as a named binding in the compiled code.</summary>
+    /// <param name="value">The bound value, written directly as the right-hand side of a <c>let</c>.</param>
+    /// <returns>The value unchanged; on .NET this is the identity function.</returns>
+    /// <remarks>In a release build a binding that is used once is replaced by its value where that keeps the order of
+    /// evaluation. Use this where the shape of the code matters too, such as a React hook that the rules of hooks
+    /// want called at the top level of the function. Has an effect only as the whole value of a <c>let</c>.</remarks>
+    /// <example><code lang="fsharp">
+    /// let scrollRef = keepBinding (useScrollRef ())
+    /// let isThreshold = keepBinding (useScroll (threshold, scrollRef))
+    /// isThreshold &amp;&amp; smOrAbove
+    /// // const scrollRef = useScrollRef();
+    /// // const isThreshold = useScroll(threshold, scrollRef);
+    /// // if (isThreshold) { ... }
+    /// </code></example>
+    let keepBinding (value: 'T) : 'T = value

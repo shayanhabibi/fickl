@@ -6805,6 +6805,11 @@ let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
         match args with
         | [ arg ] -> TypeCast(arg, t) |> Some
         | _ -> None
+    // FableTransforms leaves the binding of a value with this tag alone, then drops the wrapper
+    | "keepBinding", _ ->
+        match args with
+        | [ arg ] -> emit r t [ arg ] false "$0" |> withTag "fickl-keep-binding" |> Some
+        | _ -> None
     | "jsSpread", _ ->
         match args with
         | [ source; setters ] ->
