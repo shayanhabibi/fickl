@@ -14,3 +14,8 @@ let nativeErrorsDefine = "FICKL_NATIVE_ERRORS"
 /// (JavaScript and TypeScript)
 [<Literal>]
 let privateFieldsDefine = "FICKL_PRIVATE_FIELDS"
+
+/// `--checkedDivision`: dividing an integer or a decimal by zero raises DivideByZeroException (JavaScript and
+/// TypeScript)
+[<Literal>]
+let checkedDivisionDefine = "FICKL_CHECKED_DIVISION"
