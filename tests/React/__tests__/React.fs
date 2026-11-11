@@ -91,4 +91,18 @@ Jest.describe("React tests", (fun () ->
         Jest.expect(node).toHaveTextContent("3.142")
     ))
 
+    Jest.test("JSX component passed by reference keeps its state when the parent renders again", (fun () ->
+        let elem = RTL.render(Counter.ComponentByReferenceJSX() |> unbox)
+        Jest.expect(elem.getByTestId "header-jsx").toHaveTextContent("5")
+        RTL.fireEvent.click(elem.getByTestId "button-increment-jsx")
+        Jest.expect(elem.getByTestId "header-jsx").toHaveTextContent("6")
+        let header = elem.getByTestId "header-jsx"
+
+        RTL.fireEvent.click(elem.getByTestId "button-rerender-jsx")
+        Jest.expect(elem.getByTestId "button-rerender-jsx").toHaveTextContent("Rendered 2 times")
+        // The same DOM node with the same state: the counter was not mounted again
+        Jest.expect(elem.getByTestId "header-jsx").toBe(header)
+        Jest.expect(elem.getByTestId "header-jsx").toHaveTextContent("6")
+    ))
+
 ))

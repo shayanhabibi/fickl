@@ -1,0 +1,69 @@
+
+import { Screen } from "./screen.js";
+import { Screens_Member_Z18115A39, Imported } from "./Screens.jsx.actual";
+
+export { Screen };
+
+export function NoParams($props) {
+    return <div>Hi There</div>;
+}
+
+export function Curried($props) {
+    return <div>{$props.name}{$props.age}</div>;
+}
+
+export function Tupled($props) {
+    return <div>{$props.name}{$props.age}</div>;
+}
+
+export function Generic($props) {
+    return <div>{$props.item}</div>;
+}
+
+export function templateHoles() {
+    return <div>
+    <Screen component={NoParams} />
+    <Screen component={Curried} />
+    <Screen component={Tupled} />
+    <Screen component={Generic} />
+    <Screen component={Imported} />
+    <Screen component={Screens_Member_Z18115A39} />
+</div>;
+}
+
+export function createProps() {
+    return <Screen component={NoParams}
+        fallback={Curried} />;
+}
+
+export function createTag() {
+    return <NoParams />;
+}
+
+export function wrapped() {
+    return <div>
+    <Screen render={(age) => <Curried name="partial"
+        age={age} />} />
+    <Screen render={(name_1) => ((age_1) => <Curried name={name_1}
+        age={age_1} />)} />
+    <Screen render={(age_2) => ((name_2) => <Curried name={name_2}
+        age={age_2} />)} />
+    <Screen render={() => <div>Inlined</div>} />
+</div>;
+}
+
+export function called() {
+    return <div><NoParams /></div>;
+}
+
+export function apply(render) {
+    return render("a", 1);
+}
+
+export const asFunction = () => <NoParams />;
+
+export function asArgument() {
+    return apply((name, age) => <Curried name={name}
+        age={age} />);
+}
+

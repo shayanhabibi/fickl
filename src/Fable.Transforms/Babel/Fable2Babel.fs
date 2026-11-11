@@ -3879,12 +3879,66 @@ module Util =
         | SeqLibCall "toList" [ SeqLibCall "delay" _ as generator ] -> read generator
         | _ -> None
 
+    /// Matches the function F# builds when a `[<JSX.Component>]` function is used as a value instead of
+    /// being called (`fun a b -> Comp a b`, or `fun (a, b) -> Comp(a, b)` for tupled parameters) and
+    /// returns the component itself. A partial application does not match, nor does a lambda the user
+    /// wrote that names its arguments, which stays the way to ask for a function called by position.
+    let (|JsxComponentRef|_|) (com: IBabelCompiler) (expr: Fable.Expr) : Fable.Expr option =
+        let rec readLambda (acc: Fable.Ident list) expr =
+            match expr with
+            | MaybeCasted(Fable.Lambda(arg, body, _)) -> readLambda (arg :: acc) body
+            | MaybeCasted(Fable.Delegate(args, body, _, [])) -> readLambda (List.rev args @ acc) body
+            | MaybeCasted body -> List.rev acc, body
+
+        let isArgRef (arg: Fable.Ident) (value: Fable.Expr) =
+            match value with
+            | MaybeCasted(Fable.IdentExpr ident) -> ident.Name = arg.Name
+            | _ -> false
+
+        let isTupleItemRef (tuple: Fable.Ident) (index: int, value: Fable.Expr) =
+            match value with
+            | MaybeCasted(Fable.Get(Fable.IdentExpr ident, Fable.TupleIndex i, _, _)) ->
+                ident.Name = tuple.Name && i = index
+            | _ -> false
+
+        match readLambda [] expr with
+        | [], _ -> None
+        | lambdaArgs, Fable.Call(callee, ({ ThisArg = None } as info), _, _) when
+            lambdaArgs |> List.forall (fun arg -> arg.IsCompilerGenerated)
+            ->
+            let lambdaArgs = lambdaArgs |> List.filter (fun arg -> arg.Type <> Fable.Unit)
+
+            let callArgs =
+                info.Args
+                |> List.filter (
+                    function
+                    | MaybeCasted(Fable.Value(Fable.UnitConstant, _)) -> false
+                    | _ -> true
+                )
+
+            let isEtaExpansion =
+                match lambdaArgs, callArgs with
+                | [ tuple ], _ :: _ :: _ -> callArgs |> List.indexed |> List.forall (isTupleItemRef tuple)
+                | _ -> lambdaArgs.Length = callArgs.Length && List.forall2 isArgRef lambdaArgs callArgs
+
+            match info.MemberRef |> Option.bind com.TryGetMember with
+            | Some memberInfo when isEtaExpansion && hasAttribute Atts.jsxComponent memberInfo.Attributes -> Some callee
+            | _ -> None
+        | _ -> None
+
+    /// A component passed by reference keeps its identity between renders, which a new arrow
+    /// function around it does not, so the framework would remount it every time.
+    let jsxComponentRefOrSelf (com: IBabelCompiler) (expr: Fable.Expr) =
+        match expr with
+        | JsxComponentRef com componentRef -> componentRef
+        | expr -> expr
+
     let transformJsxProps (com: IBabelCompiler) (props: JsxPropSource list) =
         // `children` is taken out of the props to be printed between the tags, which the object
         // a condition spreads into the element cannot do.
         let readKeyValue isConditional (range: SourceLocation option) key value (props, children) =
             if key <> "children" then
-                Some(JsxPropExpr.KeyValue(key, value) :: props, children)
+                Some(JsxPropExpr.KeyValue(key, jsxComponentRefOrSelf com value) :: props, children)
             elif isConditional then
                 jsxPropsError "JSX children cannot be set under a condition in the props list"
                 |> addError com [] range
@@ -4066,7 +4120,8 @@ but thanks to the optimisation done below we get
         match transformJsxProps com props with
         | None -> Expression.nullLiteral ()
         | Some(props, children) ->
-            let componentOrTag = transformAsExpr com ctx componentOrTag
+            let componentOrTag =
+                jsxComponentRefOrSelf com componentOrTag |> transformAsExpr com ctx
 
             let children =
                 children
@@ -4260,7 +4315,9 @@ but thanks to the optimisation done below we get
                     | head :: parts -> (stripImports com ctx range head) :: parts
                     | parts -> parts
 
-                let values = values |> List.mapToArray (transformAsExpr com ctx)
+                let values =
+                    values |> List.mapToArray (jsxComponentRefOrSelf com >> transformAsExpr com ctx)
+
                 Expression.jsxTemplate (List.toArray parts, values) |> Some
             | MaybeCasted(Fable.Call(Fable.Import({
                                                       Selector = "concat"
@@ -4289,7 +4346,9 @@ but thanks to the optimisation done below we get
                     | head :: tail -> (stripImports com ctx range head) :: tail
                     | parts -> parts
 
-                let values = values |> List.mapToArray (transformAsExpr com ctx)
+                let values =
+                    values |> List.mapToArray (jsxComponentRefOrSelf com >> transformAsExpr com ctx)
+
                 Expression.jsxTemplate (List.toArray parts, values) |> Some
             | _ ->
                 "Expecting a string literal or interpolation without formatting"

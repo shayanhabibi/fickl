@@ -67,3 +67,24 @@ let FormatSpecifierJSX(value: float) =
         $"""
         <div data-testid="format-specifier">%.3f{value}</div>
         """
+
+// Renders the component it is given, the way a router or a navigator does
+[<JSX.Component>]
+let ComponentHostJSX(screen: obj) : JSX.Element =
+    React?createElement(screen, createObj [ "init" ==> 5 ])
+
+// A component used as a value is passed by reference, so that it is the same function
+// on every render and React keeps its state instead of mounting it again
+[<JSX.Component>]
+let ComponentByReferenceJSX() =
+    let (renders, setRenders) = Feliz.React.useState(1)
+    JSX.html
+        $"""
+        <div>
+            <button data-testid="button-rerender-jsx"
+                onClick={fun _ -> setRenders(renders + 1)}>
+                Rendered {renders} times
+            </button>
+            <ComponentHostJSX screen={CounterJSX} />
+        </div>
+        """
