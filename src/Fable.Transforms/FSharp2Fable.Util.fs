@@ -2465,6 +2465,80 @@ module Util =
         let returnsUnknown (memb: Fable.MemberFunctionOrValue) =
             tryFSharpMember memb |> Option.exists (fun m -> contains m.ReturnParameter.Type)
 
+    /// fickl: an F# type abbreviation is declared in TypeScript as a type alias of the type it stands for (#155).
+    /// The abbreviation has no entity of its own in the Fable AST, so its declaration travels as a tagged member
+    /// declaration: the generated member's parameter types are the alias's type parameters, and its return type
+    /// is the aliased type. Only Fable2Babel reads it, and only for TypeScript.
+    module TsTypeAlias =
+        [<Literal>]
+        let Tag = "fickl-type-alias"
+
+        [<Literal>]
+        let PrivateTag = "fickl-type-alias-private"
+
+        let isTypeAlias (com: Compiler) (ent: FSharpEntity) =
+            (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+            && ent.IsFSharpAbbreviation
+            && not ent.IsMeasure
+            && not (
+                ent.Attributes
+                |> hasAttrib "Microsoft.FSharp.Core.MeasureAnnotatedAbbreviationAttribute"
+            )
+
+        /// The name the alias is declared with, mangled like the name of a class in the same place.
+        let declarationName (com: Compiler) (ent: FSharpEntity) =
+            // FCS gives an abbreviation no full name
+            let fullName =
+                match ent.DeclaringEntity, ent.Namespace with
+                | Some declaring, _ -> FsEnt.FullName declaring + "." + ent.LogicalName
+                | None, Some ns -> ns + "." + ent.LogicalName
+                | None, None -> ent.LogicalName
+
+            let entRef: Fable.EntityRef =
+                {
+                    FullName = fullName
+                    Path =
+                        ent.DeclarationLocation.FileName
+                        |> Path.normalizePathAndEnsureFsExtension
+                        |> Fable.SourcePath
+                }
+
+            getEntityDeclarationName com entRef
+
+        let tryDeclaration (com: Compiler) (ent: FSharpEntity) : Fable.MemberDecl option =
+            match declarationName com ent with
+            | name when String.IsNullOrEmpty(name) -> None
+            | name ->
+                let genParams =
+                    ent.GenericParameters
+                    |> Seq.filter (fun p -> not p.IsMeasure)
+                    |> Seq.map (fun p ->
+                        Fable.GenericParam(genParamName p, false, FsGenParam.Constraints p |> Seq.toList)
+                    )
+                    |> Seq.toList
+
+                let aliased =
+                    makeType Map.empty ent.AbbreviatedType |> TsUnknown.markType ent.AbbreviatedType
+
+                let isPrivate = ent.Accessibility.IsPrivate || typeIsHiddenBySignatureFile ent
+
+                Some
+                    {
+                        Name = name
+                        Args = []
+                        Body = Fable.Value(Fable.UnitConstant, None)
+                        MemberRef = Fable.GeneratedMember.Function(name, genParams, aliased, isInstance = false)
+                        IsMangled = false
+                        ImplementedSignatureRef = None
+                        UsedNames = Set.empty
+                        XmlDoc = tryGetXmlDoc ent.XmlDoc
+                        Tags =
+                            if isPrivate then
+                                [ Tag; PrivateTag ]
+                            else
+                                [ Tag ]
+                    }
+
     /// fickl: `[<NoOverloadSuffix>]` on an overloaded member would give its overloads one name
     let checkNoOverloadSuffix (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
         match memb.DeclaringEntity with

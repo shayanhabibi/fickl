@@ -603,6 +603,7 @@ let transformFile (com: Compiler) (jsProgram: Program) (file: Fable.File) : Prog
         |> List.collect (
             function
             | Fable.ClassDeclaration decl -> [ decl.Name ]
+            | Fable.MemberDeclaration decl when List.contains Util.TsTypeAlias.Tag decl.Tags -> [ decl.Name ]
             | Fable.ModuleDeclaration decl -> typeNames decl.Members
             | _ -> []
         )
