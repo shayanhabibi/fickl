@@ -1,0 +1,40 @@
+
+import { map } from "./fable_modules/fable-library-js.5.27.0/List.js";
+import { jsSpread } from "./fable_modules/fable-library-js.5.27.0/Util.js";
+
+export function resize(options) {
+    return ({ ...options, size: (options.size + 1) });
+}
+
+export function update(make) {
+    return ({ ...make(), name: "updated", ["data-id"]: "id", onChange: ((previous, next) => {
+        previous + next;
+    }), limit: undefined });
+}
+
+export function resizeAll(all) {
+    return map((options) => (({ ...options, size: 0 })), all);
+}
+
+export function conditional(options, grow) {
+    return jsSpread(options, (o) => {
+        if (grow) {
+            o.size = ((options.size * 2) | 0);
+        }
+    });
+}
+
+export function merge(defaults, options) {
+    return ({ ...defaults, ...options });
+}
+
+export function mergeWithLiteral(defaults) {
+    return ({ ...defaults, ...{
+        size: 1,
+    } });
+}
+
+export function mergeAll(all) {
+    return Object.assign({}, ...all);
+}
+

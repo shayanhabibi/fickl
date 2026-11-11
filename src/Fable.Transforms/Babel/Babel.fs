@@ -479,6 +479,8 @@ type ObjectMember =
         typeParameters: TypeParameter array *
         loc: SourceLocation option *
         doc: string option
+    /// fickl: `...argument` in an object literal, which copies the own enumerable properties of the argument
+    | ObjectSpread of argument: Expression
 
 //    let shorthand = defaultArg shorthand_ false
 //    member _.Shorthand: bool = shorthand

@@ -6697,6 +6697,62 @@ let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
         match args with
         | [ arg ] -> TypeCast(arg, t) |> Some
         | _ -> None
+    | "jsSpread", _ ->
+        match args with
+        | [ source; setters ] ->
+            let rec setsNestedProperty =
+                function
+                | Sequential statements -> List.exists setsNestedProperty statements
+                | Set(Get _, FieldSet _, _, _, _) -> true
+                | _ -> false
+
+            match setters with
+            | Lambda(_, body, _) when setsNestedProperty body ->
+                "jsSpread copies one level, so it cannot set a property of a nested object. Set the nested object as a whole."
+                |> addErrorAndReturnNull com ctx.InlinePath r
+                |> Some
+            | _ ->
+                match makePojoFromLambda com setters with
+                | ObjectExpr(members, _, _) ->
+                    // `({ ...source, key: value })`, in parentheses so that it is not read as a block where a statement can
+                    // start. A key that is not a plain identifier is passed as a computed key.
+                    let isPlainKey (key: string) =
+                        key <> ""
+                        && not (Char.IsDigit key[0])
+                        && key |> Seq.forall (fun c -> Char.IsLetterOrDigit c || c = '_')
+
+                    let properties, values =
+                        (([], [ source ]), members)
+                        ||> List.fold (fun (properties, values) memb ->
+                            let index = List.length values
+
+                            if isPlainKey memb.Name then
+                                properties @ [ $"%s{memb.Name}: $%i{index}" ], values @ [ memb.Body ]
+                            else
+                                properties @ [ $"[$%i{index}]: $%i{index + 1}" ],
+                                values @ [ makeStrConst memb.Name; memb.Body ]
+                        )
+
+                    let macro = "({ " + String.concat ", " ("...$0" :: properties) + " })"
+                    emitExpr r t values macro |> Some
+                | _ ->
+                    Helper.LibCall(com, "Util", "jsSpread", t, [ source; setters ], ?loc = r)
+                    |> Some
+        | _ -> None
+    | "jsMerge", _ ->
+        match args with
+        | [ sources ] ->
+            match sources with
+            | ArrayOrListLiteral(sources, _) ->
+                let macro =
+                    sources
+                    |> List.mapi (fun i _ -> $"...$%i{i}")
+                    |> String.concat ", "
+                    |> sprintf "({ %s })"
+
+                emitExpr r t sources macro |> Some
+            | _ -> emitExpr r t [ sources ] "Object.assign({}, ...$0)" |> Some
+        | _ -> None
     | "jsFunction", Some(args, body, name) ->
         Delegate(args, body, name, [ "not-arrow"; "fickl-js-function" ])
         |> expose args.Length

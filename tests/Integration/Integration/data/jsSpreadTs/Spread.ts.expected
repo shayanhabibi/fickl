@@ -1,0 +1,54 @@
+
+import type { Option } from "./fable_modules/fable-library-ts.5.27.0/Option.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { type FSharpList, map } from "./fable_modules/fable-library-ts.5.27.0/List.ts";
+import { jsSpread } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+
+export interface Options {
+    get "data-id"(): string,
+    limit?: Option<int32>,
+    get name(): string,
+    get onChange(): ((arg0: int32, arg1: int32) => void),
+    get size(): int32,
+    set "data-id"(arg0: string),
+    set name(arg0: string),
+    set onChange(arg0: ((arg0: int32, arg1: int32) => void)),
+    set size(arg0: int32)
+}
+
+export function resize(options: Options): Options {
+    return ({ ...options, size: (options.size + 1) });
+}
+
+export function update(make: (() => Options)): Options {
+    return ({ ...make(), name: "updated", ["data-id"]: "id", onChange: ((previous: int32, next: int32): void => {
+        previous + next;
+    }), limit: undefined });
+}
+
+export function resizeAll(all: FSharpList<Options>): FSharpList<Options> {
+    return map<Options, Options>((options: Options): Options => (({ ...options, size: 0 })), all);
+}
+
+export function conditional(options: Options, grow: boolean): Options {
+    return jsSpread(options, (o: Options): void => {
+        if (grow) {
+            o.size = ((options.size * 2) | 0);
+        }
+    });
+}
+
+export function merge(defaults: Options, options: Options): Options {
+    return ({ ...defaults, ...options });
+}
+
+export function mergeWithLiteral(defaults: Options): Options {
+    return ({ ...defaults, ...({
+        size: 1,
+    } satisfies Partial<Options> as Options) });
+}
+
+export function mergeAll(all: FSharpList<Options>): Options {
+    return Object.assign({}, ...all);
+}
+

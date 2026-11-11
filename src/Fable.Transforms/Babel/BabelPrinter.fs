@@ -1126,6 +1126,10 @@ module PrinterExtensions =
 
                 printer.PrintObjectMethod(kind, key, parameters, body, isComputed, returnType, typeParameters, loc)
 
+            | ObjectSpread argument ->
+                printer.Print("...")
+                printer.ComplexExpressionWithParens(argument)
+
         member printer.PrintObjectProperty(key, value, isComputed) =
             if isComputed then
                 printer.Print("[")
