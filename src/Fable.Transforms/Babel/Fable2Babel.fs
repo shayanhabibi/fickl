@@ -3805,6 +3805,13 @@ module Util =
 
             emitExpression range macro args
 
+    /// The page that explains what the props list of `JSX.create` can contain
+    let jsxPropsDocsUrl =
+        "https://github.com/shayanhabibi/fickl/blob/main/docs/jsx-props.md"
+
+    /// Ends an error about the props list of `JSX.create` with a link to the page that explains it
+    let jsxPropsError (message: string) = $"%s{message}. See %s{jsxPropsDocsUrl}"
+
     [<RequireQualifiedAccess>]
     type JsxPropExpr =
         | KeyValue of key: string * value: Fable.Expr
@@ -3866,7 +3873,9 @@ module Util =
             if key <> "children" then
                 Some(JsxPropExpr.KeyValue(key, value) :: props, children)
             elif isConditional then
-                addError com [] range "JSX children cannot be set under a condition in the props list"
+                jsxPropsError "JSX children cannot be set under a condition in the props list"
+                |> addError com [] range
+
                 None
             else
                 match value with
@@ -3906,7 +3915,8 @@ module Util =
                                                               _,
                                                               _))) -> Some(JsxPropExpr.Spread value :: props, children)
                 | Some _, JsxPropSource.Single e ->
-                    addError com [] e.Range "Cannot detect JSX prop key at compile time"
+                    jsxPropsError "Cannot detect JSX prop key at compile time"
+                    |> addError com [] e.Range
 
                     None
             )
@@ -4219,11 +4229,11 @@ but thanks to the optimisation done below we get
         | Fable.Tags.Contains "jsx", componentOrTag :: JsxPropsGenerator props :: _ ->
             transformJsxEl com ctx componentOrTag props |> Some
         | Fable.Tags.Contains "jsx", _ ->
-            "Expecting a static list or array literal (no generator) for JSX props"
+            jsxPropsError "Expecting a static list or array literal (no generator) for JSX props"
             |> addErrorAndReturnNull com range
             |> Some
         | Fable.Tags.Contains "jsx-spread", _ ->
-            "JSX.spread can only be used as an element of the props list passed to JSX.create"
+            jsxPropsError "JSX.spread can only be used as an element of the props list passed to JSX.create"
             |> addErrorAndReturnNull com range
             |> Some
         | Fable.Tags.Contains "jsx-template", args ->
