@@ -392,8 +392,18 @@ export function defaultOf<T>(): T {
   return null as T;
 }
 
+// Debug builds store the F# full name of a union, record or exception under this key of its class.
+// A hot-module reload evaluates the module again, so one F# type gets a second class object.
+export const typeIdSymbol: unique symbol = Symbol.for("fickl.type.id");
+
 export function sameConstructor<T>(x: T, y: T) {
-  return Object.getPrototypeOf(x)?.constructor === Object.getPrototypeOf(y)?.constructor;
+  const xCons = Object.getPrototypeOf(x)?.constructor;
+  const yCons = Object.getPrototypeOf(y)?.constructor;
+  if (xCons === yCons) {
+    return true;
+  }
+  const xId = xCons?.[typeIdSymbol];
+  return xId !== undefined && xId === yCons?.[typeIdSymbol];
 }
 
 export interface IEnumerator<T> extends IDisposable {
