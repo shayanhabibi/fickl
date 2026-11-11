@@ -3359,6 +3359,15 @@ let decimals (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg:
     | ("Compare" | "CompareTo" | "Equals" | "GetHashCode"), _ -> valueTypes com ctx r t i thisArg args
     | _, _ -> None
 
+/// The `NumberStyles` flags `BigInt.parse` honours: white space, a leading sign and the hexadecimal
+/// and binary specifiers. It rejects a string that needs any other flag.
+let private bigintParseStyles =
+    int (
+        System.Globalization.NumberStyles.Integer
+        ||| System.Globalization.NumberStyles.AllowHexSpecifier
+        ||| System.Globalization.NumberStyles.AllowBinarySpecifier
+    )
+
 let bigints (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg with
     | ".ctor", None ->
@@ -3393,6 +3402,35 @@ let bigints (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: 
             |> Some
     | "Log2", None ->
         Helper.LibCall(com, "BigInt", "ilog2", t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
+        |> Some
+    | ("Parse" | "TryParse") as meth, None when not args.IsEmpty ->
+        // Every overload is (string, [NumberStyles], [IFormatProvider]), and TryParse ends with the result
+        let str, rest = args.Head, args.Tail
+
+        let style, rest =
+            match rest with
+            | (ExprType(Number(Int32, _)) as style) :: rest ->
+                match style with
+                | NumberConst(NumberValue.Int32 flags, _) when flags &&& ~~~bigintParseStyles <> 0 ->
+                    WarningCodes.numberStylesIgnored flags
+                    |> addWarningWithCode com ctx.InlinePath r
+                | _ -> ()
+
+                style, rest
+            | _ -> makeIntConst (int System.Globalization.NumberStyles.Integer), rest
+
+        let provider, outValue =
+            if meth = "TryParse" then
+                List.truncate (rest.Length - 1) rest, List.skip (rest.Length - 1) rest
+            else
+                rest, []
+
+        match provider with
+        | []
+        | [ InvariantCulture ] -> ()
+        | _ -> WarningCodes.formatProviderIgnored |> addWarningWithCode com ctx.InlinePath r
+
+        Helper.LibCall(com, "BigInt", Naming.lowerFirst meth, t, [ str; style ] @ outValue, ?loc = r)
         |> Some
     | meth, callee ->
         let args =
