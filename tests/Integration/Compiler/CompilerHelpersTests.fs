@@ -7,6 +7,7 @@ open Fable.Tests.Compiler.Util.Compiler
 
 open System
 open System.Reflection
+open Fable
 open Fable.Transforms
 
 /// Every warning code `WarningCodes` can emit, read from the module itself so that this test
@@ -71,6 +72,23 @@ let tests =
             WarningCodes.isSuppressible (Some "FABLE9999") |> equal true
             // A warning with no code at all is still caught by a bare `// fable-disable-line`.
             WarningCodes.isSuppressible None |> equal true
+
+        // fickl: two compilations for different targets can run in one process, each on its own threads (#398).
+        // Both run on threads of their own here, so the test leaves no language behind for the tests after it.
+        testCase "A compilation keeps its target language when another thread starts one for another target" <| fun _ ->
+            let seen = ref Fable.JavaScript
+
+            let first =
+                Threading.Thread(fun () ->
+                    Fable.Compiler.SetLanguageUnsafe Fable.TypeScript
+                    let second = Threading.Thread(fun () -> Fable.Compiler.SetLanguageUnsafe Fable.JavaScript)
+                    second.Start()
+                    second.Join()
+                    seen.Value <- Fable.Compiler.Language)
+
+            first.Start()
+            first.Join()
+            seen.Value |> equal Fable.TypeScript
 
         testCase "expectedVersionMatchesActual works for same major version" <| fun _ ->
             Fable.CompilerExt.expectedVersionMatchesActual "5.0.0" "5.0.0" |> equal true
