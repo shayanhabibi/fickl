@@ -127,6 +127,386 @@ let dateTimeOffsetModule (com: Compiler) =
     else
         "DateOffset"
 
+/// The values each date and time runtime module exports, by module name. The handlers below call a member they do not
+/// route explicitly by its lower-cased name, so a member missing here would compile to an import of a function that
+/// does not exist, which only fails when the module is loaded. Kept in sync with `src/fable-library-ts/<module>.ts` by
+/// a test in tests/Integration/Compiler/UnsupportedBclMemberTests.fs.
+let dateLibraryExports: Map<string, Set<string>> =
+    [
+        "Date",
+        [
+            "getKind"
+            "unixEpochMillisecondsToTicks"
+            "ticksToUnixEpochMilliseconds"
+            "dateOffsetToString"
+            "toString"
+            "DateTime"
+            "fromTicks"
+            "fromDateTime"
+            "fromDateTimeOffset"
+            "getTicks"
+            "minValue"
+            "maxValue"
+            "parseRaw"
+            "parse"
+            "tryParse"
+            "create"
+            "now"
+            "utcNow"
+            "today"
+            "isLeapYear"
+            "daysInMonth"
+            "toUniversalTime"
+            "toLocalTime"
+            "specifyKind"
+            "timeOfDay"
+            "date"
+            "day"
+            "hour"
+            "millisecond"
+            "minute"
+            "month"
+            "second"
+            "year"
+            "dayOfWeek"
+            "dayOfYear"
+            "add"
+            "addDays"
+            "addHours"
+            "addMinutes"
+            "addSeconds"
+            "addMilliseconds"
+            "addTicks"
+            "addYears"
+            "addMonths"
+            "subtract"
+            "toLongDateString"
+            "toShortDateString"
+            "toLongTimeString"
+            "toShortTimeString"
+            "equals"
+            "compare"
+            "compareTo"
+            "op_Addition"
+            "op_Subtraction"
+            "isDaylightSavingTime"
+        ]
+        "DateOffset",
+        [
+            "offset"
+            "fromDate"
+            "fromDateTime"
+            "fromTicks"
+            "fromUnixTimeMilliseconds"
+            "fromUnixTimeSeconds"
+            "getUtcTicks"
+            "minValue"
+            "maxValue"
+            "parse"
+            "tryParse"
+            "create"
+            "now"
+            "utcNow"
+            "toUniversalTime"
+            "toLocalTime"
+            "localDateTime"
+            "timeOfDay"
+            "date"
+            "day"
+            "hour"
+            "millisecond"
+            "minute"
+            "month"
+            "second"
+            "year"
+            "dayOfWeek"
+            "dayOfYear"
+            "add"
+            "addDays"
+            "addHours"
+            "addMinutes"
+            "addSeconds"
+            "addMilliseconds"
+            "addTicks"
+            "addYears"
+            "addMonths"
+            "subtract"
+            "equals"
+            "equalsExact"
+            "compare"
+            "compareTo"
+            "op_Addition"
+            "op_Subtraction"
+            "toOffset"
+            "toUnixTimeMilliseconds"
+            "toUnixTimeSeconds"
+        ]
+        "DateOnly",
+        [
+            "fromUnixMilliseconds"
+            "create"
+            "maxValue"
+            "minValue"
+            "dayNumber"
+            "fromDayNumber"
+            "fromDateTime"
+            "day"
+            "month"
+            "year"
+            "dayOfWeek"
+            "dayOfYear"
+            "toDateTime"
+            "toString"
+            "parse"
+            "tryParse"
+        ]
+        "TimeOnly",
+        [
+            "create"
+            "fromTicks"
+            "fromTimeSpan"
+            "fromDateTime"
+            "maxValue"
+            "add"
+            "addHours"
+            "addMinutes"
+            "isBetween"
+            "toString"
+            "parse"
+            "tryParse"
+            "op_Subtraction"
+        ]
+        "TimeSpan",
+        [
+            "create"
+            "maxValue"
+            "minValue"
+            "fromTicks"
+            "fromDays"
+            "fromHours"
+            "fromMinutes"
+            "fromSeconds"
+            "fromMilliseconds"
+            "days"
+            "hours"
+            "minutes"
+            "seconds"
+            "milliseconds"
+            "ticks"
+            "totalDays"
+            "totalHours"
+            "totalMinutes"
+            "totalSeconds"
+            "negate"
+            "add"
+            "subtract"
+            "multiply"
+            "divide"
+            "op_Addition"
+            "op_Subtraction"
+            "op_Multiply"
+            "op_Division"
+            "compare"
+            "compareTo"
+            "duration"
+            "toString"
+            "parse"
+            "tryParse"
+        ]
+        "DateTimeTemporal",
+        [
+            "PlainDateTime"
+            "getKind"
+            "dateTime"
+            "create"
+            "fromTicks"
+            "getTicks"
+            "minValue"
+            "maxValue"
+            "now"
+            "utcNow"
+            "today"
+            "specifyKind"
+            "dayOfWeek"
+            "date"
+            "timeOfDay"
+            "add"
+            "addYears"
+            "addMonths"
+            "addDays"
+            "addHours"
+            "addMinutes"
+            "addSeconds"
+            "addMilliseconds"
+            "addTicks"
+            "subtractDate"
+            "subtractTimeSpan"
+            "equals"
+            "compare"
+            "compareTo"
+            "op_Addition"
+            "hash"
+            "isLeapYear"
+            "daysInMonth"
+            "toUniversalTime"
+            "toLocalTime"
+            "isDaylightSavingTime"
+            "toLongDateString"
+            "toShortDateString"
+            "toLongTimeString"
+            "toShortTimeString"
+            "toString"
+            "parse"
+            "tryParse"
+        ]
+        "DateTimeOffsetTemporal",
+        [
+            "ZonedDateTime"
+            "offset"
+            "create"
+            "fromDate"
+            "fromTicks"
+            "fromUnixTimeMilliseconds"
+            "fromUnixTimeSeconds"
+            "minValue"
+            "maxValue"
+            "dayOfWeek"
+            "timeOfDay"
+            "date"
+            "dateTimeProp"
+            "toUniversalTime"
+            "toLocalTime"
+            "utcDateTime"
+            "localDateTime"
+            "add"
+            "addYears"
+            "addMonths"
+            "addDays"
+            "addHours"
+            "addMinutes"
+            "addSeconds"
+            "addMilliseconds"
+            "addTicks"
+            "subtractDate"
+            "subtractTimeSpan"
+            "equals"
+            "equalsExact"
+            "compare"
+            "compareTo"
+            "op_Addition"
+            "hash"
+            "toOffset"
+            "getUtcTicks"
+            "getTicks"
+            "toUnixTimeMilliseconds"
+            "toUnixTimeSeconds"
+            "now"
+            "utcNow"
+            "toString"
+            "parse"
+            "tryParse"
+        ]
+        "DateOnlyTemporal",
+        [
+            "PlainDate"
+            "create"
+            "maxValue"
+            "minValue"
+            "dayNumber"
+            "fromDayNumber"
+            "fromDateTime"
+            "dayOfWeek"
+            "toDateTime"
+            "toDateTimeOffset"
+            "addDays"
+            "addMonths"
+            "addYears"
+            "equals"
+            "compare"
+            "equalsObj"
+            "compareToObj"
+            "hash"
+            "toString"
+            "parse"
+            "tryParse"
+        ]
+        "TimeOnlyTemporal",
+        [
+            "PlainTime"
+            "create"
+            "fromTicks"
+            "fromTimeSpan"
+            "fromDateTime"
+            "minValue"
+            "maxValue"
+            "ticks"
+            "toTimeSpan"
+            "add"
+            "addHours"
+            "addMinutes"
+            "isBetween"
+            "equals"
+            "compare"
+            "equalsObj"
+            "compareToObj"
+            "hash"
+            "op_Subtraction"
+            "toString"
+            "parse"
+            "tryParse"
+        ]
+        "TimeSpanTemporal",
+        [
+            "Duration"
+            "totalNanoseconds"
+            "create"
+            "maxValue"
+            "minValue"
+            "fromTicks"
+            "zero"
+            "fromUnits"
+            "fromDays"
+            "fromHours"
+            "fromMinutes"
+            "fromSeconds"
+            "fromMilliseconds"
+            "ticks"
+            "totalDays"
+            "totalHours"
+            "totalMinutes"
+            "totalSeconds"
+            "totalMilliseconds"
+            "negate"
+            "add"
+            "subtract"
+            "multiply"
+            "divide"
+            "divideByTimeSpan"
+            "op_Addition"
+            "op_Subtraction"
+            "op_Multiply"
+            "op_UnaryNegation"
+            "compare"
+            "compareTo"
+            "equals"
+            "equalsObj"
+            "compareToObj"
+            "hash"
+            "duration"
+            "toString"
+            "parse"
+            "tryParse"
+        ]
+    ]
+    |> List.map (fun (moduleName, names) -> moduleName, set names)
+    |> Map.ofList
+
+/// False if `name` is not exported by the date or time runtime module `moduleName`: the member is not supported.
+let isDateLibraryExport (moduleName: string) (name: string) =
+    match Map.tryFind moduleName dateLibraryExports with
+    | Some names -> names.Contains name
+    | None -> true
+
 let private temporalSubtractionName opName (argTypes: Type list) =
     if opName <> Operators.subtraction then
         opName
@@ -2154,6 +2534,31 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
         |> Some
     | _ -> None
 
+/// The runtime module of a DateOnly, TimeOnly or TimeSpan
+let private dateModuleOf (com: ICompiler) (typ: Type) =
+    match typ with
+    | Builtin BclDateOnly -> dateOnlyModule com
+    | Builtin BclTimeOnly -> timeOnlyModule com
+    | _ -> timeSpanModule com
+
+/// `Equals(obj)` of a DateOnly, TimeOnly or TimeSpan when the argument is not known to be of the same type: as in
+/// .NET, false for null and for a value of another type. In TypeScript the argument can be of any type, so it goes to
+/// a parameter that accepts one.
+let private dateEqualsObj (com: ICompiler) r t (thisArg: Expr) (arg: Expr) =
+    if com.Options.JsTemporal then
+        // The `equals` of a Temporal object throws for null and parses a string
+        Helper.LibCall(com, dateModuleOf com thisArg.Type, "equalsObj", t, [ thisArg; arg ], ?loc = r)
+    else
+        // A number or a JS Date: Util.equals is false for null and for a value of another JS type
+        Helper.LibCall(com, "Util", "equals", t, [ thisArg; arg ], genArgs = [ Any ], ?loc = r)
+
+/// `CompareTo(obj)` of a DateOnly, TimeOnly or TimeSpan: as in .NET, anything is greater than null.
+let private dateCompareToObj (com: ICompiler) r t (thisArg: Expr) (arg: Expr) =
+    if com.Options.JsTemporal then
+        Helper.LibCall(com, dateModuleOf com thisArg.Type, "compareToObj", t, [ thisArg; arg ], ?loc = r)
+    else
+        Helper.LibCall(com, "Util", "compare", t, [ thisArg; arg ], genArgs = [ Any ], ?loc = r)
+
 let objects (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
     | ".ctor", _, _ -> typedObjExpr t [] |> Some
@@ -2166,6 +2571,10 @@ let objects (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
         | _, Array _ -> makeEqOp r arg1 arg2 BinaryEqual |> Some
         // Double.Equals(obj): NaN equals itself
         | Number(Floats _, _), _ -> Helper.LibCall(com, "Double", "equals", t, [ arg1; arg2 ], ?loc = r) |> Some
+        | (Builtin(BclDateOnly | BclTimeOnly | BclTimeSpan) as type1), type2 when
+            Option.isSome thisArg && type1 <> type2
+            ->
+            dateEqualsObj com r t arg1 arg2 |> Some
         | _ -> equals com ctx r true arg1 arg2 |> Some
     | "GetHashCode", Some arg, _ -> identityHash com r arg |> Some
     | "GetType", Some arg, _ ->
@@ -4258,6 +4667,35 @@ let ignoreFormatProvider com (ctx: Context) r meth args =
         [ input; defVal ]
     | _ -> args
 
+/// True if the date or time runtime module has no export for the BCL member `meth`, which the handlers below would
+/// otherwise import by its lower-cased name.
+let private isUnsupportedDateMember (moduleName: string) (meth: string) =
+    // Using an F# operator also brings its `op_` member here, but what is emitted is what `applyOp` compiles the
+    // operator to. So an operator the module does not export (`op_Subtraction` and `op_Division` of the Temporal
+    // modules) must not be reported.
+    if meth.StartsWith("op_", StringComparison.Ordinal) then
+        false
+    else
+        Naming.removeGetSetPrefix meth
+        |> Naming.lowerFirst
+        |> isDateLibraryExport moduleName
+        |> not
+
+/// `Equals` and `CompareTo` of DateOnly, TimeOnly and TimeSpan, which not all their runtime modules export.
+/// `Equals(obj)` does not get here: it is a call to Object.Equals, see `objects`.
+let private dateEqualsOrCompareTo (com: ICompiler) ctx r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    let isObjOverload =
+        match i.SignatureArgTypes with
+        | [ Builtin(BclDateOnly | BclTimeOnly | BclTimeSpan) ] -> false
+        | _ -> true
+
+    match i.CompiledName, thisArg, args with
+    | "Equals", Some left, [ right ]
+    | "Equals", None, [ left; right ] -> equals com ctx r true left right |> Some
+    | "CompareTo", Some thisArg, [ arg ] when not isObjOverload -> compare com ctx r thisArg arg |> Some
+    | "CompareTo", Some thisArg, [ arg ] -> dateCompareToObj com r t thisArg arg |> Some
+    | _ -> None
+
 let dateTime (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     let moduleName = dateTimeModule com
 
@@ -4329,22 +4767,7 @@ let dateTime (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
         let fieldName = Naming.removeGetSetPrefix i.CompiledName |> Naming.lowerFirst
 
         getFieldWith r t thisArg.Value fieldName |> Some
-    // Not implemented in fable-library: without this the catch-all below would import
-    // a function that doesn't exist, which only fails when the module is loaded.
-    | "ToOADate"
-    | "FromOADate"
-    | "ParseExact"
-    | "TryParseExact"
-    | "ToBinary"
-    | "FromBinary"
-    | "ToFileTime"
-    | "ToFileTimeUtc"
-    | "FromFileTime"
-    | "FromFileTimeUtc"
-    | "GetDateTimeFormats"
-    | "AddMicroseconds"
-    | "get_Microsecond"
-    | "get_Nanosecond" -> None
+    | meth when isUnsupportedDateMember moduleName meth -> None
     | meth ->
         let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst
@@ -4456,6 +4879,7 @@ let dateTimeOffset (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: E
         let fieldName = Naming.removeGetSetPrefix i.CompiledName |> Naming.lowerFirst
 
         getFieldWith r t thisArg.Value fieldName |> Some
+    | meth when isUnsupportedDateMember moduleName meth -> None
     | meth ->
         let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst
@@ -4468,6 +4892,8 @@ let dateOnly (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
     let moduleName = dateOnlyModule com
 
     match i.CompiledName with
+    | "Equals"
+    | "CompareTo" -> dateEqualsOrCompareTo com ctx r t i thisArg args
     | ".ctor" when args.Length = 4 ->
         "DateOnly constructor with the calendar parameter is not supported."
         |> addError com ctx.InlinePath r
@@ -4519,6 +4945,7 @@ let dateOnly (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
         let fieldName = Naming.removeGetSetPrefix i.CompiledName |> Naming.lowerFirst
 
         getFieldWith r t thisArg.Value fieldName |> Some
+    | meth when isUnsupportedDateMember moduleName meth -> None
     | meth ->
         let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst
@@ -4561,6 +4988,8 @@ let timeSpans (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg
 
         Helper.LibCall(com, moduleName, meth, t, args, i.SignatureArgTypes, ?loc = r)
         |> Some
+    | "Equals"
+    | "CompareTo" -> dateEqualsOrCompareTo com ctx r t i thisArg args
     | "get_TotalMilliseconds" when not com.Options.JsTemporal -> TypeCast(thisArg.Value, t) |> Some
     | "op_Multiply" ->
         // .NET overloads the operator on both sides: TimeSpan * float and float * TimeSpan
@@ -4610,6 +5039,7 @@ let timeSpans (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg
     | "FromSeconds" -> limitArgsCountToMilliseconds "fromSeconds" 2
     | "FromMilliseconds" -> limitArgsCountToMilliseconds "fromMilliseconds" 1
 
+    | meth when isUnsupportedDateMember moduleName meth -> None
     | meth -> timeSpanLibCall meth args
 
 let timeOnly (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
@@ -4624,6 +5054,8 @@ let timeOnly (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
         | _ ->
             Helper.LibCall(com, moduleName, "create", t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
             |> Some
+    | "Equals"
+    | "CompareTo" -> dateEqualsOrCompareTo com ctx r t i thisArg args
     | "get_MinValue" when not com.Options.JsTemporal -> makeIntConst 0 |> Some
     | "ToTimeSpan" when not com.Options.JsTemporal ->
         // The representation is identical
@@ -4675,6 +5107,7 @@ let timeOnly (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
             )
             |> Some
         | _ -> None
+    | meth when isUnsupportedDateMember moduleName meth -> None
     | meth ->
         let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix i.CompiledName |> Naming.lowerFirst

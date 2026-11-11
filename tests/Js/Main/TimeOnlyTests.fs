@@ -323,4 +323,23 @@ let tests =
             t.AddHours(1.0 / 3.0).Ticks - t.Ticks |> equal 12_000_000_000L
             t.AddMinutes(0.00001).Ticks - t.Ticks |> equal 6_000L
 #endif
+
+        testCase "TimeOnly.Equals works" <| fun () ->
+            let x = TimeOnly(10, 30, 0)
+            x.Equals(TimeOnly(10, 30, 0)) |> equal true
+            x.Equals(TimeOnly(10, 30, 1)) |> equal false
+            x.Equals(box (TimeOnly(10, 30, 0))) |> equal true
+            x.Equals(box (TimeOnly(10, 30, 1))) |> equal false
+            x.Equals(box "10:30") |> equal false
+            x.Equals(null: obj) |> equal false
+
+        testCase "TimeOnly.CompareTo works" <| fun () ->
+            let x = TimeOnly(10, 30, 0)
+            x.CompareTo(TimeOnly(10, 30, 0)) |> equal 0
+            x.CompareTo(TimeOnly(10, 30, 1)) |> equal -1
+            x.CompareTo(TimeOnly(10, 29, 59)) |> equal 1
+            x.CompareTo(box (TimeOnly(10, 30, 0))) |> equal 0
+            x.CompareTo(box (TimeOnly(10, 30, 1))) |> equal -1
+            x.CompareTo(box (TimeOnly(10, 29, 59))) |> equal 1
+            x.CompareTo(null: obj) |> equal 1
     ]

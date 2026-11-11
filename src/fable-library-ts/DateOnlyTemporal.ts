@@ -79,6 +79,16 @@ export function compare(x: DateOnly, y: DateOnly): number {
   return Temporal.PlainDate.compare(x, y);
 }
 
+// Equals(obj): as in .NET, false for null and for a value of another type
+export function equalsObj(x: DateOnly, y: unknown): boolean {
+  return y instanceof Temporal.PlainDate && equals(x, y);
+}
+
+// CompareTo(obj): as in .NET, anything is greater than null
+export function compareToObj(x: DateOnly, y: unknown): number {
+  return y == null ? 1 : compare(x, y as DateOnly);
+}
+
 export function hash(d: DateOnly): number {
   return dayNumber(d);
 }
