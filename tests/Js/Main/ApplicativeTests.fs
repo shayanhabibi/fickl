@@ -1964,6 +1964,67 @@ module PartialActivePatternsCanReturnBool =
         ]
 #endif
 
+module RecursiveTraitCalls =
+    open System.Collections.Generic
+
+    [<Struct>]
+    type MemoizationKeyWrapper<'a> = MemoizationKeyWrapper of 'a
+
+    type MemoizeN =
+        static member getOrAdd (cd: Dictionary<MemoizationKeyWrapper<'a>, 'b>) (f: 'a -> 'b) k =
+            match cd.TryGetValue(MemoizationKeyWrapper k) with
+            | (true, v) -> v
+            | (false, _) ->
+                let v = f k
+                cd.Add(MemoizationKeyWrapper k, v)
+                v
+
+    let inline memoizeN (f: '``(T1 -> T2 -> ... -> Tn)``) : '``(T1 -> T2 -> ... -> Tn)`` =
+        let inline call_2 (a: ^MemoizeN, b: ^b) =
+            ((^MemoizeN or ^b): (static member MemoizeN: ^MemoizeN * 'b -> _) (a, b))
+
+        call_2 (Unchecked.defaultof<MemoizeN>, Unchecked.defaultof<'``(T1 -> T2 -> ... -> Tn)``>) f
+
+    type MemoizeN with
+        static member MemoizeN(_: obj, _: 'a -> 'b) = MemoizeN.getOrAdd (Dictionary())
+
+        static member inline MemoizeN(_: MemoizeN, _: 't -> 'a -> 'b) =
+            MemoizeN.getOrAdd (Dictionary()) << (<<) memoizeN
+
+    let tests =
+        [
+            testCase "Recursive trait call ending in an overload with an obj parameter works" <| fun () -> // See #288
+                let effs = ResizeArray()
+                let f (x: decimal) = effs.Add "f"; x.ToString()
+                let sum2 (a: int) = effs.Add "sum2"; (+) a
+                let sum3 a (b: int) c = effs.Add "sum3"; a + b + c
+                let sum4 a b c d : int = effs.Add "sum4"; a + b + c + d
+                let msum2 = memoizeN sum2
+                let msum3 = memoizeN sum3
+                let msum4 = memoizeN sum4
+                let mf = memoizeN f
+
+                let results =
+                    [
+                        msum2 1 1
+                        msum2 1 1
+                        msum2 2 1
+                        msum3 1 2 3
+                        msum3 1 2 3
+                        msum4 3 1 2 3
+                        msum4 3 1 2 3
+                        msum4 3 5 2 3
+                    ]
+
+                equal [ 2; 2; 3; 6; 6; 9; 9; 13 ] results
+                equal "3" (mf 3M)
+                equal "3" (mf 3M)
+                // How deep the functions of three or more arguments are memoized is left out: the F# compiler
+                // resolves the inner trait call when the inline overload is defined, Fable when it is used
+                let effs = effs |> Seq.filter (fun x -> x = "sum2" || x = "f") |> List.ofSeq
+                equal [ "sum2"; "sum2"; "f" ] effs
+        ]
+
 let tests =
     testList "Applicative" (
         tests1
@@ -1980,6 +2041,7 @@ let tests =
         @ MultipleInlines.tests
         @ AccessorFunctionShorthand.tests
         @ DiscriminatedUnionIsGenerated.tests
+        @ RecursiveTraitCalls.tests
         #if !NPM_PACKAGE_FABLE_COMPILER_JAVASCRIPT
         @ PartialActivePatternsCanReturnBool.tests
         #endif

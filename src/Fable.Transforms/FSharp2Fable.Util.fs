@@ -12,7 +12,7 @@ open Fable.Transforms
 open Fable.Transforms.FSharp2Fable
 
 module Extensions =
-    let areParamTypesEqual strict genArgs (args1: Fable.Type array) (args2: IList<IList<FSharpParameter>>) =
+    let areParamTypesEqualWith typeEquals genArgs (args1: Fable.Type array) (args2: IList<IList<FSharpParameter>>) =
         // Not entirely sure why, but it seems members with a single unit argument sometimes have this parameter
         // and sometimes none, so just to be sure always remove single unit arguments
         let args2 =
@@ -24,9 +24,12 @@ module Extensions =
         if args1.Length = args2.Length then
             let args2 = args2 |> Array.map (fun p -> TypeHelpers.makeType genArgs p.Type)
 
-            Array.forall2 (typeEquals strict) args1 args2
+            Array.forall2 typeEquals args1 args2
         else
             false
+
+    let areParamTypesEqual strict genArgs args1 args2 =
+        areParamTypesEqualWith (typeEquals strict) genArgs args1 args2
 
 // type FSharpEntity with
 //     member entity.EnumerateMembersFunctionsAndValues(?includeHierarchy: bool): FSharpMemberOrFunctionOrValue seq =
@@ -559,9 +562,11 @@ type FsEnt(maybeAbbrevEnt: FSharpEntity) =
             ?argTypes: Fable.Type array,
             ?genArgs,
             // ?searchHierarchy: bool,
-            ?requireDispatchSlot: bool
+            ?requireDispatchSlot: bool,
+            ?objParamAcceptsAny: bool
         )
         =
+        let objParamAcceptsAny = defaultArg objParamAcceptsAny false
         let doNotRequireDispatchSlot = not (defaultArg requireDispatchSlot false)
 
         let genArgs = defaultArg genArgs Map.empty
@@ -592,7 +597,24 @@ type FsEnt(maybeAbbrevEnt: FSharpEntity) =
                 |> Seq.tryFind (fun m -> Extensions.areParamTypesEqual strict genArgs argTypes m.CurriedParameterGroups)
 
             // A loose comparison accepts a generic parameter as equal to any type
-            hasParamTypes true |> Option.orElseWith (fun () -> hasParamTypes false)
+            hasParamTypes true
+            |> Option.orElseWith (fun () -> hasParamTypes false)
+            |> Option.orElseWith (fun () ->
+                // Any argument can be passed to an `obj` parameter. F# prefers an overload with a closer parameter
+                // type, so this comes last
+                if objParamAcceptsAny then
+                    let typeEquals argType paramType =
+                        match paramType with
+                        | Fable.Any -> true
+                        | _ -> typeEquals false argType paramType
+
+                    candidates
+                    |> Seq.tryFind (fun m ->
+                        Extensions.areParamTypesEqualWith typeEquals genArgs argTypes m.CurriedParameterGroups
+                    )
+                else
+                    None
+            )
 
     interface Fable.Entity with
         member _.Ref = FsEnt.Ref ent
@@ -2028,6 +2050,14 @@ module TypeHelpers =
     let tryFindMember (ent: Fable.Entity) genArgs compiledName isInstance (argTypes: Fable.Type list) =
         match ent with
         | :? FsEnt as entity -> entity.TryFindMember(compiledName, isInstance, List.toArray argTypes, genArgs) //, searchHierarchy=true)
+        | _ -> None
+
+    /// Like `tryFindMember`, but for a call the F# compiler has already checked: when no overload has the
+    /// argument types, takes one whose `obj` parameters receive the arguments that do not match.
+    let tryFindMemberOfCheckedCall (ent: Fable.Entity) genArgs compiledName isInstance (argTypes: Fable.Type list) =
+        match ent with
+        | :? FsEnt as entity ->
+            entity.TryFindMember(compiledName, isInstance, List.toArray argTypes, genArgs, objParamAcceptsAny = true)
         | _ -> None
 
     let tryFindAbstractMember
