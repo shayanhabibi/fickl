@@ -60,6 +60,7 @@
     <TypeScriptCompile Include="Option.ts" />
     <Content Include="package.json" />
     <TypeScriptCompile Include="Reflection.ts" />
+    <TypeScriptCompile Include="Rune.ts" />
     <TypeScriptCompile Include="RegExp.ts" />
     <TypeScriptCompile Include="String.ts" />
     <TypeScriptCompile Include="TimeOnly.ts" />

@@ -5783,7 +5783,7 @@ but thanks to the optimisation done below we get
             | Builtin BclTimeOnly when com.Options.JsTemporal ->
                 libCall com ctx None "TimeOnlyTemporal" "minValue" [] []
             | Builtin BclTimeSpan when com.Options.JsTemporal -> libCall com ctx None "TimeSpanTemporal" "zero" [] []
-            | Builtin(BclTimeSpan | BclTimeOnly) -> Expression.numericLiteral 0
+            | Builtin(BclTimeSpan | BclTimeOnly | BclRune) -> Expression.numericLiteral 0
             | Builtin BclGuid -> Expression.stringLiteral "00000000-0000-0000-0000-000000000000"
             | Builtin BclDateTime -> libCall com ctx None (JS.Replacements.dateTimeModule com) "minValue" [] []
             | Builtin BclDateTimeOffset ->

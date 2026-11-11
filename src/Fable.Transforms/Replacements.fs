@@ -94,7 +94,7 @@ let coreModFor =
     | FSharpReference _ -> "Types"
     | BclHashSet _ -> "MutableSet"
     | BclDictionary _ -> "MutableMap"
-    | BclRune
+    | BclRune -> "Rune"
     | BclKeyValuePair _ -> FableError "Cannot decide core module" |> raise
 
 let dateOnlyModule (com: Compiler) =
@@ -808,7 +808,8 @@ let rec private erasedToString (com: ICompiler) (ctx: Context) r (typ: Type) (ex
     let needsFormat =
         function
         | Option _
-        | Tuple _ -> true
+        | Tuple _
+        | Builtin BclRune -> true
         | _ -> false
 
     let formatter (t: Type) =
@@ -838,6 +839,7 @@ let rec private erasedToString (com: ICompiler) (ctx: Context) r (typ: Type) (ex
 
         Helper.LibCall(com, "Types", "tupleToString", String, [ expr; makeArray Any formats ], ?loc = r)
     | Tuple _ -> Helper.LibCall(com, "Types", "tupleToString", String, [ expr ], ?loc = r)
+    | Builtin BclRune -> Helper.LibCall(com, "Rune", "toString", String, [ expr ], ?loc = r)
     | _ -> Helper.LibCall(com, "Types", "toString", String, [ expr ], ?loc = r)
 
 let private toStringWith nullAsEmpty com (ctx: Context) r (args: Expr list) =
@@ -854,6 +856,8 @@ let private toStringWith nullAsEmpty com (ctx: Context) r (args: Expr list) =
             | _ -> head
         | Char -> TypeCast(head, String)
         | Builtin BclGuid when tail.IsEmpty -> head
+        // A rune is its code point at runtime, so only its static type says it prints as a character
+        | Builtin BclRune -> Helper.LibCall(com, "Rune", "toString", String, [ head ], ?loc = r)
         | Builtin BclDateOnly -> Helper.LibCall(com, dateOnlyModule com, "toString", String, args)
         | Builtin BclTimeOnly -> Helper.LibCall(com, timeOnlyModule com, "toString", String, args)
         | Builtin BclTimeSpan when com.Options.JsTemporal ->
@@ -1141,7 +1145,7 @@ let isCompatibleWithNativeComparison (com: Compiler) typ =
     match typ with
     // Temporal.PlainTime and Temporal.Duration cannot be compared natively
     | Builtin(BclTimeOnly | BclTimeSpan) -> not com.Options.JsTemporal
-    | Builtin BclGuid
+    | Builtin(BclGuid | BclRune)
     | Boolean
     | Char
     | String
@@ -1172,7 +1176,8 @@ let identityHash (com: ICompiler) r (arg: Expr) =
             | Number(BigIntegers _, _) -> "bigintHash"
             | Number(Numbers _, _) -> "numberHash"
             | Builtin BclTimeSpan
-            | Builtin BclTimeOnly -> "numberHash"
+            | Builtin BclTimeOnly
+            | Builtin BclRune -> "numberHash"
             | List _ -> "safeHash"
             | Tuple _ -> "arrayHash" // F# tuples must use structural hashing
             // These are only used for structural hashing
@@ -1206,7 +1211,8 @@ let structuralHash (com: ICompiler) r (arg: Expr) =
             | Number(BigIntegers _, _) -> "bigintHash"
             | Number(Numbers _, _) -> "numberHash"
             | Builtin BclTimeSpan
-            | Builtin BclTimeOnly -> "numberHash"
+            | Builtin BclTimeOnly
+            | Builtin BclRune -> "numberHash"
             | List _ -> "safeHash"
             // TODO: Get hash functions of the generic arguments
             // for better performance when using tuples as map keys
@@ -1244,7 +1250,7 @@ let rec equals (com: ICompiler) ctx r equal (left: Expr) (right: Expr) =
     | Builtin BclTimeSpan when com.Options.JsTemporal ->
         Helper.LibCall(com, "TimeSpanTemporal", "equals", Boolean, [ left; right ], ?loc = r)
         |> is equal
-    | Builtin(BclGuid | BclTimeSpan | BclTimeOnly)
+    | Builtin(BclGuid | BclTimeSpan | BclTimeOnly | BclRune)
     | Boolean
     | Char
     | String
@@ -1307,7 +1313,7 @@ and compare (com: ICompiler) ctx r (left: Expr) (right: Expr) =
         Helper.LibCall(com, "TimeOnlyTemporal", "compare", t, [ left; right ], ?loc = r)
     | Builtin BclTimeSpan when com.Options.JsTemporal ->
         Helper.LibCall(com, "TimeSpanTemporal", "compare", t, [ left; right ], ?loc = r)
-    | Builtin(BclGuid | BclTimeSpan | BclTimeOnly)
+    | Builtin(BclGuid | BclTimeSpan | BclTimeOnly | BclRune)
     | Boolean
     | Char
     | String
@@ -1530,7 +1536,7 @@ and private getZero (com: ICompiler) (ctx: Context) (t: Type) =
     | Number(kind, uom) -> NumberConstant(NumberValue.GetZero kind, uom) |> makeValue None
     | Builtin BclTimeOnly when com.Options.JsTemporal -> Helper.LibCall(com, "TimeOnlyTemporal", "minValue", t, [])
     | Builtin BclTimeSpan when com.Options.JsTemporal -> Helper.LibCall(com, "TimeSpanTemporal", "zero", t, [])
-    | Builtin(BclTimeSpan | BclTimeOnly) -> TypeCast(makeIntConst 0, t)
+    | Builtin(BclTimeSpan | BclTimeOnly | BclRune) -> TypeCast(makeIntConst 0, t)
     | Builtin BclDateTime as t -> Helper.LibCall(com, dateTimeModule com, "minValue", t, [])
     | Builtin BclDateTimeOffset as t -> Helper.LibCall(com, dateTimeOffsetModule com, "minValue", t, [])
     | Builtin BclDateOnly as t -> Helper.LibCall(com, dateOnlyModule com, "minValue", t, [])
@@ -1809,7 +1815,8 @@ let rec defaultof (com: ICompiler) (ctx: Context) r t =
     | Builtin BclDateTime
     | Builtin BclDateTimeOffset
     | Builtin BclDateOnly
-    | Builtin BclTimeOnly -> getZero com ctx t
+    | Builtin BclTimeOnly
+    | Builtin BclRune -> getZero com ctx t
     | Builtin BclGuid -> emptyGuid ()
     | DeclaredType(entRef, _) ->
         let ent = com.GetEntity(entRef)
@@ -2259,7 +2266,20 @@ let fsFormat (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
     | ("PrintFormatToStringBuilder" | "PrintFormatToStringBuilderThen"), // Printf.kbprintf
       _,
       _ -> fsharpModule com ctx r t i thisArg args
-    | ".ctor", _, str :: (Value(NewArray(ArrayValues templateArgs, _, _), _) as values) :: _ ->
+    | ".ctor", _, str :: Value(NewArray(ArrayValues templateArgs, valuesType, valuesKind), valuesRange) :: _ ->
+        // A rune is its code point at runtime, so it becomes its character here, where its type is still known
+        let templateArgs =
+            templateArgs
+            |> List.map (
+                function
+                | ExprType(Builtin BclRune) as rune
+                | TypeCast(ExprType(Builtin BclRune) as rune, Any) -> toString com ctx None [ rune ]
+                | arg -> arg
+            )
+
+        let values =
+            Value(NewArray(ArrayValues templateArgs, valuesType, valuesKind), valuesRange)
+
         let text =
             match makeStringTemplateFrom com [| "%s"; "%i" |] templateArgs str with
             | Some v -> makeValue r v
@@ -2642,6 +2662,44 @@ let chars (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr optio
     | ("Compare" | "CompareTo" | "Equals" | "GetHashCode") -> valueTypes com ctx r t i thisArg args
     | _ -> None
 
+/// System.Text.Rune is its code point as a number. A member that is not listed here is a compile error
+let runes (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    let lib name args =
+        Helper.LibCall(com, "Rune", name, t, args, ?loc = r) |> Some
+
+    let isScalar (value: int) =
+        value >= 0 && value <= 0x10FFFF && not (value >= 0xD800 && value <= 0xDFFF)
+
+    match i.CompiledName, thisArg, args with
+    | ".ctor", None, [] -> TypeCast(makeIntConst 0, t) |> Some
+    | (".ctor" | "op_Explicit"), None, [ Value(CharConstant c, _) ] when isScalar (int c) ->
+        TypeCast(makeIntConst (int c), t) |> Some
+    | (".ctor" | "op_Explicit"), None, [ ExprType Char ] -> lib "createFromChar" args
+    | (".ctor" | "op_Explicit"), None, [ ExprType(Number((Int32 | UInt32), _)) ] -> lib "create" args
+    | ".ctor", None, [ ExprType Char; ExprType Char ] -> lib "createFromSurrogatePair" args
+    | "TryCreate", None, [ ExprType Char; _ ] -> lib "tryCreateFromChar" args
+    | "TryCreate", None, [ ExprType Char; ExprType Char; _ ] -> lib "tryCreateFromSurrogatePair" args
+    | "TryCreate", None, [ ExprType(Number((Int32 | UInt32), _)); _ ] -> lib "tryCreate" args
+    | "IsValid", None, [ ExprType(Number((Int32 | UInt32), _)) ] -> lib "isValid" args
+    | "get_ReplacementChar", None, [] -> TypeCast(makeIntConst 0xFFFD, t) |> Some
+    | "get_Value", Some rune, [] -> TypeCast(rune, t) |> Some
+    | ("get_Utf16SequenceLength" | "get_Utf8SequenceLength" | "get_IsAscii" | "get_IsBmp" | "get_Plane"), Some rune, [] ->
+        lib (Naming.lowerFirst (i.CompiledName.Substring(4))) [ rune ]
+    | "GetRuneAt", None, [ ExprType String; _ ]
+    | "TryGetRuneAt", None, [ ExprType String; _; _ ] -> lib (Naming.lowerFirst i.CompiledName) args
+    | ("GetUnicodeCategory" | "IsControl" | "IsDigit" | "IsLetter" | "IsLetterOrDigit" | "IsLower" | "IsNumber" | "IsPunctuation" | "IsSeparator" | "IsSymbol" | "IsUpper" | "IsWhiteSpace" | "ToLowerInvariant" | "ToUpperInvariant"),
+      None,
+      [ _ ] -> lib (Naming.lowerFirst i.CompiledName) args
+    | "ToString", Some rune, [] -> toString com ctx r [ rune ] |> Some
+    | "op_Equality", None, [ left; right ] -> equals com ctx r true left right |> Some
+    | "op_Inequality", None, [ left; right ] -> equals com ctx r false left right |> Some
+    | "op_LessThan", None, [ left; right ] -> booleanCompare com ctx r left right BinaryLess |> Some
+    | "op_LessThanOrEqual", None, [ left; right ] -> booleanCompare com ctx r left right BinaryLessOrEqual |> Some
+    | "op_GreaterThan", None, [ left; right ] -> booleanCompare com ctx r left right BinaryGreater |> Some
+    | "op_GreaterThanOrEqual", None, [ left; right ] -> booleanCompare com ctx r left right BinaryGreaterOrEqual |> Some
+    | ("CompareTo" | "Equals" | "GetHashCode"), Some _, _ -> valueTypes com ctx r t i thisArg args
+    | _ -> None
+
 // JS can hold an int as -0, which runtime number formatting would print with its sign
 let rec private normalizeIntegerFormatArg (arg: Expr) =
     match arg with
@@ -2706,6 +2764,7 @@ let strings (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
 
         makeEqOp r left (makeIntConst 0) BinaryEqual |> Some
     | "GetEnumerator", Some c, _ -> stringToCharArray c |> getEnumerator com r t |> Some
+    | "EnumerateRunes", Some c, [] -> Helper.LibCall(com, "Rune", "enumerateRunes", t, [ c ], ?loc = r) |> Some
     | "Contains", Some c, [ arg ] ->
         let left = Helper.InstanceCall(c, "indexOf", Int32.Number, [ arg ])
         makeEqOp r left (makeIntConst 0) BinaryGreaterOrEqual |> Some
@@ -5469,6 +5528,13 @@ let enumerators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr
         Helper.InstanceCall(callee, methName, t, args, ?loc = r) |> Some
     | _ -> None
 
+/// String.EnumerateRunes gives a value that is both the sequence and its enumerator
+let runeEnumerators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    match i.CompiledName, thisArg with
+    | "GetEnumerator", Some callee -> getEnumerator com r t callee |> Some
+    | ("MoveNext" | "get_Current"), Some _ -> enumerators com ctx r t i thisArg args
+    | _ -> None
+
 let enumerables (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (_: Expr list) =
     match thisArg, i.CompiledName with
     // This property only belongs to Key and Value Collections
@@ -6104,6 +6170,7 @@ let tryField com returnTyp ownerTyp fieldName =
     | Number(Decimal, _), _ -> Helper.LibValue(com, "Decimal", "get_" + fieldName, returnTyp) |> Some
     | String, "Empty" -> makeStrConst "" |> Some
     | Builtin BclGuid, "Empty" -> emptyGuid () |> Some
+    | Builtin BclRune, "ReplacementChar" -> TypeCast(makeIntConst 0xFFFD, returnTyp) |> Some
     | Builtin BclTimeSpan, "Zero" when com.Options.JsTemporal ->
         Helper.LibCall(com, "TimeSpanTemporal", "zero", returnTyp, []) |> Some
     | Builtin BclTimeSpan, "Zero" -> makeIntConst 0 |> Some
@@ -6153,6 +6220,8 @@ let private replacedModules =
             "System.Runtime.CompilerServices.RuntimeHelpers", runtimeHelpers
             "System.Runtime.ExceptionServices.ExceptionDispatchInfo", exceptionDispatchInfo
             Types.char, chars
+            Types.rune, runes
+            "System.Text.StringRuneEnumerator", runeEnumerators
             Types.string, strings
             "Microsoft.FSharp.Core.StringModule", stringModule
             "System.FormattableString", formattableString
@@ -7051,7 +7120,7 @@ let tryType typ =
     | List genArg -> Some(Types.list, lists, [ genArg ])
     | Builtin kind ->
         match kind with
-        | BclRune -> None
+        | BclRune -> Some(Types.rune, runes, [])
         | BclGuid -> Some(Types.guid, guids, [])
         | BclDateTime -> Some(Types.datetime, dateTime, [])
         | BclDateTimeOffset -> Some(Types.datetimeOffset, dateTimeOffset, [])
