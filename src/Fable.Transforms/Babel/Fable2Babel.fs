@@ -1614,6 +1614,14 @@ module Annotation =
             AliasTypeAnnotation(id, genArgs |> List.mapToArray (makeTypeAnnotation com ctx))
         )
 
+    /// fickl: the full name of Fickl.Core's erased intersection types, `I2<'a, 'b>` to `I4`
+    let (|ErasedIntersection|_|) (fullName: string) =
+        match fullName with
+        | "Fickl.Core.I2`2"
+        | "Fickl.Core.I3`3"
+        | "Fickl.Core.I4`4" -> Some()
+        | _ -> None
+
     /// fickl: a `[<TsEnum>]` enum is typed by its name, which TypeScript resolves to the enum's ambient declaration
     let tryTsEnumTypeAnnotation (com: IBabelCompiler) ctx (entRef: Fable.EntityRef) =
         match com.TryGetEntity entRef with
@@ -1646,9 +1654,21 @@ module Annotation =
             |> Some
         | _ -> None
 
+    /// fickl: `I2<'a, 'b>` to `I4` are `A & B`, written here rather than by their EmitType text so a union or
+    /// function argument gets parentheses
+    let tryIntersectionTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        match ent.FullName with
+        | ErasedIntersection ->
+            genArgs
+            |> List.mapToArray (makeTypeAnnotation com ctx)
+            |> IntersectionTypeAnnotation
+            |> Some
+        | _ -> None
+
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
         match genArgs, ent with
         | _, Patterns.Try (tryKeyTypeAnnotation com ctx genArgs) ta -> ta
+        | _, Patterns.Try (tryIntersectionTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryEmitTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryAugmentTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta
@@ -2775,6 +2795,16 @@ module Util =
                        )
 
                 match e.Type with
+                // fickl: an intersection is built by an unchecked cast, from a value TypeScript may not relate to it
+                | _ when
+                    toTaggedUnion
+                    && (
+                        match entRef.FullName with
+                        | ErasedIntersection -> true
+                        | _ -> false
+                    )
+                    ->
+                    AsExpression(AsExpression(jsExpr, UnknownTypeAnnotation), makeTypeAnnotation com ctx typ)
                 | Fable.DeclaredType(sourceEntRef, _) when com.IsTypeScript ->
                     let sourceEnt = com.GetEntity(sourceEntRef)
                     // Because we use a wrapper type for multi-case unions, TypeScript
