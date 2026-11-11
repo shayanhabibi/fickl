@@ -25,7 +25,7 @@ export declare class Shape<Tag extends keyof Shape_$cases> extends Union<Tag, Sh
     readonly tag: Tag;
     readonly fields: Shape_$cases[Tag][1];
     cases(): string[];
-    static readonly Empty: Shape<2>;
+    static readonly Empty: Shape_$union;
 }
 export declare function Shape_$reflection(): TypeInfo;
 export declare class Point extends Record implements IEquatable<Point>, IComparable<Point> {

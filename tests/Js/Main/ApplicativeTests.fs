@@ -361,6 +361,34 @@ type ImplicitReturnTypeOverload =
     static member op_Implicit(s: string) : int = s.Length
     static member op_Implicit(s: string) : float = float s.Length + 0.5
 
+type DelegateOverload =
+    static member Map(arg: 'T -> 'U, x: 'T) = arg x
+    static member Map(arg: Func<'T, 'U>, x: 'T) = arg.Invoke x
+
+type DelegateOverloadInstance() =
+    member _.Run(f: int -> int) = f 1
+    member _.Run(f: Func<int, int>) = f.Invoke 10
+
+[<Fable.Core.Mangle>]
+type IDelegateOverload =
+    abstract Run: f: (int -> int) -> int
+    abstract Run: f: Func<int, int> -> int
+
+type DelegateOverloadImpl() =
+    interface IDelegateOverload with
+        member _.Run(f: int -> int) = f 100
+        member _.Run(f: Func<int, int>) = f.Invoke 1000
+
+[<AbstractClass>]
+type DelegateOverloadBase() =
+    abstract Run: f: (int -> int) -> int
+    abstract Run: f: Func<int, int> -> int
+
+type DelegateOverloadChild() =
+    inherit DelegateOverloadBase()
+    override _.Run(f: int -> int) = f 100
+    override _.Run(f: Func<int, int>) = f.Invoke 2000
+
 type ArityRecord = { arity2: int->int->string }
 
 type RecordB = {
@@ -527,6 +555,12 @@ let tests5 = [
         let f: float = ImplicitReturnTypeOverload.op_Implicit "hello"
         i |> equal 5
         f |> equal 5.5
+
+    testCase "Overloads taking a function and a delegate get different names" <| fun () -> // See #287
+        DelegateOverload.Map(Func<int, int>(fun x -> x + 2), 1) |> equal 3
+        DelegateOverloadInstance().Run(Func<int, int>(fun x -> x + 1)) |> equal 11
+        (DelegateOverloadImpl() :> IDelegateOverload).Run(Func<int, int>(fun x -> x + 1)) |> equal 1001
+        (DelegateOverloadChild() :> DelegateOverloadBase).Run(Func<int, int>(fun x -> x + 1)) |> equal 2001
 
     testCase "NestedLambdas" <| fun () ->
         let mutable m = 0

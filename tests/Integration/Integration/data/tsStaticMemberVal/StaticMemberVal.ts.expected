@@ -34,8 +34,8 @@ export class Color<Tag extends keyof Color_$cases> extends Union<Tag, Color_$cas
     cases() {
         return ["Red", "Green"];
     }
-    static readonly Red: any = new Color<0>(0, []);
-    static readonly Green: any = new Color<1>(1, []);
+    static readonly Red: Color_$union = new Color<0>(0, []);
+    static readonly Green: Color_$union = new Color<1>(1, []);
 }
 
 export function Color_$reflection(): TypeInfo {
@@ -86,7 +86,7 @@ export class Box$1<T, Tag extends keyof Box$1_$cases<T>> extends Union<Tag, Box$
     cases() {
         return ["Full", "Empty"];
     }
-    static readonly Empty: any = new Box$1<any, 1>(1, []);
+    static readonly Empty: Box$1_$union<any> = new Box$1<any, 1>(1, []);
 }
 
 export function Box$1_$reflection(gen0: TypeInfo): TypeInfo {

@@ -290,6 +290,9 @@ function formatReplacement(rep: any, flags: any, padLength: any, precision: any,
     rep = "";
   } else if ((format === "O" || format === "A") && rep === null) {
     rep = "<null>";
+  } else if (format === "A" && typeof rep?.toStructuredString === "function") {
+    // A type with [<StructuredFormatDisplay>] and its own ToString, which only %A ignores
+    rep = rep.toStructuredString();
   } else {
     rep = toString(rep);
   }
