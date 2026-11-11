@@ -1,0 +1,48 @@
+
+import { item } from "./fable_modules/fable-library-js.5.27.0/Array.js";
+
+export function sumUp(n) {
+    let acc = 0;
+    let i_1 = 0;
+    while (i_1 <= n) {
+        const i = i_1;
+        acc = ((acc + i) | 0);
+        i_1 = (i_1 + 2);
+    }
+    return acc | 0;
+}
+
+export function sumDown(n) {
+    let acc = 0;
+    let i_1 = n;
+    while (i_1 >= 0) {
+        const i = i_1;
+        acc = ((acc + i) | 0);
+        i_1 = (i_1 - 3);
+    }
+    return acc | 0;
+}
+
+export function everyOther(xs) {
+    const found = [];
+    let i_1 = 0;
+    const limit = (xs.length - 1) | 0;
+    while (i_1 <= limit) {
+        const i = i_1;
+        void (found.push(xs[i] ?? item(i, xs)));
+        i_1 = (i_1 + 2);
+    }
+    return found;
+}
+
+export function thunks() {
+    const fns = [];
+    let i_1 = 1;
+    while (i_1 <= 20) {
+        const i = i_1;
+        void (fns.push(() => (i | 0)));
+        i_1 = (i_1 + 5);
+    }
+    return fns;
+}
+

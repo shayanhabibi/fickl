@@ -552,6 +552,32 @@ let stringToCharArray e =
 
 /// fickl: under --checkedDivision, the divisor of an integer or decimal division or remainder wrapped in a check
 /// that raises DivideByZeroException when it is zero. A constant other than zero needs none
+/// fickl: TypeScript checks an unchecked cast between two different types, so it has to go through `unknown`.
+/// The cast to `obj` in between is what tells Fable2Babel to write `x as unknown as T`. A value typed `obj`
+/// is `any` to TypeScript and needs no cast.
+let private uncheckedCast (com: ICompiler) (t: Type) (arg: Expr) =
+    match t, arg.Type with
+    | (Any | Unit), _
+    | _, Any -> TypeCast(arg, t)
+    | _, source when com.Options.Language = TypeScript && source <> t -> TypeCast(TypeCast(arg, Any), t)
+    | _ -> TypeCast(arg, t)
+
+/// fickl: `!!` is erased, so the value keeps its own type unless TypeScript needs to see the cast.
+/// A cast from or to a small integer stays erased: those are truncated with `| 0` according to their type,
+/// which the cast would change in TypeScript only.
+let private erasedUncheckedCast (com: ICompiler) (t: Type) (arg: Expr) =
+    let isTruncated =
+        function
+        | Number((Int8 | Int16 | Int32), NumberInfo.Empty) -> true
+        | _ -> false
+
+    match t, arg.Type with
+    | (Any | Unit), _
+    | _, Any -> arg
+    | _, source when isTruncated t || isTruncated source -> arg
+    | _, source when com.Options.Language = TypeScript && source <> t -> TypeCast(TypeCast(arg, Any), t)
+    | _ -> arg
+
 let private checkDivisor (com: ICompiler) (dividend: Expr) (divisor: Expr) =
     let isZero =
         function
@@ -974,6 +1000,23 @@ let makeDefaultEqualityComparer (com: ICompiler) ctx typArg =
                 "GetHashCode", Delegate([ x ], hash, None, Tags.empty)
             ]
     | _ -> makeEqualityComparer com ctx typArg
+
+/// Matches Comparer<T>.Default, which orders strings with String.CompareTo in .NET
+/// while F# structural comparison is ordinal
+let makeDefaultComparerFunction (com: ICompiler) ctx typArg =
+    match typArg with
+    | String ->
+        let x = makeUniqueIdent com ctx typArg "x"
+        let y = makeUniqueIdent com ctx typArg "y"
+
+        let body =
+            Helper.LibCall(com, "String", "compareTo", Int32.Number, [ IdentExpr x; IdentExpr y ])
+
+        Delegate([ x; y ], body, None, Tags.empty)
+    | _ -> makeComparerFunction com ctx typArg
+
+let makeDefaultComparer (com: ICompiler) ctx typArg =
+    objExpr [ "Compare", makeDefaultComparerFunction com ctx typArg ]
 
 // TODO: Try to detect at compile-time if the object already implements `Compare`?
 let inline makeComparerFromEqualityComparer e = e // leave it as is, if implementation supports it
@@ -1571,14 +1614,14 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
                             errors
                             |> List.iter (fun (range, error) -> addWarning com ctx.InlinePath range error)
 
-                            Some arg
-                        | Ok() -> Some arg
+                            erasedUncheckedCast com t arg |> Some
+                        | Ok() -> erasedUncheckedCast com t arg |> Some
                 else
-                    Some arg
-            | _ -> Some arg
-        | "op_Dynamic", [ left; memb ] -> getExpr r t left memb |> Some
+                    erasedUncheckedCast com t arg |> Some
+            | _ -> erasedUncheckedCast com t arg |> Some
+        | "op_Dynamic", [ left; memb ] -> getExpr r t (dynamicReceiver com left) memb |> Some
         | "op_DynamicAssignment", [ callee; prop; MaybeLambdaUncurriedAtCompileTime value ] ->
-            setExpr r callee prop (uncurryInteropValue value) |> Some
+            setExpr r (dynamicReceiver com callee) prop (uncurryInteropValue value) |> Some
         | ("op_Dollar" | "createNew" as m), callee :: args ->
             let args = destructureTupleArgs args
 
@@ -1873,7 +1916,8 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     | "DefaultAsyncBuilder", _ -> makeImportLib com t "singleton" "AsyncBuilder" |> Some
     // Erased operators.
     // KeyValuePair is already compiled as a tuple
-    | ("KeyValuePattern" | "Identity" | "Box" | "Unbox" | "ToEnum"), [ arg ] -> TypeCast(arg, t) |> Some
+    | ("KeyValuePattern" | "Identity" | "Box" | "ToEnum"), [ arg ] -> TypeCast(arg, t) |> Some
+    | "Unbox", [ arg ] -> uncheckedCast com t arg |> Some
     // Quotation splice: %expr inside a quotation. The arg is already a QuotExpr at runtime.
     | ("SpliceExpression" | "SpliceUntypedExpression"), [ arg ] -> Some arg
     // Cast to unit to make sure nothing is returned when wrapped in a lambda, see #1360
@@ -2565,7 +2609,7 @@ let binarySearch (com: ICompiler) ctx r t rangeMeth (ar: Expr) args =
             | None
             | Some NullConst
             | Some(MaybeCasted(Call(Import({ Selector = "defaultOf" }, _, _), _, _, _))) ->
-                makeComparer com ctx (getElementType ar.Type)
+                makeDefaultComparer com ctx (getElementType ar.Type)
             | Some comparer -> comparer
 
         Helper.LibCall(com, "Array", meth, t, ar :: args @ [ comparer ], ?loc = r)
@@ -2682,7 +2726,8 @@ let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (this
     | "RemoveAt", Some ar, [ idx ] -> Helper.InstanceCall(ar, "splice", t, [ idx; makeIntConst 1 ], ?loc = r) |> Some
     | "Reverse", Some ar, [] -> Helper.InstanceCall(ar, "reverse", t, args, ?loc = r) |> Some
     | "Sort", Some ar, [] ->
-        let compareFn = (genArg com ctx r 0 i.GenericArgs) |> makeComparerFunction com ctx
+        let compareFn =
+            (genArg com ctx r 0 i.GenericArgs) |> makeDefaultComparerFunction com ctx
 
         Helper.InstanceCall(ar, "sort", t, [ compareFn ], ?loc = r) |> Some
     | "Sort", Some ar, [ ExprType(DelegateType _) ] -> Helper.InstanceCall(ar, "sort", t, args, ?loc = r) |> Some
@@ -2847,6 +2892,10 @@ let arrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: E
         Helper.LibCall(com, "Array", "indexOf", t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
         |> Some
     | "BinarySearch", None, ar :: args -> binarySearch com ctx r t "binarySearchRange" ar args
+    | "Sort", None, [ ExprType(Array(elemType, _)) as ar ] ->
+        let compareFn = makeDefaultComparerFunction com ctx elemType
+
+        Helper.InstanceCall(ar, "sort", t, [ compareFn ], ?loc = r) |> Some
     | "GetEnumerator", Some arg, _ -> getEnumerator com r t arg |> Some
     | "Resize", None, args ->
         let args =
@@ -5308,6 +5357,12 @@ let controlExtensions
         Helper.LibCall(com, "Observable", meth, t, args, argTypes)
     )
 
+// The name of an anonymous record type is only known to the runtime library
+let rec private hasAnonymousRecord (t: Type) =
+    match t with
+    | AnonymousRecordType _ -> true
+    | t -> List.exists hasAnonymousRecord t.Generics
+
 let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     let returnString r x = StringConstant x |> makeValue r |> Some
 
@@ -5362,6 +5417,8 @@ let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr optio
                             |> makeTypeInfo (changeRangeToCallSite ctx.InlinePath r)
                         | None -> Value(Null t, r)
                 )
+            | "get_FullName"
+            | "get_Namespace" when hasAnonymousRecord exprType -> None
             | "get_FullName" -> getTypeFullName false exprType |> returnString r
             | "get_Namespace" -> getTypeFullName false exprType |> splitFullName |> fst |> returnString r
             | "get_IsArray" ->
@@ -6353,7 +6410,7 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
         | Some c, "GetValue" -> Helper.LibCall(com, "Reflection", "getValue", t, c :: args, ?loc = r) |> Some
         | Some c, "get_Name" ->
             match c with
-            | Value(TypeInfo(exprType, _), loc) ->
+            | Value(TypeInfo(exprType, _), loc) when not (hasAnonymousRecord exprType) ->
                 getTypeName com ctx loc exprType |> StringConstant |> makeValue r |> Some
             | c -> Helper.LibCall(com, "Reflection", "name", t, [ c ], ?loc = r) |> Some
         | _ -> None

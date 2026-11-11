@@ -1409,16 +1409,26 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             | Dart -> return Fable.Value(Fable.Null typ, r)
             | _ -> return Replacements.Api.defaultof com ctx r typ
 
-        // `for i in start .. ±1 .. stop do` does not get F#'s fast counted-loop
+        // `for i in start .. step .. stop do` does not get F#'s fast counted-loop
         // lowering (only `to`/`downto` do), so it would allocate a range sequence +
-        // enumerator. Emit a plain `Fable.ForLoop` instead, as `to`/`downto` produce.
-        | ForOfConstStepRange(var, startExpr, step, stopExpr, bodyExpr) ->
+        // enumerator. For a ±1 step emit a plain `Fable.ForLoop` instead, as `to`/`downto`
+        // produce, and for any other constant step a counted `while` (JS/TS only).
+        | ForOfConstStepRange(var, startExpr, step, stopExpr, bodyExpr) when
+            step = 1
+            || step = -1
+            || com.Options.Language = JavaScript
+            || com.Options.Language = TypeScript
+            ->
             let r = makeRangeFrom fsExpr
             let! start = transformExpr com ctx [] startExpr
             let! limit = transformExpr com ctx [] stopExpr
             let ctx, ident = putIdentInScope com ctx var None
             let! body = transformExpr com ctx [] bodyExpr
-            return makeForLoop r (step = 1) ident start limit body
+
+            if step = 1 || step = -1 then
+                return makeForLoop r (step = 1) ident start limit body
+            else
+                return makeConstStepLoop com ctx r ident start step limit body
 
         | FSharpExprPatterns.Let((var, value, _), body) ->
             match value with
@@ -1741,6 +1751,7 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                 ->
                 let! e1 = transformExpr com ctx genArgs e1
                 let! e2 = transformExpr com ctx [] e2
+                let e1 = Replacements.Util.dynamicReceiver com e1
                 let e = Fable.Get(e1, Fable.ExprGet e2, Fable.Any, e1.Range)
                 let! args = transformExprList com ctx args
                 let args = destructureTupleArgs args
@@ -2038,8 +2049,15 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             let! args = transformExprList com ctx args
             let genArgs = List.map (makeType ctx.GenericArgs) genArgs
             let typ = makeType ctx.GenericArgs fsExpr.Type
+            let r = makeRangeFrom fsExpr
 
-            return makeCallFrom com ctx (makeRangeFrom fsExpr) typ genArgs None args memb
+            match tryErasedClassOfMissingConstructor com memb with
+            | Some ent when not ctx.CapturingQuotation ->
+                return
+                    $"Cannot call the constructor of %s{ent.DisplayName} because the type is erased and has no constructor at runtime. "
+                    + "Bind the constructor to native code with [<Emit>], or the type with [<Global>] or [<Import>], or remove [<Erase>]."
+                    |> addErrorAndReturnNull com ctx.InlinePath r
+            | _ -> return makeCallFrom com ctx r typ genArgs None args memb
 
         // An explicit constructor followed by more code: `new(...) as x = { Field = ... } then ...`. F# writes it as the
         // System.Object constructor call, the object construction (a NewRecord of the class), then the `as x`
@@ -2517,7 +2535,18 @@ let private applyJsPyDecorators
                 |> Seq.mapi (fun i p -> defaultArg p.Name $"arg%d{i}", makeType Map.empty p.Type)
                 |> Seq.toList
 
-            Replacements.Api.makeMethodInfo com None name parameters returnType
+            match com.Options.Language with
+            | JavaScript
+            | TypeScript ->
+                // As in .NET, MethodInfo.Name is the member's name, not the mangled name of the
+                // compiled function, and a lone unit argument is not a parameter
+                let parameters =
+                    match parameters with
+                    | [ _, Fable.Unit ] -> []
+                    | parameters -> parameters
+
+                Replacements.Api.makeMethodInfo com None memb.CompiledName parameters returnType
+            | _ -> Replacements.Api.makeMethodInfo com None name parameters returnType
 
     let newDecorator (ent: FSharpEntity) (args: IList<FSharpType * obj>) =
         let args =
