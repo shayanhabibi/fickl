@@ -105,4 +105,36 @@ Jest.describe("React tests", (fun () ->
         Jest.expect(elem.getByTestId "header-jsx").toHaveTextContent("6")
     ))
 
+    Jest.test("A function called in a template keeps its state in the caller", (fun () ->
+        Counter.plainCounterHostRenders <- 0
+        let elem = RTL.render(Counter.PlainCounterCalled(5) |> unbox)
+        let button = elem.getByTestId "plain-called"
+        Jest.expect(Counter.plainCounterHostRenders).toBe(1)
+        RTL.fireEvent.click(button)
+        Jest.expect(button).toHaveTextContent("6")
+        Jest.expect(Counter.plainCounterHostRenders).toBe(2)
+    ))
+
+    Jest.test("JSX.el renders an undecorated function as a component with its own state", (fun () ->
+        Counter.plainCounterHostRenders <- 0
+        let elem = RTL.render(Counter.PlainCounterRendered(5) |> unbox)
+        let first = elem.getByTestId "plain-rendered-1"
+        let second = elem.getByTestId "plain-rendered-2"
+        Jest.expect(elem.getByTestId "plain-label").toHaveTextContent("label")
+        Jest.expect(first).toHaveTextContent("5")
+        Jest.expect(second).toHaveTextContent("15")
+        RTL.fireEvent.click(first)
+        RTL.fireEvent.click(first)
+        RTL.fireEvent.click(second)
+        Jest.expect(first).toHaveTextContent("7")
+        Jest.expect(second).toHaveTextContent("16")
+        // The state belongs to the counters, so the component rendering them is not rendered again
+        Jest.expect(Counter.plainCounterHostRenders).toBe(1)
+    ))
+
+    Jest.test("JSX.el compiles to a tag with the fields as props", (fun () ->
+        let elem = Fable.Core.JSX.el Counter.PlainCounter {| init = 1; testId = "t" |}
+        Jest.expect(elem).toStrictEqual(Fable.Core.JSX.jsx """<PlainCounter init={1} testId="t" />""")
+    ))
+
 ))
