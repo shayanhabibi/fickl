@@ -329,7 +329,8 @@ let stringToInt com (ctx: Context) r targetType (args: Expr list) : Expr =
         | Number(kind, _) -> kind
         | x -> FableError $"Unexpected type in stringToInt: %A{x}" |> raise
 
-    let style = int System.Globalization.NumberStyles.Any
+    // 0x10000 is `FSharpLiteral` in Int32.ts: FSharp.Core's conversions read prefixes and underscores
+    let style = int System.Globalization.NumberStyles.Any ||| 0x10000
     let _isFloatOrDecimal, numberModule, unsigned, bitsize = getParseParams kind
 
     let parseArgs = [ makeIntConst style; makeBoolConst unsigned; makeIntConst bitsize ]
