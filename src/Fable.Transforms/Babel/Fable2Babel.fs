@@ -6037,6 +6037,21 @@ but thanks to the optimisation done below we get
                             isStatic = true,
                             isComputed = true
                         )
+                // fickl: a hot-module reload gives the type a new class, so equality needs an identity that survives it
+                if
+                    com.Options.DebugMode
+                    && (ent.IsFSharpRecord
+                        || ent.IsValueType
+                        || ent.IsFSharpUnion
+                        || ent.IsFSharpExceptionDeclaration)
+                then
+                    yield
+                        ClassMember.classProperty (
+                            libValue com ctx "Util" "typeIdSymbol",
+                            value = Expression.stringLiteral ent.FullName,
+                            isStatic = true,
+                            isComputed = true
+                        )
                 yield classCons
                 yield! classMembers
                 for interfaceName, symbolName, isAsync in
