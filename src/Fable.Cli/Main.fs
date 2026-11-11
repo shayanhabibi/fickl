@@ -1157,7 +1157,23 @@ let private getFilesToCompile
 
     projCracked, filesToCompile
 
-let private areCompiledFilesUpToDate (state: State) (filesToCompile: string[]) =
+/// fickl: a failed compilation still writes its outputs, which then look up to date, so it leaves this file
+/// in fable_modules until a compilation succeeds
+let private failedCompilationMarker (fableModulesDir: string) =
+    IO.Path.Combine(fableModulesDir, "compilation_failed")
+
+let private markFailedCompilation (fableModulesDir: string) (hasError: bool) =
+    try
+        let marker = failedCompilationMarker fableModulesDir
+
+        if hasError then
+            IO.File.WriteAllText(marker, "")
+        elif IO.File.Exists marker then
+            IO.File.Delete marker
+    with er ->
+        Log.verbose (lazy $"Cannot update {failedCompilationMarker fableModulesDir}: {er.Message}")
+
+let private areCompiledFilesUpToDate (state: State) (fableModulesDir: string) (filesToCompile: string[]) =
     try
         let mutable foundCompiledFile = false
         let pathResolver = state.GetPathResolver()
@@ -1194,7 +1210,9 @@ let private areCompiledFilesUpToDate (state: State) (filesToCompile: string[]) =
                     true
             )
         // If we don't find compiled files, assume we need recompilation
-        upToDate && foundCompiledFile
+        upToDate
+        && foundCompiledFile
+        && not (IO.File.Exists(failedCompilationMarker fableModulesDir))
     with er ->
         Log.warning ("Cannot check timestamp of compiled files: " + er.Message)
         false
@@ -1629,7 +1647,7 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
         if
             Option.isNone state.Watcher
             && projCracked.CanReuseCompiledFiles
-            && areCompiledFilesUpToDate state filesToCompile
+            && areCompiledFilesUpToDate state projCracked.FableModulesDir filesToCompile
         then
             Log.always "Skipped compilation because all generated files are up-to-date!"
 
@@ -1651,7 +1669,7 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
                     && projCracked.CanReuseCompiledFiles
                     && not runProc.IsWatch
                     && runProc.ExeFile <> Naming.placeholder
-                    && areCompiledFilesUpToDate state filesToCompile
+                    && areCompiledFilesUpToDate state projCracked.FableModulesDir filesToCompile
                     ->
                     let cliArgs = runProcessAndForget cliArgs runProc
 
@@ -1789,6 +1807,7 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
 
             errorLogs |> Array.iter (formatLog cliArgs.RootDir >> Log.error)
             let hasError = Array.isEmpty errorLogs |> not
+            markFailedCompilation projCracked.FableModulesDir hasError
 
             // Generate assembly and serialize info if precompile is selected
             let! exitCode =
