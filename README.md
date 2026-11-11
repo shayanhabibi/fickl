@@ -11,7 +11,7 @@ Our priorities, in order:
 4. Ergonomics of TS interop
 5. Decision tree transparency and diagnostics
 
-> ### Why this fork/lab
+> ## Why this fork/lab
 >
 > Because we have large projects that are developing fast, and we can't wait for fable
 > publish timelines. We also prefer *Explicit control of expression* rather than *Implicit*.
@@ -57,14 +57,12 @@ We provide a conditional compiler constant:
 >
 > You can opt in and try Fickl features using the conditional compiler directive.
 
-
 ## Are there core behaviour differences?
 
 We track differences in compilation speed, features and bug fixes.
 
 We try to automate this, so that any publish of Fickl will update the README and
 remove claims of behaviour differences.
-
 
 ## Future direction
 
@@ -167,7 +165,6 @@ is fixed upstream, we remove it from our differences list automatically.
 Every publish cycle of Fickl benchmarks itself against the latest Fable compiler, to
 measure performance differences in the compiler. This keeps the claims honest; we are
 contributing upstream, and these gaps **SHOULD** close over time.
-
 
 <!-- fickl-benchmarks:start -->
 ![Fickl 0.8.0 against Fable 5.26.0: up to 7.9× faster end to end](notes/benchmarks/fickl-0.8.0.svg)
@@ -272,6 +269,7 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | Imported string enums | Compiler | A case of an imported or global `[<StringEnum>]` union compiles to the member of the enum object, `Dir.Up`, so it type-checks against a TypeScript string enum. |
 | `--declaration` | CLI flag | Writes a TypeScript declaration file (`.d.ts`) next to each JavaScript file. |
 | `--strictOptions` | CLI flag | Keeps `Some null` apart from `None`, as on .NET. |
+| `--checkedDivision` | CLI flag | Raises `DivideByZeroException` when an integer or a decimal is divided by zero, as on .NET. |
 | `--clampByteArrays` | CLI flag | Compiles byte arrays as `Uint8ClampedArray`. |
 | `ArraySegment<'T>`, `Array.ofArrayBuffer`, `AsArrayBuffer` | Runtime, functions | An `ArraySegment` over a numeric array is a typed-array view, `ArraySegment<byte>(bytes, 4, 16)` compiling to `bytes.subarray(4, 20)`, so it shares the array's memory. `Array.ofArrayBuffer buffer` views a whole `ArrayBuffer` as a numeric array without a copy, and `array.AsArrayBuffer()` gives the array's buffer. `JS.Constructors.BigUint64Array` binds the array `uint64[]` compiles to. |
 | `--privateFields` | CLI flag | Compiles the `let` fields of every class with attached members to ES `#private` fields. |
@@ -295,6 +293,7 @@ What Fickl adds on top of Fable. The computation expressions, attributes and fun
 | `[<Fickl.Core.NoOverloadSuffix>]` on a member or type | Drops the overload hash from a method's compiled name, `Counter__Add` instead of `Counter__Add_Z524259A4`, so JavaScript can call it by name. On a type it applies to every member that is not overloaded; on an overloaded member it is an error. |
 | `[<Fickl.Core.TsEnum>]` on an enum | Emits the enum's object and TypeScript type. Without it, an enum emits nothing and is typed as its underlying number. |
 | `[<Import>]` or `[<Global>]` on a `[<StringEnum>]` union | Its cases compile to members of the imported object, `Dir.Up`. Without the attribute, they compile to their string literals. |
+| `--checkedDivision` | `/`, `%` and `Math.DivRem` on integers and decimals check the divisor and raise `DivideByZeroException` when it is zero, as on .NET. Without it, a 32-bit or smaller integer division by zero gives `0`, and `int64`, `bigint` and `decimal` throw an error of the JavaScript library that `:? DivideByZeroException` does not catch. A divisor that is a constant other than zero is not checked. |
 | `--clampByteArrays` | Compiles byte arrays as `Uint8ClampedArray`, the type canvas pixel data uses. Out-of-range values clamp instead of wrapping as on .NET. |
 | `--nativeErrors` | Every exception, from `failwith`, `invalidArg` and the runtime library to a declared F# exception, is `instanceof Error`, has a `stack` and has its inner exception as its `cause`, so Node, test runners and error reporters print it as an error. Without it, an exception is a plain object and is about 50 times faster to throw, because a native `Error` captures a stack trace when it is created ([#2160](https://github.com/fable-compiler/Fable/issues/2160)); code that throws exceptions for control flow pays that cost on every throw. The flag affects the whole program, including libraries compiled without it. |
 | `[<Fickl.Core.JsError>]` on an F# exception | The exception extends a native `Error` subclass, so only it pays for the stack trace. It still matches, compares and prints as an F# exception. |
