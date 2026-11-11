@@ -6839,6 +6839,27 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | Types.printfModule
     | Naming.StartsWith Types.printfFormat _ -> fsFormat com ctx r t info thisArg args
     | Naming.StartsWith "Fable.Core." _ -> fableCoreLib com ctx r t info thisArg args
+    // fickl: the class itself, which the annotation of `JsConstructor<'T>` types as a constructor
+    | "Fickl.Core.JsInterop" when info.CompiledName = "jsConstructorOf" ->
+        match genArg com ctx r 0 info.GenericArgs with
+        // An interface has a JS value only where it binds a global or imported class
+        | DeclaredType(ent, _) when
+            (let ent = com.GetEntity(ent)
+
+             not ent.IsInterface
+             || FSharp2Fable.Util.tryGlobalOrImportedEntity com ent |> Option.isSome)
+            ->
+            // The reference is given the constructor type, as a module value is annotated with the type of its body
+            match com.GetEntity(ent) |> constructor com with
+            | IdentExpr ident -> IdentExpr { ident with Type = t }
+            | Import(importInfo, _, range) -> Import(importInfo, t, range)
+            | cons -> cons
+            |> Some
+        | _ ->
+            "Only classes, and interfaces bound to a global or imported class, define a function constructor in JS"
+            |> addError com ctx.InlinePath r
+
+            None
     | "Fickl.Core.JsInterop" -> nativeFunction com ctx r t info.CompiledName args
     | "Fickl.Core.JS" -> jsErrors com ctx r t info args
     // fickl: a proxy handler holds only the traps that are set
