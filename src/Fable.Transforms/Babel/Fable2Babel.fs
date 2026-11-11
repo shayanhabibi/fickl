@@ -4087,6 +4087,40 @@ but thanks to the optimisation done below we get
 
         transformJsxEl com ctx callee props
 
+    /// Reads the entries out of the list expression F# builds when the list passed to `createObj`
+    /// has a `yield!` in it: `Seq.toList (Seq.delay (fun () -> Seq.append ... (Seq.delay ...)))`.
+    /// Matches only when every part is an entry or a `yield!` of a list or array literal, and every
+    /// entry is a tuple whose key is a string known at compile time and used once, so that an
+    /// object literal has the same keys, in the same order, as the object built at run time.
+    let (|PojoEntriesGenerator|_|) (expr: Fable.Expr) : Fable.Expr list option =
+        let rec read (expr: Fable.Expr) =
+            match expr with
+            | SeqLibCall "singleton" [ entry ] -> Some [ entry ]
+            | SeqLibCall "delay" [ (Fable.Lambda(_, body, _) | Fable.Delegate(_, body, _, _)) ] -> read body
+            // A `yield!` of a list or array that itself has a `yield!` in it
+            | SeqLibCall "toList" [ generator ]
+            | SeqLibCall "toArray" [ generator ] -> read generator
+            | SeqLibCall "append" [ first; second ] ->
+                match read first, read second with
+                | Some first, Some second -> Some(first @ second)
+                | _ -> None
+            | Replacements.Util.ArrayOrListLiteral(entries, _) -> Some entries
+            | _ -> None
+
+        let key (entry: Fable.Expr) =
+            match entry with
+            | MaybeCasted(Fable.Value(Fable.NewTuple(StringConst key :: _, _), _)) -> Some key
+            | _ -> None
+
+        match expr with
+        | SeqLibCall "toList" [ SeqLibCall "delay" _ as generator ] ->
+            read generator
+            |> Option.filter (fun entries ->
+                let keys = entries |> List.choose key
+                keys.Length = entries.Length && (List.distinct keys).Length = keys.Length
+            )
+        | _ -> None
+
     let optimizeCall (com: IBabelCompiler) ctx range typ callee (callInfo: Fable.CallInfo) =
         // Try to optimize some patterns after FableTransforms
         match callInfo.Tags, callInfo.Args with
@@ -4127,6 +4161,10 @@ but thanks to the optimisation done below we get
                 |> transformAsExpr com ctx
                 |> Some
             | _ -> None
+        | Fable.Tags.Contains "pojo", [ PojoEntriesGenerator entries ] ->
+            Fable.Value(Fable.NewArray(Fable.ArrayValues entries, Fable.Any, Fable.MutableArray), None)
+            |> JS.Replacements.makePojo com None
+            |> Option.map (transformAsExpr com ctx)
         | Fable.Tags.Contains "pojo", keyValueList :: caseRule :: _ ->
             JS.Replacements.makePojo com (Some caseRule) keyValueList
             |> Option.map (transformAsExpr com ctx)

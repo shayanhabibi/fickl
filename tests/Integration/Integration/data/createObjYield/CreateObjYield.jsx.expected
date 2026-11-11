@@ -1,0 +1,48 @@
+
+import { class_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+import { createObj } from "./fable_modules/fable-library-js.5.27.0/Util.js";
+import { empty, singleton, append, delay, toList } from "./fable_modules/fable-library-js.5.27.0/Seq.js";
+
+export class Shared {
+    constructor() {
+    }
+}
+
+export function Shared_$reflection() {
+    return class_type("CreateObjYield.Shared", undefined, Shared);
+}
+
+export function inlineMember() {
+    return {
+        e: "f",
+        a: "b",
+        c: "d",
+    };
+}
+
+export function nested(value) {
+    return {
+        a: value,
+        b: 2,
+        c: 3,
+        d: 4,
+        e: 5,
+    };
+}
+
+export function duplicateKey() {
+    return createObj(toList(delay(() => append(singleton(["a", 1]), delay(() => [["a", 2]])))));
+}
+
+export function conditional(test) {
+    return createObj(toList(delay(() => append(singleton(["a", 1]), delay(() => (test ? singleton(["b", 2]) : empty()))))));
+}
+
+export function dynamicKey(key) {
+    return createObj(toList(delay(() => append(singleton(["a", 1]), delay(() => [[key, 2]])))));
+}
+
+export function dynamicList(rest) {
+    return createObj(toList(delay(() => append(singleton(["a", 1]), delay(() => rest)))));
+}
+

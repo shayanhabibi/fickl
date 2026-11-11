@@ -210,6 +210,9 @@ type HandlerProps =
 [<Emit("$0.onConnect(1, 'x')")>]
 let callOnConnectFromJs (o: obj) : string = jsNative
 
+type SharedProps =
+    static member inline pair = [ "a" ==> "b"; "c" ==> "d" ]
+
 type IMyOptions =
     interface end
 
@@ -1134,6 +1137,47 @@ let tests =
         // TODO: This doesn't work in Fable 2, fix it or leave it as is?
         // Assigning dynamic access result to a value and applying multiple args
         // let add = dynObj?add in add(3,4) |> equal 7
+
+    testCase "createObj with yield! of list literals keeps the entries in source order" <| fun () -> // See #312
+        let o = createObj [ "e" ==> "f"; yield! SharedProps.pair ]
+        JS.JSON.stringify o |> equal """{"e":"f","a":"b","c":"d"}"""
+
+        let mutable log = []
+        let tick (s: string) = log <- s :: log; s
+        let o =
+            createObj [
+                "a" ==> tick "1"
+                yield! [ "b" ==> tick "2"; yield! [ "c" ==> tick "3"; "d" ==> tick "4" ] ]
+                yield! [| "e" ==> tick "5" |]
+                "f" ==> tick "6"
+            ]
+        JS.JSON.stringify o |> equal """{"a":"1","b":"2","c":"3","d":"4","e":"5","f":"6"}"""
+        List.rev log |> equal [ "1"; "2"; "3"; "4"; "5"; "6" ]
+
+    testCase "createObj with yield! lets a later duplicate key win" <| fun () ->
+        let mutable log = []
+        let tick (s: string) = log <- s :: log; s
+        let o = createObj [ "a" ==> tick "1"; yield! [ "b" ==> tick "2"; "a" ==> tick "3" ] ]
+        JS.JSON.stringify o |> equal """{"a":"3","b":"2"}"""
+        List.rev log |> equal [ "1"; "2"; "3" ]
+
+    testCase "createObj with yield! of entries not known at compile time still works" <| fun () ->
+        let mutable key = "y"
+        key <- "z"
+        let mutable rest = []
+        rest <- [ "q" ==> 9 ]
+        let cond c =
+            createObj [
+                "a" ==> 1
+                if c then
+                    "b" ==> 2
+                yield! [ "c" ==> 3 ]
+            ]
+        createObj [ "a" ==> 1; yield! [ key ==> 2 ] ] |> JS.JSON.stringify |> equal """{"a":1,"z":2}"""
+        createObj [ "a" ==> 1; yield! rest ] |> JS.JSON.stringify |> equal """{"a":1,"q":9}"""
+        createObj [ "a" ==> 1; for i in 1..2 do string i ==> i ] |> JS.JSON.stringify |> equal """{"1":1,"2":2,"a":1}"""
+        cond true |> JS.JSON.stringify |> equal """{"a":1,"b":2,"c":3}"""
+        cond false |> JS.JSON.stringify |> equal """{"a":1,"c":3}"""
 
     testCase "Lambdas are converted to delegates with dynamic operators" <| fun () ->
         let o =
