@@ -2931,6 +2931,20 @@ module Util =
         && not (isGlobalOrImportedFSharpEntity ent)
         && not (isPojoDefinedByConsArgsFSharpEntity ent)
 
+    /// The class of a constructor that JS/TS output would call but never define: `[<Erase>]` drops the class
+    /// declaration, so only a constructor bound to native code (Emit, Import, Global) or inlined can be called
+    let tryErasedClassOfMissingConstructor (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        match com.Options.Language, memb.DeclaringEntity with
+        | (JavaScript | TypeScript), Some ent when
+            memb.IsConstructor
+            && hasAttrib Atts.erase ent.Attributes
+            && isCompiledClass ent
+            && not (isEmittedOrImportedMember memb)
+            && not (isInline memb)
+            ->
+            Some ent
+        | _ -> None
+
     let private tryPrimaryConstructor (ent: FSharpEntity) =
         ent.MembersFunctionsAndValues |> Seq.tryFind _.IsImplicitConstructor
 

@@ -1929,4 +1929,61 @@ let run (s: string) = pick s false
 """
       |> Assert.Is.strictSuccess
       |> ignore
+
+    testCase "Calling the constructor of an erased class is an error" <| fun _ ->
+      compile """
+open Fable.Core
+[<Erase>]
+type X(a: string) =
+  member _.getA() = a
+let create () = X("a")
+"""
+      |> Assert.Exists.errorWith "Cannot call the constructor of X because the type is erased"
+      |> ignore
+
+    testCase "A static member of an erased class cannot call its constructor" <| fun _ ->
+      compile """
+open Fable.Core
+[<Erase>]
+type X(a: string) =
+  static member Make() = X("c")
+"""
+      |> Assert.Exists.errorWith "Cannot call the constructor of X because the type is erased"
+      |> ignore
+
+    testCase "Erased types with a native constructor or no class constructor still compile" <| fun _ ->
+      compile """
+open Fable.Core
+[<Erase>]
+type EmitCtor [<Emit("new Map()")>] () =
+  [<Emit("$0.size")>]
+  member _.Size: int = jsNative
+[<Erase; Global("Map")>]
+type GlobalMap() =
+  [<Emit("$0.size")>]
+  member _.Size: int = jsNative
+[<Erase; Import("EventEmitter", "node:events")>]
+type Emitter() =
+  member _.eventNames() : string[] = jsNative
+[<Erase>]
+type EmitNew =
+  [<Emit("new Set($0)")>]
+  new (xs: int[]) = {}
+  [<Emit("$0.size")>]
+  member _.Size: int = jsNative
+[<Erase>]
+type U = A of int | B of string
+[<Erase>]
+type SingleCase = SingleCase of string
+type ICtor =
+  [<EmitConstructor>]
+  abstract Create: unit -> obj
+[<Global("Date")>]
+let dateCtor: ICtor = jsNative
+let run () =
+  EmitCtor().Size + GlobalMap().Size + Emitter().eventNames().Length + EmitNew([| 1 |]).Size,
+  A 1, SingleCase "s", dateCtor.Create()
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
   ]
