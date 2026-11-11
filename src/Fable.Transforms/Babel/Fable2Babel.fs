@@ -664,6 +664,12 @@ module Reflection =
             Expression.arrayExpression (generics)
             jsConstructor com ctx ent
             cases
+            // The function FSharp2Fable declares next to the union when a case has attributes to build
+            if FSharp2Fable.Util.hasConstructibleCaseAttributes com ent then
+                let caseAttributes =
+                    FSharp2Fable.Util.entityIdentWithSuffix com ent.Ref FSharp2Fable.Util.caseAttributesSuffix
+
+                com.TransformAsExpr(ctx, caseAttributes)
         ]
         |> libReflectionCall com ctx None "union"
 
