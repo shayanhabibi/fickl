@@ -889,6 +889,23 @@ let tests =
         let r, _date = DateTime.TryParse(invalidAmericanDate, CultureInfo.InvariantCulture, DateTimeStyles.None)
         r |> equal false
 
+    testCase "DateTime.TryParse rejects a day or month that is out of range" <| fun () -> // See #270
+        [ "2020-02-30"; "2021-02-29"; "2020-04-31"; "2020-13-01"; "2020-02-30T10:00:00" ]
+        |> List.map (fun s -> fst (DateTime.TryParse s))
+        |> equal [ false; false; false; false; false ]
+
+        let r, d = DateTime.TryParse "2020-02-29"
+        r |> equal true
+        (d.Year, d.Month, d.Day) |> equal (2020, 2, 29)
+
+        let r, d = DateTime.TryParse "2020-04-30T10:20:30"
+        r |> equal true
+        (d.Year, d.Month, d.Day, d.Hour, d.Minute, d.Second) |> equal (2020, 4, 30, 10, 20, 30)
+
+    testCase "DateTime.Parse throws for a day that is out of range" <| fun () -> // See #270
+        throwsAnyError (fun () -> DateTime.Parse "2020-02-30")
+        throwsAnyError (fun () -> DateTime.Parse "2021-02-29")
+
     testCase "DateTime.TryParse rejects JS-permissive strings that .NET rejects" <| fun () ->
         // JS's Date constructor treats unrecognised words as timezone abbreviations, so it
         // accepts strings .NET rejects: "ABC 6" (ABC), "XYZ 2024" (XYZ), and words that merely
