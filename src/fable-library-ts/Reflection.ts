@@ -100,7 +100,28 @@ export function getGenerics(t: TypeInfo): TypeInfo[] {
   return t.generics != null ? t.generics : [];
 }
 
-export function getHashCode(t: TypeInfo) {
+// Anonymous records keep an empty `fullname`, their identity is their fields.
+function isAnonRecord(t: TypeInfo): boolean {
+  return t.fullname === "" && t.fields != null;
+}
+
+// .NET names them `<>f__AnonymousType{hash of the field names}`{field count}`
+// and puts the field types in the generic arguments, so the name depends
+// only on the field names and the full name also on the field types.
+function anonRecordName(t: TypeInfo): string {
+  const fields = getRecordElements(t);
+  const hash = stringHash(fields.map(([k]) => k).join("\0")) >>> 0;
+  return "<>f__AnonymousType" + hash + "`" + fields.length;
+}
+
+function anonRecordGenerics(t: TypeInfo): TypeInfo[] {
+  return getRecordElements(t).map(([, fieldType]) => fieldType);
+}
+
+export function getHashCode(t: TypeInfo): number {
+  if (isAnonRecord(t)) {
+    return combineHashCodes([stringHash(anonRecordName(t)), ...anonRecordGenerics(t).map(getHashCode)]);
+  }
   const fullnameHash = stringHash(t.fullname);
   const genHashes: number[] = getGenerics(t).map(getHashCode);
   return combineHashCodes([fullnameHash, ...genHashes]);
@@ -238,6 +259,8 @@ export function name(info: FieldInfo | TypeInfo | CaseInfo | MethodInfo): string
     const elemType = getElementType(info);
     if (elemType != null) {
       return name(elemType) + "[]";
+    } else if (isAnonRecord(info)) {
+      return anonRecordName(info);
     } else {
       const i = info.fullname.lastIndexOf(".");
       return i === -1 ? info.fullname : info.fullname.slice(i + 1);
@@ -251,6 +274,8 @@ export function fullName(t: TypeInfo): string {
   const elemType = getElementType(t);
   if (elemType != null) {
     return fullName(elemType) + "[]";
+  } else if (isAnonRecord(t)) {
+    return anonRecordName(t) + "[" + anonRecordGenerics(t).map((x) => fullName(x)).join(",") + "]";
   } else if (t.generics == null || t.generics.length === 0) {
     return t.fullname
   } else {
