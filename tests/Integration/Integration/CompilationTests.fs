@@ -156,6 +156,28 @@ let private precompiledBaseTest name fixture shouldCompile =
                     Directory.Delete(tempDir, true)
         })
 
+/// fickl: both projects in `langVersion` compile the same record spread, an F# 11 feature, and differ only in
+/// their `<LangVersion>` (#255)
+let private langVersionTest name project shouldCompile =
+    testCaseAsync
+        name
+        (async {
+            let projectDir = Path.Combine(__SOURCE_DIRECTORY__, "langVersion", project)
+            let outDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+
+            try
+                let exitCode =
+                    Fable.Cli.Entry.main [| projectDir; "--outDir"; outDir; "--noCache" |]
+
+                if shouldCompile then
+                    Expect.equal exitCode 0 "Expected the compilation to succeed"
+                else
+                    Expect.notEqual exitCode 0 "Expected the compilation to fail"
+            finally
+                if Directory.Exists outDir then
+                    Directory.Delete(outDir, true)
+        })
+
 /// Compiles the project in one snapshot case and compares each `.expected` file with what it produced
 let private compileCase (testCaseDir: string) =
     async {
@@ -236,6 +258,8 @@ let tests =
         [
             precompiledBaseTest "Inheriting a precompiled class with a self identifier is an error" "selfBase" false
             precompiledBaseTest "Inheriting a precompiled class with a static let binding compiles" "staticInit" true
+            langVersionTest "An F# 11 feature is an error under LangVersion 10.0" "lang10" false
+            langVersionTest "An F# 11 feature compiles under LangVersion 11.0" "lang11" true
         ]
     |> testList "Compilation"
 

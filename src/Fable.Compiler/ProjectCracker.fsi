@@ -79,4 +79,8 @@ type ProjectCrackerResolver =
 /// Whether an assembly sits where a NuGet package keeps it, so its package metadata can be looked for next to it.
 val isPackageAssemblyPath: dllPath: string -> bool
 
+/// Whether the checker accepts this `--langversion` value. On one it rejects, it drops the project's references
+/// without a diagnostic.
+val isLangVersionSupported: version: string -> bool
+
 val getFullProjectOpts: resolver: ProjectCrackerResolver -> opts: CrackerOptions -> CrackerResponse

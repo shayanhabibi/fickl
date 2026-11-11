@@ -461,6 +461,26 @@ let getSourcesFromFablePkg (opts: CrackerOptions) (projFile: string) =
         |> List.map Path.normalizeFullPath
     )
 
+// FCS keeps the type that knows the language versions internal, hence the reflection
+let isLangVersionSupported (version: string) =
+    let versions =
+        typeof<FSharpProjectOptions>.Assembly.GetType("FSharp.Compiler.Features+LanguageVersion", true)
+
+    let flags =
+        Reflection.BindingFlags.Instance
+        ||| Reflection.BindingFlags.Static
+        ||| Reflection.BindingFlags.Public
+        ||| Reflection.BindingFlags.NonPublic
+
+    let instance = versions.GetProperty("Default", flags).GetValue(null)
+
+    let accepts (name: string) =
+        versions.GetMethod(name, flags).Invoke(instance, [| box version |]) :?> bool
+
+    // Preview is accepted by the checker, but not counted as supported
+    version.Equals("preview", StringComparison.OrdinalIgnoreCase)
+    || accepts "ContainsVersion" && accepts "IsVersionSupported"
+
 let private extractUsefulOptionsAndSources
     isMainProj
     (line: string)
@@ -468,12 +488,17 @@ let private extractUsefulOptionsAndSources
     =
     if line.StartsWith('-') then
         //   "--warnaserror" // Disable for now to prevent unexpected errors, see #2288
+        // fickl: one checker project covers every source, so only the main project's language version can apply
         if line.StartsWith("--langversion:", StringComparison.Ordinal) && isMainProj then
-            let v = line.Substring("--langversion:".Length).ToLowerInvariant()
+            let version = line.Substring("--langversion:".Length)
 
-            if v = "preview" then
+            // The checker fails without a diagnostic on a version it does not accept
+            if isLangVersionSupported version then
                 accSources, line :: accOptions
             else
+                Log.warning
+                    $"LangVersion %s{version} is not supported by this compiler, the default language version is used instead"
+
                 accSources, accOptions
         // Only forward the nullness flag if it is coming from the main project
         elif line.StartsWith("--checknulls+", StringComparison.Ordinal) && isMainProj then
