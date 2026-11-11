@@ -109,6 +109,8 @@ type PathResolver =
     abstract GetOrAddDeduplicateTargetDir: importDir: string * addTargetDir: (Set<string> -> string) -> string
 
 module Imports =
+    val isRootAbsolutePath: path: string -> bool
+
     val getRelativePath: path: string -> pathTo: string -> string
 
     val getTargetAbsolutePath:

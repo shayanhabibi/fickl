@@ -600,6 +600,10 @@ module Imports =
     let isAbsolutePath (path: string) =
         path.StartsWith('/') || path.IndexOf(':') = 1
 
+    /// fickl: a JavaScript import from the root of the site, like "/env.js". It names no file on disk, so it is
+    /// printed as written. Only the user writes one: the paths the compiler makes for JavaScript are relative
+    let isRootAbsolutePath (path: string) = path.StartsWith('/')
+
     let getRelativePath (path: string) (pathTo: string) =
         let relPath = IO.Path.GetRelativePath(path, pathTo).Replace('\\', '/')
 
