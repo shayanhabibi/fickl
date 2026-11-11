@@ -1818,6 +1818,9 @@ let rec defaultof (com: ICompiler) (ctx: Context) r t =
     | Builtin BclTimeOnly
     | Builtin BclRune -> getZero com ctx t
     | Builtin BclGuid -> emptyGuid ()
+    // A struct in .NET, a class in the library
+    | DeclaredType(entRef, _) when entRef.FullName = "System.Numerics.Complex" ->
+        Helper.LibCall(com, "System.Numerics", "Complex_get_Zero", t, [], ?loc = r)
     | DeclaredType(entRef, _) ->
         let ent = com.GetEntity(entRef)
         // TODO: For BCL types we cannot access the constructor, raise error or warning?
@@ -3077,17 +3080,19 @@ let copyToArray (com: ICompiler) r t (i: CallInfo) args =
     Helper.LibCall(com, "Util", "copyToArray", t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
     |> Some
 
+/// .NET uses the default comparer when the comparer is null. The null literal
+/// gets here as Util.defaultOf() unless its type is nullable (see defaultof)
+let comparerOrDefault (com: ICompiler) ctx (ar: Expr) (comparer: Expr option) =
+    match comparer with
+    | None
+    | Some NullConst
+    | Some(MaybeCasted(Call(Import({ Selector = "defaultOf" }, _, _), _, _, _))) ->
+        makeDefaultComparer com ctx (getElementType ar.Type)
+    | Some comparer -> comparer
+
 let binarySearch (com: ICompiler) ctx r t rangeMeth (ar: Expr) args =
     let call meth args comparer =
-        let comparer =
-            match comparer with
-            // .NET uses the default comparer when the comparer is null. The null literal
-            // gets here as Util.defaultOf() unless its type is nullable (see defaultof)
-            | None
-            | Some NullConst
-            | Some(MaybeCasted(Call(Import({ Selector = "defaultOf" }, _, _), _, _, _))) ->
-                makeDefaultComparer com ctx (getElementType ar.Type)
-            | Some comparer -> comparer
+        let comparer = comparerOrDefault com ctx ar comparer
 
         Helper.LibCall(com, "Array", meth, t, ar :: args @ [ comparer ], ?loc = r)
         |> Some
@@ -3270,7 +3275,14 @@ let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (this
         Helper.InstanceCall(ar, "sort", t, [ compareFn ], ?loc = r) |> Some
     | "Sort", Some ar, [ ExprType(DelegateType _) ] -> Helper.InstanceCall(ar, "sort", t, args, ?loc = r) |> Some
     | "Sort", Some ar, [ arg ] ->
-        Helper.LibCall(com, "Array", "sortInPlace", t, [ ar; arg ], i.SignatureArgTypes, ?loc = r)
+        let comparer = comparerOrDefault com ctx ar (Some arg)
+
+        Helper.LibCall(com, "Array", "sortInPlace", t, [ ar; comparer ], i.SignatureArgTypes, ?loc = r)
+        |> Some
+    | "Sort", Some ar, [ index; count; comparer ] ->
+        let comparer = comparerOrDefault com ctx ar (Some comparer)
+
+        Helper.LibCall(com, "Array", "sortInPlaceRangeCount", t, [ ar; index; count; comparer ], ?loc = r)
         |> Some
     | "ToArray", Some ar, [] -> Helper.InstanceCall(ar, "slice", t, args, ?loc = r) |> Some
     | _ -> None
@@ -3413,6 +3425,27 @@ let arrayCopy (com: ICompiler) (ctx: Context) r t source sourceIndex target targ
 
     Helper.LibCall(com, "Array", "copyTo", t, args, ?loc = r) |> Some
 
+/// The static System.Array.Sort overloads that take more than the array
+let arraySort (com: ICompiler) ctx r t (i: CallInfo) (ar: Expr) args =
+    let call meth args comparer =
+        let comparer = comparerOrDefault com ctx ar comparer
+
+        // The type arguments keep tsc from inferring `unknown` for null items
+        Helper.LibCall(com, "Array", meth, t, ar :: args @ [ comparer ], genArgs = i.GenericArgs, ?loc = r)
+        |> Some
+
+    match i.SignatureArgTypes, args with
+    | [ _; DelegateType _ ], [ comparison ] -> Helper.InstanceCall(ar, "sort", t, [ comparison ], ?loc = r) |> Some
+    | [ _; Array _ ], [ items ] -> call "sortInPlaceKeysItems" [ items ] None
+    | [ _; _ ], [ comparer ] -> call "sortInPlace" [] (Some comparer)
+    | [ _; Array _; _ ], [ items; comparer ] -> call "sortInPlaceKeysItems" [ items ] (Some comparer)
+    | [ _; _; _ ], [ index; length ] -> call "sortInPlaceRange" [ index; length ] None
+    | [ _; Array _; _; _ ], [ items; index; length ] -> call "sortInPlaceKeysItemsRange" [ items; index; length ] None
+    | [ _; _; _; _ ], [ index; length; comparer ] -> call "sortInPlaceRange" [ index; length ] (Some comparer)
+    | [ _; Array _; _; _; _ ], [ items; index; length; comparer ] ->
+        call "sortInPlaceKeysItemsRange" [ items; index; length ] (Some comparer)
+    | _ -> None
+
 let arrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
     | "get_Length", Some arg, _ -> getFieldWith r t arg "length" |> Some
@@ -3434,6 +3467,7 @@ let arrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: E
         let compareFn = makeDefaultComparerFunction com ctx elemType
 
         Helper.InstanceCall(ar, "sort", t, [ compareFn ], ?loc = r) |> Some
+    | "Sort", None, ar :: args -> arraySort com ctx r t i ar args
     | "GetEnumerator", Some arg, _ -> getEnumerator com r t arg |> Some
     | "Resize", None, args ->
         let args =
@@ -6196,6 +6230,10 @@ let tryField com returnTyp ownerTyp fieldName =
         | "System.BitConverter" ->
             Helper.LibCall(com, "BitConverter", Naming.lowerFirst fieldName, returnTyp, [])
             |> Some
+        // Static readonly fields in .NET, static properties of the library class
+        | "System.Numerics.Complex" ->
+            Helper.LibCall(com, "System.Numerics", "Complex_get_" + fieldName, returnTyp, [])
+            |> Some
         | "System.Diagnostics.Stopwatch" when fieldName = "Frequency" || fieldName = "IsHighResolution" ->
             Helper.LibCall(com, "Stopwatch", Naming.lowerFirst fieldName, returnTyp, [])
             |> Some
@@ -6227,6 +6265,7 @@ let private replacedModules =
             "System.FormattableString", formattableString
             "System.Runtime.CompilerServices.FormattableStringFactory", formattableString
             "System.Text.StringBuilder", bclType
+            "System.Numerics.Complex", bclType
             Types.array, arrays
             Types.array + "`2", arrays2D
             "Microsoft.FSharp.Collections.Array2DModule", array2DModule
