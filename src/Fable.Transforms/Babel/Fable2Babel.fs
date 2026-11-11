@@ -2307,6 +2307,30 @@ module Util =
 
         Expression.callExpression (funcExpr, List.toArray args, ?typeArguments = genArgs, ?loc = r)
 
+    /// A declaration lists a type parameter name once (see makeTypeParamDecl), so when a type parameter
+    /// of the member shadows one of its declaring type, only the argument for the member's one is passed
+    let dropShadowedGenericArgs
+        (com: IBabelCompiler)
+        (memberInfo: Fable.MemberFunctionOrValue option)
+        (genArgs: Fable.Type list)
+        =
+        match memberInfo with
+        | Some info when com.IsTypeScript && not (List.isEmpty genArgs) ->
+            let entGenParams =
+                match info.DeclaringEntity |> Option.bind com.TryGetEntity with
+                | Some ent when not ent.IsFSharpModule -> ent.GenericParameters
+                | _ -> []
+
+            let names = entGenParams @ info.GenericParameters |> List.map (fun g -> g.Name)
+            let distinctNames = List.distinct names
+
+            if List.sameLength names genArgs && not (List.sameLength names distinctNames) then
+                let lastArgs = List.zip names genArgs |> Map
+                distinctNames |> List.map (fun name -> lastArgs[name])
+            else
+                genArgs
+        | _ -> genArgs
+
     let callFunctionWithThisContext r funcExpr (args: Expression list) =
         let args = thisExpr :: args |> List.toArray
         Expression.callExpression (get None funcExpr "call", args, ?loc = r)
@@ -4238,9 +4262,12 @@ but thanks to the optimisation done below we get
                             ?typeArguments = typeParamInst,
                             ?loc = range
                         )
-                | None -> callFunction com ctx range callee callInfo.GenericArgs args
+                | None ->
+                    let genArgs = dropShadowedGenericArgs com memberInfo callInfo.GenericArgs
+                    callFunction com ctx range callee genArgs args
                 | Some(TransformExpr com ctx thisArg) ->
-                    callFunction com ctx range callee callInfo.GenericArgs (thisArg :: args)
+                    let genArgs = dropShadowedGenericArgs com memberInfo callInfo.GenericArgs
+                    callFunction com ctx range callee genArgs (thisArg :: args)
 
     let transformCurriedApply (com: IBabelCompiler) ctx range (applied: Fable.Expr) args =
         let resultType =
