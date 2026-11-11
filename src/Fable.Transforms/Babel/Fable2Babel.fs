@@ -5821,6 +5821,9 @@ but thanks to the optimisation done below we get
                             match memb.CompiledName with
                             | "ToString" -> "toString"
                             | name -> name
+                    // The %A hook FSharp2Fable attaches to a class with [<StructuredFormatDisplay>]
+                    if hasAttribute "Microsoft.FSharp.Core.StructuredFormatDisplayAttribute" baseEnt.Attributes then
+                        "toStructuredString"
                     yield! ancestorOverrides baseEnt
                 ]
             | _ -> []
