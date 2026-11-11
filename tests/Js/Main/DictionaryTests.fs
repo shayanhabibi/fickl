@@ -307,6 +307,12 @@ let tests =
         let dic = dict <| seq { for i in 1. .. 10. -> i.ToString(), i*i }
         dic.["2"] |> equal 4.
 
+    testCase "Members of an IDictionary item can be accessed" <| fun () -> // See #283
+        let getA (dic: IDictionary<int, MyRecord>) key = dic.[key].a
+        let dic = dict [ (1, { a = 5 }) ]
+        getA dic 1 |> equal 5
+        getA (Map [ (2, { a = 7 }) ]) 2 |> equal 7
+
     testCase "Interface IDictionary.Keys works" <| fun () ->
         let dic = dict <| seq { for i in 1. .. 10. -> i.ToString(), i*i }
         let i = ref ""
