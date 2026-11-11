@@ -865,8 +865,29 @@ type NoSuffixCalc(seed: int) =
     member _.Over(x: string) = x.Length
     static member Make(x: int) = NoSuffixCalc(x)
 
+[<Erase>]
+type ErasedWithOperators =
+    | ErasedNum of int
+
+    static member (+)(ErasedNum x, ErasedNum y) = 2 * (x + y)
+    static member (-)(ErasedNum x, ErasedNum y) = ErasedNum(x - y - 1000)
+    static member (~-)(ErasedNum x) = ErasedNum(x + 100)
+
 let tests =
   testList "JsInterop" [
+    testCase "Custom operators of an erased union are used with operands built by the case constructor" <| fun _ -> // fickl #280
+        let unwrap (ErasedNum x) = x
+        let addBoth (x: ErasedWithOperators) (y: ErasedWithOperators) = x + y
+        let addRight (x: ErasedWithOperators) (y: int) = x + ErasedNum y
+        let addLeft (x: int) (y: ErasedWithOperators) = ErasedNum x + y
+        let addNew (x: int) (y: int) = ErasedNum x + ErasedNum y
+        addBoth (ErasedNum 1) (ErasedNum 2) |> equal 6
+        addRight (ErasedNum 1) 2 |> equal 6
+        addLeft 1 (ErasedNum 2) |> equal 6
+        addNew 1 2 |> equal 6
+        ErasedNum 5 - ErasedNum 2 |> unwrap |> equal -997
+        -(ErasedNum 1) |> unwrap |> equal 101
+
     testCase "NoOverloadSuffix members work" <| fun _ ->
         let c = NoSuffixCounter(10)
         c.Add 1 |> equal 11

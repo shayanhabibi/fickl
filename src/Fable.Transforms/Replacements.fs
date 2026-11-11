@@ -2028,7 +2028,19 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
             |> Some
     | "Not", [ operand ] -> // TODO: Check custom operator?
         makeUnOp r t operand UnaryNot |> Some
-    | Patterns.SetContains Operators.standardSet, _ -> applyOp com ctx r t i.CompiledName args |> Some
+    | Patterns.SetContains Operators.standardSet, _ ->
+        // fickl: the case constructor of an erased union leaves only its payload, so the operand has the payload's
+        // type and the union's own operator is not found: give it back the type the operator was resolved with
+        let args =
+            args
+            |> List.mapi (fun idx arg ->
+                match List.tryItem idx i.GenericArgs, arg.Type with
+                | Some(DeclaredType _), DeclaredType _ -> arg
+                | Some(DeclaredType _ as operandType), _ -> TypeCast(arg, operandType)
+                | _ -> arg
+            )
+
+        applyOp com ctx r t i.CompiledName args |> Some
     // Type info
     | "TypeOf", _ ->
         (genArg com ctx r 0 i.GenericArgs)
