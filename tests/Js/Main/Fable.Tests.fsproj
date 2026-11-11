@@ -48,6 +48,7 @@
     <Compile Include="TaskTests.fs" />
     <Compile Include="CharTests.fs" />
     <Compile Include="ComparisonTests.fs" />
+    <Compile Include="ComplexTests.fs" />
     <Compile Include="ConditionalWeakTableTests.fs" />
     <Compile Include="ConvertTests.fs" />
     <Compile Include="CustomOperatorsTests.fs" />

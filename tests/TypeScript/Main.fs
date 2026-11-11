@@ -33,6 +33,7 @@ let allTests =
     Array2DTests.tests
     Async.tests
     Chars.tests
+    Complexes.tests
     Comparison.tests
     ConditionalWeakTable.tests
     Convert.tests

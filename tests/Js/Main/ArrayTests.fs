@@ -776,6 +776,128 @@ let tests =
         // F# structural comparison stays ordinal
         Array.sort xs |> equal [| "1"; "A"; "B"; "_"; "a"; "b" |]
 
+    testCase "System.Array.Sort works with a comparer" <| fun () -> // See fickl #321
+        let desc = ComparisonIdentity.FromFunction(fun (a: int) b -> compare b a)
+        let xs = [| 5; 3; 9; 1; 7; 2 |]
+        System.Array.Sort(xs, desc)
+        xs |> equal [| 9; 7; 5; 3; 2; 1 |]
+        // A null comparer means the default one
+        System.Array.Sort(xs, (null: IComparer<int>))
+        xs |> equal [| 1; 2; 3; 5; 7; 9 |]
+        let ss = [| "b"; "A"; "a"; "B"; "_"; "1" |]
+        System.Array.Sort(ss, (null: IComparer<string>))
+        ss |> equal [| "_"; "1"; "a"; "A"; "b"; "B" |]
+        let byLength = ComparisonIdentity.FromFunction(fun (a: string) (b: string) -> compare a.Length b.Length)
+        let ws = [| "ccc"; "a"; "bb" |]
+        System.Array.Sort(ws, byLength)
+        ws |> equal [| "a"; "bb"; "ccc" |]
+
+    testCase "System.Array.Sort works with a Comparison" <| fun () -> // See fickl #321
+        let xs = [| 5; 3; 9; 1; 7; 2 |]
+        System.Array.Sort(xs, System.Comparison<int>(fun x y -> compare y x))
+        xs |> equal [| 9; 7; 5; 3; 2; 1 |]
+        let ws = [| "ccc"; "a"; "bb" |]
+        System.Array.Sort(ws, System.Comparison<string>(fun x y -> compare x.Length y.Length))
+        ws |> equal [| "a"; "bb"; "ccc" |]
+
+    testCase "System.Array.Sort works with a range" <| fun () -> // See fickl #321
+        let desc = ComparisonIdentity.FromFunction(fun (a: int) b -> compare b a)
+        let xs = [| 5; 3; 9; 1; 7; 2 |]
+        System.Array.Sort(xs, 1, 4)
+        xs |> equal [| 5; 1; 3; 7; 9; 2 |]
+        System.Array.Sort(xs, 1, 4, desc)
+        xs |> equal [| 5; 9; 7; 3; 1; 2 |]
+        System.Array.Sort(xs, 1, 4, null)
+        xs |> equal [| 5; 1; 3; 7; 9; 2 |]
+        System.Array.Sort(xs, 6, 0)
+        xs |> equal [| 5; 1; 3; 7; 9; 2 |]
+        let fs = [| 5.5; 3.5; 9.5; 1.5 |]
+        System.Array.Sort(fs, 0, 3)
+        fs |> equal [| 3.5; 5.5; 9.5; 1.5 |]
+        let ss = [| "b"; "A"; "a"; "B"; "_"; "1" |]
+        System.Array.Sort(ss, 1, 4)
+        ss |> equal [| "b"; "_"; "a"; "A"; "B"; "1" |]
+
+    testCase "System.Array.Sort validates the range" <| fun () -> // See fickl #321
+        let desc = ComparisonIdentity.FromFunction(fun (a: int) b -> compare b a)
+        let xs = [| 5; 3; 9; 1; 7; 2 |]
+        let outOfBounds = "Offset and length were out of bounds for the array or count is greater than the number of elements from index to the end of the source collection."
+        throwsError "Non-negative number required. (Parameter 'index')" (fun () -> System.Array.Sort(xs, -1, 2))
+        throwsError "Non-negative number required. (Parameter 'length')" (fun () -> System.Array.Sort(xs, 1, -2))
+        throwsError outOfBounds (fun () -> System.Array.Sort(xs, 3, 4))
+        throwsError outOfBounds (fun () -> System.Array.Sort(xs, 7, 0))
+        throwsError "Non-negative number required. (Parameter 'index')" (fun () -> System.Array.Sort(xs, -1, 2, desc))
+        throwsError outOfBounds (fun () -> System.Array.Sort(xs, 3, 4, desc))
+        xs |> equal [| 5; 3; 9; 1; 7; 2 |]
+
+    testCase "System.Array.Sort works with keys and items" <| fun () -> // See fickl #321
+        let desc = ComparisonIdentity.FromFunction(fun (a: int) b -> compare b a)
+        let keys = [| 3; 1; 2 |]
+        let items = [| "c"; "a"; "b" |]
+        System.Array.Sort(keys, items)
+        keys |> equal [| 1; 2; 3 |]
+        items |> equal [| "a"; "b"; "c" |]
+        System.Array.Sort(keys, items, desc)
+        keys |> equal [| 3; 2; 1 |]
+        items |> equal [| "c"; "b"; "a" |]
+        // Items past the keys are left alone
+        let keys = [| 3; 1; 2; 0 |]
+        let items = [| 30; 10; 20; 0; 99 |]
+        System.Array.Sort(keys, items)
+        keys |> equal [| 0; 1; 2; 3 |]
+        items |> equal [| 0; 10; 20; 30; 99 |]
+        let keys = [| "b"; "A"; "a"; "B" |]
+        let items = [| 1; 2; 3; 4 |]
+        System.Array.Sort(keys, items)
+        keys |> equal [| "a"; "A"; "b"; "B" |]
+        items |> equal [| 3; 2; 1; 4 |]
+        // Null items sort the keys alone
+        let keys = [| 3; 1; 2 |]
+        System.Array.Sort(keys, (null: string[]))
+        keys |> equal [| 1; 2; 3 |]
+        System.Array.Sort(keys, (null: string[]), desc)
+        keys |> equal [| 3; 2; 1 |]
+
+    testCase "System.Array.Sort works with keys and items in a range" <| fun () -> // See fickl #321
+        let desc = ComparisonIdentity.FromFunction(fun (a: int) b -> compare b a)
+        let keys = [| 5; 3; 9; 1; 7; 2 |]
+        let items = [| "5"; "3"; "9"; "1"; "7"; "2" |]
+        System.Array.Sort(keys, items, 1, 4)
+        keys |> equal [| 5; 1; 3; 7; 9; 2 |]
+        items |> equal [| "5"; "1"; "3"; "7"; "9"; "2" |]
+        System.Array.Sort(keys, items, 1, 4, desc)
+        keys |> equal [| 5; 9; 7; 3; 1; 2 |]
+        items |> equal [| "5"; "9"; "7"; "3"; "1"; "2" |]
+        // The items only need to cover the range
+        let keys = [| 3; 1; 2; 4 |]
+        let items = [| "a"; "b"; "c" |]
+        System.Array.Sort(keys, items, 0, 3)
+        keys |> equal [| 1; 2; 3; 4 |]
+        items |> equal [| "b"; "c"; "a" |]
+
+    testCase "System.Array.Sort validates keys and items" <| fun () -> // See fickl #321
+        let desc = ComparisonIdentity.FromFunction(fun (a: int) b -> compare b a)
+        let outOfBounds = "Offset and length were out of bounds for the array or count is greater than the number of elements from index to the end of the source collection."
+        throwsError outOfBounds (fun () -> System.Array.Sort([| 3; 1; 2 |], [| "a"; "b" |]))
+        throwsError outOfBounds (fun () -> System.Array.Sort([| 3; 1; 2 |], [| "a"; "b" |], desc))
+        throwsError "Non-negative number required. (Parameter 'index')" (fun () -> System.Array.Sort([| 3; 1; 2 |], [| "a"; "b"; "c" |], -1, 2))
+        throwsError "Non-negative number required. (Parameter 'length')" (fun () -> System.Array.Sort([| 3; 1; 2 |], [| "a"; "b"; "c" |], 1, -2))
+        throwsError outOfBounds (fun () -> System.Array.Sort([| 3; 1; 2 |], [| "a"; "b"; "c" |], 1, 3))
+        throwsError outOfBounds (fun () -> System.Array.Sort([| 3; 1; 2; 4 |], [| "a"; "b" |], 1, 2))
+
+    testCase "ResizeArray.Sort works with a range" <| fun () -> // See fickl #321
+        let desc = ComparisonIdentity.FromFunction(fun (a: int) b -> compare b a)
+        let xs = ResizeArray [ 5; 3; 9; 1; 7; 2 ]
+        xs.Sort(1, 4, desc)
+        xs.ToArray() |> equal [| 5; 9; 7; 3; 1; 2 |]
+        xs.Sort(1, 4, null)
+        xs.ToArray() |> equal [| 5; 1; 3; 7; 9; 2 |]
+        xs.Sort((null: IComparer<int>))
+        xs.ToArray() |> equal [| 1; 2; 3; 5; 7; 9 |]
+        throwsError "Non-negative number required. (Parameter 'index')" (fun () -> xs.Sort(-1, 2, null))
+        throwsError "Non-negative number required. (Parameter 'count')" (fun () -> xs.Sort(1, -2, null))
+        throwsAnyError (fun () -> xs.Sort(4, 3, null))
+
     testCase "System.Array.BinarySearch passes the array element to the comparer first" <| fun () ->
         let xs = [|1; 3; 5; 7; 9|]
         let calls = ResizeArray<int * int>()
