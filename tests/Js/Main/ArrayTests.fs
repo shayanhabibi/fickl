@@ -167,6 +167,16 @@ let tests =
         xs |> equal [| 1uy; 0uy |]
 #endif
 
+    testCase "Array.zeroCreate and Array.create evaluate the count once" <| fun () ->
+        let mutable calls = 0
+        let size () =
+            calls <- calls + 1
+            2
+        Array.zeroCreate<decimal> (size ()) |> equal [| 0M; 0M |]
+        calls |> equal 1
+        Array.create (size ()) "a" |> equal [| "a"; "a" |]
+        calls |> equal 2
+
     testCase "Mapping from values to functions works" <| fun () ->
         let a = [| "a"; "b"; "c" |]
         let b = [| 1; 2; 3 |]
@@ -286,6 +296,16 @@ let tests =
         let b = [| |]
         throwsAnyError (fun () -> b.[0])
 
+    testCase "Array indexer evaluates the array once" <| fun () ->
+        let mutable calls = 0
+        let size () =
+            calls <- calls + 1
+            3
+        (Array.zeroCreate<int> (size ())).[1] |> equal 0
+        calls |> equal 1
+        throwsAnyError (fun () -> (Array.zeroCreate<int> (size ())).[5])
+        calls |> equal 2
+
     testCase "Array getter returns None for an in-bounds option element" <| fun () ->
         let xs = [| Some 1; None; Some 3 |]
         Array.get xs 1 |> equal None
@@ -294,6 +314,23 @@ let tests =
         Array.item 1 xs |> equal None
         xs[2] |> equal (Some 3)
         throwsAnyError (fun () -> xs[3])
+
+    testCase "Array getter evaluates the array and the index once" <| fun () ->
+        let mutable calls = 0
+        let xs = [| 10; 20; 30 |]
+        let next () =
+            calls <- calls + 1
+            calls
+        xs.[next ()] |> equal 20
+        calls |> equal 1
+        let ys = ResizeArray [ "a"; "b" ]
+        let pick () =
+            calls <- calls + 1
+            ys
+        (pick ()).[1] |> equal "b"
+        calls |> equal 2
+        throwsAnyError (fun () -> xs.[next ()])
+        calls |> equal 3
 
     testCase "Array setter works" <| fun () ->
         let x = [| 1.; 2.; 3.; 4.; 5. |]

@@ -122,6 +122,12 @@ let tests = testList "Strings" [
         sb.Append(8.0f) |> ignore // float32
         sb.ToString().Replace(",", ".") |> equal "12345678"
 
+    testCase "StringBuilder.Append treats null as empty" <| fun () -> // See #5162
+        let n: string = null
+        let o: obj = null
+        let sb = System.Text.StringBuilder()
+        sb.Append("a").Append(n).Append(o).Append("b").ToString() |> equal "ab"
+
     testCase "StringBuilder.AppendFormat works" <| fun () ->
         let sb = System.Text.StringBuilder()
         sb.AppendFormat("Hello{0}World{1}", " ", "!") |> ignore
@@ -256,6 +262,14 @@ let tests = testList "Strings" [
     testCase "sprintf without arguments works" <| fun () ->
         sprintf "hello" |> equal "hello"
 
+    testCase "sprintf \"%s\" prints null as empty" <| fun () -> // See #5162
+        let n: string = null
+        sprintf "%s" n |> equal ""
+        sprintf "a%sb" n |> equal "ab"
+        sprintf "[%5s]" n |> equal "[     ]"
+        sprintf "[%-5s]" n |> equal "[     ]"
+        (try failwithf "x%sy" n with e -> e.Message) |> equal "xy"
+
     testCase "input of print format can be retrieved" <| fun () ->
         let pathScan (pf:PrintfFormat<_,_,_,_,'t>) =
             let formatStr = pf.Value
@@ -302,6 +316,17 @@ let tests = testList "Strings" [
         String.Concat("a", null, "b") |> equal "ab"
         String.Concat("a", (null: obj), box 1) |> equal "a1"
         String.Concat([| "a"; null; "b" |]) |> equal "ab"
+
+    testCase "input of interpolated print format can be retrieved" <| fun () -> // See #3969
+        let f (fmt: Printf.StringFormat<string>) = fmt.Value, sprintf fmt
+        let x, s = 42, "z"
+        f $"wow %d{x}" |> equal ("wow %d%P()", "wow 42")
+        f $"a %d{x} b %s{s} c {x + 1}" |> equal ("a %d%P() b %s%P() c %P()", "a 42 b z c 43")
+
+    testCase "ksprintf and kprintf work with interpolated strings" <| fun () -> // See #3969
+        let x = 3
+        Printf.ksprintf (fun s -> s + "!") $"ks %d{x} {x + 1}" |> equal "ks 3 4!"
+        Printf.kprintf (fun s -> s + "?") $"kp {x}" |> equal "kp 3?"
 
     testCase "sprintf with escaped percent symbols works" <| fun () -> // See #195
         let r, r1, r2 = "Ratio", 0.213849, 0.799898
@@ -536,6 +561,13 @@ let tests = testList "Strings" [
     testCase "String.Format should fail if there are less arguments than placeholders" <| fun () -> // See #2768
         throwsAnyError <| fun () -> String.Format ("Hello {0}", args = Array.empty)
 
+    testCase "String.Format treats null arguments as empty" <| fun () -> // See #5162
+        let n: string = null
+        let o: obj = null
+        String.Format("a{0}b", n) |> equal "ab"
+        String.Format("a{0}b", o) |> equal "ab"
+        String.Format("[{0,3}]", n) |> equal "[   ]"
+
     testCase "String.Format combining padding and zeroes pattern works" <| fun () ->
         String.Format(CultureInfo.InvariantCulture, "{0:++0.00++}", -5000.5657) |> equal "-++5000.57++"
         String.Format(CultureInfo.InvariantCulture, "{0:000.00}foo", 5) |> equal "005.00foo"
@@ -609,6 +641,44 @@ let tests = testList "Strings" [
         String.Format(CultureInfo.InvariantCulture, "{0:P0}", 0.5) |> equal "50 %"
         String.Format(CultureInfo.InvariantCulture, "{0:P2}", 0.1234) |> equal "12.34 %"
         String.Format(CultureInfo.InvariantCulture, "{0:C2}", 1000) |> equal "¤1,000.00"
+
+    testCase "sprintf rounds exact midpoints of floats to even" <| fun () -> // See #5202
+        sprintf "%.2f" 0.125 |> equal "0.12"
+        sprintf "%.0f" 2.5 |> equal "2"
+        sprintf "%.0f" 0.5 |> equal "0"
+        sprintf "%.0f" 1.5 |> equal "2"
+        sprintf "%.0f" -2.5 |> equal "-2"
+        sprintf "%.0f" -0.5 |> equal "-0"
+        sprintf "%.0f" 2.5f |> equal "2"
+        sprintf "%.2g" 0.125 |> equal "0.12"
+        sprintf "%.2f" 1.005 |> equal "1.00"
+        sprintf "%.2f" 0.375 |> equal "0.38"
+        sprintf "%.1f" 0.05 |> equal "0.1"
+        sprintf "%.0f" 2.5m |> equal "3"
+        sprintf "%.2f" 0.125m |> equal "0.13"
+
+    testCase "Standard numeric formats round exact midpoints of floats to even" <| fun () -> // See #5202
+        (0.125).ToString("F2", CultureInfo.InvariantCulture) |> equal "0.12"
+        (2.5).ToString("F0", CultureInfo.InvariantCulture) |> equal "2"
+        (-2.5).ToString("F0", CultureInfo.InvariantCulture) |> equal "-2"
+        (0.125f).ToString("F2", CultureInfo.InvariantCulture) |> equal "0.12"
+        (0.125).ToString("E1", CultureInfo.InvariantCulture) |> equal "1.2E-001"
+        (9.5).ToString("E0", CultureInfo.InvariantCulture) |> equal "1E+001"
+        (2.5e20).ToString("E0", CultureInfo.InvariantCulture) |> equal "2E+020"
+        (3.5e20).ToString("E0", CultureInfo.InvariantCulture) |> equal "4E+020"
+        (0.125).ToString("P0", CultureInfo.InvariantCulture) |> equal "12 %"
+        (-0.125).ToString("P0", CultureInfo.InvariantCulture) |> equal "-12 %"
+        (0.00125).ToString("P1", CultureInfo.InvariantCulture) |> equal "0.1 %"
+        (0.005).ToString("P0", CultureInfo.InvariantCulture) |> equal "1 %"
+        (2.5).ToString("N0", CultureInfo.InvariantCulture) |> equal "2"
+        (2.5).ToString("C0", CultureInfo.InvariantCulture) |> equal "¤2"
+        (0.125).ToString("G2", CultureInfo.InvariantCulture) |> equal "0.12"
+        String.Format(CultureInfo.InvariantCulture, "{0:F2}", 0.125) |> equal "0.12"
+        (1.005).ToString("F2", CultureInfo.InvariantCulture) |> equal "1.00"
+        (0.375).ToString("F2", CultureInfo.InvariantCulture) |> equal "0.38"
+        (0.125).ToString("0.00", CultureInfo.InvariantCulture) |> equal "0.13"
+        (2.5m).ToString("F0", CultureInfo.InvariantCulture) |> equal "3"
+        (0.125m).ToString("F2", CultureInfo.InvariantCulture) |> equal "0.13"
 
     testCase "G format specifier trims trailing zeros without corrupting exponential notation" <| fun () ->
         (123.45).ToString("G17", CultureInfo.InvariantCulture) |> equal "123.45"
@@ -1228,6 +1298,21 @@ let tests = testList "Strings" [
         throwsAnyError <| fun () ->
             input.Chars(3) |> ignore
 
+    testCase "String indexer evaluates the string and the index once" <| fun () ->
+        let mutable calls = 0
+        let next () =
+            calls <- calls + 1
+            calls
+        let pick () =
+            calls <- calls + 1
+            "abc"
+        "abc".[next ()] |> equal 'b'
+        calls |> equal 1
+        (pick ()).[2] |> equal 'c'
+        calls |> equal 2
+        throwsAnyError (fun () -> "abc".[next () + 2])
+        calls |> equal 3
+
     testCase "String indexer works" <| fun () ->
         let input = "hello"
         input.[1] |> equal 'e'
@@ -1338,6 +1423,15 @@ let tests = testList "Strings" [
         String.Concat((null: string), "b") |> equal "b"
         String.Concat([| "a"; null; "b" |]) |> equal "ab"
         String.Concat(box "a", null, box 1) |> equal "a1"
+
+    testCase "string treats null as empty" <| fun () -> // See #5162
+        let n: string = null
+        let o: obj = null
+        string n |> equal ""
+        string (box n) |> equal ""
+        string o |> equal ""
+        string (None: int option) |> equal ""
+        string "a" |> equal "a"
 
     testCase "System.String.Concat works" <| fun () ->
         String.Concat("a", "b", "c")

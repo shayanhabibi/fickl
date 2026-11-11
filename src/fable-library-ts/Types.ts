@@ -54,6 +54,10 @@ export function tupleToString(xs: any[], formats?: (((x: any) => string) | null 
   }).join(", ") + ")";
 }
 
+export function toStringOrEmpty(x: any): string {
+  return x == null ? "" : toString(x);
+}
+
 export function unionToString(name: string, fields: any[]) {
   if (fields.length === 0) {
     return name;

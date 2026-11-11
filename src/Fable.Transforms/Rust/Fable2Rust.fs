@@ -4364,6 +4364,7 @@ module Util =
     let getEntityFieldsAsIdents com (ent: Fable.Entity) : Fable.Ident list =
         let fieldIdents =
             ent.FSharpFields
+            |> List.filter (fun field -> not field.IsStatic)
             |> List.map (fun field ->
                 let name = field.Name
                 let typ = FableTransforms.uncurryType field.FieldType
@@ -4921,11 +4922,29 @@ module Util =
         let isByRefPreferred =
             memb.Attributes |> Seq.exists (fun a -> a.Entity.FullName = Atts.rustByRef)
 
+        let hasFactAttribute =
+            memb.Attributes
+            |> Seq.exists (fun a -> a.Entity.FullName.EndsWith(".FactAttribute", StringComparison.Ordinal))
+
+        let asyncTestReturnType =
+            match hasFactAttribute, decl.Body.Type with
+            | true, Replacements.Util.IsEntity (Types.fsharpAsyncGeneric) (_, [ returnType ]) -> Some returnType
+            | _ -> None
+
+        let returnType = asyncTestReturnType |> Option.defaultValue decl.Body.Type // memb.ReturnParameter.Type
+
         let fnDecl, fnBody, genArgs =
             let ctx = { ctx with IsParamByRefPreferred = isByRefPreferred }
             let parameters = memb.CurriedParameterGroups |> List.concat
-            let returnType = decl.Body.Type // memb.ReturnParameter.Type
             transformFunc com ctx parameters returnType (Some memb.FullName) decl.Args decl.Body
+
+        let fnBody =
+            match asyncTestReturnType with
+            | Some _returnType ->
+                // wrap the async test body with runSynchronously
+                let none = mkGenericPathExpr [ rawIdent "None" ] None
+                makeLibCall com ctx None "Async" "runSynchronously" [ fnBody; none; none ]
+            | None -> fnBody
 
         let isUnsafe =
             memb.Attributes |> Seq.exists (fun a -> a.Entity.FullName = Atts.rustUnsafe)
@@ -4933,7 +4952,7 @@ module Util =
         let fnBodyBlock =
             if isUnsafe then
                 fnBody |> mkUnsafeBlockExpr |> mkBodyBlock
-            else if decl.Body.Type = Fable.Unit then
+            else if returnType = Fable.Unit then
                 mkSemiBlock fnBody
             else
                 mkExprBlock fnBody
@@ -5565,11 +5584,13 @@ module Util =
         // }
         // impl Eq for {self_ty} {}
         // impl core::hash::Hash for {self_ty} {
+        //     #[inline]
         //     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         //         core::hash::Hash::hash(&(self as *const Self as usize), state)
         //     }
         // }
         // impl Native_::Hashable for {self_ty} {
+        //     #[inline]
         //     fn getHashCode(&self) -> i32 { Native_::referenceHash(self) }
         // }
 
@@ -5611,7 +5632,7 @@ module Util =
 
             let generics = [ hParam ] |> mkGenerics
             let fnKind = mkFnKind DEFAULT_FN_HEADER fnDecl generics fnBody
-            mkFnAssocItem [] "hash" fnKind
+            mkFnAssocItem [ mkAttr "inline" [] ] "hash" fnKind
 
         let getHashCodeFnItem =
             let referenceHashName = getLibraryImportName com ctx "Native" "referenceHash"
