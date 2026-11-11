@@ -8346,6 +8346,22 @@ but thanks to the optimisation done below we get
             withCurrentScope ctx decl.UsedNames
             <| fun ctx -> transformAction com ctx decl.Body
 
+        // fickl: an F# type abbreviation, which only TypeScript declares
+        | Fable.MemberDeclaration decl when List.contains FSharp2Fable.Util.TsTypeAlias.Tag decl.Tags ->
+            match decl.MemberRef with
+            | Fable.GeneratedMemberRef(Fable.GeneratedFunction info) when com.IsTypeScript ->
+                let isPublic =
+                    not (List.contains FSharp2Fable.Util.TsTypeAlias.PrivateTag decl.Tags)
+
+                TypeAliasDeclaration(
+                    decl.Name,
+                    makeTypeParamDecl com ctx info.ParamTypes,
+                    makeTypeAnnotation com ctx info.ReturnType
+                )
+                |> asModuleDeclaration isPublic
+                |> List.singleton
+            | _ -> []
+
         | Fable.MemberDeclaration decl ->
             withCurrentScope ctx decl.UsedNames
             <| fun ctx ->
