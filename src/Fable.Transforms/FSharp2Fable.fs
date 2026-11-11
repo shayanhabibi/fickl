@@ -2517,7 +2517,18 @@ let private applyJsPyDecorators
                 |> Seq.mapi (fun i p -> defaultArg p.Name $"arg%d{i}", makeType Map.empty p.Type)
                 |> Seq.toList
 
-            Replacements.Api.makeMethodInfo com None name parameters returnType
+            match com.Options.Language with
+            | JavaScript
+            | TypeScript ->
+                // As in .NET, MethodInfo.Name is the member's name, not the mangled name of the
+                // compiled function, and a lone unit argument is not a parameter
+                let parameters =
+                    match parameters with
+                    | [ _, Fable.Unit ] -> []
+                    | parameters -> parameters
+
+                Replacements.Api.makeMethodInfo com None memb.CompiledName parameters returnType
+            | _ -> Replacements.Api.makeMethodInfo com None name parameters returnType
 
     let newDecorator (ent: FSharpEntity) (args: IList<FSharpType * obj>) =
         let args =
