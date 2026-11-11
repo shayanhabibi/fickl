@@ -573,6 +573,73 @@ let rec private forLoopBoundTailCall (n: int) acc =
 let mutable forLoopPublicArray = [| 1; 2; 3 |]
 let mutable private forLoopPrivateArray = [| 1; 2; 3 |]
 
+// A binding whose value has effects, used once in a position that may not run (#309)
+let private effect (log: ResizeArray<string>) (name: string) (value: 'T) : 'T =
+    log.Add name
+    value
+
+let private effectsOf (f: ResizeArray<string> -> 'T) =
+    let log = ResizeArray<string>()
+
+    try
+        f log |> ignore
+    with _ ->
+        log.Add "threw"
+
+    List.ofSeq log
+
+exception private EffectFailed of int * int
+
+let private effectInBranch (log: ResizeArray<string>) (cond: bool) =
+    let v = effect log "v" 1
+    if cond then v else 0
+
+let private effectInAnd (log: ResizeArray<string>) (cond: bool) =
+    let v = effect log "v" true
+    cond && v
+
+let private effectInOr (log: ResizeArray<string>) (cond: bool) =
+    let v = effect log "v" true
+    cond || v
+
+let private effectInLambda (log: ResizeArray<string>) =
+    let v = effect log "v" 1
+    let f = fun () -> v
+    f () + f ()
+
+let private effectInMatchTarget (log: ResizeArray<string>) (o: int option) =
+    let v = effect log "v" 1
+
+    match o with
+    | Some x when x > 0 -> v
+    | _ -> 0
+
+let private effectInLoop (log: ResizeArray<string>) (n: int) =
+    let v = effect log "v" 1
+    let mutable sum = 0
+
+    for _ in 1..n do
+        sum <- sum + v
+
+    sum
+
+let private effectInTry (log: ResizeArray<string>) =
+    let v = effect log "v" 1
+
+    try
+        v + effect log "t" 1
+    with _ ->
+        0
+
+let private effectAfterThrow (log: ResizeArray<string>) : int =
+    let v = effect log "v" 1
+    failwith "boom" |> ignore
+    v
+
+let private effectInThrownValue (log: ResizeArray<string>) : int =
+    let v = effect log "v" 1
+    raise (EffectFailed(effect log "w" 2, v))
+
 let tests =
   testList "Miscellaneous" [
     testCase "Hoisted vars don't conflict with while loop" <| fun () -> // see #4031
@@ -1948,4 +2015,18 @@ let tests =
         docCommentWithCommentEnd 'x' |> equal "x"
         { Value = 2 }.Value |> equal 2
         DocCommentClass().Get() |> equal 1
+
+    testCase "A binding with effects runs where it is declared, not where it is used" <| fun () -> // See #309
+        effectsOf (fun log -> effectInBranch log false) |> equal [ "v" ]
+        effectsOf (fun log -> effectInAnd log false) |> equal [ "v" ]
+        effectsOf (fun log -> effectInOr log true) |> equal [ "v" ]
+        effectsOf effectInLambda |> equal [ "v" ]
+        effectsOf (fun log -> effectInMatchTarget log None) |> equal [ "v" ]
+        effectsOf (fun log -> effectInLoop log 0) |> equal [ "v" ]
+        effectsOf (fun log -> effectInLoop log 2) |> equal [ "v" ]
+        effectsOf effectInTry |> equal [ "v"; "t" ]
+
+    testCase "A binding with effects is not moved after a throw" <| fun () -> // See #309
+        effectsOf effectAfterThrow |> equal [ "v"; "threw" ]
+        effectsOf effectInThrownValue |> equal [ "v"; "w"; "threw" ]
   ]
