@@ -2459,8 +2459,14 @@ let binarySearch (com: ICompiler) ctx r t rangeMeth (ar: Expr) args =
     | _ -> None
 
 let arrayGetItem (com: ICompiler) r (t: Type) (args: Expr list) (signatureArgTypes: Type list) =
+    // fickl: tsc infers `unknown` for the item when no contextual type reaches the call, so name the item type
+    let genArgs =
+        match args with
+        | [ _; ExprType(Array(itemType, _)) ] -> [ itemType ]
+        | _ -> []
+
     let item =
-        Helper.LibCall(com, "Array", "item", t, args, signatureArgTypes, ?loc = r)
+        Helper.LibCall(com, "Array", "item", t, args, signatureArgTypes, genArgs = genArgs, ?loc = r)
 
     match args with
     // V8 cannot specialise the read inside the shared `item` once it sees many array kinds

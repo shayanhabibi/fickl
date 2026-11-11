@@ -3014,6 +3014,14 @@ module Util =
         | Python -> true
         | _ -> false
 
+    // fickl: upstream gates this on supportsCompilerGeneratedBaseCall, which the fork keeps for Python only
+    let supportsExplicitConstructorThen (com: Compiler) =
+        match com.Options.Language with
+        | JavaScript
+        | TypeScript
+        | Python -> true
+        | _ -> false
+
     /// A class without a primary constructor gets a compiler-generated one that takes its fields
     let hasCompilerGeneratedConstructor (ent: FSharpEntity) =
         ent.IsClass

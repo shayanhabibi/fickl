@@ -6,7 +6,7 @@ import { int32ToString, type MutableArray } from "./fable_modules/fable-library-
 export function collect(xs: MutableArray<int32>): void {
     const found: int32[] = [];
     for (let idx = 0; idx <= (xs.length - 1); idx++) {
-        const x: int32 = item(idx, xs) | 0;
+        const x: int32 = (xs[idx] ?? item<int32>(idx, xs)) | 0;
         void (found.push(x));
     }
 }

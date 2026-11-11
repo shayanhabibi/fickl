@@ -1143,7 +1143,7 @@ let private (|ExplicitConstructorThen|_|) com (ctx: Context) (fsExpr: FSharpExpr
     | Some m when
         m.IsConstructor
         && not m.IsImplicitConstructor
-        && supportsCompilerGeneratedBaseCall com
+        && supportsExplicitConstructorThen com
         && m.DeclaringEntity
            |> Option.exists (fun ent -> (tryGetBaseEntity ent).IsNone && not (isAttachMembersEntity com ent))
         ->

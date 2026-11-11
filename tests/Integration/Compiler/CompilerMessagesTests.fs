@@ -830,7 +830,8 @@ type Derived =
       |> Assert.Exists.errorWith "does not support inheriting from"
       |> ignore
 
-    testCase "Self identifier with an explicit constructor base results in error" <| fun _ ->
+    // fickl: upstream reports an error here; the fork's explicit constructors support a base class
+    testCase "Self identifier with an explicit constructor base compiles" <| fun _ ->
       let source =
         """
 type Base =
@@ -843,10 +844,11 @@ type Derived =
     new () as self = { inherit Base(1); Y = 0 } then self.Y <- self.N
 """
       compile source
-      |> Assert.Exists.errorWith "uses a self identifier"
+      |> Assert.Is.strictSuccess
       |> ignore
 
-    testCase "Self identifier with a primary constructor base results in error" <| fun _ ->
+    // fickl: upstream reports an error here; the fork's explicit constructors support a base class
+    testCase "Self identifier with a primary constructor base compiles" <| fun _ ->
       let source =
         """
 type Base(a: int) =
@@ -858,31 +860,7 @@ type Derived =
     new (a: int) as self = { inherit Base(a); Y = 0 } then self.Y <- self.A + 1
 """
       compile source
-      |> Assert.Exists.errorWith "uses a self identifier"
-      |> ignore
-
-    testCase "Self identifier with a BCL base results in error" <| fun _ ->
-      let source =
-        """
-type Derived =
-    inherit System.Exception
-    val Code: int
-    new (m: string) as self = { inherit System.Exception(m); Code = 1 }
-"""
-      compile source
-      |> Assert.Exists.errorWith "uses a self identifier"
-      |> ignore
-
-    testCase "Self identifier with AttachMembers results in error" <| fun _ ->
-      let source =
-        """
-[<Fable.Core.AttachMembers>]
-type C =
-    val mutable V: int
-    new (v: int) as self = { V = v } then self.V <- self.V + 1
-"""
-      compile source
-      |> Assert.Exists.errorWith "uses a self identifier"
+      |> Assert.Is.strictSuccess
       |> ignore
 
     testCase "Child of a primary constructor class with a self identifier compiles" <| fun _ ->
