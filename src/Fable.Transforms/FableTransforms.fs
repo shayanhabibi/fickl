@@ -242,7 +242,12 @@ let noSideEffectBeforeIdent identName expr =
         | Lambda _
         | Delegate _
         | Quote _ -> false
-        | Extended((Throw _ | Debugger), _) -> true
+        // Nothing after a throw runs, so an ident that is not inside the thrown expression is out of reach
+        | Extended(Throw(Some e, _), _) -> findIdentOrSideEffect e |> orSideEffect
+        | Extended(Throw(None, _), _) ->
+            sideEffect <- true
+            true
+        | Extended(Debugger, _) -> true
         | Extended(Curry(e, _), _) -> findIdentOrSideEffect e
         | CurriedApply(callee, args, _, _) -> callee :: args |> findIdentOrSideEffectInList |> orSideEffect
         | Call(e1, info, _, _) ->
@@ -256,8 +261,14 @@ let noSideEffectBeforeIdent identName expr =
         | Operation(kind, _, _, _) ->
             match kind with
             | Unary(_, operand) -> findIdentOrSideEffect operand
-            | Binary(_, left, right)
-            | Logical(_, left, right) -> findIdentOrSideEffect left || findIdentOrSideEffect right
+            | Binary(_, left, right) -> findIdentOrSideEffect left || findIdentOrSideEffect right
+            // The right operand only runs for some values of the left one, like the branches of IfThenElse
+            | Logical(_, left, _) ->
+                if findIdentOrSideEffect left then
+                    true
+                else
+                    sideEffect <- true
+                    true
         | Value(value, _) ->
             match value with
             | ThisValue _
