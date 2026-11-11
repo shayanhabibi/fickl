@@ -26,6 +26,8 @@ export interface Headers {
     [key: string]: string
 }
 
+export type Scores = globalThis.Record<string, int32>;
+
 export function scores(): globalThis.Record<string, int32> {
     const r = {} as globalThis.Record<string, int32>;
     r["alice"]=3;

@@ -14,17 +14,21 @@ export class CaseInfo {
   public tag: number;
   public name: string;
   public fields?: FieldInfo[] | undefined;
+  // Builds the custom attributes of the case, only set when the case has some
+  public attributes?: (() => any[]) | undefined;
 
   constructor(
     declaringType: TypeInfo,
     tag: number,
     name: string,
-    fields?: FieldInfo[]
+    fields?: FieldInfo[],
+    attributes?: () => any[]
   ) {
     this.declaringType = declaringType;
     this.tag = tag;
     this.name = name;
     this.fields = fields;
+    this.attributes = attributes;
   }
 }
 
@@ -163,10 +167,13 @@ export function union_type(
   fullname: string,
   generics: TypeInfo[],
   construct: Constructor,
-  cases: () => FieldInfo[][]): TypeInfo {
+  cases: () => FieldInfo[][],
+  // The custom attributes of each case, by tag
+  attributes?: () => any[][]): TypeInfo {
   const t: TypeInfo = new TypeInfo(fullname, generics, construct, undefined, undefined, () => {
     const caseNames = construct.prototype.cases() as string[];
-    return cases().map((fields, i) => new CaseInfo(t, i, caseNames[i]!, fields))
+    return cases().map((fields, i) =>
+      new CaseInfo(t, i, caseNames[i]!, fields, attributes && (() => attributes()[i] ?? [])))
   });
   return t;
 }
@@ -516,6 +523,14 @@ export function getUnionFields(v: any, t: TypeInfo): [CaseInfo, any[]] {
     throw new Exception(`Cannot find case ${v.name} in union type`);
   }
   return [case_, v.fields];
+}
+
+// Like .NET, each call builds new attribute instances
+export function getCaseCustomAttributes(uci: CaseInfo, attributeType?: TypeInfo): any[] {
+  const attributes = uci.attributes?.() ?? [];
+  return attributeType == null || attributeType.fullname === "System.Attribute"
+    ? attributes
+    : attributes.filter((attribute) => isInstanceOfType(attributeType, attribute));
 }
 
 export function getUnionCaseFields(uci: CaseInfo): FieldInfo[] {

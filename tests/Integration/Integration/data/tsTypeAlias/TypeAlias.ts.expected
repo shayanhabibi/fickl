@@ -1,0 +1,154 @@
+
+import { Union, Record } from "./fable_modules/fable-library-ts.5.27.0/Types.ts";
+import type { float64, int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { int32ToString, type MutableArray, type IComparable, type IEquatable } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+import { union_type, float64_type, record_type, int32_type, string_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+import { tryFind, type FSharpMap } from "./fable_modules/fable-library-ts.5.27.0/Map.ts";
+import { ofArray, type FSharpList as FSharpList_1 } from "./fable_modules/fable-library-ts.5.27.0/List.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.27.0/Option.ts";
+import { item } from "./fable_modules/fable-library-ts.5.27.0/Array.ts";
+
+export class User extends Record implements IEquatable<User>, IComparable<User> {
+    readonly Name: string;
+    readonly Age: int32;
+    constructor(Name: string, Age: int32) {
+        super();
+        this.Name = Name;
+        this.Age = (Age | 0);
+    }
+}
+
+export function User_$reflection(): TypeInfo {
+    return record_type("TypeAlias.User", [], User, () => [["Name", string_type], ["Age", int32_type]]);
+}
+
+export type Shape_$union = 
+    | Shape<0>
+    | Shape<1>
+
+export type Shape_$cases = {
+    0: ["Circle", [float64]],
+    1: ["Square", [float64]]
+}
+
+export function Shape_Circle(radius: float64) {
+    return new Shape<0>(0, [radius]);
+}
+
+export function Shape_Square(side: float64) {
+    return new Shape<1>(1, [side]);
+}
+
+export class Shape<Tag extends keyof Shape_$cases> extends Union<Tag, Shape_$cases[Tag][0]> {
+    constructor(tag: Tag, fields: Shape_$cases[Tag][1]) {
+        super();
+        this.tag = tag;
+        this.fields = fields;
+    }
+    readonly tag: Tag;
+    readonly fields: Shape_$cases[Tag][1];
+    cases() {
+        return ["Circle", "Square"];
+    }
+}
+
+export function Shape_$reflection(): TypeInfo {
+    return union_type("TypeAlias.Shape", [], Shape, () => [[["radius", float64_type]], [["side", float64_type]]]);
+}
+
+export interface IGreeter {
+    Greet(name: string): string
+}
+
+export type UserId = int32;
+
+export type UserMap = FSharpMap<string, User>;
+
+export type Handler = ((arg0: string) => void);
+
+export type Reducer = ((arg0: int32) => ((arg0: string) => int32));
+
+export type Callback = ((arg0: string, arg1: int32) => boolean);
+
+export type Point = [float64, float64];
+
+export type StructPoint = [int32, int32];
+
+export type Pair$1<T> = [T, T];
+
+export type Lookup$2<K, V> = FSharpMap<K, FSharpList_1<V>>;
+
+export type Greeters$1<T extends IGreeter> = MutableArray<T>;
+
+export type AccountId = int32;
+
+export type Pairs = FSharpList_1<[int32, int32]>;
+
+export type Meters = float64;
+
+export type Distance$1 = float64;
+
+export type MaybeUser = Option<User>;
+
+export type Shapes = Shape_$union[];
+
+export type Greeter = IGreeter;
+
+export type Names = Iterable<string>;
+
+export type Anything = any;
+
+export type Json = unknown;
+
+export type Nothing = void;
+
+export type Settings = {
+    Depth: int32,
+    Verbose: boolean
+}
+
+export type FSharpList = FSharpList_1<int32>;
+
+type Secret = string;
+
+export type Token = string;
+
+export type Nested_Id = string;
+
+export type Nested_Deeper_Ids = MutableArray<string>;
+
+export type Other_Id = int32;
+
+export function Handler(handler: ((arg0: string) => void)): void {
+    handler("a");
+}
+
+export function userName(users: FSharpMap<string, User>, id: int32): Option<User> {
+    return tryFind<string, User>(int32ToString(id), users);
+}
+
+export function apply(reducer: ((arg0: int32, arg1: string) => int32), state: int32): int32 {
+    return reducer(state, "x") | 0;
+}
+
+export function swap(_arg1_: int32, _arg1__1: int32): [int32, int32] {
+    const _arg = [_arg1_, _arg1__1] as [int32, int32];
+    return [_arg[1], _arg[0]] as [int32, int32];
+}
+
+export function length(distance: float64): float64 {
+    return distance;
+}
+
+export function first(ids: MutableArray<string>): string {
+    return ids[0] ?? item<string>(0, ids);
+}
+
+export const numbers: FSharpList_1<int32> = ofArray([1, 2]);
+
+const secret = "s";
+
+export function reveal(): string {
+    return secret;
+}
+

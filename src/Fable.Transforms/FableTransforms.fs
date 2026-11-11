@@ -367,6 +367,106 @@ let canInlineArg (com: Compiler) identName value body =
                 && noSideEffectBeforeIdent identName body
                 && not (isIdentCaptured identName body))
 
+/// fickl: whether evaluating the expression has no effect and reads nothing that can change, so that it gives the
+/// same result wherever it is evaluated. Unlike `canHaveSideEffects` it accepts an expression that creates a value
+let rec private isOrderIndependent (com: Compiler) expr =
+    match expr with
+    | TypeCast(e, _) -> isOrderIndependent com e
+    | Value(kind, _) ->
+        match kind with
+        | NewArray(ArrayValues exprs, _, _)
+        | NewTuple(exprs, _)
+        | NewUnion(exprs, _, _, _)
+        | NewRecord(exprs, _, _)
+        | NewAnonymousRecord(exprs, _, _, _) -> List.forall (isOrderIndependent com) exprs
+        | NewList(Some(head, tail), _) -> isOrderIndependent com head && isOrderIndependent com tail
+        | NewOption(Some e, _, _) -> isOrderIndependent com e
+        | _ -> not (canHaveSideEffects com expr)
+    | ObjectExpr([], _, None) -> true
+    // `null` of a type that is not known to be nullable
+    | Call(Import({
+                      Selector = "defaultOf"
+                      Kind = LibraryImport _
+                  },
+                  _,
+                  _),
+           {
+               ThisArg = None
+               Args = []
+           },
+           _,
+           _) -> true
+    // `createObj [ "key", value ]`
+    | Call(Import _,
+           {
+               ThisArg = None
+               Args = [ Replacements.Util.ArrayOrListLiteral(fields, _) ]
+               Tags = Tags.Contains "pojo"
+           },
+           _,
+           _) -> List.forall (isOrderIndependent com) fields
+    // A value of a module, which is a call without arguments until the backend prints it
+    | Call((IdentExpr _ | Import _ as callee),
+           ({
+                ThisArg = None
+                Args = []
+            } as info),
+           _,
+           _) when List.contains "value" info.Tags ->
+        let isMutable =
+            match callee with
+            | IdentExpr id -> id.IsMutable
+            | _ -> false
+
+        not isMutable
+        && not (info.MemberRef |> Option.bind com.TryGetMember |> Option.exists _.IsMutable)
+    | e -> not (canHaveSideEffects com e)
+
+/// fickl: `let xs = [ a; b ] in f(x, ...xs)` can be `f(x, a, b)` when `xs` is only read by that spread, since the
+/// collection is then never seen. JavaScript evaluates the callee and the arguments from left to right, so moving
+/// the elements after them keeps the order only when one side cannot tell: either the elements or everything
+/// evaluated between the binding and the spread is order independent (#311)
+let canInlineSpreadLiteral (com: Compiler) (ident: Ident) elements body =
+    let isSpreadOfIdent (info: CallInfo) =
+        match List.tryLast info.Args with
+        | Some(MaybeCasted(IdentExpr id)) when id.Name = ident.Name ->
+            info.MemberRef |> Option.bind com.TryGetMember |> Option.exists _.HasSpread
+        | _ -> false
+
+    // The method read off an object is fixed in F#, so reading it is not something the elements can change
+    let isCalleeOrderIndependent (info: CallInfo) callee =
+        match callee with
+        | Get(target, FieldGet fieldInfo, _, _) when not fieldInfo.IsMutable ->
+            isOrderIndependent com target
+            && info.MemberRef
+               |> Option.bind com.TryGetMember
+               |> Option.exists (fun memb -> not memb.IsGetter && not memb.IsSetter)
+        | callee -> isOrderIndependent com callee
+
+    let rec precedingIsOrderIndependent expr =
+        match expr with
+        | TypeCast(e, _) -> precedingIsOrderIndependent e
+        | Let(_, value, letBody) ->
+            match precedingIsOrderIndependent letBody with
+            | Some isIndependent -> Some(isIndependent && isOrderIndependent com value)
+            | None -> None
+        | Call(callee, info, _, _) when isSpreadOfIdent info ->
+            let args = List.take (info.Args.Length - 1) info.Args
+
+            (isCalleeOrderIndependent info callee
+             && Option.forall (isOrderIndependent com) info.ThisArg
+             && List.forall (isOrderIndependent com) args)
+            |> Some
+        | _ -> None
+
+    match com.Options.Language with
+    | JavaScript
+    | TypeScript when not ident.IsMutable && countReferencesUntil 2 ident.Name body = 1 ->
+        match precedingIsOrderIndependent body with
+        | Some precedingIsIndependent -> precedingIsIndependent || List.forall (isOrderIndependent com) elements
+        | None -> false
+    | _ -> false
+
 /// Returns arity of lambda (or lambda option) types
 let (|Arity|) typ =
     let rec getArity arity =
@@ -562,7 +662,13 @@ module private Transforms =
                 // if the replaced ident has the concrete type. This happens in FSharp2Fable step,
                 // see FSharpExprPatterns.CallWithWitnesses
                 replaceValuesAndGenArgs (Map [ ident.Name, value ]) letBody
-            | None -> e
+            | None ->
+                match value with
+                | Replacements.Util.ArrayOrListLiteral(elements, _) when
+                    canInlineSpreadLiteral com ident elements letBody
+                    ->
+                    replaceValues (Map [ ident.Name, value ]) letBody
+                | _ -> e
         | e -> e
 
     let typeEqualsAtCompileTime t1 t2 =

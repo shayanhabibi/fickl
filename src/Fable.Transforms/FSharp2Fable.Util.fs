@@ -2465,6 +2465,80 @@ module Util =
         let returnsUnknown (memb: Fable.MemberFunctionOrValue) =
             tryFSharpMember memb |> Option.exists (fun m -> contains m.ReturnParameter.Type)
 
+    /// fickl: an F# type abbreviation is declared in TypeScript as a type alias of the type it stands for (#155).
+    /// The abbreviation has no entity of its own in the Fable AST, so its declaration travels as a tagged member
+    /// declaration: the generated member's parameter types are the alias's type parameters, and its return type
+    /// is the aliased type. Only Fable2Babel reads it, and only for TypeScript.
+    module TsTypeAlias =
+        [<Literal>]
+        let Tag = "fickl-type-alias"
+
+        [<Literal>]
+        let PrivateTag = "fickl-type-alias-private"
+
+        let isTypeAlias (com: Compiler) (ent: FSharpEntity) =
+            (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+            && ent.IsFSharpAbbreviation
+            && not ent.IsMeasure
+            && not (
+                ent.Attributes
+                |> hasAttrib "Microsoft.FSharp.Core.MeasureAnnotatedAbbreviationAttribute"
+            )
+
+        /// The name the alias is declared with, mangled like the name of a class in the same place.
+        let declarationName (com: Compiler) (ent: FSharpEntity) =
+            // FCS gives an abbreviation no full name
+            let fullName =
+                match ent.DeclaringEntity, ent.Namespace with
+                | Some declaring, _ -> FsEnt.FullName declaring + "." + ent.LogicalName
+                | None, Some ns -> ns + "." + ent.LogicalName
+                | None, None -> ent.LogicalName
+
+            let entRef: Fable.EntityRef =
+                {
+                    FullName = fullName
+                    Path =
+                        ent.DeclarationLocation.FileName
+                        |> Path.normalizePathAndEnsureFsExtension
+                        |> Fable.SourcePath
+                }
+
+            getEntityDeclarationName com entRef
+
+        let tryDeclaration (com: Compiler) (ent: FSharpEntity) : Fable.MemberDecl option =
+            match declarationName com ent with
+            | name when String.IsNullOrEmpty(name) -> None
+            | name ->
+                let genParams =
+                    ent.GenericParameters
+                    |> Seq.filter (fun p -> not p.IsMeasure)
+                    |> Seq.map (fun p ->
+                        Fable.GenericParam(genParamName p, false, FsGenParam.Constraints p |> Seq.toList)
+                    )
+                    |> Seq.toList
+
+                let aliased =
+                    makeType Map.empty ent.AbbreviatedType |> TsUnknown.markType ent.AbbreviatedType
+
+                let isPrivate = ent.Accessibility.IsPrivate || typeIsHiddenBySignatureFile ent
+
+                Some
+                    {
+                        Name = name
+                        Args = []
+                        Body = Fable.Value(Fable.UnitConstant, None)
+                        MemberRef = Fable.GeneratedMember.Function(name, genParams, aliased, isInstance = false)
+                        IsMangled = false
+                        ImplementedSignatureRef = None
+                        UsedNames = Set.empty
+                        XmlDoc = tryGetXmlDoc ent.XmlDoc
+                        Tags =
+                            if isPrivate then
+                                [ Tag; PrivateTag ]
+                            else
+                                [ Tag ]
+                    }
+
     /// fickl: `[<NoOverloadSuffix>]` on an overloaded member would give its overloads one name
     let checkNoOverloadSuffix (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
         match memb.DeclaringEntity with
@@ -4541,6 +4615,182 @@ module Util =
         | Imported com ctx r typ None imported -> imported
         | Try (tryGetIdentFromScope ctx r (Some typ)) expr, _ -> expr
         | _ -> getValueMemberRef v |> memberIdent com ctx r typ v
+
+    /// Suffix of the function that builds the custom attributes of a union's cases (JS/TS)
+    let caseAttributesSuffix = "_$caseAttributes"
+
+    /// Whether the attribute class is compiled by Fable, so an instance of it can be built at runtime
+    let isConstructibleAttribute (com: Compiler) (att: Fable.Attribute) =
+        let fullName = att.Entity.FullName
+
+        att.Entity.SourcePath.IsSome
+        && not (fullName.StartsWith("Fable.Core.", StringComparison.Ordinal))
+        && not (fullName.StartsWith("Fickl.Core.", StringComparison.Ordinal))
+        && com.TryGetEntity(att.Entity)
+           |> Option.exists (fun ent ->
+               List.isEmpty ent.GenericParameters
+               && not (isErasedOrStringEnumEntity ent)
+               && not (isGlobalOrImportedEntity ent)
+           )
+
+    /// Whether the union gets a function building the custom attributes of its cases (JS/TS)
+    let hasConstructibleCaseAttributes (com: Compiler) (ent: Fable.Entity) =
+        (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+        && not com.Options.NoReflection
+        && ent.IsFSharpUnion
+        && not (isErasedOrStringEnumEntity ent)
+        && not (isGlobalOrImportedEntity ent)
+        && ent.UnionCases
+           |> List.exists (fun uci -> uci.Attributes |> Seq.exists (isConstructibleAttribute com))
+
+    let rec private tryMakeAttributeArg (typ: Fable.Type) (value: obj) : Fable.Expr option =
+        let all (exprs: Fable.Expr option list) =
+            if List.forall Option.isSome exprs then
+                Some(List.choose id exprs)
+            else
+                None
+
+        match value with
+        | null -> makeNullTyped typ |> Some
+        | :? FSharpType as t -> makeType Map.empty t |> makeTypeInfo None |> Some
+        | :? (obj[]) as values ->
+            let elementType =
+                match typ with
+                | Fable.Array(elementType, _) -> elementType
+                | _ -> Fable.Any
+
+            values
+            |> Array.toList
+            |> List.map (tryMakeAttributeArg elementType)
+            |> all
+            |> Option.map (makeArray elementType)
+        | value ->
+            try
+                match typ with
+                | Fable.Boolean
+                | Fable.String
+                | Fable.Char
+                | Fable.Number _ -> makeTypeConst None typ value |> Some
+                | _ -> makeConstFromObj value |> Some
+            with _ ->
+                None
+
+    let rec private tryFindAttributeSetter (ent: FSharpEntity) (name: string) =
+        if (FsEnt.Ref ent).SourcePath.IsNone then
+            None
+        else
+            ent.TryGetMembersFunctionsAndValues()
+            |> Seq.tryPick (fun memb ->
+                if not memb.IsInstanceMember then
+                    None
+                elif memb.IsPropertySetterMethod && memb.CompiledName = "set_" + name then
+                    Some memb
+                elif memb.IsProperty && memb.HasSetterMethod && memb.DisplayName = name then
+                    Some memb.SetterMethod
+                else
+                    None
+            )
+            |> Option.orElseWith (fun () ->
+                tryGetBaseEntity ent
+                |> Option.bind (fun (baseEnt, _) -> tryFindAttributeSetter baseEnt name)
+            )
+
+    /// The expression building the attribute: the call of the constructor the attribute names,
+    /// followed by the setters of its named arguments
+    let private tryMakeAttributeInstance (com: IFableCompiler) (ctx: Context) identName (att: FSharpAttribute) =
+        let attEnt = nonAbbreviatedDefinition att.AttributeType
+        let typ = Fable.DeclaredType(FsEnt.Ref attEnt, [])
+        let consArgs = att.ConstructorArguments |> Seq.toList
+
+        let cons =
+            attEnt.TryGetMembersFunctionsAndValues()
+            |> Seq.tryFind (fun memb ->
+                let parameters = memb.CurriedParameterGroups |> Seq.concat |> Seq.toList
+
+                memb.IsConstructor
+                && parameters.Length = consArgs.Length
+                && List.forall2
+                    (fun (p: FSharpParameter) (argType, _) -> makeType Map.empty p.Type = makeType Map.empty argType)
+                    parameters
+                    consArgs
+            )
+
+        let makeArgs args =
+            let args =
+                args
+                |> List.map (fun (argType, value) -> tryMakeAttributeArg (makeType Map.empty argType) value)
+
+            if List.forall Option.isSome args then
+                Some(List.choose id args)
+            else
+                None
+
+        let setters =
+            att.NamedArguments
+            |> Seq.toList
+            // A named argument that sets a field finds no setter
+            |> List.map (fun (argType, name, _, value) ->
+                match tryFindAttributeSetter attEnt name, makeArgs [ argType, value ] with
+                | Some setter, Some args -> Some(setter, args)
+                | _ -> None
+            )
+
+        match cons, makeArgs consArgs with
+        | Some cons, Some args when List.forall Option.isSome setters ->
+            let instance = makeCallFrom com ctx None typ [] None args cons
+
+            match List.choose id setters with
+            | [] -> Some instance
+            | setters ->
+                let ident = makeTypedIdent typ identName
+                let identExpr = Fable.IdentExpr ident
+
+                let body =
+                    [
+                        for setter, args in setters do
+                            makeCallFrom com ctx None Fable.Unit [] (Some identExpr) args setter
+                        identExpr
+                    ]
+                    |> Fable.Sequential
+
+                Some(Fable.Let(ident, instance, body))
+        | _ -> None
+
+    /// The custom attributes of each union case, as an array of arrays indexed by the case tag,
+    /// together with the names of the identifiers it declares
+    let makeCaseAttributes (com: IFableCompiler) (ctx: Context) (ent: FSharpEntity) =
+        let usedNames = HashSet<string>()
+
+        let cases =
+            ent.UnionCases
+            |> Seq.toList
+            |> List.mapi (fun tag uci ->
+                uci.Attributes
+                |> Seq.toList
+                |> List.filter (fun att -> isConstructibleAttribute com (FsAtt att))
+                |> List.mapi (fun index att ->
+                    let identName = $"att%i{tag}_%i{index}"
+
+                    match tryMakeAttributeInstance com ctx identName att with
+                    | Some(Fable.Let _ as expr) ->
+                        usedNames.Add(identName) |> ignore
+                        Some expr
+                    | Some expr -> Some expr
+                    | None ->
+                        $"Cannot build %s{att.AttributeType.DisplayName} for union case %s{uci.Name}: only constructors and property setters declared in F# source, with constant arguments, are supported. UnionCaseInfo.GetCustomAttributes will not return it."
+                        |> addWarning com ctx.InlinePath (Some(makeRange uci.DeclarationLocation))
+
+                        None
+                )
+                |> List.choose id
+            )
+            // The runtime reads a missing entry as no attributes
+            |> List.rev
+            |> List.skipWhile List.isEmpty
+            |> List.rev
+            |> List.map (makeArray Fable.Any)
+
+        makeArray (Fable.Array(Fable.Any, Fable.MutableArray)) cases, Set.ofSeq usedNames
 
     /// Runtime checks that tell apart union cases the tag or type test alone cannot
     [<RequireQualifiedAccess>]

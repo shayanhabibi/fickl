@@ -42,6 +42,7 @@ module private Fixture =
             NoParallelTypeCheck = false
             Exclude = [ "Fable.Core" ]
             Replace = Map.empty
+            FileExtensions = Map.empty
             RunProcess = None
             CompilerOptions = CompilerOptionsHelper.Make()
             Verbosity = Verbosity.Silent

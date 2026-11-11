@@ -14,6 +14,7 @@
     <Compile Include="Enums.fs" />
     <Compile Include="Augment.fs" />
     <Compile Include="ReExports.fs" />
+    <Compile Include="Aliases.fs" />
   </ItemGroup>
 
   <ItemGroup>

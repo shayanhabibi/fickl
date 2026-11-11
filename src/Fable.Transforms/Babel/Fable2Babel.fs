@@ -59,6 +59,8 @@ type Context =
         SymbolAccessCache: Dictionary<string, Expression option>
         /// <summary>Native fields replacing decorated auto-property backing storage in the current class.</summary>
         NativeAutoProperties: Map<string, ClassMember>
+        /// <summary>Static constructors folded into native static fields, by class name.</summary>
+        NativeStaticFields: Map<string, StaticFieldInits.Plan>
         /// <summary>Directly in a primary constructor, where <c>new.target</c> is the class being constructed.</summary>
         IsClassConstructor: bool
     }
@@ -664,6 +666,12 @@ module Reflection =
             Expression.arrayExpression (generics)
             jsConstructor com ctx ent
             cases
+            // The function FSharp2Fable declares next to the union when a case has attributes to build
+            if FSharp2Fable.Util.hasConstructibleCaseAttributes com ent then
+                let caseAttributes =
+                    FSharp2Fable.Util.entityIdentWithSuffix com ent.Ref FSharp2Fable.Util.caseAttributesSuffix
+
+                com.TransformAsExpr(ctx, caseAttributes)
         ]
         |> libReflectionCall com ctx None "union"
 
@@ -3871,12 +3879,66 @@ module Util =
         | SeqLibCall "toList" [ SeqLibCall "delay" _ as generator ] -> read generator
         | _ -> None
 
+    /// Matches the function F# builds when a `[<JSX.Component>]` function is used as a value instead of
+    /// being called (`fun a b -> Comp a b`, or `fun (a, b) -> Comp(a, b)` for tupled parameters) and
+    /// returns the component itself. A partial application does not match, nor does a lambda the user
+    /// wrote that names its arguments, which stays the way to ask for a function called by position.
+    let (|JsxComponentRef|_|) (com: IBabelCompiler) (expr: Fable.Expr) : Fable.Expr option =
+        let rec readLambda (acc: Fable.Ident list) expr =
+            match expr with
+            | MaybeCasted(Fable.Lambda(arg, body, _)) -> readLambda (arg :: acc) body
+            | MaybeCasted(Fable.Delegate(args, body, _, [])) -> readLambda (List.rev args @ acc) body
+            | MaybeCasted body -> List.rev acc, body
+
+        let isArgRef (arg: Fable.Ident) (value: Fable.Expr) =
+            match value with
+            | MaybeCasted(Fable.IdentExpr ident) -> ident.Name = arg.Name
+            | _ -> false
+
+        let isTupleItemRef (tuple: Fable.Ident) (index: int, value: Fable.Expr) =
+            match value with
+            | MaybeCasted(Fable.Get(Fable.IdentExpr ident, Fable.TupleIndex i, _, _)) ->
+                ident.Name = tuple.Name && i = index
+            | _ -> false
+
+        match readLambda [] expr with
+        | [], _ -> None
+        | lambdaArgs, Fable.Call(callee, ({ ThisArg = None } as info), _, _) when
+            lambdaArgs |> List.forall (fun arg -> arg.IsCompilerGenerated)
+            ->
+            let lambdaArgs = lambdaArgs |> List.filter (fun arg -> arg.Type <> Fable.Unit)
+
+            let callArgs =
+                info.Args
+                |> List.filter (
+                    function
+                    | MaybeCasted(Fable.Value(Fable.UnitConstant, _)) -> false
+                    | _ -> true
+                )
+
+            let isEtaExpansion =
+                match lambdaArgs, callArgs with
+                | [ tuple ], _ :: _ :: _ -> callArgs |> List.indexed |> List.forall (isTupleItemRef tuple)
+                | _ -> lambdaArgs.Length = callArgs.Length && List.forall2 isArgRef lambdaArgs callArgs
+
+            match info.MemberRef |> Option.bind com.TryGetMember with
+            | Some memberInfo when isEtaExpansion && hasAttribute Atts.jsxComponent memberInfo.Attributes -> Some callee
+            | _ -> None
+        | _ -> None
+
+    /// A component passed by reference keeps its identity between renders, which a new arrow
+    /// function around it does not, so the framework would remount it every time.
+    let jsxComponentRefOrSelf (com: IBabelCompiler) (expr: Fable.Expr) =
+        match expr with
+        | JsxComponentRef com componentRef -> componentRef
+        | expr -> expr
+
     let transformJsxProps (com: IBabelCompiler) (props: JsxPropSource list) =
         // `children` is taken out of the props to be printed between the tags, which the object
         // a condition spreads into the element cannot do.
         let readKeyValue isConditional (range: SourceLocation option) key value (props, children) =
             if key <> "children" then
-                Some(JsxPropExpr.KeyValue(key, value) :: props, children)
+                Some(JsxPropExpr.KeyValue(key, jsxComponentRefOrSelf com value) :: props, children)
             elif isConditional then
                 jsxPropsError "JSX children cannot be set under a condition in the props list"
                 |> addError com [] range
@@ -4058,7 +4120,8 @@ but thanks to the optimisation done below we get
         match transformJsxProps com props with
         | None -> Expression.nullLiteral ()
         | Some(props, children) ->
-            let componentOrTag = transformAsExpr com ctx componentOrTag
+            let componentOrTag =
+                jsxComponentRefOrSelf com componentOrTag |> transformAsExpr com ctx
 
             let children =
                 children
@@ -4252,7 +4315,9 @@ but thanks to the optimisation done below we get
                     | head :: parts -> (stripImports com ctx range head) :: parts
                     | parts -> parts
 
-                let values = values |> List.mapToArray (transformAsExpr com ctx)
+                let values =
+                    values |> List.mapToArray (jsxComponentRefOrSelf com >> transformAsExpr com ctx)
+
                 Expression.jsxTemplate (List.toArray parts, values) |> Some
             | MaybeCasted(Fable.Call(Fable.Import({
                                                       Selector = "concat"
@@ -4281,7 +4346,9 @@ but thanks to the optimisation done below we get
                     | head :: tail -> (stripImports com ctx range head) :: tail
                     | parts -> parts
 
-                let values = values |> List.mapToArray (transformAsExpr com ctx)
+                let values =
+                    values |> List.mapToArray (jsxComponentRefOrSelf com >> transformAsExpr com ctx)
+
                 Expression.jsxTemplate (List.toArray parts, values) |> Some
             | _ ->
                 "Expecting a string literal or interpolation without formatting"
@@ -6257,30 +6324,82 @@ but thanks to the optimisation done below we get
         let classCons =
             ClassMember.classMethod (ClassPrimaryConstructor consArgsModifiers, consArgs, Some consBody)
 
+        let staticFieldPlan = Map.tryFind entName ctx.NativeStaticFields
+
+        let nativeStaticNames =
+            match staticFieldPlan with
+            | Some plan -> plan.Fields |> List.map (fun (name, _, _) -> name) |> set
+            | None -> Set.empty
+
+        // fickl: a static member cannot name the class's type parameters (TS2302), so they become `any`
+        let staticFieldAnnotation (field: Fable.Field) =
+            let rec erase (t: Fable.Type) =
+                match t with
+                | Fable.GenericParam _ -> Fable.Any
+                | t -> t.MapGenerics erase
+
+            if FSharp2Fable.FsField.IsCurriedField field then
+                makeTypeAnnotation com ctx (erase field.FieldType)
+            else
+                makeFieldAnnotation com ctx (erase field.FieldType)
+
+        // fickl: `static let` initializers that are safe at class evaluation become native static fields.
+        // They go last in the class body, after the union case singletons they may read.
+        let nativeStaticFields =
+            match staticFieldPlan with
+            | None -> [||]
+            | Some plan ->
+                let ctx =
+                    { ctx with
+                        UsedNames = { ctx.UsedNames with CurrentDeclarationScope = HashSet plan.UsedNames }
+                        ScopedTypeParams = Set.empty
+                    }
+
+                let members =
+                    plan.Fields
+                    |> List.mapToArray (fun (name, typ, value) ->
+                        let field =
+                            ent.FSharpFields |> List.find (fun field -> field.IsStatic && field.Name = name)
+
+                        let key, isComputed = SymbolKeys.fieldKey com ctx field
+                        let value = com.TransformAsExpr(ctx, value) |> wrapIntExpression typ
+
+                        if com.IsTypeScript then
+                            ClassMember.classProperty (
+                                key,
+                                value = value,
+                                isComputed = isComputed,
+                                isStatic = true,
+                                typeAnnotation = staticFieldAnnotation field,
+                                ?accessModifier =
+                                    (if field.IsMutable then
+                                         None
+                                     else
+                                         Some Readonly)
+                            )
+                        else
+                            ClassMember.classProperty (key, value = value, isComputed = isComputed, isStatic = true)
+                    )
+
+                ctx.UsedNames.DeclarationScopes.UnionWith(ctx.UsedNames.CurrentDeclarationScope)
+                members
+
         let classFields =
             if com.IsTypeScript then
                 ent.FSharpFields
                 // fickl: a union keeps its case fields in `fields`, so it declares only its static fields
                 |> List.filter (fun field -> not ent.IsFSharpUnion || field.IsStatic)
                 |> List.filter (fun field -> not (ctx.NativeAutoProperties.ContainsKey field.Name))
+                |> List.filter (fun field -> not (field.IsStatic && Set.contains field.Name nativeStaticNames))
                 |> List.mapToArray (fun field ->
                     let prop, isComputed =
                         match SymbolKeys.tryPrivateFieldName com ent field with
                         | Some privateName -> Expression.identifier privateName, false
                         | None -> SymbolKeys.fieldKey com ctx field
 
-                    // fickl: a static member cannot name the class's type parameters (TS2302), so they become `any`
                     let ta =
                         if field.IsStatic then
-                            let rec erase (t: Fable.Type) =
-                                match t with
-                                | Fable.GenericParam _ -> Fable.Any
-                                | t -> t.MapGenerics erase
-
-                            if FSharp2Fable.FsField.IsCurriedField field then
-                                makeTypeAnnotation com ctx (erase field.FieldType)
-                            else
-                                makeFieldAnnotation com ctx (erase field.FieldType)
+                            staticFieldAnnotation field
                         else
                             makeFieldAnnotationOf com ctx field
                     // Static fields need to be initialized by static constructor
@@ -6385,6 +6504,7 @@ but thanks to the optimisation done below we get
                                 Some body,
                                 ?returnType = returnType
                             )
+                yield! nativeStaticFields
             |]
 
         let members =
@@ -8226,6 +8346,22 @@ but thanks to the optimisation done below we get
             withCurrentScope ctx decl.UsedNames
             <| fun ctx -> transformAction com ctx decl.Body
 
+        // fickl: an F# type abbreviation, which only TypeScript declares
+        | Fable.MemberDeclaration decl when List.contains FSharp2Fable.Util.TsTypeAlias.Tag decl.Tags ->
+            match decl.MemberRef with
+            | Fable.GeneratedMemberRef(Fable.GeneratedFunction info) when com.IsTypeScript ->
+                let isPublic =
+                    not (List.contains FSharp2Fable.Util.TsTypeAlias.PrivateTag decl.Tags)
+
+                TypeAliasDeclaration(
+                    decl.Name,
+                    makeTypeParamDecl com ctx info.ParamTypes,
+                    makeTypeAnnotation com ctx info.ReturnType
+                )
+                |> asModuleDeclaration isPublic
+                |> List.singleton
+            | _ -> []
+
         | Fable.MemberDeclaration decl ->
             withCurrentScope ctx decl.UsedNames
             <| fun ctx ->
@@ -8537,6 +8673,357 @@ but thanks to the optimisation done below we get
 
             selector, Some alias
 
+/// fickl: finds the static constructors whose assignments can run as native static class fields.
+///
+/// A static constructor is emitted as a function called right after its class, so it runs once the
+/// module binding of the class is set. A native static field runs earlier, while the class is being
+/// evaluated: code inside the class body sees the class through the inner binding, but code outside
+/// it still finds the module binding uninitialized. An initializer is therefore folded only when
+/// nothing it can run reads the class, or anything declared after it, from outside the class body.
+module StaticFieldInits =
+    type Plan =
+        {
+            /// Field name, field type and initializer, in the order the static constructor assigns them
+            Fields: (string * Fable.Type * Fable.Expr) list
+            UsedNames: Set<string>
+        }
+
+    type private Root =
+        {
+            Index: int
+            Bodies: Fable.Expr list
+        }
+
+    let rec private addTypeEntities (acc: HashSet<string>) (t: Fable.Type) =
+        match t with
+        | Fable.DeclaredType(entRef, _) -> acc.Add entRef.FullName |> ignore
+        | _ -> ()
+
+        t.Generics |> List.iter (addTypeEntities acc)
+
+    /// Collects the root names and entity full names an expression may refer to. `ownClass` is the class
+    /// whose body holds the expression, where reading its static fields goes through the inner binding.
+    /// `reflected` gets the entities whose reflection info is read, and `builtUnions` the unions built through
+    /// the constructor function of a case with fields, as TypeScript does. Both are functions outside the class.
+    let private addMentions
+        (rootNames: string seq)
+        (ownClass: string option)
+        (acc: HashSet<string>)
+        (reflected: HashSet<string>)
+        (builtUnions: HashSet<string>)
+        expr
+        =
+        let addType t = addTypeEntities acc t
+
+        let addCallInfo (info: Fable.CallInfo) =
+            info.GenericArgs |> List.iter addType
+
+            match info.MemberRef with
+            | Some(Fable.MemberRef(entRef, _)) -> acc.Add entRef.FullName |> ignore
+            | _ -> ()
+
+        let rec loop (expr: Fable.Expr) =
+            addType expr.Type
+
+            match expr with
+            | Fable.Get(Fable.IdentExpr ident, Fable.FieldGet _, _, _) when Some ident.Name = ownClass -> ()
+            | Fable.Set(Fable.IdentExpr ident, Fable.FieldSet _, _, value, _) when Some ident.Name = ownClass ->
+                loop value
+            | _ ->
+                match expr with
+                | Fable.IdentExpr ident -> acc.Add ident.Name |> ignore
+                | Fable.Value(Fable.TypeInfo(t, _), _) ->
+                    addType t
+                    addTypeEntities reflected t
+                | Fable.Value(Fable.NewUnion(values, _, entRef, _), _) when not values.IsEmpty ->
+                    builtUnions.Add entRef.FullName |> ignore
+                | Fable.Test(_, Fable.TypeTest t, _) -> addType t
+                | Fable.Call(_, info, _, _) -> addCallInfo info
+                | Fable.Emit(info, _, _) ->
+                    addCallInfo info.CallInfo
+
+                    for name in rootNames do
+                        if info.Macro.Contains name then
+                            acc.Add name |> ignore
+                | _ -> ()
+
+                AST.getSubExpressions expr |> List.iter loop
+
+        loop expr
+
+    let private classBodies (decl: Fable.ClassDecl) =
+        [
+            yield! Option.toList decl.BaseCall
+            match decl.Constructor with
+            | Some cons -> yield cons.Body
+            | None -> ()
+            for memb in decl.AttachedMembers do
+                yield memb.Body
+        ]
+
+    /// The assignments of a static constructor that only sets static fields of one class of this file
+    let private (|StaticFieldSets|_|) (decl: Fable.ActionDecl) =
+        match decl.Body with
+        // FCS gives the static constructor a single unit argument
+        | Fable.Call(Fable.Delegate(args, body, Some _, _), info, _, _) when
+            info.Args.IsEmpty
+            && info.ThisArg.IsNone
+            && args |> List.forall (fun arg -> arg.Type = Fable.Unit)
+            ->
+            let rec flatten statement =
+                match statement with
+                | Fable.Sequential statements -> List.collect flatten statements
+                | Fable.Value(Fable.UnitConstant, _) -> []
+                | statement -> [ statement ]
+
+            let statements = flatten body
+
+            let sets =
+                statements
+                |> List.choose (
+                    function
+                    | Fable.Set(Fable.IdentExpr ident, Fable.FieldSet name, typ, value, _) ->
+                        Some(ident, (name, typ, value))
+                    | _ -> None
+                )
+
+            match sets with
+            | (ident, _) :: _ when
+                sets.Length = statements.Length
+                && sets |> List.forall (fun (other, _) -> other.Name = ident.Name)
+                ->
+                Some(ident, List.map snd sets)
+            | _ -> None
+        | _ -> None
+
+    let private mentionsGenericParam (expr: Fable.Expr) =
+        let rec hasGenericParam (t: Fable.Type) =
+            match t with
+            | Fable.GenericParam _ -> true
+            | t -> t.Generics |> List.exists hasGenericParam
+
+        expr
+        |> AST.deepExists (fun e ->
+            hasGenericParam e.Type
+            || match e with
+               | Fable.Call(_, info, _, _) -> info.GenericArgs |> List.exists hasGenericParam
+               | Fable.Value(Fable.TypeInfo(t, _), _)
+               | Fable.Test(_, Fable.TypeTest t, _) -> hasGenericParam t
+               | _ -> false
+        )
+
+    let private isFoldableClass
+        (com: IBabelCompiler)
+        (ent: Fable.Entity)
+        (fields: (string * Fable.Type * Fable.Expr) list)
+        =
+        let names = fields |> List.map (fun (name, _, _) -> name)
+
+        let isStaticMemberName name =
+            FSharp2Fable.Util.isAttachMembersFableEntity com ent
+            && ent.MembersFunctionsAndValues
+               |> Seq.exists (fun memb -> not memb.IsInstance && (memb.CompiledName = name || memb.DisplayName = name))
+
+        not ent.IsInterface
+        && not (FSharp2Fable.Util.isErasedOrStringEnumEntity ent)
+        && not (FSharp2Fable.Util.isGlobalOrImportedEntity ent)
+        && not (FSharp2Fable.Util.isPojoDefinedByConsArgsEntity ent)
+        // A decorator replaces the class or its members before the static fields run
+        && not (Util.hasAttribute Atts.ficklJsDecorator ent.Attributes)
+        && not (
+            ent.MembersFunctionsAndValues
+            |> Seq.exists (fun memb -> Util.hasAttribute Atts.ficklJsDecorator memb.Attributes)
+        )
+        // The zero-initialization of `[<DefaultValue>] static val` runs after the class
+        && not (
+            ent.FSharpFields
+            |> List.exists (fun f -> f.IsStatic && f.HasDefaultValueAttribute)
+        )
+        // A static field cannot name the type parameters of its class (TS2302)
+        && (ent.GenericParameters.IsEmpty
+            || fields |> List.forall (fun (_, _, value) -> not (mentionsGenericParam value)))
+        && List.distinct names = names
+        && names
+           |> List.forall (fun name ->
+               // JS rejects these as field names
+               name <> "prototype"
+               && name <> "constructor"
+               && ent.FSharpFields |> List.exists (fun f -> f.IsStatic && f.Name = name)
+               // A field defined over an accessor of the same name would replace it
+               && not (isStaticMemberName name)
+           )
+
+    let private tryPlan
+        (roots: Dictionary<string, Root>)
+        (classIndex: int)
+        (classDecl: Fable.ClassDecl)
+        (classIdent: Fable.Ident)
+        (action: Fable.ActionDecl)
+        (fields: (string * Fable.Type * Fable.Expr) list)
+        =
+        let consName = classDecl.Constructor |> Option.map (fun cons -> cons.Name)
+
+        // The constructor function sits outside the class, so the initializers call the class directly
+        let fields =
+            fields
+            |> List.map (fun (name, typ, value) ->
+                let value =
+                    value
+                    |> AST.visitFromInsideOut (
+                        function
+                        | Fable.Call(Fable.IdentExpr ident, info, t, r) when Some ident.Name = consName ->
+                            Fable.Call(Fable.IdentExpr classIdent, { info with Tags = "new" :: info.Tags }, t, r)
+                        | e -> e
+                    )
+
+                name, typ, value
+            )
+
+        let ownRoot = roots[classDecl.Name]
+        let visited = HashSet<Root>(HashIdentity.Reference)
+        let pending = Queue<Fable.Expr * bool>()
+
+        for _, _, value in fields do
+            pending.Enqueue((value, true))
+
+        let mutable isSafe = true
+
+        while isSafe && pending.Count > 0 do
+            let expr, isOwn = pending.Dequeue()
+            let mentions = HashSet<string>()
+            let reflected = HashSet<string>()
+            let builtUnions = HashSet<string>()
+
+            let ownClass =
+                if isOwn then
+                    Some classDecl.Name
+                else
+                    None
+
+            addMentions roots.Keys ownClass mentions reflected builtUnions expr
+
+            // The reflection info of a type of this file may lead to the class, and reads it from outside its body
+            if
+                builtUnions.Contains classDecl.Entity.FullName
+                || reflected |> Seq.exists roots.ContainsKey
+            then
+                isSafe <- false
+
+            for name in mentions do
+                match roots.TryGetValue name with
+                | true, root when obj.ReferenceEquals(root, ownRoot) ->
+                    // Outside the class body nothing may read the class, and its constructor function does
+                    if not isOwn || Some name = consName then
+                        isSafe <- false
+                    elif visited.Add root then
+                        for body in root.Bodies do
+                            pending.Enqueue((body, true))
+                | true, root ->
+                    // Declared after the class: today it is ready by the time the static constructor runs
+                    if root.Index > classIndex then
+                        isSafe <- false
+                    elif visited.Add root then
+                        for body in root.Bodies do
+                            pending.Enqueue((body, false))
+                | _ -> ()
+
+        if isSafe then
+            Some
+                {
+                    Fields = fields
+                    UsedNames = action.UsedNames
+                }
+        else
+            None
+
+    let plan (com: IBabelCompiler) (declarations: Fable.Declaration list) =
+        let declarations = List.toArray declarations
+
+        let candidates =
+            declarations
+            |> Array.indexed
+            |> Array.choose (
+                function
+                | index, Fable.ActionDeclaration(StaticFieldSets(classIdent, fields) as action) ->
+                    Some(index, action, classIdent, fields)
+                | _ -> None
+            )
+
+        if Array.isEmpty candidates then
+            List.ofArray declarations, Map.empty
+        else
+            let roots = Dictionary<string, Root>()
+
+            declarations
+            |> Array.iteri (fun index decl ->
+                match decl with
+                | Fable.MemberDeclaration memb ->
+                    roots[memb.Name] <-
+                        {
+                            Index = index
+                            Bodies = [ memb.Body ]
+                        }
+                | Fable.ClassDeclaration classDecl ->
+                    let root =
+                        {
+                            Index = index
+                            Bodies = classBodies classDecl
+                        }
+
+                    roots[classDecl.Name] <- root
+                    roots[classDecl.Entity.FullName] <- root
+
+                    classDecl.Constructor |> Option.iter (fun cons -> roots[cons.Name] <- root)
+                | Fable.ActionDeclaration _
+                | Fable.ModuleDeclaration _ -> ()
+            )
+
+            let isFunction (decl: Fable.Declaration) =
+                match decl with
+                | Fable.MemberDeclaration memb ->
+                    match com.TryGetMember memb.MemberRef with
+                    | Some info -> not info.IsValue
+                    | None -> false
+                | _ -> false
+
+            let folded = HashSet<int>()
+
+            let plans =
+                candidates
+                |> Array.choose (fun (actionIndex, action, classIdent, fields) ->
+                    declarations
+                    |> Array.tryFindIndex (
+                        function
+                        | Fable.ClassDeclaration classDecl -> classDecl.Name = classIdent.Name
+                        | _ -> false
+                    )
+                    |> Option.bind (fun classIndex ->
+                        match declarations[classIndex] with
+                        | Fable.ClassDeclaration classDecl when
+                            classIndex < actionIndex
+                            // Only hoisted functions may sit between the class and its static constructor
+                            && declarations[classIndex + 1 .. actionIndex - 1] |> Array.forall isFunction
+                            && isFoldableClass com (com.GetEntity classDecl.Entity) fields
+                            ->
+                            tryPlan roots classIndex classDecl classIdent action fields
+                            |> Option.map (fun plan ->
+                                folded.Add actionIndex |> ignore
+                                classDecl.Name, plan
+                            )
+                        | _ -> None
+                    )
+                )
+                |> Map.ofArray
+
+            let declarations =
+                declarations
+                |> Array.indexed
+                |> Array.filter (fun (index, _) -> not (folded.Contains index))
+                |> Array.map snd
+                |> List.ofArray
+
+            declarations, plans
+
 module Compiler =
     open Util
 
@@ -8755,6 +9242,7 @@ module Compiler =
                 NativeGeneratorType = None
                 SymbolAccessCache = Dictionary()
                 NativeAutoProperties = Map.empty
+                NativeStaticFields = Map.empty
                 IsClassConstructor = false
             }
 
@@ -8791,7 +9279,10 @@ module Compiler =
                 | _ -> ()
 
         registerSymbolKeys file.Declarations
-        let rootDecls = List.collect (transformDeclaration com ctx) file.Declarations
+
+        let declarations, staticFieldPlans = StaticFieldInits.plan com file.Declarations
+        let ctx = { ctx with NativeStaticFields = staticFieldPlans }
+        let rootDecls = List.collect (transformDeclaration com ctx) declarations
 
         // fickl: --nativeErrors switches the library's Exception to a native Error before this file's code runs
         let rootDecls =

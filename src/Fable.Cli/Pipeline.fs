@@ -89,7 +89,6 @@ module Js =
     type BabelWriter
         (com: Compiler, cliArgs: CliArgs, pathResolver: PathResolver, sourcePath: string, targetPath: string)
         =
-        let fileExt = cliArgs.CompilerOptions.FileExtension
         let sourceDir = Path.GetDirectoryName(sourcePath)
         let targetDir = Path.GetDirectoryName(targetPath)
         let memoryStream = new IO.MemoryStream()
@@ -129,6 +128,10 @@ module Js =
 
             member _.MakeImportPath(path) =
                 let projDir = IO.Path.GetDirectoryName(cliArgs.ProjectFile)
+
+                // fickl: the imported source file can have its own extension (`--fileExtension`). The path
+                // still names the source here, relative to this one; below it becomes a path between outputs
+                let fileExt = Imports.getFileExtension cliArgs sourceDir path
 
                 let path =
                     // TODO: Check precompiled out path for other languages too

@@ -27,6 +27,7 @@ type CacheInfo =
         SourceMaps: bool
         SourceMapsRoot: string option
         TreatWarningsAsErrors: bool
+        FileExtensions: Map<string, string>
     }
 
 type CrackerOptions =
@@ -46,6 +47,7 @@ type CrackerOptions =
     member ProjFile: string
     member SourceMaps: bool
     member SourceMapsRoot: string option
+    member FileExtensions: Map<string, string>
     member EvaluateOnly: bool
     member BuildDll: normalizedDllPath: string -> unit
     member WaitForBuiltDlls: unit -> unit

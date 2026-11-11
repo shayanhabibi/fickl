@@ -3052,6 +3052,17 @@ let private isIgnoredLeafEntity (com: Compiler) (ent: FSharpEntity) =
     || ent.Attributes
        |> hasAttrib "Microsoft.FSharp.Core.MeasureAnnotatedAbbreviationAttribute"
 
+let rec private getTypeAliasNames (com: Compiler) decls : Set<string> =
+    decls
+    |> List.map (
+        function
+        | FSharpImplementationFileDeclaration.Entity(ent, []) when TsTypeAlias.isTypeAlias com ent ->
+            Set.singleton (TsTypeAlias.declarationName com ent)
+        | FSharpImplementationFileDeclaration.Entity(_, sub) -> getTypeAliasNames com sub
+        | _ -> Set.empty
+    )
+    |> Set.unionMany
+
 // In case this is a recursive module, do a first pass to get all entity and member names
 let rec private getUsedRootNames (com: Compiler) (usedNames: Set<string>) decls =
     (usedNames, decls)
@@ -3579,6 +3590,10 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
                 )
 
             match sub with
+            | [] when TsTypeAlias.isTypeAlias (com :> Compiler) fsEnt ->
+                TsTypeAlias.tryDeclaration (com :> Compiler) fsEnt
+                |> Option.map Fable.MemberDeclaration
+                |> Option.toList
             | [] when isIgnoredLeafEntity (com :> Compiler) fsEnt -> []
             | [] ->
                 let entRef = FsEnt.Ref fsEnt
@@ -3613,6 +3628,25 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
                                     Tags = Fable.Tags.empty
                                     XmlDoc = tryGetXmlDoc fsEnt.XmlDoc
                                 }
+
+                            // Read by the reflection info of the union, see Fable2Babel
+                            if hasConstructibleCaseAttributes com ent then
+                                let name = name + caseAttributesSuffix
+                                let body, usedNames = makeCaseAttributes com ctx fsEnt
+
+                                Fable.MemberDeclaration
+                                    {
+                                        Name = name
+                                        Args = []
+                                        Body = body
+                                        UsedNames = usedNames
+                                        IsMangled = true
+                                        MemberRef =
+                                            Fable.GeneratedMember.Function(name, [], body.Type, isInstance = false)
+                                        ImplementedSignatureRef = None
+                                        Tags = Fable.Tags.empty
+                                        XmlDoc = None
+                                    }
                         ]
             // This adds modules in the AST for languages that support them (like Rust)
             | sub when
@@ -4436,6 +4470,15 @@ let transformFile (com: Compiler) =
     let declarations = com.GetImplementationFile(com.CurrentFile)
     let usedRootNames = getUsedRootNames com Set.empty declarations
     let ctx = Context.Create(usedRootNames)
+
+    // fickl: TypeScript declares a type alias for an abbreviation, so imports are named around it. A value can
+    // share the alias's name, as the two live in different namespaces, so this is not checked for duplicates
+    let usedRootNames =
+        if com.Options.Language = TypeScript then
+            Set.union usedRootNames (getTypeAliasNames com declarations)
+        else
+            usedRootNames
+
     let com = FableCompiler(com)
 
     let rootDecls =

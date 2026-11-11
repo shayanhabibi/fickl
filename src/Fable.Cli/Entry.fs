@@ -61,6 +61,12 @@ let knownCliArgs () =
         [ "--cwd" ], [ "Working directory" ]
         [ "-o"; "--outDir" ], [ "Redirect compilation output to a directory" ]
         [ "-e"; "--extension" ], [ "Extension for generated JS files (default .fs.js)" ]
+        [ "--fileExtension" ],
+        [
+            "Extension for the file generated from one source file, as <file>=<extension>:"
+            "`--fileExtension vite.config.fs=.js` writes vite.config.js. Can be repeated"
+            "(JavaScript and TypeScript)"
+        ]
         [ "-s"; "--sourceMaps" ], [ "Enable source maps" ]
         [ "--sourceMapsRoot" ], [ "Set the value of the `sourceRoot` property in generated source maps" ]
         [], []
@@ -413,6 +419,50 @@ type Runner =
                     File.defaultFileExt usesOutDir language
                 )
 
+            // fickl: the output extension of single source files
+            let! fileExtensions =
+                (Ok Map.empty, args.Values "--fileExtension")
+                ||> List.fold (fun acc (value: string) ->
+                    acc
+                    |> Result.bind (fun (acc: Map<string, string>) ->
+                        let fail reason =
+                            Error $"--fileExtension %s{value}: %s{reason}"
+
+                        match value.LastIndexOf('=') with
+                        | -1 -> fail "expected <file>=<extension>, like vite.config.fs=.js"
+                        | i ->
+                            let file = value.Substring(0, i).Trim()
+                            let ext = value.Substring(i + 1).Trim()
+
+                            let ext =
+                                if ext.StartsWith('.') then
+                                    ext
+                                else
+                                    "." + ext
+
+                            if
+                                not (
+                                    file.EndsWith(".fs", StringComparison.Ordinal)
+                                    || file.EndsWith(".fsx", StringComparison.Ordinal)
+                                )
+                            then
+                                fail "the file must be an .fs or .fsx source file"
+                            elif ext = "." || ext.IndexOfAny([| '/'; '\\' |]) >= 0 then
+                                fail "the extension must be like .js or .config.js, without a directory"
+                            else
+                                match language with
+                                | JavaScript
+                                | TypeScript ->
+                                    let file = normalizeAbsolutePath file
+
+                                    match Map.tryFind file acc with
+                                    | Some other when other <> ext ->
+                                        fail $"the file was already given the extension %s{other}"
+                                    | _ -> Ok(Map.add file ext acc)
+                                | _ -> fail "only JavaScript and TypeScript can set the extension of one file"
+                    )
+                )
+
             let compilerOptions =
                 CompilerOptionsHelper.Make(
                     language = language,
@@ -454,6 +504,7 @@ type Runner =
                             v.[0], normalizeAbsolutePath v.[1]
                         )
                         |> Map
+                    FileExtensions = fileExtensions
                     RunProcess = runProc
                     CompilerOptions = compilerOptions
                     Verbosity = verbosity

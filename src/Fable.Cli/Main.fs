@@ -192,7 +192,12 @@ module Util =
                     File.changeExtensionButUseDefaultExtensionInFableModules lang isInFableModules path fileExt
                 | _ -> Path.ChangeExtension(path, fileExt)
 
-            let fileExt = cliArgs.CompilerOptions.FileExtension
+            // fickl: this file's own extension when it was given one
+            let fileExt =
+                match lang with
+                | JavaScript
+                | TypeScript -> cliArgs.FileExtensionFor file
+                | _ -> cliArgs.CompilerOptions.FileExtension
 
             match cliArgs.OutDir with
             | Some outDir ->
@@ -1612,6 +1617,48 @@ let private checkRunProcess (state: State) (projCracked: ProjectCracked) (compil
 
             exitCode, state
 
+/// fickl: a file given its own extension (`--fileExtension`) can be written where another file is.
+/// A mapping that names no source of the project is a mistake too: it would silently do nothing.
+let private checkFileExtensions (state: State) (sourceFiles: string[]) =
+    let cliArgs = state.CliArgs
+
+    let fail (message: string) (details: string seq) =
+        let details = details |> String.concat Log.newLine
+        Fable.FableError($"{message}{Log.newLine}{details}") |> raise
+
+    let sources = HashSet(sourceFiles |> Array.filter (Naming.isInFableModules >> not))
+
+    let unknown =
+        cliArgs.FileExtensions
+        |> Map.toArray
+        |> Array.filter (fun (file, _) -> not (sources.Contains file))
+        |> Array.map (fun (file, ext) -> $"  {File.relPathToCurDir file}={ext}")
+
+    if not (Array.isEmpty unknown) then
+        fail
+            "--fileExtension names a file that is not a source file of the project or of a project it references:"
+            unknown
+
+    let pathResolver = state.GetPathResolver()
+
+    let collisions =
+        sourceFiles
+        |> Array.filter isSourceFile
+        |> Array.groupBy (fun source ->
+            (getOutPath cliArgs pathResolver source |> Path.normalizeFullPath).ToLowerInvariant()
+        )
+        |> Array.filter (fun (_, sources) ->
+            sources.Length > 1 && sources |> Array.exists cliArgs.FileExtensions.ContainsKey
+        )
+        |> Array.map (fun (_, sources) ->
+            let outPath = getOutPath cliArgs pathResolver sources[0] |> File.relPathToCurDir
+            let sources = sources |> Array.map File.relPathToCurDir |> String.concat ", "
+            $"  {outPath} would be written for {sources}"
+        )
+
+    if not (Array.isEmpty collisions) then
+        fail "--fileExtension makes two source files compile to the same file:" collisions
+
 let private compilationCycle (state: State) (changes: ISet<string>) =
     async {
         let cliArgs = state.CliArgs
@@ -1682,6 +1729,9 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
                     let projCracked, filesToCompile = getFilesToCompile state changes None projCracked
 
                     projCracked, Some fableCompiler, filesToCompile
+
+        if not cliArgs.FileExtensions.IsEmpty then
+            checkFileExtensions state projCracked.SourceFilePaths
 
         // Update the watcher (it will restart if the fsproj has changed)
         // so changes while compiling get enqueued

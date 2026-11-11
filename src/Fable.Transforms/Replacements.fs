@@ -7128,6 +7128,9 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
             Helper.LibCall(com, "Reflection", "getUnionCaseFields", t, [ c ], ?loc = r)
             |> Some
         | Some c, "GetValue" -> Helper.LibCall(com, "Reflection", "getValue", t, c :: args, ?loc = r) |> Some
+        | Some c, "GetCustomAttributes" when info.DeclaringEntityFullName = "Microsoft.FSharp.Reflection.UnionCaseInfo" ->
+            Helper.LibCall(com, "Reflection", "getCaseCustomAttributes", t, c :: args, ?loc = r)
+            |> Some
         | Some c, "get_Name" ->
             match c with
             | Value(TypeInfo(exprType, _), loc) when not (hasAnonymousRecord exprType) ->
