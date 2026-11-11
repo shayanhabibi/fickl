@@ -2956,6 +2956,7 @@ let private transformMemberDecl
                  && ((FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
                      || FsMemberFunctionOrValue.HasJsDecorator memb)))
             && memb.CompiledName <> ".cctor"
+            && not (isExplicitConstructorFunction com memb)
             ->
             transformExplicitlyAttachedMember com ctx ent memb args body
             []

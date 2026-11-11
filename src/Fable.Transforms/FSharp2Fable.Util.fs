@@ -2924,6 +2924,14 @@ module Util =
              && not (isGlobalOrImportedFSharpEntity ent)
              && (inheritsJsClass ent || tryPrivateFieldsAttribute ent = Some true))))
 
+    /// fickl: whether the constructor is an explicit one (`new(...) = ...`) that JavaScript and TypeScript compile to
+    /// a function, also in a class that attaches its members. A JS class has a single constructor, which takes the
+    /// fields of the class or is its primary constructor, so `new C(...)` cannot run an explicit constructor
+    let isExplicitConstructorFunction (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+        && memb.IsConstructor
+        && not memb.IsImplicitConstructor
+
     let isPojoDefinedByConsArgsEntity (entity: Fable.Entity) =
         entity |> hasAttribute Atts.pojoDefinedByConsArgs
 
@@ -3056,6 +3064,17 @@ module Util =
 
                     baseType, parameters
                 )
+            | _ -> None
+        | _ -> None
+
+    /// The base type of an explicit class that inherits a class Fable does not compile, like System.Exception or
+    /// an imported class (#334). The class extends it, and an explicit constructor makes the base object it builds
+    /// an instance of the class, as the arguments of the base constructor differ between explicit constructors
+    let tryForeignBaseType (ent: Fable.Entity) : Fable.DeclaredType option =
+        match ent with
+        | :? FsEnt as fsEnt when isExplicitClass fsEnt.FSharpEntity ->
+            match tryGetBaseEntity fsEnt.FSharpEntity, ent.BaseType with
+            | Some(baseEnt, _), Some baseType when not (isCompiledClass baseEnt) -> Some baseType
             | _ -> None
         | _ -> None
 
@@ -3939,7 +3958,7 @@ module Util =
                 | None when
                     com.Options.Language <> Rust
                     && not (isInline memb)
-                    && (isAttachMembersEntity com e
+                    && ((isAttachMembersEntity com e && not (isExplicitConstructorFunction com memb))
                         || isPojoDefinedByConsArgsFSharpEntity e
                         || ((com.Options.Language = JavaScript || com.Options.Language = TypeScript)
                             && ((FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
