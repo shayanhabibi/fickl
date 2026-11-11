@@ -315,6 +315,40 @@ Exception:
         with _ ->
             true
 
+    /// fickl: the TargetFramework MSBuild builds a project reference with, read from the item the referencing
+    /// project's design-time build resolved: the one `SetTargetFramework` names, which is the ProjectReference's own
+    /// or the nearest to the referencing project's framework, as `dotnet build` picks it.
+    let private referenceTargetFramework (reference: JsonElement) =
+        let metadata (name: string) =
+            match reference.TryGetProperty name with
+            | true, value when not (String.IsNullOrWhiteSpace(value.GetString())) -> Some(value.GetString())
+            | _ -> None
+
+        let setTargetFramework =
+            metadata "SetTargetFramework"
+            |> Option.bind (fun properties ->
+                properties.Split(';', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+                |> Array.tryPick (fun property ->
+                    match property.Split('=', 2) with
+                    | [| name; value |] when
+                        name.Trim().Equals("TargetFramework", StringComparison.OrdinalIgnoreCase)
+                        && not (String.IsNullOrWhiteSpace value)
+                        ->
+                        Some(value.Trim())
+                    | _ -> None
+                )
+            )
+
+        setTargetFramework
+        |> Option.orElseWith (fun () -> metadata "NearestTargetFramework")
+        |> Option.orElseWith (fun () ->
+            metadata "TargetFrameworks"
+            |> Option.bind (fun targetFrameworks ->
+                targetFrameworks.Split(';', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+                |> Array.tryHead
+            )
+        )
+
     let mkOptionsFromDesignTimeBuildAux
         (referenceTargetFrameworks: ConcurrentDictionary<string, string>)
         (isMain: bool)
@@ -468,12 +502,26 @@ Exception:
                 match items.TryGetProperty "_MSBuildProjectReferenceExistent" with
                 | true, existentReferences ->
                     for reference in existentReferences.EnumerateArray() do
-                        match reference.TryGetProperty "TargetFrameworks" with
-                        | true, targetFrameworks when not (String.IsNullOrWhiteSpace(targetFrameworks.GetString())) ->
-                            let referencePath = FileInfo(reference.GetProperty("FullPath").GetString()).FullName
+                        match referenceTargetFramework reference with
+                        | Some targetFramework ->
+                            // Not the item's FullPath: MSBuild resolves it against the directory it was started in
+                            let referencePath =
+                                FileInfo(
+                                    Path.Combine(fsproj.DirectoryName, reference.GetProperty("Identity").GetString())
+                                )
+                                    .FullName
 
-                            referenceTargetFrameworks[referencePath] <- targetFrameworks.GetString().Split(';').[0]
-                        | _ -> ()
+                            // A project is cracked once, so when two projects ask for different frameworks of it
+                            // the one cracked first, nearest the main project, decides.
+                            if not (referenceTargetFrameworks.TryAdd(referencePath, targetFramework)) then
+                                let chosen = referenceTargetFrameworks[referencePath]
+
+                                if chosen <> targetFramework then
+                                    Log.verbose (
+                                        lazy
+                                            $"%s{fsproj.Name} references %s{Path.GetFileName referencePath} as %s{targetFramework}, but it is compiled as %s{chosen}"
+                                    )
+                        | None -> ()
                 | _ -> ()
 
                 let outputType = properties.GetProperty("OutputType").GetString()
@@ -713,7 +761,7 @@ module private SpeculativeReferences =
 
                 for KeyValue(path, targetFramework) in speculation.ReferenceTargetFrameworks do
                     if not (String.Equals(path, fsproj.FullName, StringComparison.OrdinalIgnoreCase)) then
-                        referenceTargetFrameworks[path] <- targetFramework
+                        referenceTargetFrameworks.TryAdd(path, targetFramework) |> ignore
 
                 Some response
 
@@ -741,6 +789,9 @@ type MSBuildCrackerResolver() =
 
             // fickl: see SpeculativeReferences
             if isMain then
+                // The choices of an earlier crack (watch mode) must not outlive the project files they came from
+                referenceTargetFrameworks.Clear()
+
                 speculations <-
                     if SpeculativeReferences.isEnabled () then
                         SpeculativeReferences.start options fsproj
