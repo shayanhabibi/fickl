@@ -618,6 +618,65 @@ let rec namesof com ctx acc e =
 
 let curriedApply r t applied args = CurriedApply(applied, args, t, r)
 
+/// fickl: `--debugPipelines` (#305). A pipeline is a nest of applications, `sum(map(g, filter(f, xs)))`, that a
+/// debugger can neither step through nor inspect. Under the flag every piped value that is not already a name, a
+/// property of one or a constant is bound first, and the stages of a chain come out as a flat run of bindings:
+/// `const pipe = filter(f, xs); const pipe_1 = map(g, pipe); return sum(pipe_1);`
+module Pipelines =
+    let isEnabled (com: ICompiler) =
+        match com.Options.Language with
+        | JavaScript
+        | TypeScript -> List.contains Fickl.Options.debugPipelinesDefine com.Options.Define
+        | _ -> false
+
+    let private isStage (com: ICompiler) (ident: Ident) =
+        Fickl.Options.isPipelineStage com.Options.Define ident.IsCompilerGenerated ident.Name
+
+    /// Binds `piped` and passes its name on, after the stages `piped` is itself made of
+    let rec private bindPiped (com: ICompiler) ctx (piped: Expr) (apply: Expr -> Expr) =
+        match piped with
+        | Let(ident, value, body) when isStage com ident -> Let(ident, value, bindPiped com ctx body apply)
+        | IdentExpr _
+        | Value _
+        // A property of a name can be inspected as it is, and stepping over the read shows nothing
+        | Get(IdentExpr _, FieldGet _, _, _) -> apply piped
+        | _ when piped.Type = Unit -> apply piped
+        | _ ->
+            let stage =
+                { makeUniqueIdent com ctx piped.Type Fickl.Options.pipelineStageName with Range = piped.Range }
+
+            Let(stage, piped, apply (IdentExpr stage))
+
+    /// A partial application such as `List.map g` binds its arguments around a lambda that makes the call, and
+    /// neither a binding nor a lambda has a range of its own
+    let rec private stageRange (f: Expr) =
+        match f with
+        | Let(ident, _, body) -> stageRange body |> Option.orElse ident.Range
+        | Lambda(_, body, _)
+        | Delegate(_, body, _, _) -> stageRange body
+        | _ -> f.Range
+
+    /// `ignore`, which leaves nothing of the piped value to read
+    let private discards (f: Expr) =
+        match f with
+        | Lambda(arg, TypeCast(IdentExpr discarded, Unit), _) -> discarded.Name = arg.Name
+        | _ -> false
+
+    /// `piped |> f`: the application takes the range of `f` rather than of the whole pipeline, which starts where
+    /// its first value does, so that each stage maps to its own source line
+    let apply (com: ICompiler) ctx r t (f: Expr) (piped: Expr list) =
+        let r = stageRange f |> Option.orElse r
+
+        let rec bind bound piped =
+            match piped with
+            | [] -> curriedApply r t f (List.rev bound)
+            | head :: rest -> bindPiped com ctx head (fun head -> bind (head :: bound) rest)
+
+        if discards f then
+            curriedApply r t f piped
+        else
+            bind [] piped
+
 /// Builds Option/ValueOption replacements that apply a function argument directly as AST
 /// (not via a lib call), so a lambda literal beta-reduces away instead of allocating a closure.
 module Options =

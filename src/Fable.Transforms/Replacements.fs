@@ -2372,6 +2372,10 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
 
         Helper.LibCall(com, modul, meth, t, args, i.SignatureArgTypes, ?loc = r) |> Some
     // Pipes and composition
+    // fickl: --debugPipelines makes each stage of a forward pipeline a statement (#305)
+    | "op_PipeRight", [ x; f ] when Pipelines.isEnabled com -> Pipelines.apply com ctx r t f [ x ] |> Some
+    | "op_PipeRight2", [ x; y; f ] when Pipelines.isEnabled com -> Pipelines.apply com ctx r t f [ x; y ] |> Some
+    | "op_PipeRight3", [ x; y; z; f ] when Pipelines.isEnabled com -> Pipelines.apply com ctx r t f [ x; y; z ] |> Some
     | "op_PipeRight", [ x; f ]
     | "op_PipeLeft", [ f; x ] -> curriedApply r t f [ x ] |> Some
     | "op_PipeRight2", [ x; y; f ]

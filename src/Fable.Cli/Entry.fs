@@ -130,6 +130,11 @@ let knownCliArgs () =
             "Raise DivideByZeroException when an integer or a decimal is divided by zero, as .NET does,"
             "by checking the divisor at runtime (JavaScript and TypeScript)"
         ]
+        [ "--debugPipelines" ],
+        [
+            "Compile each stage of a `|>` pipeline to a statement that binds its result to a constant,"
+            "so a debugger can step through the stages and inspect them (JavaScript and TypeScript)"
+        ]
         [ "--privateFields" ],
         [
             "Compile the let fields of classes with attached members to ES #private fields,"
@@ -395,6 +400,8 @@ type Runner =
                             Fickl.Options.privateFieldsDefine
                         if args.FlagEnabled "--checkedDivision" then
                             Fickl.Options.checkedDivisionDefine
+                        if args.FlagEnabled "--debugPipelines" then
+                            Fickl.Options.debugPipelinesDefine
                         match language with
                         | Php -> "FABLE_COMPILER_PHP"
                         | Rust -> "FABLE_COMPILER_RUST"
