@@ -443,6 +443,7 @@ type AbstractMember =
         returnType: TypeAnnotation *
         isComputed: bool *
         isOptional: bool *
+        isReadonly: bool *
         doc: string option
     /// e.g. `[key: string]: string` in `interface Headers { [key: string]: string }`
     | AbstractIndexSignature of
@@ -1051,8 +1052,15 @@ module Helpers =
 
     type AbstractMember with
 
-        static member abstractProperty(key, typ, ?isComputed, ?isOptional, ?doc) =
-            AbstractProperty(key, typ, defaultArg isComputed false, defaultArg isOptional false, doc)
+        static member abstractProperty(key, typ, ?isComputed, ?isOptional, ?isReadonly, ?doc) =
+            AbstractProperty(
+                key,
+                typ,
+                defaultArg isComputed false,
+                defaultArg isOptional false,
+                defaultArg isReadonly false,
+                doc
+            )
 
         static member abstractMethod(kind, key, parameters, returnType, ?typeParameters, ?isComputed, ?doc) =
             AbstractMethod(

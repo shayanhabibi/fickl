@@ -7823,6 +7823,50 @@ but thanks to the optimisation done below we get
                     |> declareModuleMember com ctx exposedCons
         ]
 
+    /// fickl: a property of an interface whose type is an option. Interfaces with mangled member names declare
+    /// their getters as methods, and an indexed property takes arguments, so neither is one
+    let private isOptionGetter (com: IBabelCompiler) (ent: Fable.Entity) (memb: Fable.MemberFunctionOrValue) =
+        memb.IsGetter
+        && not (FSharp2Fable.Util.isMangledAbstractFableEntity com ent)
+        && not (hasAttribute Atts.emitIndexer memb.Attributes)
+        && List.isEmpty (List.concat memb.CurriedParameterGroups)
+        && (
+            match memb.ReturnParameter.Type with
+            | Fable.Option _ -> true
+            | _ -> false
+        )
+
+    /// fickl: declares the getter of an option as the optional property `name?: T`, so TypeScript can leave the
+    /// key out; F# reads a missing key as `None`. A read-only property is typed `T | undefined`, as the getters
+    /// implementing it are. One with a setter keeps `Option<T>`, the type of the values F# assigns to it
+    let private makeOptionalProperty
+        (com: IBabelCompiler)
+        ctx
+        (memb: Fable.MemberFunctionOrValue)
+        hasSetter
+        (abstractMember: AbstractMember)
+        =
+        match abstractMember with
+        | AbstractMethod(ObjectGetter, key, [||], returnType, _, isComputed, doc) ->
+            let typ =
+                match memb.ReturnParameter.Type with
+                | Fable.Option(genArg, isStruct) when
+                    not (hasSetter || mustWrapOption genArg || Util.isStrictOption com isStruct genArg)
+                    ->
+                    let genArg = genArg |> FableTransforms.uncurryType |> makeTypeAnnotation com ctx
+                    UnionTypeAnnotation [| genArg; UndefinedTypeAnnotation |]
+                | _ -> returnType
+
+            AbstractMember.abstractProperty (
+                key,
+                typ,
+                isComputed = isComputed,
+                isOptional = true,
+                isReadonly = not hasSetter,
+                ?doc = doc
+            )
+        | _ -> abstractMember
+
     let private makeInterfaceDeclaration (com: IBabelCompiler) ctx (ent: Fable.Entity) name doc =
 
         let members =
@@ -7834,7 +7878,27 @@ but thanks to the optimisation done below we get
                 // A plain Emit has no shape to declare
                 && not (hasAttribute Atts.emitAttr memb.Attributes)
             )
-            |> Seq.choose (transformAbstractMember com ctx ent)
+            |> Seq.toList
+            |> fun membs ->
+                let optionGetters =
+                    membs
+                    |> List.filter (isOptionGetter com ent)
+                    |> List.map (fun memb -> memb.DisplayName)
+                    |> Set.ofList
+
+                let hasSetter name =
+                    membs |> List.exists (fun m -> m.IsSetter && m.DisplayName = name)
+
+                membs
+                |> List.choose (fun memb ->
+                    if memb.IsSetter && Set.contains memb.DisplayName optionGetters then
+                        None
+                    elif Set.contains memb.DisplayName optionGetters && memb.IsGetter then
+                        transformAbstractMember com ctx ent memb
+                        |> Option.map (makeOptionalProperty com ctx memb (hasSetter memb.DisplayName))
+                    else
+                        transformAbstractMember com ctx ent memb
+                )
             |> mergeIndexSignatures
 
         let extends =
