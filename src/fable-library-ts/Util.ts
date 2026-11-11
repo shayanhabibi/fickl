@@ -110,19 +110,21 @@ let nativeErrors = false;
 
 type CaptureStackTrace = (target: object, constructorOpt?: Function) => void;
 
-// fickl: gives an exception the parts of a native Error that its constructor does not: `cause` and, unless the
-// object already is an Error, `stack`. Both are non-enumerable, so record equality and printing ignore them.
-function initNativeError(self: object, innerException: unknown, constructorOpt: Function | undefined, hasStack: boolean) {
+// fickl: an inner exception is also the `cause` of a native Error, so JS tools show the chain. It is non-enumerable,
+// as on an Error, so record equality and printing ignore it.
+function setCause(self: object, innerException: unknown) {
   if (innerException != null) {
     Object.defineProperty(self, "cause", { value: innerException, writable: true, configurable: true });
   }
-  if (!hasStack) {
-    const capture = (Error as unknown as { captureStackTrace?: CaptureStackTrace }).captureStackTrace;
-    if (typeof capture === "function") {
-      capture(self, constructorOpt);
-    } else {
-      Object.defineProperty(self, "stack", { value: new Error((self as { message?: string }).message).stack, writable: true, configurable: true });
-    }
+}
+
+// fickl: gives an exception the `stack` of a native Error, non-enumerable like `cause`
+function captureStack(self: object, constructorOpt: Function | undefined) {
+  const capture = (Error as unknown as { captureStackTrace?: CaptureStackTrace }).captureStackTrace;
+  if (typeof capture === "function") {
+    capture(self, constructorOpt);
+  } else {
+    Object.defineProperty(self, "stack", { value: new Error((self as { message?: string }).message).stack, writable: true, configurable: true });
   }
 }
 
@@ -138,12 +140,15 @@ export class Exception {
   // At runtime this is `undefined` when no inner exception was provided, just like
   // a `defaultOf()` value, which is fine for code that reads `.InnerException`.
   public innerException!: Exception;
+  // fickl: the inner exception, under the name a JS Error gives it. Only declared, so it is absent without one.
+  declare public cause?: unknown;
 
   constructor(msg?: string, innerException?: Exception | null) {
     this.message = msg ?? "";
     this.innerException = innerException as Exception;
+    setCause(this, innerException);
     if (nativeErrors) {
-      initNativeError(this, innerException, new.target, false);
+      captureStack(this, new.target);
     }
   }
 
@@ -153,7 +158,7 @@ export class Exception {
 }
 
 /** fickl: makes every Exception, and so every F# exception, a JS Error: `instanceof Error` holds for it, and it has
- * a `stack` and, with an inner exception, a `cause`. Compiled code calls it under --nativeErrors. It affects the whole
+ * a `stack`. Compiled code calls it under --nativeErrors. It affects the whole
  * program, including Exceptions created earlier, which then have no stack. Calling it again does nothing. */
 export function enableNativeErrors(): void {
   if (!nativeErrors) {
@@ -171,7 +176,7 @@ export class ErrorException extends Error {
     super();
     this.message = msg ?? "";
     this.innerException = innerException as Exception;
-    initNativeError(this, innerException, new.target, true);
+    setCause(this, innerException);
   }
 
   override toString() {
@@ -185,6 +190,47 @@ export function exceptionMessage(e: unknown): string {
   return (typeof e === "object" && e !== null) || typeof e === "function"
     ? (e as { message: string }).message
     : String(e);
+}
+
+/** fickl: the InnerException of a caught value: the inner exception of an F# exception, or the `cause` of a JS error */
+export function innerException(e: unknown): Exception {
+  const error = e as { innerException?: Exception, cause?: unknown } | null | undefined;
+  return (error?.innerException ?? error?.cause) as Exception;
+}
+
+/** fickl: follows the inner exceptions to the first one, as .NET does: an AggregateException is followed only while
+ * it holds a single error. */
+export function getBaseException(e: Exception): Exception {
+  if (isAggregateException(e)) {
+    let last: unknown = e;
+    while (isAggregateException(last) && (last as AggregateException).errors.length === 1) {
+      last = (last as AggregateException).errors[0];
+    }
+    return last as Exception;
+  }
+  let last = e;
+  for (let inner = innerException(last); inner != null; inner = innerException(last)) {
+    last = inner;
+  }
+  return last;
+}
+
+/** fickl: System.AggregateException, shaped like a JS AggregateError: InnerExceptions is `errors`. As on .NET, the
+ * messages of the errors are appended to the message and the first error is the InnerException. */
+export class AggregateException extends Exception {
+  public readonly errors: Exception[];
+
+  constructor(msg?: string | null, errors?: Iterable<Exception> | null) {
+    const inner = errors == null ? [] : Array.from(errors);
+    super(inner.reduce((m, e) => `${m} (${exceptionMessage(e)})`, msg ?? "One or more errors occurred."), inner[0]);
+    this.errors = inner;
+  }
+}
+
+/** fickl: the type test of AggregateException, which a JS AggregateError (ES2021) also passes */
+export function isAggregateException(x: unknown): boolean {
+  const nativeError = (globalThis as { AggregateError?: Function }).AggregateError;
+  return x instanceof AggregateException || (nativeError != null && x instanceof nativeError);
 }
 
 export function isException(x: any) {

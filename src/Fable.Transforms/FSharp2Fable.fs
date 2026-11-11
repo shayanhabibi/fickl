@@ -328,7 +328,7 @@ let private transformTraitCall
 
         let entGenArgsMap = List.zip entGenParamNames entGenArgs |> Map
 
-        tryFindMember entity entGenArgsMap membCompiledName isInstance argTypes
+        tryFindMemberOfCheckedCall entity entGenArgsMap membCompiledName isInstance argTypes
         |> Option.map (fun memb ->
             // Resolve method generic args before making the call, see #2135
             let genArgsMap =
@@ -1669,6 +1669,11 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             | Some unionExpr, UnionCaseTesterFor unionCase ->
                 return! transformUnionCaseTest com ctx (makeRangeFrom fsExpr) unionExpr unionExpr.Type unionCase
 
+            | Some fsCallee, _ when isMultiDimArrayMember com fsCallee memb ->
+                let! callee = transformExpr com ctx [] fsCallee
+
+                return makeMultiDimArrayMemberCall com ctx (makeRangeFrom fsExpr) typ fsCallee.Type callee args memb
+
             | fsCallee, _ ->
                 let r = makeRangeFrom fsExpr
                 let! callee = transformExprOpt com ctx fsCallee
@@ -2814,6 +2819,7 @@ let private transformExplicitlyAttachedMember
     let name, isMangled =
         match (com :> Compiler).Options.Language with
         | Rust -> getMemberDeclarationName com memb |> fst, true
+        | _ when memb.IsExtensionMember -> (getAbstractMemberInfo com declaringEntity memb).name, false
         | _ -> FsMemberFunctionOrValue.CompiledName(memb), false
 
     com.AddAttachedMember(
@@ -2832,6 +2838,42 @@ let private transformExplicitlyAttachedMember
                 XmlDoc = tryGetXmlDoc memb.XmlDoc
             }
     )
+
+/// fickl: an extension attached to its class shares the class's JavaScript names, which are not mangled
+let private checkAttachedExtensionCollision
+    (com: FableCompiler)
+    (ctx: Context)
+    (ent: FSharpEntity)
+    (memb: FSharpMemberOrFunctionOrValue)
+    =
+    let name = (getAbstractMemberInfo com ent memb).name
+    let isGetter = FsMemberFunctionOrValue.IsGetter memb
+    let isSetter = FsMemberFunctionOrValue.IsSetter memb
+
+    let collidesWithMember =
+        com.TryGetAttachedMembers(ent.FullName)
+        |> Option.exists (fun (members: AttachedMembers) ->
+            members.Members
+            |> Seq.exists (fun other ->
+                other.Name = name
+                && (
+                    match (com :> Compiler).TryGetMember(other.MemberRef) with
+                    | Some info ->
+                        info.IsInstance = memb.IsInstanceMember
+                        && not ((isGetter && info.IsSetter) || (isSetter && info.IsGetter))
+                    | None -> true
+                )
+            )
+        )
+
+    let collidesWithField =
+        memb.IsInstanceMember
+        && ent.FSharpFields
+           |> Seq.exists (fun field -> not field.IsStatic && FsField.FSharpFieldName field = name)
+
+    if collidesWithMember || collidesWithField then
+        $"Extension member %s{memb.DisplayName} is attached to %s{ent.DisplayName}, which already has a member named %s{name}: attached members are not mangled. Rename it or declare the extension in another file"
+        |> addError com ctx.InlinePath (Some(makeRange memb.DeclarationLocation))
 
 let private transformMemberDecl
     (com: FableCompiler)
@@ -2982,7 +3024,13 @@ let private transformMemberDecl
             ->
             transformExplicitlyAttachedMember com ctx ent memb args body
             []
-        | _ -> transformMemberFunctionOrValue com ctx memb args body
+        | _ ->
+            match tryAttachedExtensionEntity com memb with
+            | Some ent ->
+                checkAttachedExtensionCollision com ctx ent memb
+                transformExplicitlyAttachedMember com ctx ent memb args body
+                []
+            | None -> transformMemberFunctionOrValue com ctx memb args body
 
 let private addUsedRootName (com: Compiler) name (usedRootNames: Set<string>) =
     if not (com.Options.Language = Rust) && Set.contains name usedRootNames then
@@ -3040,6 +3088,8 @@ let rec private getUsedRootNames (com: Compiler) (usedNames: Set<string>) decls 
                 memb.IsOverrideOrExplicitInterfaceImplementation
                 || isInline memb
                 || isEmittedOrImportedMember memb
+                // fickl: compiled into the body of the class it extends
+                || (tryAttachedExtensionEntity com memb).IsSome
             then
                 usedNames
             else

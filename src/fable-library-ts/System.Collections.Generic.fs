@@ -1,8 +1,9 @@
 namespace System.Collections.Generic
 
-type KeyNotFoundException(message: string) =
-    inherit System.Exception(message)
-    new() = KeyNotFoundException(SR.Arg_KeyNotFound)
+type KeyNotFoundException(message: string, innerException: exn | null) =
+    inherit System.Exception(message, innerException)
+    new() = KeyNotFoundException(SR.Arg_KeyNotFound, Unchecked.defaultof<exn>)
+    new(message: string) = KeyNotFoundException(message, Unchecked.defaultof<exn>)
 
 type Comparer<'T when 'T: comparison and 'T: null>(comparison: 'T -> 'T -> int) =
 

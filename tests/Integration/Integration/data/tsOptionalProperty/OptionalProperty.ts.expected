@@ -1,0 +1,92 @@
+
+import { defaultArg, some, unwrap, type Option } from "./fable_modules/fable-library-ts.5.27.0/Option.ts";
+import type { float64, int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+
+export interface IOpts {
+    label?: Option<string>,
+    get name(): string,
+    readonly nested?: Option<Option<int32>>,
+    readonly nothing?: Option<void>,
+    readonly size?: int32 | undefined,
+    readonly vsize?: int32 | undefined
+}
+
+export interface IMore extends IOpts {
+    readonly extra?: float64 | undefined
+}
+
+export class Impl implements IOpts {
+    "label@": Option<string>;
+    constructor() {
+        this["label@"] = undefined;
+    }
+    get name(): string {
+        return "a";
+    }
+    get size(): int32 | undefined {
+        return 1;
+    }
+    get vsize(): int32 | undefined {
+        return undefined;
+    }
+    get label(): string | undefined {
+        const __: Impl = this;
+        return unwrap(__["label@"]);
+    }
+    set label(v: Option<string>) {
+        const __: Impl = this;
+        __["label@"] = v;
+    }
+    get nested(): Option<Option<int32>> {
+        return some(undefined);
+    }
+    get nothing(): Option<void> {
+        return some(undefined);
+    }
+}
+
+export function Impl_$reflection(): TypeInfo {
+    return class_type("OptionalProperty.Impl", undefined, Impl);
+}
+
+export function Impl_$ctor(): Impl {
+    return new Impl();
+}
+
+export const fromObjExpr: IOpts = new (class {
+    get name(): string {
+        return "a";
+    }
+    get size(): int32 | undefined {
+        return undefined;
+    }
+    get vsize(): int32 | undefined {
+        return 1;
+    }
+    get label(): string | undefined {
+        return undefined;
+    }
+    set label(_arg: Option<string>) {
+    }
+    get nested(): Option<Option<int32>> {
+        return undefined;
+    }
+    get nothing(): Option<void> {
+        return undefined;
+    }
+}
+)();
+
+export function read(o: IOpts): int32 {
+    return (defaultArg<int32>(o.size, 0) + defaultArg<string>(o.label, "").length) | 0;
+}
+
+export function write(o: IOpts, label: Option<string>): void {
+    o.label = label;
+}
+
+export const fromJsOptions = {
+    label: "a",
+} satisfies Partial<IOpts> as IOpts;
+

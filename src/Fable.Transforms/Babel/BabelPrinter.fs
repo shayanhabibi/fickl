@@ -1196,8 +1196,11 @@ module PrinterExtensions =
                 printer.PrintParameters(parameters)
                 printer.Print("): ")
                 printer.Print(returnType)
-            | AbstractProperty(key, returnType, isComputed, isOptional, doc) ->
+            | AbstractProperty(key, returnType, isComputed, isOptional, isReadonly, doc) ->
                 printer.PrintJsDoc(doc)
+
+                if isReadonly then
+                    printer.Print("readonly ")
 
                 if isComputed then
                     printer.Print("[")

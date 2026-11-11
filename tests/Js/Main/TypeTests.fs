@@ -945,6 +945,40 @@ type MyOptionalClass(?arg1: float, ?arg2: string, ?arg3: int) =
     member val P2 = defaultArg arg2 "1"
     member val P3 = defaultArg arg3 1
 
+[<AttachMembers>]
+type AttachedWithExtensions(i: int) =
+    member _.Value = i
+
+// Intrinsic extension: part of the type
+type AttachedWithExtensions with
+    member this.Triple = this.Value * 3
+
+[<AttachMembers>]
+type AttachedGenericWithExtensions<'T>(v: 'T) =
+    member val Item = v with get, set
+
+let private attachedExtensionHelper x = x + 1
+
+// Optional extensions in the file of the class
+[<AutoOpen>]
+module AttachedExtensions =
+    type AttachedWithExtensions with
+        member this.Double = this.Value * 2
+        member this.Times(n: int) = attachedExtensionHelper (this.Value * n) - 1
+        member this.Curried (a: int) (b: int) = this.Value + a + b
+        member this.Optional(?n: int) = defaultArg n this.Value
+        member inline this.Inlined = this.Value + 1000
+        static member Zero = AttachedWithExtensions(0)
+        static member Of(n: int) = AttachedWithExtensions(n)
+
+    type AttachedGenericWithExtensions<'T> with
+        member this.Map(f: 'T -> 'U) = AttachedGenericWithExtensions(f this.Item)
+        member this.Pair(other: 'U) = this.Item, other
+
+        member this.Content
+            with get () = this.Item
+            and set (v: 'T) = this.Item <- v
+
 type VeryOptionalInterface =
     abstract Bar: int option
     abstract Baz: bool option
@@ -2391,4 +2425,37 @@ let tests =
         AttachedExplicitOverloads(2, "z").Show() |> equal "2z"
         AttachedSecondary(1).Show() |> equal "2s"
         AttachedSecondary(2, "z").Show() |> equal "2z"
+
+    testCase "Type extensions of an AttachMembers class work" <| fun () ->
+        let x = AttachedWithExtensions(5)
+        x.Triple |> equal 15
+        x.Double |> equal 10
+        x.Times 4 |> equal 20
+        x.Curried 1 2 |> equal 8
+        x.Optional() |> equal 5
+        x.Optional 9 |> equal 9
+        x.Inlined |> equal 1005
+        AttachedWithExtensions.Zero.Value |> equal 0
+        (AttachedWithExtensions.Of 3).Value |> equal 3
+        [ 1; 2 ] |> List.map x.Times |> equal [ 5; 10 ]
+        let y = AttachedGenericWithExtensions(3)
+        y.Content <- 4
+        y.Content |> equal 4
+        (y.Map(fun v -> string (v + 1))).Item |> equal "5"
+        y.Pair "a" |> equal (4, "a")
+
+#if FABLE_COMPILER
+    testCase "Type extensions in the file of an AttachMembers class are attached to it" <| fun () ->
+        let x = AttachedWithExtensions(5)
+        Fable.Core.JsInterop.emitJsExpr<int> x "$0.Triple" |> equal 15
+        Fable.Core.JsInterop.emitJsExpr<int> x "$0.Double" |> equal 10
+        Fable.Core.JsInterop.emitJsExpr<int> x "$0.Times(4)" |> equal 20
+        Fable.Core.JsInterop.emitJsExpr<int> x "$0.Curried(1, 2)" |> equal 8
+        Fable.Core.JsInterop.emitJsExpr<int> Fable.Core.JsInterop.jsConstructor<AttachedWithExtensions> "$0.Zero.Value" |> equal 0
+        Fable.Core.JsInterop.emitJsExpr<int> Fable.Core.JsInterop.jsConstructor<AttachedWithExtensions> "$0.Of(3).Value" |> equal 3
+        let y = AttachedGenericWithExtensions(3)
+        Fable.Core.JsInterop.emitJsExpr<unit> y "$0.Content = 7"
+        y.Item |> equal 7
+        Fable.Core.JsInterop.emitJsExpr<int> y "$0.Map((v) => v + 1).Content" |> equal 8
+#endif
   ]

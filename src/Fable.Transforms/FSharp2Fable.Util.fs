@@ -12,7 +12,7 @@ open Fable.Transforms
 open Fable.Transforms.FSharp2Fable
 
 module Extensions =
-    let areParamTypesEqual strict genArgs (args1: Fable.Type array) (args2: IList<IList<FSharpParameter>>) =
+    let areParamTypesEqualWith typeEquals genArgs (args1: Fable.Type array) (args2: IList<IList<FSharpParameter>>) =
         // Not entirely sure why, but it seems members with a single unit argument sometimes have this parameter
         // and sometimes none, so just to be sure always remove single unit arguments
         let args2 =
@@ -24,9 +24,12 @@ module Extensions =
         if args1.Length = args2.Length then
             let args2 = args2 |> Array.map (fun p -> TypeHelpers.makeType genArgs p.Type)
 
-            Array.forall2 (typeEquals strict) args1 args2
+            Array.forall2 typeEquals args1 args2
         else
             false
+
+    let areParamTypesEqual strict genArgs args1 args2 =
+        areParamTypesEqualWith (typeEquals strict) genArgs args1 args2
 
 // type FSharpEntity with
 //     member entity.EnumerateMembersFunctionsAndValues(?includeHierarchy: bool): FSharpMemberOrFunctionOrValue seq =
@@ -559,9 +562,11 @@ type FsEnt(maybeAbbrevEnt: FSharpEntity) =
             ?argTypes: Fable.Type array,
             ?genArgs,
             // ?searchHierarchy: bool,
-            ?requireDispatchSlot: bool
+            ?requireDispatchSlot: bool,
+            ?objParamAcceptsAny: bool
         )
         =
+        let objParamAcceptsAny = defaultArg objParamAcceptsAny false
         let doNotRequireDispatchSlot = not (defaultArg requireDispatchSlot false)
 
         let genArgs = defaultArg genArgs Map.empty
@@ -592,7 +597,24 @@ type FsEnt(maybeAbbrevEnt: FSharpEntity) =
                 |> Seq.tryFind (fun m -> Extensions.areParamTypesEqual strict genArgs argTypes m.CurriedParameterGroups)
 
             // A loose comparison accepts a generic parameter as equal to any type
-            hasParamTypes true |> Option.orElseWith (fun () -> hasParamTypes false)
+            hasParamTypes true
+            |> Option.orElseWith (fun () -> hasParamTypes false)
+            |> Option.orElseWith (fun () ->
+                // Any argument can be passed to an `obj` parameter. F# prefers an overload with a closer parameter
+                // type, so this comes last
+                if objParamAcceptsAny then
+                    let typeEquals argType paramType =
+                        match paramType with
+                        | Fable.Any -> true
+                        | _ -> typeEquals false argType paramType
+
+                    candidates
+                    |> Seq.tryFind (fun m ->
+                        Extensions.areParamTypesEqualWith typeEquals genArgs argTypes m.CurriedParameterGroups
+                    )
+                else
+                    None
+            )
 
     interface Fable.Entity with
         member _.Ref = FsEnt.Ref ent
@@ -1843,10 +1865,13 @@ module TypeHelpers =
 
     let makeTypeFromDef withConstraints ctxTypeArgs (genArgs: IList<FSharpType>) (tdef: FSharpEntity) =
         if tdef.IsArrayType then
-            Fable.Array(
-                makeTypeGenArgsWithConstraints withConstraints ctxTypeArgs genArgs |> List.head,
-                Fable.MutableArray
-            )
+            let genArg =
+                makeTypeGenArgsWithConstraints withConstraints ctxTypeArgs genArgs |> List.head
+
+            match Compiler.Language, tdef.ArrayRank with
+            // fickl: a `'T[,]` is an array of rows, and each row is a plain JS array whatever the element type
+            | (JavaScript | TypeScript), 2 -> Fable.Array(Fable.Array(genArg, Fable.ResizeArray), Fable.MutableArray)
+            | _ -> Fable.Array(genArg, Fable.MutableArray)
         elif tdef.IsDelegate then
             makeTypeFromDelegate withConstraints ctxTypeArgs genArgs tdef
         elif tdef.IsEnum then
@@ -2028,6 +2053,14 @@ module TypeHelpers =
     let tryFindMember (ent: Fable.Entity) genArgs compiledName isInstance (argTypes: Fable.Type list) =
         match ent with
         | :? FsEnt as entity -> entity.TryFindMember(compiledName, isInstance, List.toArray argTypes, genArgs) //, searchHierarchy=true)
+        | _ -> None
+
+    /// Like `tryFindMember`, but for a call the F# compiler has already checked: when no overload has the
+    /// argument types, takes one whose `obj` parameters receive the arguments that do not match.
+    let tryFindMemberOfCheckedCall (ent: Fable.Entity) genArgs compiledName isInstance (argTypes: Fable.Type list) =
+        match ent with
+        | :? FsEnt as entity ->
+            entity.TryFindMember(compiledName, isInstance, List.toArray argTypes, genArgs, objParamAcceptsAny = true)
         | _ -> None
 
     let tryFindAbstractMember
@@ -2932,6 +2965,40 @@ module Util =
         && memb.IsConstructor
         && not memb.IsImplicitConstructor
 
+    /// fickl: the [<AttachMembers>] class an optional type extension declared in the class's own file extends,
+    /// for JavaScript and TypeScript. Its members compile into the class body like the class's own members.
+    /// An extension in another file stays a module function: the class is already emitted there.
+    let tryAttachedExtensionEntity (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        if
+            memb.IsExtensionMember
+            && (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+        then
+            memb.ApparentEnclosingEntity
+            |> Option.filter (fun ent ->
+                isAttachMembersEntity com ent
+                && not (isGlobalOrImportedFSharpEntity ent)
+                && not (isErasedOrStringEnumFSharpEntity ent)
+                && ent.DeclarationLocation.FileName = memb.DeclarationLocation.FileName
+            )
+        else
+            None
+
+    /// fickl: F# compiles an optional extension member as `Type.Member`, and `Type.Member.Static` when static,
+    /// this is the name of the member alone
+    let extensionMemberName (memb: FSharpMemberOrFunctionOrValue) =
+        let name = memb.CompiledName
+
+        if memb.IsExtensionMember then
+            let name =
+                if not memb.IsInstanceMember && name.EndsWith(".Static", StringComparison.Ordinal) then
+                    name.Substring(0, name.Length - ".Static".Length)
+                else
+                    name
+
+            name.Substring(name.LastIndexOf('.') + 1)
+        else
+            name
+
     let isPojoDefinedByConsArgsEntity (entity: Fable.Entity) =
         entity |> hasAttribute Atts.pojoDefinedByConsArgs
 
@@ -3577,7 +3644,7 @@ module Util =
             then
                 getMemberDisplayName memb
             else
-                memb.CompiledName
+                extensionMemberName memb
 
         {|
             name = name
@@ -3946,6 +4013,21 @@ module Util =
 
         // The value/method is not imported, check if the declaring entity is
         | None, Some callInfo, Some e ->
+            // fickl: an extension attached to its class is called on the class or the instance, which F# passes
+            // as the first argument
+            let e, callInfo =
+                match tryAttachedExtensionEntity com memb with
+                | None -> e, callInfo
+                | Some ent ->
+                    match callInfo.ThisArg, callInfo.Args with
+                    | None, thisArg :: args when memb.IsInstanceMember ->
+                        ent,
+                        { callInfo with
+                            ThisArg = Some thisArg
+                            Args = args
+                        }
+                    | _ -> ent, callInfo
+
             let moduleOrClassExpr =
                 match tryGlobalOrImportedFSharpEntity com e with
                 | Some expr -> Some expr
@@ -4363,6 +4445,44 @@ module Util =
             let fableMember = FsMemberFunctionOrValue(memb)
             // TODO: Move plugin application to FableTransforms
             com.ApplyMemberCallPlugin(fableMember, callExpr)
+
+    /// fickl: a `System.Array` member called on a `'T[,]`. The Fable type of a `'T[,]` is that of a jagged array,
+    /// where `Length` is the number of rows, so only the F# type of the callee tells the two apart.
+    let isMultiDimArrayMember (com: IFableCompiler) (fsCallee: FSharpExpr) (memb: FSharpMemberOrFunctionOrValue) =
+        match com.Options.Language, memb.DeclaringEntity, fsCallee.Type with
+        | (JavaScript | TypeScript), Some ent, NonAbbreviatedType calleeType ->
+            calleeType.HasTypeDefinition
+            && calleeType.TypeDefinition.IsArrayType
+            && calleeType.TypeDefinition.ArrayRank > 1
+            && FsEnt.FullName ent = Types.array
+        | _ -> false
+
+    /// Replaces the member as one of `System.Array` followed by the rank, as in "System.Array`2"
+    let makeMultiDimArrayMemberCall
+        (com: IFableCompiler)
+        (ctx: Context)
+        r
+        typ
+        (NonAbbreviatedType calleeType: FSharpType)
+        (callee: Fable.Expr)
+        (args: Fable.Expr list)
+        (memb: FSharpMemberOrFunctionOrValue)
+        =
+        let info: Fable.ReplaceCallInfo =
+            {
+                SignatureArgTypes = getArgTypes com memb
+                DeclaringEntityFullName = FsEnt.FullName calleeType.TypeDefinition
+                HasSpread = false
+                IsModuleValue = false
+                IsInterface = false
+                CompiledName = memb.CompiledName
+                OverloadSuffix = ""
+                GenericArgs = []
+            }
+
+        match com.TryReplace(ctx, r, typ, info, Some callee, args) with
+        | Some e -> e
+        | None -> failReplace com ctx r info (Some callee)
 
     let makeCallFrom
         (com: IFableCompiler)
