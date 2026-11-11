@@ -26,7 +26,7 @@ let private hashToString (i: int) =
 
 // Not perfect but hopefully covers most of the cases
 // Using only common constrains from https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/generics/constraints
-let private getConstraintHash genParams =
+let private getConstraintHash strict genParams =
     function
     // TODO: Full member signature hash?
     | Fable.Constraint.HasMember(name, isStatic) ->
@@ -36,7 +36,7 @@ let private getConstraintHash genParams =
              "")
         + "member "
         + name
-    | Fable.Constraint.CoercesTo t -> ":>" + (getTypeFastFullName genParams t)
+    | Fable.Constraint.CoercesTo t -> ":>" + (getTypeFastFullName strict genParams t)
     | Fable.Constraint.IsNullable -> "null"
     | Fable.Constraint.IsNotNullable -> "not null"
     | Fable.Constraint.IsValueType -> "struct"
@@ -48,16 +48,18 @@ let private getConstraintHash genParams =
     | Fable.Constraint.IsUnmanaged -> "unmanaged"
     | Fable.Constraint.IsDelegate(at, rt) ->
         "delegate"
-        + ([ at; rt ] |> List.map (getTypeFastFullName genParams) |> String.concat "|")
-    | Fable.Constraint.IsEnum t -> "enum" + (getTypeFastFullName genParams t)
+        + ([ at; rt ]
+           |> List.map (getTypeFastFullName strict genParams)
+           |> String.concat "|")
+    | Fable.Constraint.IsEnum t -> "enum" + (getTypeFastFullName strict genParams t)
     | Fable.Constraint.SimpleChoice types ->
         "simple choice"
-        + (types |> List.map (getTypeFastFullName genParams) |> String.concat "|")
+        + (types |> List.map (getTypeFastFullName strict genParams) |> String.concat "|")
 
-let rec private getTypeFastFullName (genParams: IDictionary<_, _>) (t: Fable.Type) =
+let rec private getTypeFastFullName (strict: bool) (genParams: IDictionary<_, _>) (t: Fable.Type) =
     match t with
     | Fable.Nullable(genArg, isStruct) ->
-        let typeName = getTypeFastFullName genParams genArg
+        let typeName = getTypeFastFullName strict genParams genArg
 
         if isStruct then
             $"System.Nullable<%s{typeName}>"
@@ -72,10 +74,13 @@ let rec private getTypeFastFullName (genParams: IDictionary<_, _>) (t: Fable.Typ
         else
             match genParams.TryGetValue(name) with
             | true, i -> i
-            | false, _ -> constraints |> List.map (getConstraintHash genParams) |> String.concat ","
+            | false, _ ->
+                constraints
+                |> List.map (getConstraintHash strict genParams)
+                |> String.concat ","
     | Fable.Tuple(genArgs, isStruct) ->
         let genArgs =
-            genArgs |> Seq.map (getTypeFastFullName genParams) |> String.concat " * "
+            genArgs |> Seq.map (getTypeFastFullName strict genParams) |> String.concat " * "
 
         if isStruct then
             "struct " + genArgs
@@ -88,28 +93,34 @@ let rec private getTypeFastFullName (genParams: IDictionary<_, _>) (t: Fable.Typ
             | Fable.MutableArray -> "resizearray"
             | Fable.ImmutableArray -> "immutablearray"
 
-        getTypeFastFullName genParams genArg + " " + name
-    | Fable.List genArg -> getTypeFastFullName genParams genArg + " list"
+        getTypeFastFullName strict genParams genArg + " " + name
+    | Fable.List genArg -> getTypeFastFullName strict genParams genArg + " list"
     | Fable.Option(genArg, isStruct) ->
         (if isStruct then
              "struct "
          else
              "")
-        + (getTypeFastFullName genParams genArg)
+        + (getTypeFastFullName strict genParams genArg)
         + " option"
     | Fable.LambdaType(argType, returnType) ->
         [ argType; returnType ]
-        |> List.map (getTypeFastFullName genParams)
+        |> List.map (getTypeFastFullName strict genParams)
         |> String.concat " -> "
     // TODO: Use Func` instead?
     | Fable.DelegateType(argTypes, returnType) ->
-        argTypes @ [ returnType ]
-        |> List.map (getTypeFastFullName genParams)
-        |> String.concat " -> "
+        let name =
+            argTypes @ [ returnType ]
+            |> List.map (getTypeFastFullName strict genParams)
+            |> String.concat " -> "
+
+        if strict then
+            "delegate(" + name + ")"
+        else
+            name
     | Fable.AnonymousRecordType(fieldNames, genArgs, isStruct) ->
         let fields =
             Seq.zip fieldNames genArgs
-            |> Seq.map (fun (key, typ) -> key + " : " + getTypeFastFullName genParams typ)
+            |> Seq.map (fun (key, typ) -> key + " : " + getTypeFastFullName strict genParams typ)
             |> String.concat "; "
 
         (if isStruct then
@@ -120,7 +131,7 @@ let rec private getTypeFastFullName (genParams: IDictionary<_, _>) (t: Fable.Typ
         + fields
         + "|}"
     | Fable.DeclaredType(tdef, genArgs) ->
-        let genArgs = genArgs |> Seq.mapToList (getTypeFastFullName genParams)
+        let genArgs = genArgs |> Seq.mapToList (getTypeFastFullName strict genParams)
         // Not sure why, but when precompiling F# changes measure types to MeasureProduct<'M, MeasureOne>
         match tdef.FullName, genArgs with
         | Types.measureProduct2, [ measure; Types.measureOne ] ->
@@ -154,11 +165,14 @@ let private combineHashCodes (hashes: int seq) =
     else
         hashes |> Array.reduce (fun h1 h2 -> ((h1 <<< 5) + h1) ^^^ h2)
 
-let private getHashPrivate (paramTypes: ParamTypes) genParams =
+let private getHashWith strict (paramTypes: ParamTypes) genParams =
     paramTypes
-    |> List.map (getTypeFastFullName genParams >> Naming.stringHash)
+    |> List.map (getTypeFastFullName strict genParams >> Naming.stringHash)
     |> combineHashCodes
     |> hashToString
+
+// A delegate and an F# function have the same name here, and the hashes of existing members depend on it
+let private getHashPrivate (paramTypes: ParamTypes) genParams = getHashWith false paramTypes genParams
 
 let hasEmptyOverloadSuffix (curriedParamTypes: ParamTypes) =
     // Don't use overload suffix for members without arguments
@@ -183,6 +197,36 @@ let getHash (entityGenericParams: string list) (curriedParamTypeGroups: Fable.Ty
     // TODO: Also private methods defined with `let` cannot be overloaded
     // but I don't know how to identify them in the AST
     | _ -> ""
+
+/// fickl: as `getHash`, except that a member taking a delegate gets a hash of its own when `getHash` gives it
+/// the hash of another overload, as with `'T -> 'U` and `Func<'T, 'U>`. `overloads` holds the curried
+/// parameter types of the members sharing the member's name, the member included.
+let getHashAmongOverloads
+    (entityGenericParams: string list)
+    (overloads: Fable.Type list list seq)
+    (curriedParamTypeGroups: Fable.Type list list)
+    =
+    let hash = getHash entityGenericParams curriedParamTypeGroups
+
+    match curriedParamTypeGroups with
+    | [ paramTypes ] when hash <> "" ->
+        let genParams =
+            entityGenericParams |> List.mapi (fun i p -> p, string<int> i) |> dict
+
+        let strictHash = getHashWith true paramTypes genParams
+
+        let isShared () =
+            overloads
+            |> Seq.filter (fun overload -> getHash entityGenericParams overload = hash)
+            |> Seq.truncate 2
+            |> Seq.length
+            |> (<) 1
+
+        if strictHash <> hash && isShared () then
+            strictHash
+        else
+            hash
+    | _ -> hash
 
 /// For op_Implicit/op_Explicit, the return type is part of the overload signature.
 /// This function includes the return type in the hash to distinguish overloads that differ only by return type.
