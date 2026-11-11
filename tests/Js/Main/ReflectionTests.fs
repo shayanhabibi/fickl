@@ -454,6 +454,28 @@ let reflectionTests = [
       generic = typeof<Result<AnonRec1, string>> |> equal false
       generic = typeof<Result<{| numbers: int list |}, string>> |> equal true
 
+  testCase "Anonymous record types have a name" <| fun () -> // See #275
+      let t = {| A = {| B = "content" |} |}.GetType()
+      let inner = (FSharpType.GetRecordFields t).[0].PropertyType
+      System.String.IsNullOrEmpty t.FullName |> equal false
+      System.String.IsNullOrEmpty inner.FullName |> equal false
+      t.FullName = inner.FullName |> equal false
+      let intA = typeof<{| a: int |}>
+      let stringA = typeof<{| a: string |}>
+      let intB = typeof<{| b: int |}>
+      intA.FullName = typeof<{| a: int |}>.FullName |> equal true
+      intA.FullName = stringA.FullName |> equal false
+      intA.FullName = intB.FullName |> equal false
+      intA.Name.StartsWith("<>f__AnonymousType", System.StringComparison.Ordinal) |> equal true
+      intA.FullName.StartsWith(intA.Name, System.StringComparison.Ordinal) |> equal true
+      intA.Name = stringA.Name |> equal true
+      intA.Name = intB.Name |> equal false
+      System.String.IsNullOrEmpty intA.Namespace |> equal true
+      typeof<{| a: int |}[]>.FullName = intA.FullName + "[]" |> equal true
+      intA.GetHashCode() = typeof<{| a: int |}>.GetHashCode() |> equal true
+      intA = stringA |> equal false
+      intA = intB |> equal false
+
   testCase "FSharp.Reflection: Anonymous Record" <| fun () ->
     let typ = typeof<{| String: string; Int: int |}>
     let record = {| String = "a"; Int = 1 |}

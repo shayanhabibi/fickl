@@ -5335,6 +5335,12 @@ let controlExtensions
         Helper.LibCall(com, "Observable", meth, t, args, argTypes)
     )
 
+// The name of an anonymous record type is only known to the runtime library
+let rec private hasAnonymousRecord (t: Type) =
+    match t with
+    | AnonymousRecordType _ -> true
+    | t -> List.exists hasAnonymousRecord t.Generics
+
 let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     let returnString r x = StringConstant x |> makeValue r |> Some
 
@@ -5389,6 +5395,8 @@ let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr optio
                             |> makeTypeInfo (changeRangeToCallSite ctx.InlinePath r)
                         | None -> Value(Null t, r)
                 )
+            | "get_FullName"
+            | "get_Namespace" when hasAnonymousRecord exprType -> None
             | "get_FullName" -> getTypeFullName false exprType |> returnString r
             | "get_Namespace" -> getTypeFullName false exprType |> splitFullName |> fst |> returnString r
             | "get_IsArray" ->
@@ -6380,7 +6388,7 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
         | Some c, "GetValue" -> Helper.LibCall(com, "Reflection", "getValue", t, c :: args, ?loc = r) |> Some
         | Some c, "get_Name" ->
             match c with
-            | Value(TypeInfo(exprType, _), loc) ->
+            | Value(TypeInfo(exprType, _), loc) when not (hasAnonymousRecord exprType) ->
                 getTypeName com ctx loc exprType |> StringConstant |> makeValue r |> Some
             | c -> Helper.LibCall(com, "Reflection", "name", t, [ c ], ?loc = r) |> Some
         | _ -> None
