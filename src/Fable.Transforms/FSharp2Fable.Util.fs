@@ -2047,6 +2047,26 @@ module TypeHelpers =
             | _ -> None
         )
 
+    /// Names of the type variables left unsolved by type inference (FCS names them `?` plus a stamp)
+    let rec getUnsolvedGenericParams (types: FSharpType list) : string list =
+        types
+        |> List.collect (fun t ->
+            if t.IsGenericParameter then
+                if t.GenericParameter.Name.StartsWith("?", StringComparison.Ordinal) then
+                    [ genParamName t.GenericParameter ]
+                else
+                    []
+            else
+                // FCS throws for the types it gives no arguments to, a measure variable for one
+                let genArgs =
+                    try
+                        List.ofSeq t.GenericArguments
+                    with _ ->
+                        []
+
+                getUnsolvedGenericParams genArgs
+        )
+
     let tryFindWitness (ctx: Context) argTypes isInstance traitName =
         ctx.Witnesses
         |> List.tryFind (fun w ->

@@ -1143,6 +1143,11 @@ type SelfPrimaryBase(x: int) as this =
 type SelfPrimaryChild() =
     inherit SelfPrimaryBase(2)
 
+type ShadowedTypeParamContainer<'T> =
+    | ShadowedTypeParamCase of 'T
+    // 'T shadows the type parameter of the union on purpose
+    static member CodecInner<'T, 'E>(t: int) : int = t + 1
+
 let tests =
   testList "Types" [
     testCase "Explicit constructors with `as x ... then` work" <| fun () -> // #79
@@ -2290,4 +2295,8 @@ let tests =
         valClassSelfSaved.Count |> equal 3
         obj.ReferenceEquals(valClassSelfSaved.[1], b) |> equal true
         obj.ReferenceEquals(valClassSelfSaved.[2], b) |> equal true
+
+    testCase "Static member type parameter can shadow one of its type" <| fun () ->
+        ShadowedTypeParamContainer<string>.CodecInner<float, bool> 41 |> equal 42
+        ShadowedTypeParamContainer<string>.CodecInner 41 |> equal 42
   ]

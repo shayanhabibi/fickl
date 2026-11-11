@@ -1718,7 +1718,20 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                                     trampoline {
                                         let ctx, args = makeFunctionArgs com ctx args
 
-                                        let! body = transformExpr com ctx [] body
+                                        // FCS leaves the type arguments it cannot infer from the trait signature
+                                        // unsolved in the witness, a direct call gets `obj` for them
+                                        let bodyCtx =
+                                            match body with
+                                            | FSharpExprPatterns.Call(_, _, ownerGenArgs, membGenArgs, _) ->
+                                                let genArgs =
+                                                    (ctx.GenericArgs,
+                                                     getUnsolvedGenericParams (ownerGenArgs @ membGenArgs))
+                                                    ||> List.fold (fun genArgs name -> Map.add name Fable.Any genArgs)
+
+                                                { ctx with GenericArgs = genArgs }
+                                            | _ -> ctx
+
+                                        let! body = transformExpr com bodyCtx [] body
 
                                         let w: Fable.Witness =
                                             {
