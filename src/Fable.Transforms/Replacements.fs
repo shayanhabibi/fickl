@@ -1401,6 +1401,14 @@ let rec defaultof (com: ICompiler) (ctx: Context) r t =
         // Null t |> makeValue None
         Helper.LibCall(com, "Util", "defaultOf", t, [], ?loc = r)
 
+/// A function reaching `==>` or `?<-` through an identifier (a member argument, the argument of
+/// an inlined member...) cannot be flattened here. Passing it as an untyped emit argument lets
+/// FableTransforms flatten it once inlining and argument uncurrying have settled its final shape.
+let private uncurryInteropValue (value: Expr) =
+    match value with
+    | MaybeCasted(IdentExpr { Type = LambdaType(_, LambdaType _) } as fn) -> emitExpr fn.Range Any [ fn ] "$0"
+    | _ -> value
+
 let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     let fixDynamicImportPath =
         function
@@ -1570,7 +1578,7 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
             | _ -> Some arg
         | "op_Dynamic", [ left; memb ] -> getExpr r t left memb |> Some
         | "op_DynamicAssignment", [ callee; prop; MaybeLambdaUncurriedAtCompileTime value ] ->
-            setExpr r callee prop value |> Some
+            setExpr r callee prop (uncurryInteropValue value) |> Some
         | ("op_Dollar" | "createNew" as m), callee :: args ->
             let args = destructureTupleArgs args
 
@@ -1587,7 +1595,7 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
                 let isStatement = rest = "Statement"
                 emitTemplate r t args isStatement template |> Some
         | "op_EqualsEqualsGreater", [ name; MaybeLambdaUncurriedAtCompileTime value ] ->
-            makeTuple r true [ name; value ] |> Some
+            makeTuple r true [ name; uncurryInteropValue value ] |> Some
         | "createObj", _ -> Helper.LibCall(com, "Util", "createObj", Any, args) |> withTag "pojo" |> Some
         | "keyValueList", [ caseRule; keyValueList ] ->
             // makePojo com ctx caseRule keyValueList
