@@ -50,6 +50,9 @@ module CodeServices =
     /// A hint for a name that is not defined (FS0039) in a compilation that contains
     /// `[<assembly: AutoOpen "Ns">]`, which has no effect on sources compiled into the same assembly.
     val getAssemblyAutoOpenHints: results: FSharpCheckProjectResults -> LogEntry array
+    /// Like `getFSharpDiagnostics`, but drops FS0433 (misplaced entry point) for every file other than the
+    /// last of `sourceFiles`: an entry point in a referenced project is legal, and is not run.
+    val getProjectFSharpDiagnostics: sourceFiles: string array -> diagnostics: FSharpDiagnostic array -> LogEntry array
 
     /// Type check a project using the InteractiveChecker
     val typeCheckProject:
