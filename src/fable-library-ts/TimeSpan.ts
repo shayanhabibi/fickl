@@ -1,6 +1,7 @@
 import { FSharpRef } from "./Types.ts";
-import { Exception, comparePrimitives, padLeftAndRightWithZeros, padWithZeros } from "./Util.ts";
-import { toInt64, fromFloat64 } from "./BigInt.ts";
+import { Exception, comparePrimitives, padWithZeros } from "./Util.ts";
+import { fromFloat64, type int64 } from "./BigInt.ts";
+import { ArgumentOutOfRangeException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
 
 // TimeSpan in runtime just becomes a number representing milliseconds
 export type TimeSpan = number;
@@ -13,6 +14,25 @@ export type TimeSpan = number;
  */
 function signedRound(value: number) {
   return value < 0 ? Math.ceil(value) : Math.floor(value);
+}
+
+const maxTicks = 9223372036854775807n;
+const minTicks = -9223372036854775808n;
+
+// Int64.MaxValue ticks are 922337203685477.5807ms, which a double cannot hold:
+// the closest one is .625. `ticks` maps these two values back to the Int64 limits.
+export const maxValue: TimeSpan = 922337203685477.625;
+export const minValue: TimeSpan = -922337203685477.625;
+
+function checkOverflow(ms: number): TimeSpan {
+  if (ms > maxValue || ms < minValue) {
+    throw OverflowException_$ctor_Z721C83C5("TimeSpan overflowed because the duration is too long.");
+  }
+  return ms;
+}
+
+function fromParts(d: number, h: number, m: number, s: number, ms: number): TimeSpan {
+  return d * 86400000 + h * 3600000 + m * 60_000 + s * 1000 + ms;
 }
 
 export function create(d: number = 0, h: number = 0, m: number = 0, s: number = 0, ms: number = 0) {
@@ -28,31 +48,45 @@ export function create(d: number = 0, h: number = 0, m: number = 0, s: number = 
       // d,h,m,s,ms
       break;
   }
-  return d * 86400000 + h * 3600000 + m * 60_000 + s * 1000 + ms;
+  const total = fromParts(d, h, m, s, ms);
+  if (total > maxValue || total < minValue) {
+    throw ArgumentOutOfRangeException_$ctor_Z721C83C5("TimeSpan overflowed because the duration is too long.");
+  }
+  return total;
 }
 
-export function fromTicks(ticks: number | bigint) {
-  return Number(BigInt(ticks) / 10000n);
+export function fromTicks(ticks: number | bigint): TimeSpan {
+  const n = Number(ticks);
+  if (!Number.isSafeInteger(n)) {
+    // Beyond 2^53 ticks: divide in BigInt so whole milliseconds stay exact,
+    // the sub-millisecond rest is rounded to the closest double
+    const t = BigInt(ticks);
+    return Number(t / 10000n) + Number(t % 10000n) / 10000;
+  }
+  const ms = n / 10000;
+  // `ticks` truncates ms * 10000 like .NET does. When the division rounded down,
+  // take the next double so that the same tick count is read back.
+  return Math.abs(ms * 10000) < Math.abs(n) ? ms * (1 + Number.EPSILON) : ms;
 }
 
 export function fromDays(d: number, h: number = 0, m: bigint = 0n, s: bigint = 0n, ms: bigint = 0n) {
-  return create(d, h, Number(m), Number(s), Number(ms));
+  return checkOverflow(fromParts(d, h, Number(m), Number(s), Number(ms)));
 }
 
 export function fromHours(h: number, m: bigint = 0n, s: bigint = 0n, ms: bigint = 0n) {
-  return create(0, h, Number(m), Number(s), Number(ms));
+  return checkOverflow(fromParts(0, h, Number(m), Number(s), Number(ms)));
 }
 
 export function fromMinutes(m: number | bigint, s: bigint = 0n, ms: bigint = 0n) {
-  return create(0, 0, Number(m), Number(s), Number(ms));
+  return checkOverflow(fromParts(0, 0, Number(m), Number(s), Number(ms)));
 }
 
 export function fromSeconds(s: number | bigint, ms: bigint = 0n) {
-  return create(0, 0, 0, Number(s), Number(ms));
+  return checkOverflow(fromParts(0, 0, 0, Number(s), Number(ms)));
 }
 
 export function fromMilliseconds(ms: number | bigint) {
-  return Number(ms);
+  return checkOverflow(Number(ms));
 }
 
 export function days(ts: TimeSpan) {
@@ -75,8 +109,13 @@ export function milliseconds(ts: TimeSpan) {
   return signedRound(ts % 1000);
 }
 
-export function ticks(ts: TimeSpan) {
-  return toInt64(Number.isInteger(ts) ? BigInt(ts) * 10000n : fromFloat64(ts * 10000));
+export function ticks(ts: TimeSpan): int64 {
+  checkOverflow(ts);
+  if (Number.isInteger(ts)) {
+    return BigInt(ts) * 10000n;
+  }
+  const t = fromFloat64(ts * 10000);
+  return t > maxTicks ? maxTicks : t < minTicks ? minTicks : t;
 }
 
 export function totalDays(ts: TimeSpan) {
@@ -100,19 +139,19 @@ export function negate(ts: TimeSpan) {
 }
 
 export function add(ts1: number, ts2: number) {
-  return ts1 + ts2;
+  return checkOverflow(ts1 + ts2);
 }
 
 export function subtract(ts1: number, ts2: number) {
-  return ts1 - ts2;
+  return checkOverflow(ts1 - ts2);
 }
 
 export function multiply(ts: TimeSpan, factor: number) {
-  return ts * factor;
+  return checkOverflow(ts * factor);
 }
 
 export function divide(ts: TimeSpan, b: number) {
-  return ts / b;
+  return checkOverflow(ts / b);
 }
 
 export const op_Addition = add;
@@ -135,9 +174,19 @@ export function toString(ts: TimeSpan, format = "c", _provider?: any) {
   const h = Math.abs(hours(ts));
   const m = Math.abs(minutes(ts));
   const s = Math.abs(seconds(ts));
-  const ms = Math.abs(milliseconds(ts));
   const sign = ts < 0 ? "-" : "";
-  return `${sign}${d === 0 && (format === "c" || format === "g") ? "" : format === "c" ? d + "." : d + ":"}${format === "g" ? h : padWithZeros(h, 2)}:${padWithZeros(m, 2)}:${padWithZeros(s, 2)}${ms === 0 && (format === "c" || format === "g") ? "" : format === "g" ? "." + padWithZeros(ms, 3) : "." + padLeftAndRightWithZeros(ms, 3, 7)}`;
+  // The seven digits after the seconds, read from the ticks so that sub-millisecond digits are kept
+  let fraction = Math.abs(milliseconds(ts)) * 10000;
+  if (ts >= minValue && ts <= maxValue) {
+    const t = ticks(ts);
+    fraction = Number((t < 0n ? -t : t) % 10000000n);
+  }
+  const digits = padWithZeros(fraction, 7);
+  const dayPart = d === 0 && format !== "G" ? "" : format === "c" ? d + "." : d + ":";
+  const fractionPart = format === "G"
+    ? "." + digits
+    : fraction === 0 ? "" : "." + (format === "g" ? digits.replace(/0+$/, "") : digits);
+  return `${sign}${dayPart}${format === "g" ? h : padWithZeros(h, 2)}:${padWithZeros(m, 2)}:${padWithZeros(s, 2)}${fractionPart}`;
 }
 
 export function parse(str: string) {
@@ -148,7 +197,7 @@ export function parse(str: string) {
     if (isNaN(d)) {
       throw new Exception(`String '${str}' was not recognized as a valid TimeSpan.`);
     } else {
-      return create(d, 0, 0, 0, 0);
+      return checkOverflow(fromParts(d, 0, 0, 0, 0));
     }
   }
   if (firstColon > 0) { // process time part
@@ -181,7 +230,7 @@ export function parse(str: string) {
             throw new Exception(`String '${str}' was not recognized as a valid TimeSpan.`);
         }
       }
-      return sign * create(d, h, m, s, ms);
+      return checkOverflow(sign * fromParts(d, h, m, s, ms));
     }
   }
   throw new Exception(`String '${str}' was not recognized as a valid TimeSpan.`);

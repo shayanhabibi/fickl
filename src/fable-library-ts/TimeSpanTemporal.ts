@@ -83,6 +83,14 @@ export function zero(): TimeSpan {
   return new Temporal.Duration();
 }
 
+export function maxValue(): TimeSpan {
+  return fromTicks(9223372036854775807n);
+}
+
+export function minValue(): TimeSpan {
+  return fromTicks(-9223372036854775808n);
+}
+
 const ticksPerUnit = {
   days: 864_000_000_000,
   hours: 36_000_000_000,
