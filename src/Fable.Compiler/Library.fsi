@@ -47,6 +47,10 @@ module CodeServices =
     /// The error number is folded into the message, as `Fable.Cli` prints it.
     val getFSharpDiagnostics: diagnostics: FSharpDiagnostic array -> LogEntry array
 
+    /// A hint for a name that is not defined (FS0039) in a compilation that contains
+    /// `[<assembly: AutoOpen "Ns">]`, which has no effect on sources compiled into the same assembly.
+    val getAssemblyAutoOpenHints: results: FSharpCheckProjectResults -> LogEntry array
+
     /// Type check a project using the InteractiveChecker
     val typeCheckProject:
         sourceReader: SourceReader ->

@@ -775,9 +775,12 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                         let state =
                             { state with
                                 FSharpLogs =
-                                    Array.append
-                                        state.FSharpLogs
-                                        (CodeServices.getFSharpDiagnostics results.Diagnostics)
+                                    Array.concat
+                                        [
+                                            state.FSharpLogs
+                                            CodeServices.getFSharpDiagnostics results.Diagnostics
+                                            CodeServices.getAssemblyAutoOpenHints results
+                                        ]
                                 HasFSharpCompilationFinished = true
                             }
 
