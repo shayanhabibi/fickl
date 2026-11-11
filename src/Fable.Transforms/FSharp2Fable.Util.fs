@@ -1462,10 +1462,9 @@ module Patterns =
             ValueSome(ident, value, body)
         | _ -> ValueNone
 
-    /// Matches an `int` range operator with a compile-time-constant step of +1 or -1,
-    /// i.e. `start .. 1 .. stop` or `start .. -1 .. stop`. Any coercion to `seq` is stripped.
-    /// Only ±1 int32 steps are matched, so the range lowers to a plain counted `for`
-    /// (`Fable.ForLoop`), producing the same output as the `to`/`downto` forms.
+    /// Matches an `int` range operator with a compile-time-constant, non-zero step,
+    /// e.g. `start .. -1 .. stop` or `start .. 2 .. stop`. Any coercion to `seq` is stripped.
+    /// A zero step is left to the range function, which throws for it.
     [<return: Struct>]
     let (|ConstStepIntRange|_|) (expr: FSharpExpr) =
         let rec stripCoerce =
@@ -1475,14 +1474,14 @@ module Patterns =
 
         match stripCoerce expr with
         | Call(None, meth, _, _, [ start; Const((:? int as step), _); stop ]) when
-            meth.CompiledName = "op_RangeStep" && (step = 1 || step = -1)
+            meth.CompiledName = "op_RangeStep" && step <> 0
             ->
             ValueSome(start, step, stop)
         | _ -> ValueNone
 
-    /// A `for x in start .. ±1 .. stop do` loop, which F# does not lower to a fast
-    /// counted loop (unlike `to`/`downto`) and would otherwise allocate a range
-    /// sequence + enumerator. Yields the loop variable, bounds, step and body.
+    /// A `for x in start .. step .. stop do` loop with a constant int step, which F# does
+    /// not lower to a fast counted loop (unlike `to`/`downto`) and would otherwise allocate
+    /// a range sequence + enumerator. Yields the loop variable, bounds, step and body.
     ///
     /// F# desugars `for i in <range> do` to `let inputSequence = <range> in <for-of>`,
     /// so the range is bound one level above the enumerator loop matched by `ForOf`.
@@ -2162,6 +2161,47 @@ module Identifiers =
         { ctx with Scope = (Some fsRef, ident, value) :: ctx.Scope }, ident
 
     let (|PutIdentInScope|) com ctx fsRef = putIdentInScope com ctx fsRef None
+
+    /// Builds a counted loop for `for ident in start .. step .. stop do body` with a constant
+    /// step other than ±1, which `Fable.ForLoop` cannot express:
+    /// `let mutable counter = start in let limit = stop in while counter <= limit do let ident = counter in body; counter <- counter + step`.
+    /// The loop variable is bound inside the body so each iteration's closures capture their own value.
+    /// The counter is a float, so stepping past the int32 range ends the loop instead of wrapping around.
+    let makeConstStepLoop com ctx r (ident: Fable.Ident) (start: Fable.Expr) (step: int) (stop: Fable.Expr) body =
+        let counterType = Fable.Number(Float64, Fable.NumberInfo.Empty)
+
+        let counter =
+            { makeTypedIdent counterType (getIdentUniqueName com ctx ident.Name) with IsMutable = true }
+
+        let limit = getIdentUniqueName com ctx "limit" |> makeTypedIdent stop.Type
+        let counterExpr = Fable.IdentExpr counter
+
+        let guardOp =
+            if step > 0 then
+                BinaryLessOrEqual
+            else
+                BinaryGreaterOrEqual
+
+        // `-step` overflows for Int32.MinValue, which is then added as it is
+        let stepOp, stepSize =
+            if step < 0 && step <> System.Int32.MinValue then
+                BinaryMinus, -step
+            else
+                BinaryPlus, step
+
+        let next = makeBinOp None counterType counterExpr (makeIntConst stepSize) stepOp
+
+        let body =
+            Fable.Let(
+                ident,
+                counterExpr,
+                Fable.Sequential [ body; Fable.Set(counterExpr, Fable.ValueSet, counterType, next, None) ]
+            )
+
+        let loop =
+            makeWhileLoop r (makeEqOp None counterExpr (Fable.IdentExpr limit) guardOp) body
+
+        Fable.Let(counter, start, Fable.Let(limit, stop, loop))
 
     let identWithRange r (ident: Fable.Ident) =
         let originalName = ident.Range |> Option.bind (fun r -> r.identifierName)

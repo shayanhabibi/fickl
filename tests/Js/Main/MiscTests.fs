@@ -805,6 +805,64 @@ let tests =
             fns.Add(fun () -> i)
         fns |> Seq.map (fun f -> f ()) |> Seq.toArray |> equal [| 3; 2; 1 |]
 
+    testCase "for in range with a constant step other than 1 works" <| fun () -> // See #317
+        let collect start stop =
+            let up = ResizeArray<int>()
+            for i in start .. 3 .. stop do
+                up.Add i
+            let down = ResizeArray<int>()
+            for i in stop .. -3 .. start do
+                down.Add i
+            up.ToArray(), down.ToArray()
+        collect 0 9 |> equal ([| 0; 3; 6; 9 |], [| 9; 6; 3; 0 |])
+        collect 0 10 |> equal ([| 0; 3; 6; 9 |], [| 10; 7; 4; 1 |])
+        collect -7 -2 |> equal ([| -7; -4 |], [| -2; -5 |])
+        collect 4 4 |> equal ([| 4 |], [| 4 |])
+        collect 5 4 |> equal ([||], [||])
+        let mutable n = 0
+        for _ in 1 .. 5 .. 20 do
+            n <- n + 1
+        equal 4 n
+
+    testCase "for in range with a constant step does not wrap around at the int32 limits" <| fun () ->
+        let up = ResizeArray<int>()
+        for i in System.Int32.MaxValue - 1 .. 2 .. System.Int32.MaxValue do
+            up.Add i
+        equal [| System.Int32.MaxValue - 1 |] (up.ToArray())
+        let down = ResizeArray<int>()
+        for i in System.Int32.MinValue + 3 .. -2 .. System.Int32.MinValue do
+            down.Add i
+        equal [| System.Int32.MinValue + 3; System.Int32.MinValue + 1 |] (down.ToArray())
+
+    testCase "for in range with a constant step evaluates its bounds once and in order" <| fun () ->
+        let log = ResizeArray<string>()
+        let bound name value =
+            log.Add name
+            value
+        for i in bound "start" 1 .. 4 .. bound "stop" 9 do
+            log.Add(string i)
+        equal [| "start"; "stop"; "1"; "5"; "9" |] (log.ToArray())
+        let xs = ResizeArray [ 1; 2; 3; 4; 5; 6 ]
+        let mutable n = 0
+        for _ in 0 .. 2 .. xs.Count - 1 do
+            xs.RemoveAt 0
+            n <- n + 1
+        equal 3 n
+        let mutable hi = 4
+        let mutable m = 0
+        for _ in 0 .. 2 .. hi do
+            hi <- 100
+            m <- m + 1
+        equal 3 m
+
+    testCase "Captured loop variable in range with a constant step keeps its value" <| fun () ->
+        let fns = ResizeArray<unit -> int>()
+        for i in 10 .. -4 .. 0 do
+            fns.Add(fun () -> i)
+        for i in 1 .. 2 .. 5 do
+            fns.Add(fun () -> i)
+        fns |> Seq.map (fun f -> f ()) |> Seq.toArray |> equal [| 10; 6; 2; 1; 3; 5 |]
+
     testCase "for bound over a collection is evaluated once" <| fun () ->
         let shrinking = ResizeArray [ 1; 2; 3; 4 ]
         let mutable n = 0
