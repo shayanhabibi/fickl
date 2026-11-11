@@ -21,7 +21,7 @@ export function tryFirst(xs: MutableArray<string>): string | null {
         return null;
     }
     else {
-        return item_1(0, xs);
+        return xs[0] ?? item_1<string>(0, xs);
     }
 }
 

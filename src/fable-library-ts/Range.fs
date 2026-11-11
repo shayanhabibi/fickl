@@ -29,8 +29,39 @@ let rangeBigInt start step stop =
 let rangeDecimal start step stop =
     integralRangeStep start step stop 0m (+)
 
-let rangeDouble start step stop =
-    integralRangeStep start step stop 0.0 (+)
+// As FSharp.Core: when the step divides the range exactly, each item is start + i * step, so the rounding error of
+// adding the step does not accumulate and the last item is not lost. Otherwise the step is added to the previous item
+let rangeDouble (start: float) (step: float) (stop: float) =
+    if step = 0.0 then
+        invalidArg "step" "The step of a range cannot be zero."
+
+    if System.Double.IsNaN start then
+        invalidArg "n" "The start of a range cannot be NaN."
+
+    if System.Double.IsNaN step then
+        invalidArg "step" "The step of a range cannot be NaN."
+
+    if System.Double.IsNaN stop then
+        invalidArg "m" "The end of a range cannot be NaN."
+
+    let count = (stop - start) / step
+
+    if count = floor count then
+        let stepFn i =
+            if i <= count then
+                Some(start + i * step, i + 1.0)
+            else
+                None
+
+        Seq.delay (fun () -> Seq.unfold stepFn 0.0)
+    else
+        let stepFn x =
+            if (step > 0.0 && x <= stop) || (step < 0.0 && x >= stop) then
+                Some(x, x + step)
+            else
+                None
+
+        Seq.delay (fun () -> Seq.unfold stepFn start)
 
 let rangeInt64 start step stop =
     integralRangeStep start step stop 0L (+)

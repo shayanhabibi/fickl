@@ -369,6 +369,35 @@ type TypeWithDefaultValueTest() =
     [<DefaultValue>]
     val mutable ObjValue: System.Collections.Generic.Dictionary<string, string>
 
+type ClassWithDefaultValueInstanceFields =
+    val X: int
+    [<DefaultValue>]
+    val mutable D: int
+    [<DefaultValue>]
+    val mutable S: string
+    val Y: string
+    new(x, y) = { X = x; Y = y }
+
+[<Struct>]
+type StructWithDefaultValueInstanceField =
+    val X: int
+    [<DefaultValue(false)>]
+    val mutable D: int
+    val Y: string
+    new(x, y) = { X = x; Y = y }
+
+type ClassWithDefaultValueStaticAndInstanceFields =
+    [<DefaultValue>]
+    static val mutable private count: int
+    val X: int
+    [<DefaultValue>]
+    val mutable D: int
+    val Y: int
+    new(x, y) = { X = x; Y = y }
+    static member Count
+        with get () = ClassWithDefaultValueStaticAndInstanceFields.count
+        and set v = ClassWithDefaultValueStaticAndInstanceFields.count <- v
+
 [<Struct>]
 type NestedStruct =
     val A: float
@@ -1841,6 +1870,34 @@ let ``test Different type parameter combinations work correctly`` () =
     result3 |> equal ("B", "C")
 
 [<Fact>]
+let ``test Instance DefaultValue fields are skipped by explicit constructors`` () =
+    let c = ClassWithDefaultValueInstanceFields(1, "y")
+    c.X |> equal 1
+    c.D |> equal 0
+    c.S |> equal null
+    c.Y |> equal "y"
+    c.D <- 5
+    c.S <- "s"
+    c.D |> equal 5
+    c.S |> equal "s"
+
+    let mutable s = StructWithDefaultValueInstanceField(2, "z")
+    s.X |> equal 2
+    s.D |> equal 0
+    s.Y |> equal "z"
+    s.D <- 6
+    s.D |> equal 6
+
+[<Fact>]
+let ``test Explicit constructors skip static fields next to DefaultValue fields`` () =
+    let c = ClassWithDefaultValueStaticAndInstanceFields(1, 2)
+    ClassWithDefaultValueStaticAndInstanceFields.Count <- 4
+    c.X |> equal 1
+    c.D |> equal 0
+    c.Y |> equal 2
+    ClassWithDefaultValueStaticAndInstanceFields.Count |> equal 4
+
+[<Fact>]
 let ``test Unchecked.defaultof works for fields on structs`` () =
     let top = TopLevelStruct()
     top.A |> equal 0
@@ -1973,3 +2030,90 @@ let ``test explicit constructor resolves the generic arguments of the base class
     let pairBox = ValClassPairBox("a", "b")
     pairBox.Value |> equal ("a", "b")
     pairBox.Count |> equal 2
+
+let mutable valClassThenCalls = 0
+
+type ValClassThen =
+    val mutable Value: int
+    new () = { Value = 1 } then valClassThenCalls <- valClassThenCalls + 1
+
+[<AllowNullLiteral>]
+type ValClassSequenceInit =
+    val Next: ValClassSequenceInit
+    val Id: int
+    val Boxed: obj
+    new (id: int) = { Next = null; Id = id; Boxed = null }
+    new (a: int, b: int) = { Next = (ValClassSequenceInit(a); ValClassSequenceInit(b)); Id = 0; Boxed = box (do ValClassSequenceInit(a)) }
+    new (a: int, b: int, c: int) as self = { Next = (ValClassSequenceInit(a); ValClassSequenceInit(b)); Id = c; Boxed = box (do ValClassSequenceInit(a)) } then self.Next.Id |> ignore
+
+type ValClassSelf =
+    val mutable Name: string
+    val mutable Count: int
+    new (name: string) as self = { Name = name; Count = 0 } then self.Count <- self.Name.Length
+    new () as self = ValClassSelf("ab") then self.Count <- self.Count * 10
+
+type ValClassSelfOutOfOrder =
+    val Z: int
+    val mutable W: int
+    new () as self = { W = 2; Z = 3 } then self.W <- self.W + self.Z
+
+let valClassSelfSaved = ResizeArray<obj>()
+
+type ValClassSelfSaved =
+    val Id: int
+    new (id: int) as self = { Id = id } then valClassSelfSaved.Add(box self)
+    new () as self = ValClassSelfSaved(1) then valClassSelfSaved.Add(box self)
+
+type SelfPrimaryBase(x: int) as this =
+    let mutable touched = 0
+    do this.Touch()
+    new () = SelfPrimaryBase(1)
+    member _.X = x
+    member _.Touched = touched
+    member _.Touch() = touched <- touched + 1
+
+type SelfPrimaryChild() =
+    inherit SelfPrimaryBase(2)
+
+[<Fact>]
+let ``test explicit constructor returns the object after its then block`` () =
+    let before = valClassThenCalls
+    let c = ValClassThen()
+    c.Value |> equal 1
+    valClassThenCalls - before |> equal 1
+
+[<Fact>]
+let ``test explicit constructor keeps sequences of its own constructor calls in field values`` () =
+    let c = ValClassSequenceInit(5, 6)
+    c.Next.Id |> equal 6
+    isNull c.Boxed |> equal true
+    let d = ValClassSequenceInit(5, 6, 7)
+    (d.Next.Id, d.Id, isNull d.Boxed) |> equal (6, 7, true)
+
+[<Fact>]
+let ``test explicit constructor with a self identifier works`` () = // See #5166
+    let a = ValClassSelf("abc")
+    a.Name |> equal "abc"
+    a.Count |> equal 3
+    let b = ValClassSelf()
+    b.Name |> equal "ab"
+    b.Count |> equal 20
+    let c = ValClassSelfOutOfOrder()
+    (c.Z, c.W) |> equal (3, 5)
+
+[<Fact>]
+let ``test primary constructor with a self identifier works with a secondary constructor`` () =
+    let a = SelfPrimaryBase()
+    (a.X, a.Touched) |> equal (1, 1)
+    let b = SelfPrimaryChild()
+    (b.X, b.Touched) |> equal (2, 1)
+
+[<Fact>]
+let ``test explicit constructor self identifier is the created object`` () =
+    valClassSelfSaved.Clear()
+    let a = ValClassSelfSaved(5)
+    obj.ReferenceEquals(valClassSelfSaved.[0], a) |> equal true
+    let b = ValClassSelfSaved()
+    valClassSelfSaved.Count |> equal 3
+    obj.ReferenceEquals(valClassSelfSaved.[1], b) |> equal true
+    obj.ReferenceEquals(valClassSelfSaved.[2], b) |> equal true

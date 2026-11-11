@@ -714,7 +714,7 @@ module PrinterExtensions =
                     printer.PrintNewLine()
 
                     for line in lines do
-                        let line = Naming.xmlDecode line
+                        let line = (Naming.xmlDecode line).Replace("*/", "*\\/")
 
                         printer.Print(" * ")
                         printer.Print(line.Trim())

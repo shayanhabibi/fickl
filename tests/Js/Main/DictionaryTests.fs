@@ -28,6 +28,14 @@ type Table<'K, 'V when 'K: equality and 'K: not null> () =
 
     member _.Dic = dic
 
+type CountingDictionary() =
+    inherit Dictionary<string, int>()
+
+    member this.Increment(key: string) =
+        this.[key] <- (if this.ContainsKey key then this.[key] else 0) + 1
+type ArrayKeyDictionary() =
+    inherit Dictionary<int[], int>()
+
 let tests =
   testList "Dictionaries" [
     testCase "Dictionary and HashSet without a comparer compare array keys by reference" <| fun () -> // #81
@@ -407,4 +415,52 @@ let tests =
         coll.Remove(KeyValuePair("D", 3)) |> equal false
         coll.Remove(KeyValuePair("B", 2)) |> equal true
         coll.Count |> equal 2
+
+    testCase "Dictionary subclasses work" <| fun () ->
+        let dic = CountingDictionary()
+        dic.Increment "a"
+        dic.Increment "a"
+        dic.Increment "b"
+        dic.["a"] |> equal 2
+        dic.Count |> equal 2
+        dic.ContainsKey "b" |> equal true
+        dic.Remove "b" |> equal true
+        dic |> Seq.map (fun kv -> kv.Key, kv.Value) |> List.ofSeq |> equal [ "a", 2 ]
+
+    testCase "Dictionary compares array keys by reference" <| fun _ -> // See #5165
+        let key = [| 1 |]
+        let dic = Dictionary<int[], int>()
+        dic.[key] <- 1
+        dic.[[| 1 |]] <- 2
+        dic.Count |> equal 2
+        dic.ContainsKey key |> equal true
+        dic.ContainsKey [| 1 |] |> equal false
+        dic.[key] |> equal 1
+        let copy = Dictionary<int[], int>(dic)
+        copy.Count |> equal 2
+        copy.ContainsKey key |> equal true
+        copy.ContainsKey [| 1 |] |> equal false
+
+    testCase "Dictionary subclasses compare array keys by reference" <| fun _ ->
+        let key = [| 1 |]
+        let dic = ArrayKeyDictionary()
+        dic.[key] <- 1
+        dic.ContainsKey key |> equal true
+        dic.ContainsKey [| 1 |] |> equal false
+
+    testCase "Dictionary compares ResizeArray keys by reference" <| fun _ ->
+        let key = ResizeArray [ 1 ]
+        let dic = Dictionary<ResizeArray<int>, int>()
+        dic.[key] <- 1
+        dic.[ResizeArray [ 1 ]] <- 2
+        dic.Count |> equal 2
+        dic.ContainsKey key |> equal true
+        dic.ContainsKey(ResizeArray [ 1 ]) |> equal false
+
+    testCase "Dictionary with a structural comparer compares array keys by value" <| fun _ ->
+        let dic = Dictionary<int[], int>(HashIdentity.Structural)
+        dic.[[| 1 |]] <- 1
+        dic.ContainsKey [| 1 |] |> equal true
+        (dict [ [| 1 |], 1 ]).ContainsKey [| 1 |] |> equal true
+        (readOnlyDict [ [| 1 |], 1 ]).ContainsKey [| 1 |] |> equal true
   ]

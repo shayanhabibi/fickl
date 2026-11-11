@@ -144,6 +144,33 @@ module Unknowns =
         abstract Get: unit -> unknown
 
     let box' (value: obj) = { new IBox with member _.Get() = value }
+
+// tsc checks the declarations against the unmangled names the JavaScript uses, see #5158
+module MangleInterfaces =
+    [<Mangle(false)>]
+    type INotMangled =
+        abstract Foo: int -> int
+        abstract Bar: string
+        abstract Baz: int with get, set
+
+    [<Mangle>]
+    type IMangled =
+        abstract Foo: int -> int
+
+    let useNotMangled (x: INotMangled) = x.Foo 1, x.Bar
+    let incrementBaz (x: INotMangled) = x.Baz <- x.Baz + 1
+    let useMangled (x: IMangled) = x.Foo 1
+
+module MangleAbstractClasses =
+    [<AbstractClass; AttachMembers; Mangle>]
+    type AttachedBase() =
+        abstract Run: int -> int
+
+    type AttachedImpl() =
+        inherit AttachedBase()
+        override _.Run x = x + 3
+
+    let useAttached (x: AttachedBase) = x.Run 1
 #endif
 
 type GenericNameRecord<'a> =
@@ -293,5 +320,25 @@ let tests =
         Unknowns.describe (box 1) |> equal "other"
         (Unknowns.box' "abc").Get() |> Unknowns.lengthOf |> equal 3
         (Unknowns.parse "[1,2]")?length |> equal 2
+
+    testCase "Interfaces with [<Mangle(false)>] are declared with unmangled members" <| fun () ->
+        let baz = ref 1
+        let notMangled =
+            { new MangleInterfaces.INotMangled with
+                member _.Foo x = x + 1
+                member _.Bar = "bar"
+                member _.Baz with get () = baz.Value and set v = baz.Value <- v }
+        MangleInterfaces.useNotMangled notMangled |> equal (2, "bar")
+        notMangled?Bar |> equal "bar"
+        MangleInterfaces.incrementBaz notMangled
+        notMangled.Baz |> equal 2
+        notMangled?Baz |> equal 2
+        let mangled = { new MangleInterfaces.IMangled with member _.Foo x = x + 2 }
+        MangleInterfaces.useMangled mangled |> equal 3
+
+    testCase "Abstract classes with [<AttachMembers>] ignore [<Mangle>] in declarations" <| fun () ->
+        let attached = MangleAbstractClasses.AttachedImpl()
+        MangleAbstractClasses.useAttached attached |> equal 4
+        attached?Run(2) |> equal 5
     #endif
   ]
