@@ -1,0 +1,20 @@
+
+import { class_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+
+export function Imported($props) {
+    return <div>Imported</div>;
+}
+
+export class Screens {
+    constructor() {
+    }
+}
+
+export function Screens_$reflection() {
+    return class_type("JsxComponentRef.Screens.Screens", undefined, Screens);
+}
+
+export function Screens_Member_Z18115A39($props) {
+    return <div>{$props.name}{$props.age}</div>;
+}
+
