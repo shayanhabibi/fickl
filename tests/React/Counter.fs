@@ -43,6 +43,40 @@ let CounterJSX(init: int) =
         </div>
         """
 
+// A function without JSX.Component that keeps its own state
+let PlainCounter (props: {| init: int; testId: string |}) =
+    let (count, setCount) = Feliz.React.useState (props.init)
+
+    JSX.html
+        $"""
+        <button data-testid={props.testId} onClick={fun _ -> setCount (count + 1)}>{count}</button>
+        """
+
+let PlainLabel () = JSX.html $"""<span data-testid="plain-label">label</span>"""
+
+let mutable plainCounterHostRenders = 0
+
+// Calls PlainCounter, which makes its state part of this component
+[<JSX.Component>]
+let PlainCounterCalled (init: int) =
+    plainCounterHostRenders <- plainCounterHostRenders + 1
+    JSX.html $"""<div>{PlainCounter {| init = init; testId = "plain-called" |}}</div>"""
+
+// Renders PlainCounter as a tag, which makes it a component of its own
+[<JSX.Component>]
+let PlainCounterRendered (init: int) =
+    plainCounterHostRenders <- plainCounterHostRenders + 1
+    let second = {| init = init + 10; testId = "plain-rendered-2" |}
+
+    JSX.html
+        $"""
+        <div>
+            {JSX.el PlainLabel ()}
+            {JSX.el PlainCounter {| init = init; testId = "plain-rendered-1" |}}
+            {JSX.el PlainCounter second}
+        </div>
+        """
+
 // Regression test for https://github.com/fable-compiler/Fable/issues/3999
 // Single string hole: F# compiler lowers to String.Concat rather than printf
 [<JSX.Component>]

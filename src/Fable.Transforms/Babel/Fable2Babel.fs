@@ -4207,6 +4207,91 @@ but thanks to the optimisation done below we get
 
         transformJsxEl com ctx callee props
 
+    /// `JSX.el render props`: renders a function that is compiled as usual, taking its arguments by
+    /// position, as a JSX tag. A tag calls its function with one props object, so the only functions
+    /// that can be rendered this way are those whose single argument is already such an object, or unit.
+    let transformJsxFunctionEl (com: IBabelCompiler) ctx range (render: Fable.Expr) (props: Fable.Expr) =
+        let error (msg: string) =
+            addErrorAndReturnNull com range $"JSX.el %s{msg}"
+
+        let isPropsObject (typ: Fable.Type) =
+            match typ with
+            | Fable.Unit
+            | Fable.Any
+            | Fable.AnonymousRecordType _ -> true
+            | Fable.DeclaredType(entRef, _) ->
+                match com.TryGetEntity entRef with
+                | Some ent -> ent.IsInterface || FSharp2Fable.Util.isPojoDefinedByConsArgsEntity ent
+                | None -> false
+            | _ -> false
+
+        // A function used as a value is wrapped in a lambda when it is not a plain reference:
+        // tupled or curried parameters, a partial application, a lambda written in place.
+        // Such a wrapper is a new component on every render, which loses the state.
+        let renderRef =
+            let isArgRef (arg: Fable.Ident) (value: Fable.Expr) =
+                match value with
+                | MaybeCasted(Fable.Value(Fable.UnitConstant, _)) -> arg.Type = Fable.Unit
+                | MaybeCasted(Fable.IdentExpr ident) -> ident.Name = arg.Name
+                | _ -> false
+
+            match render with
+            | MaybeCasted(Fable.Lambda(arg,
+                                       Fable.Call(callee,
+                                                  {
+                                                      ThisArg = None
+                                                      Args = args
+                                                      MemberRef = memberRef
+                                                  },
+                                                  _,
+                                                  _),
+                                       _)) when
+                arg.IsCompilerGenerated
+                && (List.isEmpty args && arg.Type = Fable.Unit
+                    || List.forall (isArgRef arg) args && args.Length = 1)
+                ->
+                Some(callee, memberRef |> Option.bind com.TryGetMember)
+            | MaybeCasted(Fable.Lambda _ | Fable.Delegate _) -> None
+            | render -> Some(render, None)
+
+        match renderRef with
+        | _ when not (isPropsObject props.Type) ->
+            error
+                "can only render a function that takes unit or one props object (an anonymous record, an interface, a Pojo class or obj), because a tag calls its function with a props object. For other arguments, decorate the function with [<JSX.Component>] and call it."
+        | None ->
+            error
+                "expects the name of a function declared in a module or a type: a function created where it is rendered is a new component on every render and loses its state."
+        | Some(_, Some memberInfo) when hasAttribute Atts.jsxComponent memberInfo.Attributes ->
+            error "is for functions without [<JSX.Component>]. Call the decorated function to render it as a tag."
+        | Some(render, _) ->
+            let isAttributeName (name: string) =
+                name <> ""
+                && name |> Seq.forall (fun c -> Char.IsLetterOrDigit c || c = '_' || c = '-')
+
+            let props =
+                match props with
+                | MaybeCasted(Fable.Value(Fable.UnitConstant, _)) -> []
+                | MaybeCasted(Fable.Value(Fable.NewAnonymousRecord(values, fieldNames, _, _), _)) when
+                    Array.forall isAttributeName fieldNames
+                    ->
+                    List.zip (List.ofArray fieldNames) values
+                    |> List.map (fun (key, value) -> JsxProp.KeyValue(key, transformAsExpr com ctx value))
+                | props -> [ JsxProp.Spread(transformAsExpr com ctx props) ]
+
+            // JSX reads a tag starting with a lowercase letter as an HTML element, and takes
+            // nothing but a name or a member access for a component
+            let rec isComponentTag isRoot (tag: Expression) =
+                match tag with
+                | Expression.Identifier ident -> not isRoot || not (Char.IsLower ident.Name[0])
+                | MemberExpression(object, Expression.Identifier _, false, _) -> isComponentTag false object
+                | _ -> false
+
+            match transformAsExpr com ctx render with
+            | tag when isComponentTag true tag -> Expression.jsxElement (tag, props, [])
+            | _ ->
+                error
+                    "needs a function whose name starts with an uppercase letter, because JSX reads a lowercase tag as an HTML element. Rename the function, or bind it to such a name first: let Render = render"
+
     /// Reads the entries out of the list expression F# builds when the list passed to `createObj`
     /// has a `yield!` in it: `Seq.toList (Seq.delay (fun () -> Seq.append ... (Seq.delay ...)))`.
     /// Matches only when every part is an entry or a `yield!` of a list or array literal, and every
@@ -4304,6 +4389,7 @@ but thanks to the optimisation done below we get
             jsxPropsError "JSX.spread can only be used as an element of the props list passed to JSX.create"
             |> addErrorAndReturnNull com range
             |> Some
+        | Fable.Tags.Contains "jsx-el", [ render; props ] -> transformJsxFunctionEl com ctx range render props |> Some
         | Fable.Tags.Contains "jsx-template", args ->
             match args with
             | StringConst template :: _ ->

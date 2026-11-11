@@ -37,6 +37,21 @@ module JSX =
     /// Can only be used as an element of the `props` list passed to `JSX.create`.
     let spread (props: obj) : Prop = nativeOnly
 
+    /// <summary>
+    /// Renders a function that is not decorated with <c>JSX.Component</c> as a JSX tag instead of calling it,
+    /// so the framework treats it as a component of its own (own hooks state, own node in the devtools):
+    /// <c>JSX.el Row {| name = "a" |}</c> compiles to <c>&lt;Row name="a" /&gt;</c>, where calling it compiles
+    /// to <c>Row({ name: "a" })</c>.
+    /// </summary>
+    /// <remarks>
+    /// The function is compiled as usual, so it must already have the shape of a component: a function with
+    /// a name starting with an uppercase letter, taking either <c>unit</c> or one props object (an anonymous
+    /// record, an interface, a <c>Pojo</c> class or <c>obj</c>). Anything else is a compile error. Declare the
+    /// function in a module or a type: a function created during a render is a new component every time and
+    /// loses its state.
+    /// </remarks>
+    let el (render: 'Props -> Element) (props: 'Props) : Element = nativeOnly
+
     /// Creates a JSX Element directly from a string template, which can be interpolated.
     /// When using interpolation note the holes must follow JSX syntax rules.
     /// E.g. holes in the middle of a string or in the position of a prop key are not valid.

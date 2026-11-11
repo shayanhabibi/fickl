@@ -1,0 +1,79 @@
+
+import * as React from "react";
+import { class_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+
+export { React };
+
+export function Logo() {
+    return <span>logo</span>;
+}
+
+export function Row(props) {
+    return <li>{props.name}: {props.count}</li>;
+}
+
+export function Label(props) {
+    return <label>{props.label}</label>;
+}
+
+export function Badge(props) {
+    return <b>{props.text}</b>;
+}
+
+export function Item(props) {
+    return <li>{props.title}</li>;
+}
+
+export class Views {
+    constructor() {
+    }
+}
+
+export function Views_$reflection() {
+    return class_type("JsxFunctionEl.Components.Views", undefined, Views);
+}
+
+export function Views_Footer_BC1C19B(props) {
+    return <footer>{props.name}</footer>;
+}
+
+export function Called(row) {
+    return <ul>
+            {Logo()}
+            {Row(row)}
+        </ul>;
+}
+
+export function Rendered(row, label) {
+    return <ul>
+            <Logo />
+            <Row {...row} />
+            <Row count={row.count + 1}
+        name="literal" />
+            <Row {...row} />
+            <Label {...label} />
+            <Badge {...{
+            text: "new",
+        }} />
+            <Views_Footer_BC1C19B {...row} />
+            <Item data-testid="item"
+        key="k"
+        title="t" />
+        </ul>;
+}
+
+export function RenderWith(Render, row) {
+    return <Render {...row} />;
+}
+
+export function RenderMember(components, row) {
+    return <components.Row {...row} />;
+}
+
+export function InCreate(row) {
+    return <ul>
+        <Row {...row} />
+        <Logo />
+    </ul>;
+}
+
