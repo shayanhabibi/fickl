@@ -1,0 +1,155 @@
+import { record_type, string_type, class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+import type { int32, float64 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { EventEmitter } from "node:events";
+import type { MutableArray, IEquatable, IMap } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+import { Record } from "./fable_modules/fable-library-ts.5.27.0/Types.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.27.0/Option.ts";
+
+export class MyEl {
+    readonly name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+export function MyEl_$reflection(): TypeInfo {
+    return class_type("ConstructorTypes.MyEl", undefined, MyEl);
+}
+
+export function MyEl_$ctor_Z721C83C5(name: string): MyEl {
+    return new MyEl(name);
+}
+
+export function MyEl__get_Name(_: MyEl): string {
+    return _.name;
+}
+
+export abstract class Shape {
+    constructor() {
+    }
+    abstract "ConstructorTypes.Shape.get_Area"(): float64;
+}
+
+export function Shape_$reflection(): TypeInfo {
+    return class_type("ConstructorTypes.Shape", undefined, undefined);
+}
+
+export class Circle extends Shape {
+    readonly radius: float64;
+    constructor(radius: float64) {
+        super();
+        this.radius = radius;
+    }
+    override "ConstructorTypes.Shape.get_Area"(): float64 {
+        const _: Circle = this;
+        return (_.radius * _.radius) * 3;
+    }
+}
+
+export function Circle_$reflection(): TypeInfo {
+    return class_type("ConstructorTypes.Circle", undefined, Circle, Shape_$reflection());
+}
+
+export function Circle_$ctor_5E38073B(radius: float64): Circle {
+    return new Circle(radius);
+}
+
+export class Box$1<T> {
+    readonly value: T;
+    constructor(value: T) {
+        this.value = value;
+    }
+}
+
+export function Box$1_$reflection(gen0: TypeInfo): TypeInfo {
+    return class_type("ConstructorTypes.Box`1", [gen0], Box$1);
+}
+
+export function Box$1_$ctor_2B595<T>(value: T): Box$1<T> {
+    return new Box$1(value);
+}
+
+export function Box$1__get_Value<T>(_: Box$1<T>): T {
+    return _.value;
+}
+
+export const elCtor: new (...args: any[]) => MyEl = MyEl;
+
+export const boxCtor: new (...args: any[]) => Box$1<int32> = Box$1;
+
+export const dateCtor: new (...args: any[]) => Date = Date;
+
+export const emitterCtor: new (...args: any[]) => EventEmitter = EventEmitter;
+
+export const mapCtor: new (...args: any[]) => IMap<string, int32> = Map;
+
+export const shapeCtor: abstract new (...args: any[]) => Shape = Shape;
+
+export function create<T>(ctor: new (...args: any[]) => T, arg: any): T {
+    return new ctor(arg);
+}
+
+export function register(name: string, ctor: new (...args: any[]) => MyEl): MyEl {
+    return new ctor(name);
+}
+
+export class Registration extends Record implements IEquatable<Registration> {
+    readonly Tag: string;
+    readonly Ctor: new (...args: any[]) => MyEl;
+    constructor(Tag: string, Ctor: new (...args: any[]) => MyEl) {
+        super();
+        this.Tag = Tag;
+        this.Ctor = Ctor;
+    }
+}
+
+export function Registration_$reflection(): TypeInfo {
+    return record_type("ConstructorTypes.Registration", [], Registration, () => [["Tag", string_type], ["Ctor", class_type("Fickl.Core.JsConstructor`1", [MyEl_$reflection()])]]);
+}
+
+export class Registry {
+    "Current@": Option<new (...args: any[]) => MyEl>;
+    constructor() {
+        this["Current@"] = undefined;
+    }
+}
+
+export function Registry_$reflection(): TypeInfo {
+    return class_type("ConstructorTypes.Registry", undefined, Registry);
+}
+
+export function Registry_$ctor(): Registry {
+    return new Registry();
+}
+
+export function Registry__get_Current(__: Registry): Option<new (...args: any[]) => MyEl> {
+    return __["Current@"];
+}
+
+export function Registry__set_Current_8C414C0(__: Registry, v: Option<new (...args: any[]) => MyEl>): void {
+    __["Current@"] = v;
+}
+
+export const registration: Registration = new Registration("my-el", elCtor);
+
+export const ctors: MutableArray<new (...args: any[]) => MyEl> = [elCtor, elCtor];
+
+export const registry: Registry = Registry_$ctor();
+
+Registry__set_Current_8C414C0(registry, elCtor);
+
+export const el: MyEl = create<MyEl>(elCtor, "a");
+
+export const registered: MyEl = register("b", registration.Ctor);
+
+export const box: Box$1<int32> = create<Box$1<int32>>(boxCtor, 5);
+
+export const date: Date = create<Date>(dateCtor, 0);
+
+export const emitter: EventEmitter = new emitterCtor();
+
+export const map: IMap<string, int32> = new mapCtor();
+
+export const untyped = Circle as new (...args: any[]) => Circle;
+
+export const circle: Circle = new untyped(2);

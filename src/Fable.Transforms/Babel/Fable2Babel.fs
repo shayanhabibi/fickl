@@ -1659,10 +1659,22 @@ module Annotation =
             |> Some
         | _ -> None
 
+    /// fickl: `JsConstructor<'T>` of an abstract class is an abstract construct signature, the only kind TypeScript
+    /// assigns an abstract class to. Any other `'T` is left to the type's `EmitType` text.
+    let tryAbstractConstructorTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        match ent.FullName, genArgs with
+        | "Fickl.Core.JsConstructor`1", [ Fable.DeclaredType(instance, _) as genArg ] when
+            com.TryGetEntity(instance) |> Option.exists (fun ent -> ent.IsAbstractClass)
+            ->
+            EmitTypeAnnotation("abstract new (...args: any[]) => $0", [| makeTypeAnnotation com ctx genArg |])
+            |> Some
+        | _ -> None
+
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
         match genArgs, ent with
         | _, Patterns.Try (tryKeyTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryIntersectionTypeAnnotation com ctx genArgs) ta -> ta
+        | _, Patterns.Try (tryAbstractConstructorTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryEmitTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryAugmentTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta

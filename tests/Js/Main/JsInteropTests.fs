@@ -475,6 +475,9 @@ type ClassWithAttachmentsChild2() =
     member this.dileHola(name) = this.SaySomethingTo(name, "Hola, {0}")
 
 
+type ConstructedBox<'T>(value: 'T) =
+    member _.Value = value
+
 [<AbstractClass>]
 [<AttachMembers>]
 type AbstractAttachMembersBase() =
@@ -1109,6 +1112,28 @@ let tests =
         jsConstructor<ClassWithAttachments>
         |> handleClass
         |> equal "Hello Narumi!!!!!!"
+
+    testCase "jsConstructorOf is the class, which Create instantiates" <| fun () ->
+        let ctor = Fickl.Core.JsInterop.jsConstructorOf<ClassWithAttachments>
+        obj.ReferenceEquals(ctor, jsConstructor<ClassWithAttachments>) |> equal true
+        let x = ctor.Create(2, "?")
+        x.SaySomethingTo("Narumi") |> equal "Hello Narumi??"
+
+    testCase "A JsConstructor can be passed, stored and instantiated" <| fun () ->
+        let instantiate (ctor: Fickl.Core.JsConstructor<'T>) (arg: obj) : 'T = ctor.Create(arg)
+        let ctors = {| Impl = Fickl.Core.JsInterop.jsConstructorOf<ConcreteAttachMembersImpl> |}
+        (instantiate ctors.Impl null).GetValueWrapped() |> equal "[hello]"
+        let box = instantiate Fickl.Core.JsInterop.jsConstructorOf<ConstructedBox<int>> 5
+        box.Value |> equal 5
+
+    testCase "jsConstructorOf works with abstract and global classes" <| fun () ->
+        let abstractCtor = Fickl.Core.JsInterop.jsConstructorOf<AbstractAttachMembersBase>
+        obj.ReferenceEquals(abstractCtor, jsConstructor<AbstractAttachMembersBase>) |> equal true
+        jsInstanceof (ConcreteAttachMembersImpl()) abstractCtor |> equal true
+        let mapCtor = Fickl.Core.JsInterop.jsConstructorOf<JS.Map<string, int>>
+        let map = mapCtor.Create()
+        map.set("a", 1) |> ignore
+        map.size |> equal 1
 
     testCase "Can useq equals with Object.create(null)" <| fun () -> // See #2900
         let o: obj = emitJsExpr () "Object.create(null)"
