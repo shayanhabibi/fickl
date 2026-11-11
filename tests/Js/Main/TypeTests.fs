@@ -1222,6 +1222,167 @@ type AttachedSecondary(a: int, b: string) =
     new (a: int) = AttachedSecondary(a + 1, "s")
     member _.Show() = string a + b
 
+// `static let` and `static member val` initializers. Those that are safe to run while the class is
+// evaluated become native static fields in JS; the rest keep the static constructor after the class.
+let staticFieldLog = ResizeArray<string>()
+
+let staticFieldTrace (name: string) value =
+    staticFieldLog.Add name
+    value
+
+let staticFieldEarly = staticFieldTrace "early" 10
+
+type StaticFieldBasic() =
+    static let mutable count = staticFieldTrace "count" 42
+    static let other = staticFieldTrace "other" (count + staticFieldEarly)
+    static member Count with get () = count and set v = count <- v
+    static member Other = other
+    static member val Auto = staticFieldTrace "auto" 5 with get, set
+
+let staticFieldMid = staticFieldTrace "mid" 20
+
+type StaticFieldSingleton() =
+    static let mutable created = 0
+    static let instance = StaticFieldSingleton()
+    let id = created + 1
+    do created <- id
+    member _.Id = id
+    static member Created = created
+    static member Instance = instance
+
+[<Fable.Core.AttachMembers>]
+type StaticFieldAttached() =
+    static let mutable n = staticFieldTrace "attached" 1
+    static let s = "x" + string n
+    static let instance = StaticFieldAttached()
+    member _.Hello() = s + "!"
+    static member N with get () = n and set v = n <- v
+    static member S = s
+    static member Instance = instance
+
+type StaticFieldUnion =
+    | SfNone
+    | SfSome of int
+    static let fallback = SfNone
+    static let cache = System.Collections.Generic.Dictionary<int, StaticFieldUnion>()
+    static member Fallback = fallback
+    static member Cache = cache
+
+type StaticFieldUnionWithFields =
+    | SfLeaf
+    | SfNode of int
+    static let leaf = SfLeaf
+    static let node = SfNode 3
+    static member Leaf = leaf
+    static member Node = node
+
+type StaticFieldRecord =
+    { X: int }
+    static let origin = { X = 3 }
+    static member Origin = origin
+
+type StaticFieldGeneric<'T>() =
+    static let mutable hits = 0
+    static member Add(_: 'T) = hits <- hits + 1
+    static member Hits = hits
+
+// TypeScript names the type parameter in the static constructor, outside the class that declares it
+#if !FABLE_COMPILER_TYPESCRIPT
+type StaticFieldGenericItems<'T>() =
+    static let mutable items: 'T list = []
+    static member Add(x: 'T) = items <- x :: items
+    static member Items = items
+#endif
+
+let staticFieldHelper x = staticFieldTrace "helper" (x * 2)
+
+type StaticFieldEarlier(v: int) =
+    member _.V = v
+
+type StaticFieldUsesEarlier() =
+    static let h = staticFieldHelper 4
+    static let e = StaticFieldEarlier(h)
+    static let mapped = [ 1; 2; 3 ] |> List.map (fun x -> x + h)
+    static member H = h
+    static member E = e
+    static member Mapped = mapped
+
+type StaticFieldCallsOwnMember() =
+    static let a = 3
+    static let b = StaticFieldCallsOwnMember.Twice a
+    static member Twice x = x * 2
+    static member B = b
+
+type StaticFieldPing() =
+    static let p = staticFieldTrace "ping" (StaticFieldPong.Make())
+    static member P: StaticFieldPong = p
+
+and StaticFieldPong(v: int) =
+    static let q = staticFieldTrace "pong" 7
+    member _.V = v
+    static member Make() = StaticFieldPong(5)
+    static member Q = q
+
+type StaticFieldStatements() =
+    static let parsed =
+        match System.Int32.TryParse "12" with
+        | true, n -> n
+        | _ -> 0
+
+    static let failed =
+        try
+            int "zz"
+        with _ ->
+            -1
+
+    static member Parsed = parsed
+    static member Failed = failed
+
+type StaticFieldReflectsSelf() =
+    static let t = typeof<StaticFieldReflectsSelf>
+    static member T = t
+
+type StaticFieldWithDo() =
+    static let mutable x = 1
+    static do x <- x + staticFieldTrace "do" 1
+    static member X = x
+
+type StaticFieldBase() =
+    static let mutable b = staticFieldTrace "base" 1
+    static member B = b
+
+type StaticFieldDerived() =
+    inherit StaticFieldBase()
+    static let d = StaticFieldBase.B + 1
+    static member D = d
+
+type StaticFieldLazyClosure() =
+    static let f = fun () -> StaticFieldLazyClosure.Twice 2
+    static member Twice x = x * 2
+    static member F = f
+
+// `name` and `length` are read-only properties of a JS function, which a class is
+type StaticFieldFunctionNames() =
+    static let name = "n"
+    static let length = 3
+    static member Name = name
+    static member Length = length
+
+module rec StaticFieldRec =
+    let early () = Later.A + 1
+
+    type Later() =
+        static let a = 1
+        static let viaEarly = early ()
+        static let viaLate = late ()
+        static member A = a
+        static member ViaEarly = viaEarly
+        static member ViaLate = viaLate
+
+    let late () = 9
+
+let staticFieldLast = staticFieldTrace "last" 30
+
 let tests =
   testList "Types" [
     testCase "Explicit constructors with `as x ... then` work" <| fun () -> // #79
@@ -2457,5 +2618,83 @@ let tests =
         Fable.Core.JsInterop.emitJsExpr<unit> y "$0.Content = 7"
         y.Item |> equal 7
         Fable.Core.JsInterop.emitJsExpr<int> y "$0.Map((v) => v + 1).Content" |> equal 8
+#endif
+
+    testCase "static let initializers run once, in file order" <| fun () ->
+        StaticFieldBasic.Count |> equal 42
+        StaticFieldBasic.Count |> equal 42
+
+        List.ofSeq staticFieldLog
+        |> equal [
+            "early"; "count"; "other"; "auto"; "mid"; "attached"; "helper"
+            "ping"; "pong"; "do"; "base"; "last"
+        ]
+
+    testCase "static let and static member val keep their values" <| fun () ->
+        StaticFieldBasic.Other |> equal 52
+        StaticFieldBasic.Auto |> equal 5
+        StaticFieldBasic.Auto <- 6
+        StaticFieldBasic.Auto |> equal 6
+        StaticFieldBasic.Auto <- 5
+        StaticFieldBasic.Count <- 43
+        StaticFieldBasic.Count |> equal 43
+        StaticFieldBasic.Count <- 42
+
+    testCase "static let can hold an instance of its own class" <| fun () ->
+        StaticFieldSingleton.Created |> equal 1
+        StaticFieldSingleton.Instance.Id |> equal 1
+        obj.ReferenceEquals(StaticFieldSingleton.Instance, StaticFieldSingleton.Instance) |> equal true
+
+    testCase "static let works in a class with AttachMembers" <| fun () ->
+        StaticFieldAttached.S |> equal "x1"
+        StaticFieldAttached.Instance.Hello() |> equal "x1!"
+        StaticFieldAttached.N <- StaticFieldAttached.N + 1
+        StaticFieldAttached.N |> equal 2
+        StaticFieldAttached.N <- 1
+
+    testCase "static let works in unions and records" <| fun () ->
+        StaticFieldUnion.Fallback |> equal SfNone
+        StaticFieldUnion.Cache.Count |> equal 0
+        StaticFieldUnionWithFields.Leaf |> equal SfLeaf
+        StaticFieldUnionWithFields.Node |> equal (SfNode 3)
+        StaticFieldRecord.Origin |> equal { X = 3 }
+
+    testCase "static let works in a generic class" <| fun () ->
+        StaticFieldGeneric<int>.Add 1
+        StaticFieldGeneric<int>.Hits |> equal 1
+#if !FABLE_COMPILER_TYPESCRIPT
+        StaticFieldGenericItems<int>.Add 1
+        StaticFieldGenericItems<int>.Items |> equal [ 1 ]
+#endif
+
+    testCase "static let can use values, functions and types declared earlier" <| fun () ->
+        StaticFieldUsesEarlier.H |> equal 8
+        StaticFieldUsesEarlier.E.V |> equal 8
+        StaticFieldUsesEarlier.Mapped |> equal [ 9; 10; 11 ]
+        StaticFieldDerived.D |> equal 2
+        StaticFieldStatements.Parsed |> equal 12
+        StaticFieldStatements.Failed |> equal -1
+
+    testCase "static let can use members declared after the class" <| fun () ->
+        StaticFieldCallsOwnMember.B |> equal 6
+        StaticFieldPing.P.V |> equal 5
+        StaticFieldPong.Q |> equal 7
+        StaticFieldReflectsSelf.T.Name |> equal "StaticFieldReflectsSelf"
+        StaticFieldWithDo.X |> equal 2
+        StaticFieldLazyClosure.F () |> equal 4
+        StaticFieldRec.Later.ViaEarly |> equal 2
+        StaticFieldRec.Later.ViaLate |> equal 9
+
+    testCase "static let can be named like a property of a function" <| fun () ->
+        StaticFieldFunctionNames.Name |> equal "n"
+        StaticFieldFunctionNames.Length |> equal 3
+
+#if FABLE_COMPILER
+    testCase "static let is a static field of the JS class" <| fun () ->
+        let cons = Fable.Core.JsInterop.jsConstructor<StaticFieldSingleton>
+        Fable.Core.JsInterop.emitJsExpr<bool> cons "Object.hasOwn($0, 'instance')" |> equal true
+        Fable.Core.JsInterop.emitJsExpr<obj> cons "$0.instance" |> equal (box StaticFieldSingleton.Instance)
+        let cons = Fable.Core.JsInterop.jsConstructor<StaticFieldAttached>
+        Fable.Core.JsInterop.emitJsExpr<string> cons "$0.s" |> equal "x1"
 #endif
   ]

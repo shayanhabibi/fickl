@@ -1,0 +1,304 @@
+
+import type { float64, int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { record_type, int32_type, union_type, float64_type, class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+import { type IComparable, type IEquatable, int32ToString } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+import { Record, Union } from "./fable_modules/fable-library-ts.5.27.0/Types.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.27.0/Option.ts";
+
+export const seed = 10;
+
+export class Counter {
+    static "init@6": int32;
+    constructor() {
+    }
+    static count: int32 = 42;
+    static readonly doubled: int32 = ((Counter.count * 2) + seed) | 0;
+    static readonly instance: Counter = new Counter();
+    static "Auto@": int32 = 5;
+}
+
+export function Counter_$reflection(): TypeInfo {
+    return class_type("StaticFields.Counter", undefined, Counter);
+}
+
+export function Counter_$ctor(): Counter {
+    return new Counter();
+}
+
+export function Counter_get_Count(): int32 {
+    return Counter.count | 0;
+}
+
+export function Counter_set_Count_Z524259A4(v: int32): void {
+    Counter.count = (v | 0);
+}
+
+export function Counter_get_Doubled(): int32 {
+    return Counter.doubled | 0;
+}
+
+export function Counter_get_Instance(): Counter {
+    return Counter.instance;
+}
+
+export function Counter_get_Auto(): int32 {
+    return Counter["Auto@"] | 0;
+}
+
+export function Counter_set_Auto_Z524259A4(v: int32): void {
+    Counter["Auto@"] = (v | 0);
+}
+
+export class Attached {
+    static "init@20-1": int32;
+    constructor() {
+    }
+    static get N(): int32 {
+        return Attached.n | 0;
+    }
+    static set N(v: int32) {
+        Attached.n = (v | 0);
+    }
+    static get Label(): string {
+        return Attached.label;
+    }
+    static n: int32 = 1;
+    static readonly label: string = "x" + int32ToString(Attached.n);
+}
+
+export function Attached_$reflection(): TypeInfo {
+    return class_type("StaticFields.Attached", undefined, Attached);
+}
+
+export function Attached_$ctor(): Attached {
+    return new Attached();
+}
+
+export type Shape_$union = 
+    | Shape<0>
+    | Shape<1>
+
+export type Shape_$cases = {
+    0: ["Empty", []],
+    1: ["Circle", [float64]]
+}
+
+export function Shape_Empty() {
+    return Shape.Empty;
+}
+
+export function Shape_Circle(Item: float64) {
+    return new Shape<1>(1, [Item]);
+}
+
+export class Shape<Tag extends keyof Shape_$cases> extends Union<Tag, Shape_$cases[Tag][0]> {
+    static "init@31-2": int32;
+    constructor(tag: Tag, fields: Shape_$cases[Tag][1]) {
+        super();
+        this.tag = tag;
+        this.fields = fields;
+    }
+    readonly tag: Tag;
+    readonly fields: Shape_$cases[Tag][1];
+    cases() {
+        return ["Empty", "Circle"];
+    }
+    static readonly Empty: Shape_$union = new Shape<0>(0, []);
+    static readonly fallback: Shape_$union = Shape.Empty;
+}
+
+export function Shape_$reflection(): TypeInfo {
+    return union_type("StaticFields.Shape", [], Shape, () => [[], [["Item", float64_type]]]);
+}
+
+export function Shape_get_Fallback(): Shape_$union {
+    return Shape.fallback;
+}
+
+export class Point extends Record implements IEquatable<Point>, IComparable<Point> {
+    static "init@38-3": int32;
+    readonly X: int32;
+    constructor(X: int32) {
+        super();
+        this.X = (X | 0);
+    }
+    static readonly origin: Point = new Point(0);
+}
+
+export function Point_$reflection(): TypeInfo {
+    return record_type("StaticFields.Point", [], Point, () => [["X", int32_type]]);
+}
+
+export function Point_get_Origin(): Point {
+    return Point.origin;
+}
+
+export class Registry$1<T> {
+    static "init@44-4": int32;
+    constructor() {
+    }
+    static hits: int32 = 0;
+}
+
+export function Registry$1_$reflection(gen0: TypeInfo): TypeInfo {
+    return class_type("StaticFields.Registry`1", [gen0], Registry$1);
+}
+
+export function Registry$1_$ctor<T>(): Registry$1<T> {
+    return new Registry$1();
+}
+
+export function Registry$1_Hit_2B595<T>(_arg: T): void {
+    Registry$1.hits = ((Registry$1.hits + 1) | 0);
+}
+
+export function Registry$1_get_Hits<T>(): int32 {
+    return Registry$1.hits | 0;
+}
+
+export class CallsOwnMember {
+    static b: int32;
+    static "init@51-5": int32;
+    constructor() {
+    }
+}
+
+export function CallsOwnMember_$reflection(): TypeInfo {
+    return class_type("StaticFields.CallsOwnMember", undefined, CallsOwnMember);
+}
+
+export function CallsOwnMember_$ctor(): CallsOwnMember {
+    return new CallsOwnMember();
+}
+
+((): void => {
+    CallsOwnMember.b = (CallsOwnMember_Twice_Z524259A4(3) | 0);
+})();
+
+export function CallsOwnMember_Twice_Z524259A4(x: int32): int32 {
+    return (x * 2) | 0;
+}
+
+export function CallsOwnMember_get_B(): int32 {
+    return CallsOwnMember.b | 0;
+}
+
+export class ReflectsSelf {
+    static t: any;
+    static "init@57-6": int32;
+    constructor() {
+    }
+}
+
+export function ReflectsSelf_$reflection(): TypeInfo {
+    return class_type("StaticFields.ReflectsSelf", undefined, ReflectsSelf);
+}
+
+export function ReflectsSelf_$ctor(): ReflectsSelf {
+    return new ReflectsSelf();
+}
+
+((): void => {
+    ReflectsSelf.t = ReflectsSelf_$reflection();
+})();
+
+export function ReflectsSelf_get_T(): any {
+    return ReflectsSelf.t;
+}
+
+export type BuildsCaseWithFields_$union = 
+    | BuildsCaseWithFields<0>
+    | BuildsCaseWithFields<1>
+
+export type BuildsCaseWithFields_$cases = {
+    0: ["Leaf", []],
+    1: ["Node", [int32]]
+}
+
+export function BuildsCaseWithFields_Leaf() {
+    return BuildsCaseWithFields.Leaf;
+}
+
+export function BuildsCaseWithFields_Node$(Item: int32) {
+    return new BuildsCaseWithFields<1>(1, [Item]);
+}
+
+export class BuildsCaseWithFields<Tag extends keyof BuildsCaseWithFields_$cases> extends Union<Tag, BuildsCaseWithFields_$cases[Tag][0]> {
+    static node: BuildsCaseWithFields_$union;
+    static "init@61-7": int32;
+    constructor(tag: Tag, fields: BuildsCaseWithFields_$cases[Tag][1]) {
+        super();
+        this.tag = tag;
+        this.fields = fields;
+    }
+    readonly tag: Tag;
+    readonly fields: BuildsCaseWithFields_$cases[Tag][1];
+    cases() {
+        return ["Leaf", "Node"];
+    }
+    static readonly Leaf: BuildsCaseWithFields_$union = new BuildsCaseWithFields<0>(0, []);
+}
+
+export function BuildsCaseWithFields_$reflection(): TypeInfo {
+    return union_type("StaticFields.BuildsCaseWithFields", [], BuildsCaseWithFields, () => [[], [["Item", int32_type]]]);
+}
+
+((): void => {
+    BuildsCaseWithFields.node = BuildsCaseWithFields_Node$(3);
+})();
+
+export function BuildsCaseWithFields_get_Built(): BuildsCaseWithFields_$union {
+    return BuildsCaseWithFields.node;
+}
+
+export class Box$1<T> {
+    static "Last@": Option<any>;
+    static "init@69-8": int32;
+    constructor() {
+    }
+}
+
+export function Box$1_$reflection(gen0: TypeInfo): TypeInfo {
+    return class_type("StaticFields.Box`1", [gen0], Box$1);
+}
+
+export function Box$1_$ctor<T>(): Box$1<T> {
+    return new Box$1();
+}
+
+((): void => {
+    Box$1["Last@"] = undefined;
+})();
+
+export function Box$1_get_Last<T>(): Option<T> {
+    return Box$1["Last@"];
+}
+
+export function Box$1_set_Last_7462E5D6<T>(v: Option<T>): void {
+    Box$1["Last@"] = v;
+}
+
+export class WithStaticDo {
+    static x: int32;
+    static "init@73-9": int32;
+    constructor() {
+    }
+}
+
+export function WithStaticDo_$reflection(): TypeInfo {
+    return class_type("StaticFields.WithStaticDo", undefined, WithStaticDo);
+}
+
+export function WithStaticDo_$ctor(): WithStaticDo {
+    return new WithStaticDo();
+}
+
+((): void => {
+    WithStaticDo.x = 1;
+    WithStaticDo.x = ((WithStaticDo.x + 1) | 0);
+})();
+
+export function WithStaticDo_get_X(): int32 {
+    return WithStaticDo.x | 0;
+}
+

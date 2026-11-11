@@ -1,0 +1,248 @@
+
+import { record_type, int32_type, union_type, float64_type, class_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+import { int32ToString } from "./fable_modules/fable-library-js.5.27.0/Util.js";
+import { Record, Union } from "./fable_modules/fable-library-js.5.27.0/Types.js";
+
+export const seed = 10;
+
+export class Counter {
+    constructor() {
+    }
+    static count = 42;
+    static doubled = ((Counter.count * 2) + seed) | 0;
+    static instance = new Counter();
+    static "Auto@" = 5;
+}
+
+export function Counter_$reflection() {
+    return class_type("StaticFields.Counter", undefined, Counter);
+}
+
+export function Counter_$ctor() {
+    return new Counter();
+}
+
+export function Counter_get_Count() {
+    return Counter.count | 0;
+}
+
+export function Counter_set_Count_Z524259A4(v) {
+    Counter.count = (v | 0);
+}
+
+export function Counter_get_Doubled() {
+    return Counter.doubled | 0;
+}
+
+export function Counter_get_Instance() {
+    return Counter.instance;
+}
+
+export function Counter_get_Auto() {
+    return Counter["Auto@"] | 0;
+}
+
+export function Counter_set_Auto_Z524259A4(v) {
+    Counter["Auto@"] = (v | 0);
+}
+
+export class Attached {
+    constructor() {
+    }
+    static get N() {
+        return Attached.n | 0;
+    }
+    static set N(v) {
+        Attached.n = (v | 0);
+    }
+    static get Label() {
+        return Attached.label;
+    }
+    static n = 1;
+    static label = "x" + int32ToString(Attached.n);
+}
+
+export function Attached_$reflection() {
+    return class_type("StaticFields.Attached", undefined, Attached);
+}
+
+export function Attached_$ctor() {
+    return new Attached();
+}
+
+export class Shape extends Union {
+    constructor(tag, fields) {
+        super();
+        this.tag = tag;
+        this.fields = fields;
+    }
+    cases() {
+        return ["Empty", "Circle"];
+    }
+    static Empty = new Shape(0, []);
+    static fallback = Shape.Empty;
+}
+
+export function Shape_$reflection() {
+    return union_type("StaticFields.Shape", [], Shape, () => [[], [["Item", float64_type]]]);
+}
+
+export function Shape_get_Fallback() {
+    return Shape.fallback;
+}
+
+export class Point extends Record {
+    constructor(X) {
+        super();
+        this.X = (X | 0);
+    }
+    static origin = new Point(0);
+}
+
+export function Point_$reflection() {
+    return record_type("StaticFields.Point", [], Point, () => [["X", int32_type]]);
+}
+
+export function Point_get_Origin() {
+    return Point.origin;
+}
+
+export class Registry$1 {
+    constructor() {
+    }
+    static hits = 0;
+}
+
+export function Registry$1_$reflection(gen0) {
+    return class_type("StaticFields.Registry`1", [gen0], Registry$1);
+}
+
+export function Registry$1_$ctor() {
+    return new Registry$1();
+}
+
+export function Registry$1_Hit_2B595(_arg) {
+    Registry$1.hits = ((Registry$1.hits + 1) | 0);
+}
+
+export function Registry$1_get_Hits() {
+    return Registry$1.hits | 0;
+}
+
+export class CallsOwnMember {
+    constructor() {
+    }
+}
+
+export function CallsOwnMember_$reflection() {
+    return class_type("StaticFields.CallsOwnMember", undefined, CallsOwnMember);
+}
+
+export function CallsOwnMember_$ctor() {
+    return new CallsOwnMember();
+}
+
+(() => {
+    CallsOwnMember.b = (CallsOwnMember_Twice_Z524259A4(3) | 0);
+})();
+
+export function CallsOwnMember_Twice_Z524259A4(x) {
+    return (x * 2) | 0;
+}
+
+export function CallsOwnMember_get_B() {
+    return CallsOwnMember.b | 0;
+}
+
+export class ReflectsSelf {
+    constructor() {
+    }
+}
+
+export function ReflectsSelf_$reflection() {
+    return class_type("StaticFields.ReflectsSelf", undefined, ReflectsSelf);
+}
+
+export function ReflectsSelf_$ctor() {
+    return new ReflectsSelf();
+}
+
+(() => {
+    ReflectsSelf.t = ReflectsSelf_$reflection();
+})();
+
+export function ReflectsSelf_get_T() {
+    return ReflectsSelf.t;
+}
+
+export class BuildsCaseWithFields extends Union {
+    constructor(tag, fields) {
+        super();
+        this.tag = tag;
+        this.fields = fields;
+    }
+    cases() {
+        return ["Leaf", "Node"];
+    }
+    static Leaf = new BuildsCaseWithFields(0, []);
+}
+
+export function BuildsCaseWithFields_$reflection() {
+    return union_type("StaticFields.BuildsCaseWithFields", [], BuildsCaseWithFields, () => [[], [["Item", int32_type]]]);
+}
+
+(() => {
+    BuildsCaseWithFields.node = (new BuildsCaseWithFields(/* Node */ 1, [3]));
+})();
+
+export function BuildsCaseWithFields_get_Built() {
+    return BuildsCaseWithFields.node;
+}
+
+export class Box$1 {
+    constructor() {
+    }
+}
+
+export function Box$1_$reflection(gen0) {
+    return class_type("StaticFields.Box`1", [gen0], Box$1);
+}
+
+export function Box$1_$ctor() {
+    return new Box$1();
+}
+
+(() => {
+    Box$1["Last@"] = undefined;
+})();
+
+export function Box$1_get_Last() {
+    return Box$1["Last@"];
+}
+
+export function Box$1_set_Last_7462E5D6(v) {
+    Box$1["Last@"] = v;
+}
+
+export class WithStaticDo {
+    constructor() {
+    }
+}
+
+export function WithStaticDo_$reflection() {
+    return class_type("StaticFields.WithStaticDo", undefined, WithStaticDo);
+}
+
+export function WithStaticDo_$ctor() {
+    return new WithStaticDo();
+}
+
+(() => {
+    WithStaticDo.x = 1;
+    WithStaticDo.x = ((WithStaticDo.x + 1) | 0);
+})();
+
+export function WithStaticDo_get_X() {
+    return WithStaticDo.x | 0;
+}
+
