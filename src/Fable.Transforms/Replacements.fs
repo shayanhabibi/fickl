@@ -2066,6 +2066,7 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
             Helper.LibCall(com, "JSX", "spread", t, args, ?loc = r)
             |> withTag "jsx-spread"
             |> Some
+        | "el" -> Helper.LibCall(com, "JSX", "el", t, args, ?loc = r) |> withTag "jsx-el" |> Some
         | "html"
         | "jsx" ->
             Helper.LibCall(com, "JSX", "html", t, args, ?loc = r)
@@ -2548,13 +2549,24 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
         applyOp com ctx r t i.CompiledName args |> Some
     // Type info
     | "TypeOf", _ ->
-        (genArg com ctx r 0 i.GenericArgs)
-        |> makeTypeInfo (changeRangeToCallSite ctx.InlinePath r)
-        |> Some
+        let genArg = genArg com ctx r 0 i.GenericArgs
+        let range = changeRangeToCallSite ctx.InlinePath r
+
+        if FSharp2Fable.Util.PassGenerics.dependsOnPassed com ctx genArg then
+            FSharp2Fable.Util.PassGenerics.makeTypeInfo range genArg |> Some
+        else
+            makeTypeInfo range genArg |> Some
     | "TypeDefOf", _ ->
-        (genArg com ctx r 0 i.GenericArgs)
-        |> makeTypeDefinitionInfo (changeRangeToCallSite ctx.InlinePath r)
-        |> Some
+        let range = changeRangeToCallSite ctx.InlinePath r
+
+        match genArg com ctx r 0 i.GenericArgs with
+        // fickl: the definition of a type passed with PassGenerics is only known at runtime
+        | GenericParam(name = name) as genArg when FSharp2Fable.Util.PassGenerics.isPassed com ctx name ->
+            let typeInfo = FSharp2Fable.Util.PassGenerics.makeTypeInfo range genArg
+
+            Helper.LibCall(com, "Reflection", "getGenericTypeDefinition", t, [ typeInfo ], ?loc = r)
+            |> Some
+        | genArg -> makeTypeDefinitionInfo range genArg |> Some
     | _ -> None
 
 /// The runtime module of a DateOnly, TimeOnly or TimeSpan
@@ -5982,15 +5994,280 @@ let rec private hasAnonymousRecord (t: Type) =
     | AnonymousRecordType _ -> true
     | t -> List.exists hasAnonymousRecord t.Generics
 
+/// fickl: `typeof<T>.GetMethod("name")` is resolved while compiling, as members have no table to look them up in
+/// at runtime: the `MethodInfo` holds a function that calls the one member found (#293)
+module private GetMethod =
+    open FSharp.Compiler.Symbols
+    open Fable.Transforms.FSharp2Fable
+
+    [<Literal>]
+    let private Public = 16
+
+    [<Literal>]
+    let private Instance = 4
+
+    [<Literal>]
+    let private Static = 8
+
+    let private requirements =
+        "Type.GetMethod is resolved at compile time, so it needs a type known at compile time, as in typeof<MyType>, "
+        + "and literals for the name of the method and for the binding flags or the types of the parameters"
+
+    let rec private tryBindingFlags ctx (e: Expr) =
+        match e with
+        | MaybeInScope ctx (NumberConst(NumberValue.Int32 flags, _)) -> Some flags
+        | MaybeInScope ctx (Operation(Binary(BinaryOrBitwise, left, right), _, _, _)) ->
+            match tryBindingFlags ctx left, tryBindingFlags ctx right with
+            | Some left, Some right -> Some(left ||| right)
+            | _ -> None
+        | _ -> None
+
+    let private tryTypes ctx (e: Expr) =
+        match e with
+        | MaybeInScope ctx (ArrayOrListLiteral(types, _)) ->
+            let known =
+                types
+                |> List.choose (
+                    function
+                    | MaybeCasted(Value(TypeInfo(t, _), _)) -> Some t
+                    | _ -> None
+                )
+
+            if List.sameLength known types then
+                Some known
+            else
+                None
+        | _ -> None
+
+    let private makeGenMap (ent: FSharpEntity) (genArgs: Type list) =
+        let names = ent.GenericParameters |> Seq.mapToList TypeHelpers.genParamName
+
+        if List.sameLength names genArgs then
+            List.zip names genArgs |> Map
+        else
+            Map.empty
+
+    /// The type and the types it inherits from, each with its generic arguments
+    let rec private hierarchy (ent: FSharpEntity) (genArgs: Type list) =
+        let ent = Helpers.nonAbbreviatedDefinition ent
+
+        (ent, genArgs)
+        :: (
+            match TypeHelpers.tryGetBaseEntity ent with
+            | Some(baseEnt, baseGenArgs) ->
+                let genMap = makeGenMap ent genArgs
+                baseGenArgs |> Seq.mapToList (TypeHelpers.makeType genMap) |> hierarchy baseEnt
+            | None -> []
+        )
+
+    let private paramTypes genMap (memb: FSharpMemberOrFunctionOrValue) =
+        match
+            memb.CurriedParameterGroups
+            |> Seq.concat
+            |> Seq.mapToList (fun p -> TypeHelpers.makeType genMap p.Type)
+        with
+        | [ Unit ] -> []
+        | types -> types
+
+    let private sameTypes (types1: Type list) (types2: Type list) =
+        List.sameLength types1 types2 && List.forall2 (typeEquals true) types1 types2
+
+    /// The members .NET finds by name: the public methods of the type and the public instance methods it inherits
+    let private findMethods (ent: FSharpEntity) genArgs (name: string) flags (argTypes: Type list option) =
+        let found =
+            Collections.Generic.List<FSharpEntity * Type list * FSharpMemberOrFunctionOrValue>()
+
+        hierarchy ent genArgs
+        |> List.iteri (fun depth (declaringEnt, genArgs) ->
+            let genMap = makeGenMap declaringEnt genArgs
+
+            for memb in declaringEnt.TryGetMembersFunctionsAndValues() do
+                let membParamTypes = lazy (paramTypes genMap memb)
+
+                // An override and the abstract member it implements are one method
+                let isHidden () =
+                    found
+                    |> Seq.exists (fun (ent, genArgs, other) ->
+                        other.IsInstanceMember = memb.IsInstanceMember
+                        && sameTypes (membParamTypes.Force()) (paramTypes (makeGenMap ent genArgs) other)
+                    )
+
+                if
+                    memb.CompiledName = name
+                    && not memb.IsProperty
+                    && not memb.IsEvent
+                    && not memb.IsConstructor
+                    && not memb.IsExtensionMember
+                    && not memb.IsExplicitInterfaceImplementation
+                    && memb.Accessibility.IsPublic
+                    && (depth = 0 || memb.IsInstanceMember)
+                    && flags
+                       &&& (if memb.IsInstanceMember then
+                                Instance
+                            else
+                                Static)
+                       <> 0
+                    && (argTypes |> Option.forall (sameTypes (membParamTypes.Force())))
+                    && not (isHidden ())
+                then
+                    found.Add(declaringEnt, genArgs, memb)
+        )
+
+        Seq.toList found
+
+    /// Whether .NET may have a method the compiler knows nothing about, like the ones it generates for a record
+    let private mayBeImplicit (ent: FSharpEntity) (name: string) =
+        match name with
+        | "ToString"
+        | "Equals"
+        | "GetHashCode"
+        | "GetType" -> true
+        | _ when ent.IsEnum || ent.IsDelegate -> true
+        | _ when
+            ent.IsFSharpRecord
+            || ent.IsFSharpUnion
+            || ent.IsFSharpExceptionDeclaration
+            || ent.IsValueType
+            ->
+            name = "CompareTo"
+            || name.StartsWith("get_", StringComparison.Ordinal)
+            || name.StartsWith("set_", StringComparison.Ordinal)
+            || name.StartsWith("New", StringComparison.Ordinal)
+        | _ -> false
+
+    let private makeMethodInfo
+        (com: ICompiler)
+        (ctx: Context)
+        r
+        (ent: FSharpEntity)
+        (genArgs: Type list)
+        (memb: FSharpMemberOrFunctionOrValue)
+        =
+        let genMap = makeGenMap ent genArgs
+
+        let parameters =
+            match
+                Seq.concat memb.CurriedParameterGroups
+                |> Seq.toList
+                |> List.mapi (fun i p -> defaultArg p.Name $"arg%d{i}", TypeHelpers.makeType genMap p.Type)
+            with
+            | [ _, Unit ] -> []
+            | parameters -> parameters
+
+        let returnType = TypeHelpers.makeType genMap memb.ReturnParameter.Type
+        let target = makeUniqueIdent com ctx Any "target"
+        let args = makeUniqueIdent com ctx (Array(Any, MutableArray)) "args"
+
+        // The compiled member takes its parameters as .NET does: one after another, whether tupled or curried
+        let callArgs =
+            parameters
+            |> List.mapi (fun i (_, t) -> makeIntConst i |> getExpr None t (IdentExpr args))
+
+        let callee =
+            if memb.IsInstanceMember then
+                Some(IdentExpr target)
+            else
+                None
+
+        let invoke =
+            Util.makeCallFrom com ctx r returnType genArgs callee callArgs memb
+            |> makeDelegate [ target; args ]
+
+        let args =
+            [
+                makeStrConst memb.CompiledName
+                parameters
+                |> List.map (fun (name, t) -> makeTuple None false [ makeStrConst name; makeTypeInfo None t ])
+                |> makeArray Any
+                makeTypeInfo None returnType
+                makeBoolConst (not memb.IsInstanceMember)
+                invoke
+            ]
+
+        Helper.LibCall(com, "Reflection", "MethodInfo", Any, args, isConstructor = true, ?loc = r)
+
+    let private resolveIn (com: ICompiler) (ctx: Context) r t (ent: FSharpEntity) genArgs name flags argTypes =
+        let error msg =
+            addError com ctx.InlinePath r msg
+            Value(Null t, r)
+
+        match findMethods ent genArgs name flags argTypes with
+        | [] when mayBeImplicit ent name ->
+            $"Type.GetMethod cannot tell whether %s{ent.DisplayName} has a method named '%s{name}': only the members written in the type are known at compile time"
+            |> error
+        | [] -> Value(Null t, r)
+        | [ declaringEnt, genArgs, memb ] ->
+            if memb.IsCompilerGenerated || Option.isNone (FsEnt.Ref declaringEnt).SourcePath then
+                $"Type.GetMethod cannot give a method for %s{declaringEnt.DisplayName}.%s{name}: it is not compiled from F# sources"
+                |> error
+            elif memb.GenericParameters.Count > declaringEnt.GenericParameters.Count then
+                $"Type.GetMethod does not support generic methods: %s{declaringEnt.DisplayName}.%s{name}"
+                |> error
+            elif Helpers.isInline memb then
+                $"Type.GetMethod does not support inline members: %s{declaringEnt.DisplayName}.%s{name}"
+                |> error
+            else
+                makeMethodInfo com ctx r declaringEnt genArgs memb
+        | _ ->
+            $"Ambiguous match: %s{ent.DisplayName} has more than one public method named '%s{name}'. "
+            + "Pass the types of the parameters, as in GetMethod(name, [| typeof<int> |])"
+            |> error
+
+    let resolve (com: ICompiler) (ctx: Context) r t (thisArg: Expr) (args: Expr list) =
+        let error msg =
+            addError com ctx.InlinePath r msg
+            Value(Null t, r)
+
+        let flagsAndTypes =
+            match args with
+            | [ _ ] -> Some(Public ||| Instance ||| Static, None)
+            | [ _; types ] when types.Type = Array(MetaType, MutableArray) ->
+                tryTypes ctx types
+                |> Option.map (fun types -> Public ||| Instance ||| Static, Some types)
+            | [ _; flags ] -> tryBindingFlags ctx flags |> Option.map (fun flags -> flags, None)
+            | _ -> None
+
+        match thisArg, args, flagsAndTypes with
+        | Value(TypeInfo(GenericParam(name = name), _), _), _, _ -> genericTypeInfoError name |> error
+        | Value(TypeInfo(DeclaredType(entRef, genArgs), _), _),
+          MaybeInScopeStringConst ctx name :: _,
+          Some(flags, types) ->
+            if flags &&& ~~~(Public ||| Instance ||| Static) <> 0 || flags &&& Public = 0 then
+                "Type.GetMethod only supports the binding flags Public, Instance and Static, and Public is required"
+                |> error
+            else
+                match com.GetEntity(entRef) with
+                | :? FsEnt as ent when Option.isSome entRef.SourcePath ->
+                    resolveIn com ctx r t ent.FSharpEntity genArgs name flags types
+                | ent ->
+                    $"Type.GetMethod is not supported for %s{ent.FullName}: its members are not compiled from F# sources"
+                    |> error
+        | Value(TypeInfo(DeclaredType _, _), _), ([ _ ] | [ _; _ ]), _ -> error requirements
+        | Value(TypeInfo(DeclaredType _, _), _), _, _ ->
+            "Type.GetMethod is only supported with a name, and either binding flags or the types of the parameters"
+            |> error
+        | Value(TypeInfo(typ, _), _), _, _ ->
+            $"Type.GetMethod is not supported for %s{getTypeFullName false typ}: only classes, records, unions and interfaces compiled from F# sources have methods to find"
+            |> error
+        | _ -> error requirements
+
 let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     let returnString r x = StringConstant x |> makeValue r |> Some
 
     let resolved =
         // Some optimizations when the type is known at compile time
         match thisArg with
+        | Some(MaybeInScope ctx typ) when
+            i.CompiledName = "GetMethod"
+            && (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+            ->
+            GetMethod.resolve com ctx r t typ args |> Some
+        // fickl: a type passed with PassGenerics is only known at runtime
+        | Some(Value(TypeInfo(exprType, _), _)) when FSharp2Fable.Util.PassGenerics.dependsOnPassed com ctx exprType ->
+            None
         | Some(Value(TypeInfo(exprType, _), exprRange) as thisArg) ->
             match exprType with
-            | GenericParam(name = name) -> genericTypeInfoError name |> addError com ctx.InlinePath exprRange
+            | GenericParam(name = name) -> genericTypeInfoErrorFor com name |> addError com ctx.InlinePath exprRange
             | _ -> ()
 
             match i.CompiledName with
@@ -6805,6 +7082,11 @@ let private nativeFunction (com: ICompiler) (ctx: Context) r t methodName args =
         match args with
         | [ arg ] -> TypeCast(arg, t) |> Some
         | _ -> None
+    // FableTransforms leaves the binding of a value with this tag alone, then drops the wrapper
+    | "keepBinding", _ ->
+        match args with
+        | [ arg ] -> emit r t [ arg ] false "$0" |> withTag "fickl-keep-binding" |> Some
+        | _ -> None
     | "jsSpread", _ ->
         match args with
         | [ source; setters ] ->
@@ -7123,6 +7405,17 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
         | Some c, "get_Tag" -> makeStrConst "tag" |> getExpr r t c |> Some
         | Some c, "get_ReturnType" -> makeStrConst "returnType" |> getExpr r t c |> Some
         | Some c, "GetParameters" -> makeStrConst "parameters" |> getExpr r t c |> Some
+        // fickl: only the methods that `Type.GetMethod` finds at compile time have these (#293)
+        | Some c, ("get_IsStatic" | "Invoke" as meth) when
+            (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+            && List.length args =
+                (if meth = "Invoke" then
+                     2
+                 else
+                     0)
+            ->
+            let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst
+            Helper.LibCall(com, "Reflection", meth, t, c :: args, ?loc = r) |> Some
         | Some c, ("get_PropertyType" | "get_ParameterType") -> makeIntConst 1 |> getExpr r t c |> Some
         | Some c, "GetFields" ->
             Helper.LibCall(com, "Reflection", "getUnionCaseFields", t, [ c ], ?loc = r)
@@ -7133,7 +7426,10 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
             |> Some
         | Some c, "get_Name" ->
             match c with
-            | Value(TypeInfo(exprType, _), loc) when not (hasAnonymousRecord exprType) ->
+            | Value(TypeInfo(exprType, _), loc) when
+                not (hasAnonymousRecord exprType)
+                && not (FSharp2Fable.Util.PassGenerics.dependsOnPassed com ctx exprType)
+                ->
                 getTypeName com ctx loc exprType |> StringConstant |> makeValue r |> Some
             | c -> Helper.LibCall(com, "Reflection", "name", t, [ c ], ?loc = r) |> Some
         | _ -> None

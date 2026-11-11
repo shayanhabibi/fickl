@@ -2713,6 +2713,19 @@ let private transformMemberFunction
                     | None -> body, getFunctionMemberRef memb
                 | _ -> body, getFunctionMemberRef memb
 
+            let args =
+                if PassGenerics.isPassing com memb then
+                    match memberRef, PassGenerics.tryGetDeclarationError memb with
+                    | Fable.GeneratedMemberRef _, _ ->
+                        "PassGenerics is not supported on decorated functions"
+                        |> addError com ctx.InlinePath (Some(makeRange memb.DeclarationLocation))
+
+                        args
+                    | _, Some _ -> args // Reported by transformMemberDecl
+                    | _, None -> PassGenerics.declarationArgs com bodyCtx memb args
+                else
+                    args
+
             [
                 Fable.MemberDeclaration
                     {
@@ -2890,6 +2903,17 @@ let private transformMemberDecl
 
     TypeGuards.check com memb
 
+    let isPassingGenerics = PassGenerics.isPassing com memb
+
+    if isPassingGenerics then
+        PassGenerics.tryGetDeclarationError memb
+        |> Option.iter (addError com ctx.InlinePath (Some(makeRange memb.DeclarationLocation)))
+
+    let checkPassGenericsOnAttachedMember () =
+        if isPassingGenerics then
+            "PassGenerics is not supported on members attached to the class prototype"
+            |> addError com ctx.InlinePath (Some(makeRange memb.DeclarationLocation))
+
     if
         (FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
         && (memb.DeclaringEntity |> Option.exists _.IsFSharpModule)
@@ -3022,12 +3046,14 @@ let private transformMemberDecl
             && memb.CompiledName <> ".cctor"
             && not (isExplicitConstructorFunction com memb)
             ->
+            checkPassGenericsOnAttachedMember ()
             transformExplicitlyAttachedMember com ctx ent memb args body
             []
         | _ ->
             match tryAttachedExtensionEntity com memb with
             | Some ent ->
                 checkAttachedExtensionCollision com ctx ent memb
+                checkPassGenericsOnAttachedMember ()
                 transformExplicitlyAttachedMember com ctx ent memb args body
                 []
             | None -> transformMemberFunctionOrValue com ctx memb args body

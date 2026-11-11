@@ -16,6 +16,22 @@ let ComponentAcceptingCurriedFunction fn _oneMoreParam =
         prop.text (value.ToString())
     ]
 
+// A release build moves `scrollRef` and `isThreshold` into the condition; `keepBinding` keeps each
+// hook call as a statement of its own at the top level of the hook (#309)
+let useKeptBindings (threshold: int) =
+    let (smOrAbove, _) = Feliz.React.useState true
+    let scrollRef = Fickl.Core.JsInterop.keepBinding (Feliz.React.useRef 3)
+    let isThreshold = Fickl.Core.JsInterop.keepBinding (Feliz.React.useMemo ((fun () -> threshold > scrollRef.current), [| box threshold |]))
+    isThreshold && smOrAbove
+
+[<ReactComponent>]
+let ComponentWithKeptBindings (threshold: int) =
+    let above = useKeptBindings threshold
+    Html.p [
+        prop.testId "kept"
+        prop.text (if above then "above" else "below")
+    ]
+
 Jest.describe("React tests", (fun () ->
 
     Jest.test("Counter renders correctly", (fun () ->
@@ -85,6 +101,17 @@ Jest.describe("React tests", (fun () ->
         Jest.expect(node).toHaveTextContent("John Doe")
     ))
 
+    Jest.test("keepBinding keeps hook calls as top-level statements", (fun () ->
+        let source: string = emitJsExpr useKeptBindings "String($0)"
+        Jest.expect(source.Contains("const scrollRef =")).toBe(true)
+        Jest.expect(source.Contains("const isThreshold =")).toBe(true)
+
+        let elem = RTL.render(ComponentWithKeptBindings 5)
+        Jest.expect(elem.getByTestId "kept").toHaveTextContent("above")
+        elem.rerender(ComponentWithKeptBindings 1)
+        Jest.expect(elem.getByTestId "kept").toHaveTextContent("below")
+    ))
+
     Jest.test("JSX format specifier hole renders correctly", (fun () ->
         let elem = RTL.render(Counter.FormatSpecifierJSX(3.14159) |> unbox)
         let node = elem.getByTestId "format-specifier"
@@ -103,6 +130,38 @@ Jest.describe("React tests", (fun () ->
         // The same DOM node with the same state: the counter was not mounted again
         Jest.expect(elem.getByTestId "header-jsx").toBe(header)
         Jest.expect(elem.getByTestId "header-jsx").toHaveTextContent("6")
+    ))
+
+    Jest.test("A function called in a template keeps its state in the caller", (fun () ->
+        Counter.plainCounterHostRenders <- 0
+        let elem = RTL.render(Counter.PlainCounterCalled(5) |> unbox)
+        let button = elem.getByTestId "plain-called"
+        Jest.expect(Counter.plainCounterHostRenders).toBe(1)
+        RTL.fireEvent.click(button)
+        Jest.expect(button).toHaveTextContent("6")
+        Jest.expect(Counter.plainCounterHostRenders).toBe(2)
+    ))
+
+    Jest.test("JSX.el renders an undecorated function as a component with its own state", (fun () ->
+        Counter.plainCounterHostRenders <- 0
+        let elem = RTL.render(Counter.PlainCounterRendered(5) |> unbox)
+        let first = elem.getByTestId "plain-rendered-1"
+        let second = elem.getByTestId "plain-rendered-2"
+        Jest.expect(elem.getByTestId "plain-label").toHaveTextContent("label")
+        Jest.expect(first).toHaveTextContent("5")
+        Jest.expect(second).toHaveTextContent("15")
+        RTL.fireEvent.click(first)
+        RTL.fireEvent.click(first)
+        RTL.fireEvent.click(second)
+        Jest.expect(first).toHaveTextContent("7")
+        Jest.expect(second).toHaveTextContent("16")
+        // The state belongs to the counters, so the component rendering them is not rendered again
+        Jest.expect(Counter.plainCounterHostRenders).toBe(1)
+    ))
+
+    Jest.test("JSX.el compiles to a tag with the fields as props", (fun () ->
+        let elem = Fable.Core.JSX.el Counter.PlainCounter {| init = 1; testId = "t" |}
+        Jest.expect(elem).toStrictEqual(Fable.Core.JSX.jsx """<PlainCounter init={1} testId="t" />""")
     ))
 
 ))

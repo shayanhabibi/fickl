@@ -381,3 +381,20 @@ type AugmentModuleAttribute(modulePath: string, interfaceName: string) =
     inherit Attribute()
     member _.ModulePath = modulePath
     member _.InterfaceName = interfaceName
+
+/// <summary>Passes the type arguments of a generic function to it at runtime, so <c>typeof&lt;'T></c> works without <c>inline</c>.</summary>
+/// <remarks>
+/// <code>
+/// [&lt;PassGenerics>]
+/// let nameOf&lt;'T> () = typeof&lt;'T>.Name
+/// </code>
+/// The compiled function takes one extra trailing argument per type parameter, and every F# call passes the type
+/// information: of the known type, or of the caller's own type parameter when the caller is <c>inline</c> or has
+/// this attribute too. Applies to JavaScript and TypeScript, on module functions and non-virtual members of
+/// classes; not on abstract members, overrides, interface implementations, members attached to the class
+/// prototype, or functions with a <c>ParamArray</c> or <c>ParamObject</c>. The extra arguments are part of the
+/// JavaScript signature, so calls from JavaScript code must pass them.
+/// </remarks>
+[<AttributeUsage(AttributeTargets.Method)>]
+type PassGenericsAttribute() =
+    inherit Attribute()

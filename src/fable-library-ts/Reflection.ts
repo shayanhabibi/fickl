@@ -38,15 +38,22 @@ export class MethodInfo {
   public name: string;
   public parameters: ParameterInfo[];
   public returnType: TypeInfo;
+  // Only the methods found by Type.GetMethod, which the compiler resolves, have these
+  public isStatic?: boolean | undefined;
+  public invoke?: ((target: any, args: any[]) => any) | undefined;
 
   constructor(
     name: string,
     parameters: ParameterInfo[],
     returnType: TypeInfo,
+    isStatic?: boolean,
+    invoke?: (target: any, args: any[]) => any,
   ) {
     this.name = name;
     this.parameters = parameters;
     this.returnType = returnType;
+    this.isStatic = isStatic;
+    this.invoke = invoke;
   }
 }
 
@@ -638,6 +645,29 @@ export function createInstance(t: TypeInfo, consArgs?: any[]): any {
         throw new Exception(`Cannot access constructor of ${t.fullname}`);
     }
   }
+}
+
+// MethodInfo.IsStatic, for a method found by Type.GetMethod
+export function isStatic(method: MethodInfo): boolean {
+  if (method.isStatic == null) {
+    throw new Exception(`Cannot tell whether ${method.name} is static: only the methods found by Type.GetMethod know`);
+  }
+  return method.isStatic;
+}
+
+// MethodInfo.Invoke, for a method found by Type.GetMethod
+export function invoke(method: MethodInfo, target: any, args?: any[] | null): any {
+  if (method.invoke == null) {
+    throw new Exception(`Cannot invoke ${method.name}: only the methods found by Type.GetMethod can be invoked`);
+  }
+  const args_ = args ?? [];
+  if (!method.isStatic && target == null) {
+    throw new Exception("Non-static method requires a target.");
+  }
+  if (args_.length !== method.parameters.length) {
+    throw new Exception("Parameter count mismatch.");
+  }
+  return method.invoke(target, args_);
 }
 
 export function getValue(propertyInfo: PropertyInfo, v: any): any {

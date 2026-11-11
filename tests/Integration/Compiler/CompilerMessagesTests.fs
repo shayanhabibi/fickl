@@ -2021,4 +2021,162 @@ let run () =
 """
       |> Assert.Is.strictSuccess
       |> ignore
+
+    // fickl#292
+    testCase "typeof of a type parameter in a non-inline function suggests PassGenerics" <| fun _ ->
+      compile """
+let nameOf<'T> () = typeof<'T>.Name
+"""
+      |> Assert.Exists.errorWith "Cannot get type info of generic parameter T"
+      |> Assert.Exists.errorWith "add the Fickl.Core.PassGenerics attribute"
+      |> ignore
+
+    testCase "PassGenerics passes type arguments to a non-inline function" <| fun _ ->
+      compile """
+open Fickl.Core
+[<PassGenerics>]
+let nameOf<'T> () = typeof<'T>.Name
+[<PassGenerics>]
+let forward<'T> (x: 'T) = nameOf<'T list> ()
+let inline viaInline (x: 'T) = forward x
+type C<'T>() =
+  [<PassGenerics>]
+  member _.Name<'U>(?x: int) = typeof<'T>.Name + typeof<'U>.Name
+[<PassGenerics>]
+let typeFunction<'T> = typeof<'T>.Name
+let run () = typeFunction<int>, nameOf<int> (), forward 1, viaInline "a", C<int>().Name<string>(), List.map forward [ 1 ]
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
+    // fickl#293: Type.GetMethod is resolved at compile time
+    testCase "Type.GetMethod and MethodInfo.Invoke compile for a known type and a literal name" <| fun _ ->
+      compile """
+type Calc(k: int) =
+    static member Add(a: int, b: int) = a + b
+    static member Over(a: int) = a
+    static member Over(a: string) = a
+    member _.Scale(x: int) = x * k
+let inline find<'T> (name: string) = typeof<'T>.GetMethod(name)
+let run () =
+  typeof<Calc>.GetMethod("Add").Invoke(null, [| box 1; box 2 |]),
+  typeof<Calc>.GetMethod("Scale").Invoke(Calc(2), [| box 1 |]),
+  typeof<Calc>.GetMethod("Over", [| typeof<int> |]).IsStatic,
+  typeof<Calc>.GetMethod("Missing"),
+  (find<Calc> "Add").Name
+"""
+      |> Assert.Is.strictSuccess
+      |> ignore
+
+    testCase "A generic caller of a PassGenerics function must pass its type arguments too" <| fun _ ->
+      compile """
+open Fickl.Core
+[<PassGenerics>]
+let nameOf<'T> () = typeof<'T>.Name
+let caller<'T> (x: 'T) = nameOf<'T> ()
+"""
+      |> Assert.Exists.errorWith "Cannot get type info of generic parameter T"
+      |> Assert.Exists.errorWith "add the Fickl.Core.PassGenerics attribute"
+      |> ignore
+
+    testCase "PassGenerics is rejected where the type arguments cannot be passed" <| fun _ ->
+      compile """
+open Fable.Core
+open Fickl.Core
+type IDescribe =
+  abstract Name<'T> : unit -> string
+type Describe() =
+  interface IDescribe with
+    [<PassGenerics>]
+    member _.Name<'T>() = typeof<'T>.Name
+"""
+      |> Assert.Exists.errorWith "PassGenerics is not supported on abstract members, overrides and interface implementations"
+      |> ignore
+
+      compile """
+open Fable.Core
+open Fickl.Core
+[<AttachMembers>]
+type Attached() =
+  [<PassGenerics>]
+  member _.Name<'T>() = typeof<'T>.Name
+"""
+      |> Assert.Exists.errorWith "PassGenerics is not supported on members attached to the class prototype"
+      |> ignore
+
+      compile """
+open Fickl.Core
+type Rest =
+  [<PassGenerics>]
+  static member Name<'T>([<System.ParamArray>] xs: int[]) = typeof<'T>.Name
+"""
+      |> Assert.Exists.errorWith "PassGenerics is not supported on functions with a ParamArray"
+      |> ignore
+
+    testCase "Type.GetMethod requires a literal name" <| fun _ ->
+      compile """
+type Calc() =
+    static member Add(a: int, b: int) = a + b
+let find (name: string) = typeof<Calc>.GetMethod(name)
+"""
+      |> Assert.Exists.errorWith "Type.GetMethod is resolved at compile time"
+      |> ignore
+
+    testCase "Type.GetMethod requires a type known at compile time" <| fun _ ->
+      compile """
+let find (t: System.Type) = t.GetMethod("Add")
+"""
+      |> Assert.Exists.errorWith "Type.GetMethod is resolved at compile time"
+      |> ignore
+
+    testCase "Type.GetMethod reports a generic parameter that is not resolved" <| fun _ ->
+      compile """
+let find<'T> () = typeof<'T>.GetMethod("Add")
+"""
+      |> Assert.Exists.errorWith "Cannot get type info of generic parameter T"
+      |> ignore
+
+    testCase "Type.GetMethod reports an ambiguous name" <| fun _ ->
+      compile """
+type Calc() =
+    static member Over(a: int) = a
+    static member Over(a: string) = a
+let find () = typeof<Calc>.GetMethod("Over")
+"""
+      |> Assert.Exists.errorWith "Ambiguous match: Calc has more than one public method named 'Over'"
+      |> ignore
+
+    testCase "Type.GetMethod rejects generic and inline methods" <| fun _ ->
+      compile """
+type Calc() =
+    static member Gen<'T>(x: 'T) = x
+    static member inline Inl(x: int) = x + 1
+let find () = typeof<Calc>.GetMethod("Gen"), typeof<Calc>.GetMethod("Inl")
+"""
+      |> Assert.Exists.errorWith "Type.GetMethod does not support generic methods: Calc.Gen"
+      |> Assert.Exists.errorWith "Type.GetMethod does not support inline members: Calc.Inl"
+      |> ignore
+
+    testCase "Type.GetMethod rejects types and methods that are not compiled from F# sources" <| fun _ ->
+      compile """
+type R = { X: int }
+let find () =
+  typeof<string>.GetMethod("Contains"),
+  typeof<System.Text.StringBuilder>.GetMethod("Clear"),
+  typeof<R>.GetMethod("ToString")
+"""
+      |> Assert.Exists.errorWith "Type.GetMethod is not supported for System.String"
+      |> Assert.Exists.errorWith "Type.GetMethod is not supported for System.Text.StringBuilder"
+      |> Assert.Exists.errorWith "Type.GetMethod cannot tell whether R has a method named 'ToString'"
+      |> ignore
+
+    testCase "Type.GetMethod rejects binding flags it cannot honour" <| fun _ ->
+      compile """
+open System.Reflection
+type Calc() =
+    static member Add(a: int, b: int) = a + b
+let find () = typeof<Calc>.GetMethod("Add", BindingFlags.NonPublic ||| BindingFlags.Static)
+"""
+      |> Assert.Exists.errorWith "Type.GetMethod only supports the binding flags Public, Instance and Static"
+      |> ignore
   ]
