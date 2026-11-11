@@ -328,7 +328,7 @@ let private transformTraitCall
 
         let entGenArgsMap = List.zip entGenParamNames entGenArgs |> Map
 
-        tryFindMember entity entGenArgsMap membCompiledName isInstance argTypes
+        tryFindMemberOfCheckedCall entity entGenArgsMap membCompiledName isInstance argTypes
         |> Option.map (fun memb ->
             // Resolve method generic args before making the call, see #2135
             let genArgsMap =
