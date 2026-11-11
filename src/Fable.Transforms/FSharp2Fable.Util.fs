@@ -4262,6 +4262,110 @@ module Util =
                )
            | None -> false
 
+    /// fickl: `[<PassGenerics>]`, where calls pass the type arguments as trailing hidden arguments (JS/TS)
+    module PassGenerics =
+        /// Calls of the member pass its type arguments, and its declaration receives them
+        let isPassing (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+            match com.Options.Language with
+            | JavaScript
+            | TypeScript ->
+                memb.GenericParameters.Count > 0
+                && not (isInline memb)
+                && hasAttrib Atts.ficklPassGenerics memb.Attributes
+            | _ -> false
+
+        let private isSingleUnit (argTypes: Fable.Type list) =
+            match argTypes with
+            | [ Fable.Unit ] -> true
+            | _ -> false
+
+        /// Why the member cannot receive its type arguments, if it cannot
+        let tryGetDeclarationError (memb: FSharpMemberOrFunctionOrValue) =
+            if memb.IsDispatchSlot || memb.IsOverrideOrExplicitInterfaceImplementation then
+                Some "abstract members, overrides and interface implementations"
+            elif hasParamArray memb then
+                Some "functions with a ParamArray"
+            elif hasAttrib Atts.paramObject memb.Attributes then
+                Some "functions with a ParamObject"
+            else
+                None
+            |> Option.map (fun what -> $"PassGenerics is not supported on %s{what}")
+
+        /// The type parameters of the enclosing member that are available at runtime
+        let isPassed (com: Compiler) (ctx: Context) (name: string) =
+            match ctx.EnclosingMember with
+            | Some memb when isPassing com memb -> memb.GenericParameters |> Seq.exists (fun p -> genParamName p = name)
+            | _ -> false
+
+        /// A type that is only known at runtime, from the type arguments passed to the enclosing member
+        let dependsOnPassed (com: Compiler) (ctx: Context) (typ: Fable.Type) =
+            match ctx.EnclosingMember with
+            | Some memb when isPassing com memb ->
+                let rec dependsOn typ =
+                    match typ with
+                    | Fable.GenericParam(name = name) -> isPassed com ctx name
+                    | typ -> List.exists dependsOn typ.Generics
+
+                dependsOn typ
+            | _ -> false
+
+        /// Type info that is not compared at compile time, the type is only known at runtime
+        let makeTypeInfo r (typ: Fable.Type) =
+            Fable.Value(Fable.TypeInfo(typ, [ "pass-generics" ]), r)
+
+        /// The declared arguments followed by one type info argument per type parameter
+        let declarationArgs
+            (com: Compiler)
+            (ctx: Context)
+            (memb: FSharpMemberOrFunctionOrValue)
+            (args: Fable.Ident list)
+            =
+            let thisArg, args = args |> List.partition _.IsThisArgument
+
+            let args =
+                if args |> List.map _.Type |> isSingleUnit then
+                    []
+                else
+                    args
+
+            let typeInfos =
+                memb.GenericParameters
+                |> Seq.map (fun p ->
+                    getIdentUniqueName com ctx (genParamName p + "$type")
+                    |> makeTypedIdent Fable.MetaType
+                )
+                |> Seq.toList
+
+            thisArg @ args @ typeInfos
+
+        /// The arguments of a call followed by the type info of each type argument
+        let callArgs
+            (com: Compiler)
+            (ctx: Context)
+            r
+            (memb: FSharpMemberOrFunctionOrValue)
+            (genArgs: Fable.Type list)
+            (args: Fable.Expr list)
+            =
+            if memb.IsDispatchSlot then
+                tryGetDeclarationError memb |> Option.iter (addError com ctx.InlinePath r)
+                args
+            elif List.length genArgs <> memb.GenericParameters.Count then
+                $"Cannot pass the type arguments of %s{memb.DisplayName}, they are not known here"
+                |> addError com ctx.InlinePath r
+
+                args
+            else
+                let args =
+                    if getArgTypes com memb |> isSingleUnit then
+                        []
+                    else
+                        args
+
+                args
+                @ (genArgs
+                   |> List.map (fun t -> Fable.Value(Fable.TypeInfo(t, Fable.Tags.empty), r)))
+
     /// Removes optional arguments set to None in tail position
     let transformOptionalArguments
         (com: IFableCompiler)
@@ -4577,7 +4681,12 @@ module Util =
         let makeCall typ callee args =
             Fable.CallInfo.Create(
                 ?thisArg = callee,
-                args = transformOptionalArguments com ctx r memb args,
+                args =
+                    (if PassGenerics.isPassing com memb then
+                         // Trailing optional arguments are kept, the type arguments come after them
+                         PassGenerics.callArgs com ctx r memb genArgs args
+                     else
+                         transformOptionalArguments com ctx r memb args),
                 genArgs = genArgs,
                 sigArgTypes = getArgTypes com memb,
                 // isCons = memb.IsConstructor,

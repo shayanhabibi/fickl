@@ -981,6 +981,143 @@ let fableTests = [
 let fableTests = []
 #endif
 
+// fickl#292: type arguments passed at runtime to a non-inline function
+type PassGenericsRecord = { PassedX: int }
+
+module PassGenericsFns =
+    open Fickl.Core
+
+    [<PassGenerics>]
+    let nameOf<'T> () = typeof<'T>.Name
+
+    [<PassGenerics>]
+    let typeFunction<'T> = typeof<'T>.Name
+
+    [<PassGenerics>]
+    let fullNameOfArg (x: 'T) = typeof<'T>.FullName
+
+    [<PassGenerics>]
+    let typesOf<'A, 'B> (a: 'A) (b: 'B) = typeof<'A>, typeof<'B list>, typeof<'A * 'B>
+
+    [<PassGenerics>]
+    let forward<'T> (x: 'T) = fullNameOfArg x, typesOf x [ x ]
+
+    let inline viaInline<'T> (x: 'T) = fullNameOfArg x
+
+    [<PassGenerics>]
+    let isInt<'T> () = typeof<'T> = typeof<int>
+
+    [<PassGenerics>]
+    let definitionOf<'T> () = typedefof<'T>
+
+    [<PassGenerics>]
+    let genericArgNames<'T> () = typeof<'T>.GetGenericArguments() |> Array.map (fun t -> t.Name)
+
+    [<PassGenerics>]
+    let inClosure<'T> (xs: int list) = xs |> List.map (fun x -> typeof<'T>.Name + string x)
+
+    [<PassGenerics>]
+    let rec repeatName<'T> (n: int) (acc: string) : string =
+        if n = 0 then acc else repeatName<'T> (n - 1) (acc + typeof<'T>.Name)
+
+    [<PassGenerics>]
+    let fieldNames<'T> () = FSharpType.GetRecordFields typeof<'T> |> Array.map (fun p -> p.Name)
+
+    [<PassGenerics>]
+    let withOptionArg<'T> (x: int) (y: int option) = typeof<'T>.Name + string (x + defaultArg y 0)
+
+    let inline inlineName<'U> () = typeof<'U>.Name
+
+    let inline inlineIsString<'U> () = typeof<'U> = typeof<string>
+
+    [<PassGenerics>]
+    let viaInlineBody<'T> () = inlineName<'T> (), inlineIsString<'T> (), inlineName<'T option> ()
+
+    [<PassGenerics>]
+    let localFunction<'T> (x: int) =
+        let describe (y: int) = typeof<'T>.Name + string (x + y)
+        describe 1 + describe 2
+
+    type Describer() =
+        [<PassGenerics>]
+        member _.Name<'U>() = typeof<'U>.Name
+
+        [<PassGenerics>]
+        member _.NameWith<'U>(prefix: string, ?suffix: string) = prefix + typeof<'U>.Name + defaultArg suffix ""
+
+        [<PassGenerics>]
+        static member StaticName<'U>(x: int, ?y: int) = typeof<'U>.Name + string (x + defaultArg y 0)
+
+    type GenericDescriber<'T>() =
+        [<PassGenerics>]
+        member _.Names<'U>(_u: 'U) = typeof<'T>.Name + typeof<'U>.Name
+
+let passGenericsTests =
+    testList "PassGenerics" [
+        testCase "typeof of a type parameter works in a function with PassGenerics" <| fun () ->
+            PassGenericsFns.nameOf<int> () |> equal "Int32"
+            PassGenericsFns.nameOf<string> () |> equal "String"
+            PassGenericsFns.nameOf<PassGenericsRecord> () |> equal "PassGenericsRecord"
+            PassGenericsFns.fullNameOfArg 2.5 |> equal "System.Double"
+            PassGenericsFns.typeFunction<int64> |> equal "Int64"
+
+        testCase "PassGenerics passes every type parameter and types built on them" <| fun () ->
+            let a, b, c = PassGenericsFns.typesOf 1 "x"
+            a |> equal typeof<int>
+            b |> equal typeof<string list>
+            c |> equal typeof<int * string>
+
+        testCase "A function with PassGenerics forwards its type arguments" <| fun () ->
+            let name, (a, b, c) = PassGenericsFns.forward true
+            name |> equal "System.Boolean"
+            a |> equal typeof<bool>
+            b |> equal typeof<bool list list>
+            c |> equal typeof<bool * bool list>
+
+        testCase "An inline function resolves the type arguments of PassGenerics" <| fun () ->
+            PassGenericsFns.viaInline 1L |> equal "System.Int64"
+
+        testCase "Type tests of a passed type parameter happen at runtime" <| fun () ->
+            PassGenericsFns.isInt<int> () |> equal true
+            PassGenericsFns.isInt<string> () |> equal false
+            PassGenericsFns.definitionOf<int list> () |> equal typedefof<int list>
+            PassGenericsFns.definitionOf<int> () |> equal typeof<int>
+            PassGenericsFns.genericArgNames<Map<string, int>> () |> equal [| "String"; "Int32" |]
+            PassGenericsFns.fieldNames<PassGenericsRecord> () |> equal [| "PassedX" |]
+
+        testCase "PassGenerics works in closures and recursive functions" <| fun () ->
+            PassGenericsFns.inClosure<PassGenericsRecord> [ 1; 2 ]
+            |> equal [ "PassGenericsRecord1"; "PassGenericsRecord2" ]
+            PassGenericsFns.repeatName<string> 3 "" |> equal "StringStringString"
+
+        testCase "PassGenerics functions can be partially applied and used as values" <| fun () ->
+            [ 1; 2 ] |> List.map PassGenericsFns.fullNameOfArg |> equal [ "System.Int32"; "System.Int32" ]
+            let partial = PassGenericsFns.typesOf 1
+            let a, b, _ = partial "x"
+            a |> equal typeof<int>
+            b |> equal typeof<string list>
+            let f: unit -> string = PassGenericsFns.nameOf<float>
+            f () |> equal "Double"
+            let g = PassGenericsFns.withOptionArg<bool> 1
+            g None |> equal "Boolean1"
+            g (Some 2) |> equal "Boolean3"
+
+        testCase "Inline functions called by a PassGenerics function see its type arguments" <| fun () ->
+            PassGenericsFns.viaInlineBody<string> () |> equal ("String", true, "FSharpOption`1")
+            PassGenericsFns.viaInlineBody<int> () |> equal ("Int32", false, "FSharpOption`1")
+            PassGenericsFns.localFunction<bool> 1 |> equal "Boolean2Boolean3"
+
+        testCase "PassGenerics works on class members" <| fun () ->
+            let d = PassGenericsFns.Describer()
+            d.Name<int>() |> equal "Int32"
+            d.NameWith<string>("a") |> equal "aString"
+            d.NameWith<string>("a", "b") |> equal "aStringb"
+            d.NameWith<string>("a", suffix = "c") |> equal "aStringc"
+            PassGenericsFns.Describer.StaticName<string>(1) |> equal "String1"
+            PassGenericsFns.Describer.StaticName<string>(1, 2) |> equal "String3"
+            PassGenericsFns.GenericDescriber<int>().Names("s") |> equal "Int32String"
+    ]
+
 let genericTypeNamesTests =
     testList "Naming generic types"
       [  ]
@@ -991,6 +1128,7 @@ let tests =
         @ typeNameTests
         @ reflectionTests
         @ fableTests
+        @ [ passGenericsTests ]
     )
 
 #else // OPTIMIZE_FCS

@@ -403,6 +403,15 @@ let getElementType =
 let genericTypeInfoError (name: string) =
     $"Cannot get type info of generic parameter %s{name}. Fable erases generics at runtime, try inlining the functions so generics can be resolved at compile time."
 
+/// fickl: the JS/TS message, where the function can also receive its type arguments at runtime
+let genericTypeInfoErrorFor (com: Compiler) (name: string) =
+    match com.Options.Language with
+    | JavaScript
+    | TypeScript ->
+        genericTypeInfoError name
+        + " Or add the Fickl.Core.PassGenerics attribute to the function so its callers pass them at runtime."
+    | _ -> genericTypeInfoError name
+
 // This is mainly intended for typeof errors because we want to show the user where the function is originally called
 let changeRangeToCallSite (inlinePath: InlinePath list) (range: SourceLocation option) =
     List.tryLast inlinePath
@@ -432,7 +441,7 @@ let getTypeNameFromFullName (fullname: string) =
 let rec getTypeName com (ctx: Context) r t =
     match t with
     | GenericParam(name = name) ->
-        genericTypeInfoError name |> addError com ctx.InlinePath r
+        genericTypeInfoErrorFor com name |> addError com ctx.InlinePath r
         name
     | Array(elemType, _) -> // TODO: check kind
         getTypeName com ctx r elemType + "[]"
