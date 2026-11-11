@@ -2038,8 +2038,15 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             let! args = transformExprList com ctx args
             let genArgs = List.map (makeType ctx.GenericArgs) genArgs
             let typ = makeType ctx.GenericArgs fsExpr.Type
+            let r = makeRangeFrom fsExpr
 
-            return makeCallFrom com ctx (makeRangeFrom fsExpr) typ genArgs None args memb
+            match tryErasedClassOfMissingConstructor com memb with
+            | Some ent when not ctx.CapturingQuotation ->
+                return
+                    $"Cannot call the constructor of %s{ent.DisplayName} because the type is erased and has no constructor at runtime. "
+                    + "Bind the constructor to native code with [<Emit>], or the type with [<Global>] or [<Import>], or remove [<Erase>]."
+                    |> addErrorAndReturnNull com ctx.InlinePath r
+            | _ -> return makeCallFrom com ctx r typ genArgs None args memb
 
         // An explicit constructor followed by more code: `new(...) as x = { Field = ... } then ...`. F# writes it as the
         // System.Object constructor call, the object construction (a NewRecord of the class), then the `as x`
