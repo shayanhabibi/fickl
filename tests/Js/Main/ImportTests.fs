@@ -314,6 +314,21 @@ let tests =
         Util.mutableValueOpt.IsNone |> equal true
 
 #if FABLE_COMPILER
+    testCase "Re-exported imports are live bindings" <| fun () -> // See fickl#315
+        let seen = ResizeArray [ Util.ReExport.counter ]
+        Util.ReExport.increment ()
+        seen.Add Util.ReExport.counter
+        seen.Add Util.ReExport.renamedCounter
+        seen[1] |> equal (seen[0] + 1)
+        seen[2] |> equal (seen[0] + 1)
+
+    testCase "Re-exported imports work from another file" <| fun () -> // See fickl#315
+        Util.ReExport.double 4 |> equal 8
+        Util.ReExport.quadruple 4 |> equal 16
+        Util.ReExport.defaultExport?name |> equal "reexport"
+        Util.ReExport.allExports?double (5) |> equal 10
+        Util.ReExport.allExports?``default``?name |> equal "reexport"
+
     testCaseAsync "importValueDynamic works with values and single argument functions" <| fun () -> async {
         let! value = importValueDynamic Util.DynamicImport.value |> Async.AwaitPromise
         value |> equal 42

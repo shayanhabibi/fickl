@@ -1,0 +1,56 @@
+
+import { log as logAgain, log as log_1 } from "./logger.js";
+import { nested, count, emitUser, live, bump } from "./lib.js";
+
+export function callLog() {
+    const log = log_1;
+    log("y");
+}
+
+export { SlBreadcrumb } from "@shoelace-style/shoelace/dist/react";
+
+export { count as renamed } from "./lib.js";
+
+export { default as Default } from "./lib.js";
+
+export * as Ns from "./lib.js";
+
+export { count as my$002Dname } from "./lib.js";
+
+export { counter as casted } from "./lib.js";
+
+export { add } from "./lib.js";
+
+export { FOO as rooted } from "/env.js";
+
+export { thing as generated } from "./gen/thing.js";
+
+export { count as Nested_inner } from "./lib.js";
+
+export { bump };
+
+export { live };
+
+export function readLive() {
+    bump();
+    return live | 0;
+}
+
+export { logAgain };
+
+export function useLog() {
+    logAgain("x");
+}
+
+export { emitUser };
+
+export function useEmitted() {
+    return (emitUser + 1) | 0;
+}
+
+export let mutableCount = count;
+
+export const computed = count + 1;
+
+export const dotted = nested.inner;
+

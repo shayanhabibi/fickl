@@ -1,0 +1,18 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { count as count_1, counter as counter_1 } from "./lib.js";
+
+export interface Counter {
+    get value(): int32
+}
+
+export const counter: Counter = counter_1;
+
+export const anything: any = counter_1;
+
+export const count: int32 = count_1;
+
+export function readCount(): int32 {
+    return (count + counter.value) | 0;
+}
+

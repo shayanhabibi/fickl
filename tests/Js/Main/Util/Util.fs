@@ -202,3 +202,19 @@ module DynamicImport =
     let curried3 (a: int) (b: string) (c: int) = a + b.Length + c
     let higherOrder (f: int -> int -> int) (a: int) = f a 2
     let higherOrder1 (f: int -> int -> int) = f 20 2
+
+#if FABLE_COMPILER
+// Values that are exactly an import are re-exported, so importers see the live binding, see fickl#315
+module ReExport =
+    open Fable.Core.JsInterop
+
+    // Not used in this file: `export { ... } from`
+    let counter: int = importMember "../js/reexport.js"
+    let renamedCounter: int = import "counter" "../js/reexport.js"
+    let increment: unit -> unit = importMember "../js/reexport.js"
+    let defaultExport: obj = importDefault "../js/reexport.js"
+    let allExports: obj = importAll "../js/reexport.js"
+    // Used in this file: `import { double }` and `export { double }`
+    let double (x: int) : int = importMember "../js/reexport.js"
+    let quadruple (x: int) = double (double x)
+#endif
