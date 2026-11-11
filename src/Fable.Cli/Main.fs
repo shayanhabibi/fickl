@@ -1699,6 +1699,10 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
     async {
         let cliArgs = state.CliArgs
 
+        // fickl: a cycle can start on a thread that does not descend from the command line that set the
+        // language, such as the file watcher's, or in a process that compiles for several targets (#398)
+        Compiler.SetLanguageUnsafe cliArgs.CompilerOptions.Language
+
         let projCracked, fableCompiler, filesToCompile =
             match state.ProjectCrackedAndFableCompiler with
             | None ->

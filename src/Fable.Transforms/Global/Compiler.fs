@@ -134,18 +134,43 @@ module CompilerExt =
 
     let private coreAssemblyNames = set Metadata.coreAssemblies
 
+    // fickl: the language of the compilation started last in this process
     let mutable private _language = JavaScript
+
+#if !FABLE_COMPILER
+    // fickl: the language of the compilation the current thread or async flow belongs to. A process can run
+    // compilations for different targets at once, and code that has no compiler instance at hand, such as the
+    // types made by `FSharp2Fable.TypeHelpers.makeType`, reads the language from here (#398)
+    let private _flowLanguage = System.Threading.AsyncLocal<Language>()
+#endif
+
     let mutable private _checkNulls = false
 
     type Compiler with
 
         static member CoreAssemblyNames = coreAssemblyNames
 
-        static member Language = _language
+        /// The target language of the compilation running on the current thread or async flow. A thread that
+        /// belongs to no compilation reads the language of the one started last.
+        static member Language =
+#if FABLE_COMPILER
+            _language
+#else
+            match _flowLanguage.Value with
+            | language when isNull (box language) -> _language
+            | language -> language
+#endif
         static member CheckNulls = _checkNulls
 
-        /// Set these only once at the start of the program
-        static member SetLanguageUnsafe language = _language <- language
+        /// Sets the language for the current thread or async flow and what starts from it, which is where a
+        /// compilation sets its own. Threads that belong to no compilation read the language set last.
+        static member SetLanguageUnsafe language =
+#if !FABLE_COMPILER
+            _flowLanguage.Value <- language
+#endif
+            _language <- language
+
+        /// Set this only once at the start of the program
         static member SetCheckNullsUnsafe enabled = _checkNulls <- enabled
 
         member com.GetEntity(entityRef: Fable.EntityRef) =
