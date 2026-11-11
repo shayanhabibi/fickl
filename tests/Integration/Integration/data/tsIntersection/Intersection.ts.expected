@@ -1,0 +1,111 @@
+
+import type { int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import { Record } from "./fable_modules/fable-library-ts.5.27.0/Types.ts";
+import { type MutableArray, int32ToString, type IComparable, type IEquatable } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+import { record_type, int32_type, string_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+import type { Option } from "./fable_modules/fable-library-ts.5.27.0/Option.ts";
+
+export interface Named {
+    get name(): string
+}
+
+export interface Aged {
+    get age(): int32
+}
+
+export interface Tagged {
+    get tag(): string
+}
+
+export class Person extends Record implements IEquatable<Person>, IComparable<Person> {
+    readonly name: string;
+    readonly age: int32;
+    readonly tag: string;
+    constructor(name: string, age: int32, tag: string) {
+        super();
+        this.name = name;
+        this.age = (age | 0);
+        this.tag = tag;
+    }
+}
+
+export function Person_$reflection(): TypeInfo {
+    return record_type("Intersection.Person", [], Person, () => [["name", string_type], ["age", int32_type], ["tag", string_type]]);
+}
+
+export function nameOf(x: Named): string {
+    return x.name;
+}
+
+export function ageOf(x: Aged): int32 {
+    return x.age | 0;
+}
+
+export function describe(x: Named & Aged): string {
+    return (x).name + int32ToString((x).age);
+}
+
+export function describeImplicit(x: Named & Aged): string {
+    return nameOf(x) + int32ToString(ageOf(x));
+}
+
+export function asNamed(x: Named & Aged): Named {
+    return x;
+}
+
+export function ofPerson(p: Person): Named & Aged {
+    return p as unknown as Named & Aged;
+}
+
+export function ofObj(o: any): Named & Aged & Tagged {
+    return o as unknown as Named & Aged & Tagged;
+}
+
+export function three(x: Named & Aged & Tagged): string {
+    return (x).name + (x).tag;
+}
+
+export function four(x: Named & Aged & Tagged & Person): Person {
+    return x;
+}
+
+export function inResizeArray(xs: (Named & Aged)[]): int32 {
+    return xs.length | 0;
+}
+
+export function inArray(xs: MutableArray<Named & Aged>): int32 {
+    return xs.length | 0;
+}
+
+export function inUnion(x: (Named & Aged) | string): any {
+    return x;
+}
+
+export function inOption(x: Option<Named & Aged>): boolean {
+    return x != null;
+}
+
+export function asParameter(f: ((arg0: Named & Aged) => string), x: Named & Aged): string {
+    return f(x);
+}
+
+export function ofUnion(x: (Named | Tagged) & Aged): int32 {
+    return (x).age | 0;
+}
+
+export function ofFunction(x: ((arg0: int32) => string) & Named): string {
+    return (x).name;
+}
+
+export function nested(x: (Named & Aged) & Tagged): string {
+    return ((x)).name + (x).tag;
+}
+
+export function first<A, B>(x: A & B): A {
+    return x;
+}
+
+export function unsafeBoth<A, B>(value: any): A & B {
+    return value as unknown as A & B;
+}
+

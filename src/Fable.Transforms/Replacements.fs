@@ -6350,6 +6350,13 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
 
             TypeCast(curriedApply r returned call [ receiver ], t) |> Some
         | _ -> None
+    // fickl: an erased intersection is the value itself; its other members are emitted
+    | "Fickl.Core.I2`2"
+    | "Fickl.Core.I3`3"
+    | "Fickl.Core.I4`4" ->
+        match info.CompiledName, args with
+        | "UnsafeOf", [ value ] -> TypeCast(value, t) |> Some
+        | _ -> None
     | "Fickl.Core.ValueOf" ->
         match info.CompiledName, args with
         | "ofKey", [ key; target ] -> TypeCast(Get(target, ExprGet key, Any, r), t) |> Some

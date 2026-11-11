@@ -137,6 +137,20 @@ type GlobalSubclassGrandchild() =
         this.Increment()
         this.Increment()
 
+module Intersections =
+    type Named =
+        abstract name: string
+
+    type Aged =
+        abstract age: int
+
+    type Tagged =
+        abstract tag: string
+
+    let nameOf (x: Named) = x.name
+    let describe (x: I2<Named, Aged>) = x.As1.name + string x.As2.age
+    let describeImplicit (x: I2<Named, Aged>) = nameOf x + string x.As2.age
+
 [<Fickl.Core.AttachMembers>]
 type FicklAttachedCounter(start: int) =
     let mutable count = start
@@ -1456,6 +1470,35 @@ let tests =
         Fickl.Core.Record.tryGet "carol" scores |> equal None
         Fickl.Core.Record.tryGet "toString" scores |> equal None
         Keys.total !!scores [| "alice"; "bob" |] |> equal 7
+
+#if FABLE_COMPILER
+    testCase "Erased intersection types are the object itself" <| fun () ->
+        let person = {| name = "Ada"; age = 36; tag = "t" |}
+        let both: I2<Intersections.Named, Intersections.Aged> = I2.UnsafeOf person
+        obj.ReferenceEquals(both, person) |> equal true
+        obj.ReferenceEquals(both.As1, person) |> equal true
+        obj.ReferenceEquals(both.As2, person) |> equal true
+        both.As1.name |> equal "Ada"
+        both.As2.age |> equal 36
+        Intersections.describe both |> equal "Ada36"
+        Intersections.describeImplicit both |> equal "Ada36"
+        let named: Intersections.Named = both
+        obj.ReferenceEquals(named, person) |> equal true
+
+        let three: I3<Intersections.Named, Intersections.Aged, Intersections.Tagged> =
+            I3.UnsafeOf person
+
+        obj.ReferenceEquals(three.As3, person) |> equal true
+        three.As1.name + three.As3.tag |> equal "Adat"
+
+        let four: I4<Intersections.Named, Intersections.Aged, Intersections.Tagged, obj> =
+            I4.UnsafeOf person
+
+        obj.ReferenceEquals(four.As4, person) |> equal true
+        four.As2.age |> equal 36
+        emitJsExpr both "typeof $0" |> equal "object"
+        emitJsExpr both "Object.keys($0).join()" |> equal "age,name,tag"
+#endif
 
     testCase "PropertyRecord and EmitIndexer interfaces index by key" <| fun () ->
         let labels: PropertyRecord<Keys.Server, string> = !!(createObj [ "Port", box "port"; "Host", box "host"; "Retries", box "retries" ])
