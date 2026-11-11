@@ -552,6 +552,32 @@ let stringToCharArray e =
 
 /// fickl: under --checkedDivision, the divisor of an integer or decimal division or remainder wrapped in a check
 /// that raises DivideByZeroException when it is zero. A constant other than zero needs none
+/// fickl: TypeScript checks an unchecked cast between two different types, so it has to go through `unknown`.
+/// The cast to `obj` in between is what tells Fable2Babel to write `x as unknown as T`. A value typed `obj`
+/// is `any` to TypeScript and needs no cast.
+let private uncheckedCast (com: ICompiler) (t: Type) (arg: Expr) =
+    match t, arg.Type with
+    | (Any | Unit), _
+    | _, Any -> TypeCast(arg, t)
+    | _, source when com.Options.Language = TypeScript && source <> t -> TypeCast(TypeCast(arg, Any), t)
+    | _ -> TypeCast(arg, t)
+
+/// fickl: `!!` is erased, so the value keeps its own type unless TypeScript needs to see the cast.
+/// A cast from or to a small integer stays erased: those are truncated with `| 0` according to their type,
+/// which the cast would change in TypeScript only.
+let private erasedUncheckedCast (com: ICompiler) (t: Type) (arg: Expr) =
+    let isTruncated =
+        function
+        | Number((Int8 | Int16 | Int32), NumberInfo.Empty) -> true
+        | _ -> false
+
+    match t, arg.Type with
+    | (Any | Unit), _
+    | _, Any -> arg
+    | _, source when isTruncated t || isTruncated source -> arg
+    | _, source when com.Options.Language = TypeScript && source <> t -> TypeCast(TypeCast(arg, Any), t)
+    | _ -> arg
+
 let private checkDivisor (com: ICompiler) (dividend: Expr) (divisor: Expr) =
     let isZero =
         function
@@ -1571,14 +1597,14 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
                             errors
                             |> List.iter (fun (range, error) -> addWarning com ctx.InlinePath range error)
 
-                            Some arg
-                        | Ok() -> Some arg
+                            erasedUncheckedCast com t arg |> Some
+                        | Ok() -> erasedUncheckedCast com t arg |> Some
                 else
-                    Some arg
-            | _ -> Some arg
-        | "op_Dynamic", [ left; memb ] -> getExpr r t left memb |> Some
+                    erasedUncheckedCast com t arg |> Some
+            | _ -> erasedUncheckedCast com t arg |> Some
+        | "op_Dynamic", [ left; memb ] -> getExpr r t (dynamicReceiver com left) memb |> Some
         | "op_DynamicAssignment", [ callee; prop; MaybeLambdaUncurriedAtCompileTime value ] ->
-            setExpr r callee prop (uncurryInteropValue value) |> Some
+            setExpr r (dynamicReceiver com callee) prop (uncurryInteropValue value) |> Some
         | ("op_Dollar" | "createNew" as m), callee :: args ->
             let args = destructureTupleArgs args
 
@@ -1873,7 +1899,8 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     | "DefaultAsyncBuilder", _ -> makeImportLib com t "singleton" "AsyncBuilder" |> Some
     // Erased operators.
     // KeyValuePair is already compiled as a tuple
-    | ("KeyValuePattern" | "Identity" | "Box" | "Unbox" | "ToEnum"), [ arg ] -> TypeCast(arg, t) |> Some
+    | ("KeyValuePattern" | "Identity" | "Box" | "ToEnum"), [ arg ] -> TypeCast(arg, t) |> Some
+    | "Unbox", [ arg ] -> uncheckedCast com t arg |> Some
     // Quotation splice: %expr inside a quotation. The arg is already a QuotExpr at runtime.
     | ("SpliceExpression" | "SpliceUntypedExpression"), [ arg ] -> Some arg
     // Cast to unit to make sure nothing is returned when wrapped in a lambda, see #1360

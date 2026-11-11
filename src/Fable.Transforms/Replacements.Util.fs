@@ -183,6 +183,21 @@ let withTag tag =
     | Emit(i, t, r) -> Emit({ i with EmitInfo.CallInfo.Tags = tag :: i.CallInfo.Tags }, t, r)
     | e -> e
 
+/// fickl: the receiver of the dynamic operator `?`, which TypeScript has to see as `any` to allow any member on it.
+/// The operator takes an `obj`, so the receiver arrives boxed. Arrays and strings are left typed:
+/// they are native values, whose members TypeScript knows.
+let dynamicReceiver (com: Compiler) (receiver: Expr) =
+    match receiver with
+    | MaybeCasted(ExprType(Any | Array _ | String)) -> receiver
+    | _ when com.Options.Language = TypeScript ->
+        Call(
+            makeImportLib com Any "downcast" "Util",
+            { CallInfo.Create(args = [ receiver ]) with Tags = [ "downcast" ] },
+            Any,
+            receiver.Range
+        )
+    | _ -> receiver
+
 let getTags =
     function
     | Call(e, i, t, r) -> i.Tags
