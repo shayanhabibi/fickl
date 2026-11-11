@@ -3613,6 +3613,25 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
                                     Tags = Fable.Tags.empty
                                     XmlDoc = tryGetXmlDoc fsEnt.XmlDoc
                                 }
+
+                            // Read by the reflection info of the union, see Fable2Babel
+                            if hasConstructibleCaseAttributes com ent then
+                                let name = name + caseAttributesSuffix
+                                let body, usedNames = makeCaseAttributes com ctx fsEnt
+
+                                Fable.MemberDeclaration
+                                    {
+                                        Name = name
+                                        Args = []
+                                        Body = body
+                                        UsedNames = usedNames
+                                        IsMangled = true
+                                        MemberRef =
+                                            Fable.GeneratedMember.Function(name, [], body.Type, isInstance = false)
+                                        ImplementedSignatureRef = None
+                                        Tags = Fable.Tags.empty
+                                        XmlDoc = None
+                                    }
                         ]
             // This adds modules in the AST for languages that support them (like Rust)
             | sub when

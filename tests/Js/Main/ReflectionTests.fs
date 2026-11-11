@@ -333,6 +333,52 @@ type RecordGetValueType = {
     Age : int
 }
 
+type CaseLabelAttribute(label: string) =
+    inherit System.Attribute()
+    new (number: int) = CaseLabelAttribute(string number)
+    new () = CaseLabelAttribute("default")
+    member _.Label = label
+    member val Priority = 0 with get, set
+
+type CaseSubLabelAttribute(label: string, level: int) =
+    inherit CaseLabelAttribute(label)
+    member _.Level = level
+
+type CaseMarkerAttribute() =
+    inherit System.Attribute()
+
+type CaseDataAttribute(kind: MyEnum, typ: System.Type, names: string[], letter: char, ratio: float, ok: bool) =
+    inherit System.Attribute()
+    member _.Kind = kind
+    member _.Type = typ
+    member _.Names = names
+    member _.Letter = letter
+    member _.Ratio = ratio
+    member _.Ok = ok
+
+type UnionWithCaseAttributes =
+    | [<CaseLabel("DoThis")>] LabelCase
+    | [<CaseLabel("DoThat"); CaseMarker; System.Obsolete("Not built on Fable")>] SeveralCase of int
+    | PlainCase
+    | [<CaseSubLabel("sub", 3)>] SubLabelCase
+    | [<CaseLabel(5)>] NumberCase
+    | [<CaseLabel>] DefaultCase
+    | [<CaseLabel("named", Priority = 7)>] NamedCase
+    | [<CaseData(MyEnum.Bar, typeof<string>, [| "a"; "b" |], 'c', 1.5, true)>] DataCase of string
+
+// .NET also returns the attributes the F# compiler adds to a case
+let describeCaseAttribute (attribute: obj) =
+    match attribute with
+    | :? CaseSubLabelAttribute as att -> Some $"SubLabel({att.Label},{att.Level})"
+    | :? CaseLabelAttribute as att -> Some $"Label({att.Label},{att.Priority})"
+    | :? CaseMarkerAttribute -> Some "Marker"
+    | :? CaseDataAttribute -> Some "Data"
+    | _ -> None
+
+let caseAttributesOf name =
+    FSharpType.GetUnionCases typeof<UnionWithCaseAttributes>
+    |> Array.find (fun case -> case.Name = name)
+
 let reflectionTests = [
   testCase "Reflection: Array" <| fun () ->
     let arType = typeof<int[]>
@@ -779,6 +825,51 @@ let reflectionTests = [
 
     obj.ReferenceEquals(getTypeGeneric([| 2 |]).GetElementType(), typeof<int>) |> equal true
     obj.ReferenceEquals(getTypeGeneric([| 2 |]).GetElementType(), typeof<uint32>) |> equal false
+
+  testCase "UnionCaseInfo.GetCustomAttributes returns the attributes of a case in order" <| fun () -> // #278
+    let describe name =
+        (caseAttributesOf name).GetCustomAttributes() |> Array.choose describeCaseAttribute
+    describe "LabelCase" |> equal [| "Label(DoThis,0)" |]
+    describe "SeveralCase" |> equal [| "Label(DoThat,0)"; "Marker" |]
+    describe "PlainCase" |> equal [||]
+    describe "SubLabelCase" |> equal [| "SubLabel(sub,3)" |]
+
+  testCase "UnionCaseInfo.GetCustomAttributes filters by attribute type" <| fun () ->
+    let describe name (t: System.Type) =
+        (caseAttributesOf name).GetCustomAttributes(t) |> Array.choose describeCaseAttribute
+    describe "SeveralCase" typeof<CaseLabelAttribute> |> equal [| "Label(DoThat,0)" |]
+    describe "SeveralCase" typeof<CaseMarkerAttribute> |> equal [| "Marker" |]
+    describe "SeveralCase" typeof<CaseSubLabelAttribute> |> equal [||]
+    (caseAttributesOf "LabelCase").GetCustomAttributes(typeof<CaseMarkerAttribute>).Length |> equal 0
+    (caseAttributesOf "PlainCase").GetCustomAttributes(typeof<CaseLabelAttribute>).Length |> equal 0
+    // A derived attribute is returned for its base type
+    describe "SubLabelCase" typeof<CaseLabelAttribute> |> equal [| "SubLabel(sub,3)" |]
+    describe "SubLabelCase" typeof<CaseSubLabelAttribute> |> equal [| "SubLabel(sub,3)" |]
+    describe "SeveralCase" typeof<System.Attribute> |> equal [| "Label(DoThat,0)"; "Marker" |]
+
+  testCase "UnionCaseInfo.GetCustomAttributes builds attributes with their arguments" <| fun () ->
+    let label name =
+        (caseAttributesOf name).GetCustomAttributes(typeof<CaseLabelAttribute>).[0] :?> CaseLabelAttribute
+    (label "NumberCase").Label |> equal "5"
+    (label "DefaultCase").Label |> equal "default"
+    (label "NamedCase").Label |> equal "named"
+    (label "NamedCase").Priority |> equal 7
+    (label "LabelCase").Priority |> equal 0
+    let data =
+        (caseAttributesOf "DataCase").GetCustomAttributes(typeof<CaseDataAttribute>).[0] :?> CaseDataAttribute
+    data.Kind |> equal MyEnum.Bar
+    data.Type |> equal typeof<string>
+    data.Names |> equal [| "a"; "b" |]
+    data.Letter |> equal 'c'
+    data.Ratio |> equal 1.5
+    data.Ok |> equal true
+
+  testCase "UnionCaseInfo.GetCustomAttributes returns the names of the issue" <| fun () ->
+    FSharpType.GetUnionCases typeof<UnionWithCaseAttributes>
+    |> Array.take 2
+    |> Array.collect (fun case -> case.GetCustomAttributes(typeof<CaseLabelAttribute>))
+    |> Array.map (fun att -> (att :?> CaseLabelAttribute).Label)
+    |> equal [| "DoThis"; "DoThat" |]
 ]
 
 #if FABLE_COMPILER
