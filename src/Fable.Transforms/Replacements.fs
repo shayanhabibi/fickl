@@ -4133,6 +4133,22 @@ let dateTime (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
         let fieldName = Naming.removeGetSetPrefix i.CompiledName |> Naming.lowerFirst
 
         getFieldWith r t thisArg.Value fieldName |> Some
+    // Not implemented in fable-library: without this the catch-all below would import
+    // a function that doesn't exist, which only fails when the module is loaded.
+    | "ToOADate"
+    | "FromOADate"
+    | "ParseExact"
+    | "TryParseExact"
+    | "ToBinary"
+    | "FromBinary"
+    | "ToFileTime"
+    | "ToFileTimeUtc"
+    | "FromFileTime"
+    | "FromFileTimeUtc"
+    | "GetDateTimeFormats"
+    | "AddMicroseconds"
+    | "get_Microsecond"
+    | "get_Nanosecond" -> None
     | meth ->
         let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst

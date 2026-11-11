@@ -17,6 +17,7 @@ let allTests =
         Inflate.tests
         WatchDependency.tests
         RegexOptions.tests
+        UnsupportedBclMember.tests
     ]
 
 

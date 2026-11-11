@@ -34,6 +34,7 @@
     <Compile Include="InflateTests.fs" />
     <Compile Include="WatchDependencyTests.fs" />
     <Compile Include="RegexOptionsTests.fs" />
+    <Compile Include="UnsupportedBclMemberTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 </Project>
