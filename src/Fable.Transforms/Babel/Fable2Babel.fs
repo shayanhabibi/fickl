@@ -4426,7 +4426,7 @@ but thanks to the optimisation done below we get
                 |> Some
             | Fable.Call(Fable.Import({
                                           Selector = "toList"
-                                          Path = Naming.EndsWith "/Seq.js" _
+                                          Path = (Naming.EndsWith "/Seq.js" _ | Naming.EndsWith "/Seq.ts" _)
                                           Kind = Fable.LibraryImport _
                                       },
                                       _,
@@ -4480,7 +4480,7 @@ but thanks to the optimisation done below we get
                 Expression.jsxTemplate (List.toArray parts, values) |> Some
             | MaybeCasted(Fable.Call(Fable.Import({
                                                       Selector = "concat"
-                                                      Path = Naming.EndsWith "/String.js" _
+                                                      Path = (Naming.EndsWith "/String.js" _ | Naming.EndsWith "/String.ts" _)
                                                       Kind = Fable.LibraryImport _
                                                   },
                                                   _,
