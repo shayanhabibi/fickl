@@ -53,6 +53,31 @@ module JsInterop =
     /// </code></example>
     let importDynamicWith<'T> (path: string) (attributes: (string * string) list) : JS.Promise<'T> = nativeOnly
 
+    /// <summary>Copies a JavaScript object and sets some of its properties, <c>{ ...source, size: 3 }</c>.</summary>
+    /// <param name="source">The object to copy. It is evaluated once and left unchanged.</param>
+    /// <param name="setters">A lambda that sets properties of its argument, as for <c>jsOptions</c>.</param>
+    /// <returns>A plain object with the own enumerable properties of the source, including the ones its F# type
+    /// does not declare, and the properties that were set.</returns>
+    /// <remarks>The copy is one level deep and has no prototype, so it suits interfaces and other plain objects,
+    /// not class instances or F# records. Setting a property of a nested object is an error.</remarks>
+    /// <example><code lang="fsharp">
+    /// let bigger = jsSpread opts (fun o -> o.size &lt;- 3)
+    /// // { ...opts, size: 3 }
+    /// </code></example>
+    let jsSpread<'T> (source: 'T) (setters: 'T -> unit) : 'T = nativeOnly
+
+    /// <summary>Merges JavaScript objects into a new plain object, <c>{ ...defaults, ...opts }</c>.</summary>
+    /// <param name="sources">The objects to copy from. Where two have the same property, the later one wins.</param>
+    /// <returns>A plain object with the own enumerable properties of every source, including the ones the F# type
+    /// does not declare.</returns>
+    /// <remarks>A list or array literal becomes an object literal of spreads; any other sequence goes through
+    /// <c>Object.assign</c>. The copy is one level deep and has no prototype.</remarks>
+    /// <example><code lang="fsharp">
+    /// let merged = jsMerge [ defaults; opts ]
+    /// // { ...defaults, ...opts }
+    /// </code></example>
+    let jsMerge<'T> (sources: 'T seq) : 'T = nativeOnly
+
     /// <summary>Treats a <c>Partial&lt;T></c> as a complete <c>'T</c>; TypeScript sees the cast.</summary>
     /// <param name="value">An object that the caller knows has every property of <c>'T</c>.</param>
     let full (value: Partial<'T>) : 'T = nativeOnly

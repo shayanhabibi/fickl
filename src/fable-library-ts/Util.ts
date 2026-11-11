@@ -1028,6 +1028,12 @@ export function jsOptions<T>(mutator: (x: T) => void): T {
   return opts;
 }
 
+export function jsSpread<T>(source: T, mutator: (x: T) => void): T {
+  const copy = { ...source };
+  mutator(copy);
+  return copy;
+}
+
 export function round(value: number, digits: number = 0) {
   return roundToMode(value, digits, MidpointRounding.ToEven);
 }

@@ -3460,6 +3460,7 @@ module Util =
                             ?doc = doc
                         )
                         |> Some
+                    | ObjectSpread _ -> None
                 )
 
             let baseExpr, classMembers =
@@ -3503,7 +3504,8 @@ module Util =
             members
             |> List.exists (
                 function
-                | ObjectMethod _ -> true
+                | ObjectMethod _
+                | ObjectSpread _ -> true
                 | ObjectProperty(key, _, isComputed, _) ->
                     match key with
                     | Expression.Identifier(Identifier(name, _))
