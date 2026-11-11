@@ -22,6 +22,7 @@ module Util =
         static member Dummy =
             { new PathResolver with
                 member _.TryPrecompiledOutPath(_sourceDir, _relativePath) = None
+                member _.TryRedirectedImport(_sourceDir, _relativePath) = None
 
                 member _.GetOrAddDeduplicateTargetDir(_importDir, _addTargetDir) = ""
             }
@@ -384,6 +385,7 @@ type ProjectCracked(cliArgs: CliArgs, crackerResponse: CrackerResponse, sourceFi
     member _.ProjectOptions = crackerResponse.ProjectOptions
     member _.References = crackerResponse.References
     member _.PrecompiledInfo = crackerResponse.PrecompiledInfo
+    member _.RedirectedSources = crackerResponse.RedirectedSources
     member _.CanReuseCompiledFiles = crackerResponse.CanReuseCompiledFiles
     member _.SourceFiles = sourceFiles
 
@@ -605,6 +607,15 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
 
             let startInThreadPool toMsg work = postTo toMsg work |> Async.Start
 
+            // fickl: a source of a `--redirect` reference joins the project but is not compiled
+            let isRedirected (fileName: string) =
+                currentProjCracked.RedirectedSources.ContainsKey fileName
+
+            let countCompiled (files: string[]) =
+                files
+                |> Array.filter (fun file -> isImplementationFile file && not (isRedirected file))
+                |> Array.length
+
             let subscriber =
                 if projCracked.CliArgs.NoParallelTypeCheck then
                     None
@@ -727,6 +738,9 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                                     replyChannel
                                 )
 
+                            let state =
+                                { state with FableFilesToCompileExpectedCount = countCompiled filesToCompile }
+
                             typeCheck sourceFiles (Array.last filesToCompile)
                             return! loop state
 
@@ -750,6 +764,8 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                             else
                                 let state = updateProject state [ file ]
 
+                                if isRedirected fileName then
+                                    state
                                 // For Rust the last file has to compile after every other
                                 // one: it re-exports the namespaces the other files
                                 // register into a shared registry while they compile, so
@@ -758,7 +774,7 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                                 // FableFileCompiled once the rest are done -- a wait on
                                 // the actual condition, where the fixed sleep this
                                 // replaces only shrank the race for small projects.
-                                if
+                                elif
                                     projCracked.CliArgs.CompilerOptions.Language = Rust
                                     && fileName = Array.last state.FilesToCompile
                                     && state.FableFilesCompiledCount < state.FableFilesToCompileExpectedCount - 1
@@ -804,8 +820,9 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                                 let filesToCompile =
                                     state.FilesToCompile
                                     |> Array.filter (fun file ->
-                                        file.EndsWith(".fs", StringComparison.Ordinal)
-                                        || file.EndsWith(".fsx", StringComparison.Ordinal)
+                                        (file.EndsWith(".fs", StringComparison.Ordinal)
+                                         || file.EndsWith(".fsx", StringComparison.Ordinal))
+                                        && not (isRedirected file)
                                     )
 
                                 (state, filesToCompile) ||> Array.fold fableCompile
@@ -836,8 +853,7 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                                     FilesToCompileSet = set dependents
                                     FilesCompiledInCycle = Set.union state.FilesCompiledInCycle (set dependents)
                                     FableFilesToCompileExpectedCount =
-                                        state.FableFilesToCompileExpectedCount
-                                        + (dependents |> Array.filter isImplementationFile |> Array.length)
+                                        state.FableFilesToCompileExpectedCount + countCompiled dependents
                                     HasFSharpCompilationFinished = false
                                 }
 
@@ -1076,8 +1092,19 @@ type State =
         | None -> false
         | Some watchDependencies -> watchDependencies |> Array.exists changes.Contains
 
-    member this.GetPathResolver(?precompiledInfo: PrecompiledInfoImpl) =
+    member this.GetPathResolver(?precompiledInfo: PrecompiledInfoImpl, ?redirectedSources: Map<string, string>) =
         { new PathResolver with
+            member _.TryRedirectedImport(sourceDir, relativePath) =
+                match redirectedSources with
+                | Some redirected when
+                    not redirected.IsEmpty
+                    && (relativePath.EndsWith(".fs", StringComparison.Ordinal)
+                        || relativePath.EndsWith(".fsx", StringComparison.Ordinal))
+                    ->
+                    let fullPath = IO.Path.Combine(sourceDir, relativePath) |> Path.normalizeFullPath
+                    Map.tryFind fullPath redirected
+                | _ -> None
+
             member _.TryPrecompiledOutPath(sourceDir, relativePath) =
                 match precompiledInfo with
                 | None -> None
@@ -1151,7 +1178,10 @@ let private getFilesToCompile
                 let outPath = getOutPath state.CliArgs pathResolver path
 
                 let wasDeleted =
-                    (path.EndsWith(".fs") || path.EndsWith(".fsx")) && not (IO.File.Exists outPath)
+                    (path.EndsWith(".fs") || path.EndsWith(".fsx"))
+                    && not (IO.File.Exists outPath)
+                    // fickl: a source of a `--redirect` reference never has an output
+                    && not (projCracked.RedirectedSources.ContainsKey path)
 
                 // fickl: also when declarations were asked for and this file has none yet
                 let lacksDeclarations () =
@@ -1619,14 +1649,20 @@ let private checkRunProcess (state: State) (projCracked: ProjectCracked) (compil
 
 /// fickl: a file given its own extension (`--fileExtension`) can be written where another file is.
 /// A mapping that names no source of the project is a mistake too: it would silently do nothing.
-let private checkFileExtensions (state: State) (sourceFiles: string[]) =
+/// A source of a `--redirect` reference can be given an extension too, the one its package has for it: it is a
+/// known file, package source or not, but it is not written here, so it collides with nothing.
+let private checkFileExtensions (state: State) (redirectedSources: Map<string, string>) (sourceFiles: string[]) =
     let cliArgs = state.CliArgs
 
     let fail (message: string) (details: string seq) =
         let details = details |> String.concat Log.newLine
         Fable.FableError($"{message}{Log.newLine}{details}") |> raise
 
-    let sources = HashSet(sourceFiles |> Array.filter (Naming.isInFableModules >> not))
+    let sources =
+        HashSet(
+            sourceFiles
+            |> Array.filter (fun source -> not (Naming.isInFableModules source) || redirectedSources.ContainsKey source)
+        )
 
     let unknown =
         cliArgs.FileExtensions
@@ -1643,7 +1679,7 @@ let private checkFileExtensions (state: State) (sourceFiles: string[]) =
 
     let collisions =
         sourceFiles
-        |> Array.filter isSourceFile
+        |> Array.filter (fun source -> isSourceFile source && not (redirectedSources.ContainsKey source))
         |> Array.groupBy (fun source ->
             (getOutPath cliArgs pathResolver source |> Path.normalizeFullPath).ToLowerInvariant()
         )
@@ -1730,8 +1766,19 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
 
                     projCracked, Some fableCompiler, filesToCompile
 
+        // fickl: the sources of a `--redirect` reference are imported from its package: they are type-checked, as the
+        // project needs their signatures and inline bodies, but not compiled
+        let filesToCheck = filesToCompile
+
+        let filesToCompile =
+            if projCracked.RedirectedSources.IsEmpty then
+                filesToCompile
+            else
+                filesToCompile
+                |> Array.filter (projCracked.RedirectedSources.ContainsKey >> not)
+
         if not cliArgs.FileExtensions.IsEmpty then
-            checkFileExtensions state projCracked.SourceFilePaths
+            checkFileExtensions state projCracked.RedirectedSources projCracked.SourceFilePaths
 
         // Update the watcher (it will restart if the fsproj has changed)
         // so changes while compiling get enqueued
@@ -1816,8 +1863,11 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
                 fableCompiler.StartCompilation(
                     projCracked,
                     projCracked.SourceFiles, // Make sure to pass the up-to-date source files (with cleared hashes for changed files)
-                    filesToCompile,
-                    state.GetPathResolver(?precompiledInfo = projCracked.PrecompiledInfo),
+                    filesToCheck,
+                    state.GetPathResolver(
+                        ?precompiledInfo = projCracked.PrecompiledInfo,
+                        redirectedSources = projCracked.RedirectedSources
+                    ),
                     state.SilentCompilation,
                     (fun f -> state.TriggeredByDependency(f, changes)),
                     getSignatureDependents

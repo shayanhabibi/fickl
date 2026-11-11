@@ -9,6 +9,7 @@ let allTests =
     CompilationTests.tests
     CompilationTests.dllAttributeTests
     CacheInvalidation.tests
+    Redirect.tests
   ]
 
 open Expecto

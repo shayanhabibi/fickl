@@ -254,7 +254,13 @@ let apply (cliArgs: CliArgs) (response: CrackerResponse) : CrackerResponse =
     else
         let sources = packageSources cliArgs response
 
-        if Array.isEmpty sources then
+        // A redirected package is not compiled, so there is no output of it to cache, and the output of the packages
+        // that use it imports it from its npm package
+        let hasRedirected =
+            sources
+            |> Array.exists (Path.normalizeFullPath >> response.RedirectedSources.ContainsKey)
+
+        if Array.isEmpty sources || hasRedirected then
             response
         else
             let key = computeKey cliArgs response sources
