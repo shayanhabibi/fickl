@@ -41,6 +41,10 @@ type CacheInfo =
         Configuration: string
         Exclude: string list
         Replace: Map<string, string>
+        /// fickl: `--redirect` as it was when the project was cracked
+        Redirect: Map<string, string>
+        /// fickl: the sources of the redirected references, each with its import specifier (see `getRedirectedSources`)
+        RedirectedSources: Map<string, string>
         SourceMaps: bool
         SourceMapsRoot: string option
         TreatWarningsAsErrors: bool
@@ -133,6 +137,7 @@ type CrackerOptions(cliArgs: CliArgs, evaluateOnly: bool) =
     member _.Configuration: string = cliArgs.Configuration
     member _.Exclude: string list = cliArgs.Exclude
     member _.Replace: Map<string, string> = cliArgs.Replace
+    member _.Redirect: Map<string, string> = cliArgs.Redirect
     member _.PrecompiledLib: string option = cliArgs.PrecompiledLib
     member _.NoRestore: bool = cliArgs.NoRestore
     member _.ProjFile: string = cliArgs.ProjectFile
@@ -199,6 +204,8 @@ type CrackerResponse =
         PrecompiledInfo: PrecompiledInfoImpl option
         CanReuseCompiledFiles: bool
         TreatWarningsAsErrors: bool
+        /// fickl: sources that are type-checked but not compiled, each with the specifier to import it from
+        RedirectedSources: Map<string, string>
     }
 
 type ProjectOptionsResponse =
@@ -1008,6 +1015,92 @@ let private getProjectImports (projFile: string) : string list =
 
     List.ofSeq imports
 
+/// fickl: `--redirect <reference>=<specifier>` imports a project or package reference from an npm package instead of
+/// compiling it into the output. Its sources are still type-checked here (signatures, inline bodies), so this maps each
+/// of them to its import specifier: the package's files must be laid out as the reference's sources are below its
+/// project file, which is what compiling that project on its own gives.
+let getRedirectedSources
+    (opts: CrackerOptions)
+    (projRefs: CrackedFsproj list)
+    (pkgRefs: FablePackage list)
+    : Map<string, string>
+    =
+    let sameName (x: string) (y: string) =
+        String.Equals(x, y, StringComparison.OrdinalIgnoreCase)
+
+    // Name, project file, sources, and the names of the references it depends on
+    let references =
+        [
+            for proj in projRefs ->
+                IO.Path.GetFileNameWithoutExtension proj.ProjectFile,
+                proj.ProjectFile,
+                proj.SourceFiles,
+                proj.ProjectReferences |> List.map IO.Path.GetFileNameWithoutExtension
+            for pkg in pkgRefs ->
+                pkg.Id,
+                pkg.FsprojPath,
+                pkg.SourcePaths,
+                pkg.Dependencies
+                |> Set.toList
+                |> List.filter (fun dep -> pkgRefs |> List.exists (fun p -> sameName p.Id dep))
+        ]
+
+    let isRedirected (name: string) =
+        opts.Redirect |> Map.exists (fun redirected _ -> sameName redirected name)
+
+    opts.Redirect
+    |> Map.toList
+    |> List.collect (fun (name, specifier) ->
+        match references |> List.filter (fun (refName, _, _, _) -> sameName refName name) with
+        | [] ->
+            let known =
+                match references with
+                | [] -> "it has none"
+                | _ ->
+                    references
+                    |> List.map (fun (refName, _, _, _) -> refName)
+                    |> String.concat ", "
+                    |> sprintf "it has %s"
+
+            Fable.FableError
+                $"Cannot redirect %s{name} to %s{specifier}: the project has no project or Fable package reference with that name (%s{known})"
+            |> raise
+        | [ refName, projFile, sources, dependencies ] ->
+            // The reference's own copy of a dependency is the package's, this output's is another one
+            for dependency in dependencies |> List.filter (isRedirected >> not) do
+                Log.warning
+                    $"%s{refName} is redirected to %s{specifier} but %s{dependency}, which it references, is not: this output gets its own copy of %s{dependency}, apart from the one %s{specifier} uses. Redirect %s{dependency} too."
+
+            let projDir = IO.Path.GetDirectoryName projFile
+
+            sources
+            |> List.toArray
+            |> removeFilesInObjFolder
+            |> Array.filter (fun source -> not (source.EndsWith(".fsi", StringComparison.OrdinalIgnoreCase)))
+            |> Array.map (fun source ->
+                let relative = IO.Path.GetRelativePath(projDir, source).Replace('\\', '/')
+
+                if
+                    relative.StartsWith("../", StringComparison.Ordinal)
+                    || IO.Path.IsPathRooted relative
+                then
+                    Fable.FableError
+                        $"Cannot redirect %s{refName} to %s{specifier}: its source %s{source} is outside the project's folder, so where the package has its output cannot be told"
+                    |> raise
+
+                Path.normalizeFullPath source, specifier + "/" + relative
+            )
+            |> Array.toList
+        | several ->
+            let files =
+                several |> List.map (fun (_, projFile, _, _) -> projFile) |> String.concat ", "
+
+            Fable.FableError
+                $"Cannot redirect %s{name} to %s{specifier}: several references have that name (%s{files})"
+            |> raise
+    )
+    |> Map
+
 let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions) : CrackerResponse =
     if not (IO.File.Exists(opts.ProjFile)) then
         Fable.FableError("Project file does not exist: " + opts.ProjFile) |> raise
@@ -1040,6 +1133,7 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
             && cacheInfo.ProjectPath = opts.ProjFile
             && cacheInfo.FableLib = opts.FableLib
             && cacheInfo.Replace = opts.Replace
+            && cacheInfo.Redirect = opts.Redirect
             // An imported .props/.targets can add or remove source files with no .fsproj touched
             && ([ cacheInfo.ProjectPath; yield! cacheInfo.References ]
                 |> List.collect getProjectImports
@@ -1133,6 +1227,7 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
             PrecompiledInfo = precompiledInfo
             CanReuseCompiledFiles = canReuseCompiledFiles
             TreatWarningsAsErrors = cacheInfo.TreatWarningsAsErrors
+            RedirectedSources = cacheInfo.RedirectedSources
         }
 
     | None ->
@@ -1151,6 +1246,8 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
         let pkgRefs =
             pkgRefs
             |> List.map (fun pkg -> { pkg with SourcePaths = getSourcesFromFablePkg opts pkg.FsprojPath })
+
+        let redirectedSources = getRedirectedSources opts projRefs pkgRefs
 
         let sourcePaths =
             let pkgSources = pkgRefs |> List.collect (fun x -> x.SourcePaths)
@@ -1233,6 +1330,8 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
                 Configuration = opts.Configuration
                 Exclude = opts.Exclude
                 Replace = opts.Replace
+                Redirect = opts.Redirect
+                RedirectedSources = redirectedSources
                 SourceMaps = opts.SourceMaps
                 SourceMapsRoot = opts.SourceMapsRoot
                 TreatWarningsAsErrors = mainProj.TreatWarningsAsErrors
@@ -1258,4 +1357,5 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
             PrecompiledInfo = precompiledInfo
             CanReuseCompiledFiles = false
             TreatWarningsAsErrors = mainProj.TreatWarningsAsErrors
+            RedirectedSources = redirectedSources
         }

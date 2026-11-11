@@ -1083,11 +1083,12 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
 
     match argTypes with
     | Number(Decimal, _) :: _ ->
-        let opName =
-            if opName = Operators.divideByInt then
-                Operators.division
-            else
-                opName
+        let opName, args =
+            match args with
+            // DivideByInt takes an int count, the library's division two decimals
+            | [ total; count ] when opName = Operators.divideByInt ->
+                Operators.division, [ total; makeDecimalFromExpr com None total.Type count ]
+            | _ -> opName, args
 
         Helper.LibCall(com, "Decimal", opName, t, args, argTypes, ?loc = r)
     | Number(BigIntegers kind, _) :: _ ->
@@ -2372,6 +2373,10 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
 
         Helper.LibCall(com, modul, meth, t, args, i.SignatureArgTypes, ?loc = r) |> Some
     // Pipes and composition
+    // fickl: --debugPipelines makes each stage of a forward pipeline a statement (#305)
+    | "op_PipeRight", [ x; f ] when Pipelines.isEnabled com -> Pipelines.apply com ctx r t f [ x ] |> Some
+    | "op_PipeRight2", [ x; y; f ] when Pipelines.isEnabled com -> Pipelines.apply com ctx r t f [ x; y ] |> Some
+    | "op_PipeRight3", [ x; y; z; f ] when Pipelines.isEnabled com -> Pipelines.apply com ctx r t f [ x; y; z ] |> Some
     | "op_PipeRight", [ x; f ]
     | "op_PipeLeft", [ f; x ] -> curriedApply r t f [ x ] |> Some
     | "op_PipeRight2", [ x; y; f ]
@@ -4050,7 +4055,10 @@ let decimals (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg:
             | _ -> None
         | _ -> None
     | "Round", _ -> roundCall com r t "Decimal" i args |> Some
-    | ("Ceiling" | "Floor" | "Truncate" | "Min" | "Max" | "MinMagnitude" | "MaxMagnitude" | "Clamp" | "Add" | "Subtract" | "Multiply" | "Divide" | "Remainder" | "Negate" as meth),
+    | "get_Scale", _ ->
+        Helper.LibCall(com, "Decimal", "scale", t, Option.toList thisArg, ?loc = r)
+        |> Some
+    | ("Ceiling" | "Floor" | "Truncate" | "Min" | "Max" | "MinMagnitude" | "MaxMagnitude" | "Clamp" | "Add" | "Subtract" | "Multiply" | "Divide" | "Remainder" | "Negate" | "IsNegative" | "IsInteger" | "Sign" | "Abs" | "Compare" | "CopySign" as meth),
       _ ->
         let meth = Naming.lowerFirst meth
 

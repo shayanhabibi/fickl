@@ -38,11 +38,6 @@ type BuildFableLibraryTypeScript() =
 
         Shell.copyFile this.OutDir typeScriptConfig
 
-        // Copy the lib folder to the build directory
-        let libSourceFolder = Path.Combine(this.SourceDir, "lib")
-        let libDestinationFolder = Path.Combine(this.OutDir, "lib")
-        Shell.copyDir libDestinationFolder libSourceFolder FileFilter.allFiles
-
         // Copy the package.json file to the build directory
         let packageJson = Path.Combine(this.SourceDir, "package.json")
         Shell.copyFile this.OutDir packageJson

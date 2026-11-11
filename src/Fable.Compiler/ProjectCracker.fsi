@@ -24,6 +24,8 @@ type CacheInfo =
         Configuration: string
         Exclude: string list
         Replace: Map<string, string>
+        Redirect: Map<string, string>
+        RedirectedSources: Map<string, string>
         SourceMaps: bool
         SourceMapsRoot: string option
         TreatWarningsAsErrors: bool
@@ -42,6 +44,7 @@ type CrackerOptions =
     member Configuration: string
     member Exclude: string list
     member Replace: Map<string, string>
+    member Redirect: Map<string, string>
     member PrecompiledLib: string option
     member NoRestore: bool
     member ProjFile: string
@@ -63,6 +66,8 @@ type CrackerResponse =
         PrecompiledInfo: PrecompiledInfoImpl option
         CanReuseCompiledFiles: bool
         TreatWarningsAsErrors: bool
+        /// fickl: sources that are type-checked but not compiled, each with the specifier to import it from
+        RedirectedSources: Map<string, string>
     }
 
 type ProjectOptionsResponse =

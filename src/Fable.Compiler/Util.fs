@@ -32,6 +32,8 @@ type CliArgs =
         Replace: Map<string, string>
         /// fickl: the output extension of single source files (`--fileExtension`), by normalized full path
         FileExtensions: Map<string, string>
+        /// fickl: `--redirect`, the npm package (or a folder of one) to import each named reference from
+        Redirect: Map<string, string>
         RunProcess: RunProcess option
         CompilerOptions: Fable.CompilerOptions
         Verbosity: Fable.Verbosity
@@ -610,6 +612,9 @@ module Async =
 
 type PathResolver =
     abstract TryPrecompiledOutPath: sourceDir: string * relativePath: string -> string option
+
+    /// fickl: the import specifier, still with the source's extension, of a source of a `--redirect` reference
+    abstract TryRedirectedImport: sourceDir: string * relativePath: string -> string option
 
     abstract GetOrAddDeduplicateTargetDir: importDir: string * addTargetDir: (Set<string> -> string) -> string
 

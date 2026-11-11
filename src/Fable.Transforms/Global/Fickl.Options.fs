@@ -19,3 +19,19 @@ let privateFieldsDefine = "FICKL_PRIVATE_FIELDS"
 /// TypeScript)
 [<Literal>]
 let checkedDivisionDefine = "FICKL_CHECKED_DIVISION"
+
+/// `--debugPipelines`: each stage of a `|>`, `||>` or `|||>` pipeline is a statement of its own that binds the
+/// stage's result to a named constant, so a debugger can step through the stages (JavaScript and TypeScript)
+[<Literal>]
+let debugPipelinesDefine = "FICKL_DEBUG_PIPELINES"
+
+/// The name `--debugPipelines` gives the constant that holds the result of a pipeline stage, before it is made unique
+[<Literal>]
+let pipelineStageName = "pipe"
+
+/// Whether a binding holds the result of a pipeline stage under `--debugPipelines`, and so must not be inlined
+let isPipelineStage (defines: string list) (isCompilerGenerated: bool) (name: string) =
+    isCompilerGenerated
+    && (name = pipelineStageName
+        || name.StartsWith(pipelineStageName + "_", System.StringComparison.Ordinal))
+    && List.contains debugPipelinesDefine defines

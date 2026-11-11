@@ -1,8 +1,8 @@
 import { FSharpRef } from "./Types.ts";
 import { type int8, type uint8, type int16, type uint16, type int32, type uint32, type float16, type float32, type float64 } from "./Int32.ts";
-import { type decimal, fromParts, truncate } from "./Decimal.ts";
+import Decimal, { type decimal, toBigInt as decimalToBigInt } from "./Decimal.ts";
 import { Exception, bigintHash } from "./Util.ts";
-import { ArgumentException_$ctor_Z384F8060, ArgumentNullException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5 } from "./System.ts";
+import { ArgumentException_$ctor_Z384F8060, ArgumentNullException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
 
 const isBigEndian = false;
 
@@ -116,7 +116,7 @@ export function fromFloat16(n: float16): bigint { return BigInt(Math.trunc(n)); 
 export function fromFloat32(n: float32): bigint { return BigInt(Math.trunc(n)); }
 export function fromFloat64(n: float64): bigint { return BigInt(Math.trunc(n)); }
 
-export function fromDecimal(d: decimal): bigint { return BigInt(truncate(d).toString()); }
+export function fromDecimal(d: decimal): bigint { return decimalToBigInt(d); }
 
 export function fromBigInt(x: bigint): bigint { return x }
 export function fromBoolean(b: boolean): bigint { return BigInt(b); }
@@ -139,7 +139,7 @@ export function toIntN(bits: number, x: bigint, signed: boolean): bigint {
     const truncated = signed ? BigInt.asIntN(bits, x) : BigInt.asUintN(bits, x);
     if (truncated !== x) {
         const s = signed ? "a signed" : "an unsigned";
-        throw new Exception(`Value was either too large or too small for ${s} ${bits}-bit integer.`);
+        throw OverflowException_$ctor_Z721C83C5(`Value was either too large or too small for ${s} ${bits}-bit integer.`);
     }
     return truncated;
 }
@@ -174,18 +174,7 @@ export function toFloat16(x: bigint): float16 { return Number(x); }
 export function toFloat32(x: bigint): float32 { return Number(x); }
 export function toFloat64(x: bigint): float64 { return Number(x); }
 
-export function toDecimal(x: bigint): decimal {
-    const isNegative = x < zero;
-    const bits = abs(x);
-    if ((bits >> 96n) !== zero) {
-        throw new Exception("Value was either too large or too small for a Decimal.");
-    }
-    const low = Number(BigInt.asUintN(32, bits));
-    const mid = Number(BigInt.asUintN(32, bits >> 32n));
-    const high = Number(BigInt.asUintN(32, bits >> 64n));
-    const scale = 0;
-    return fromParts(low, mid, high, isNegative, scale)
-}
+export function toDecimal(x: bigint): decimal { return new Decimal(x); }
 
 export function toBigInt(x: bigint): bigint { return x; }
 export function toBoolean(x: bigint): boolean { return x !== zero; }

@@ -34,8 +34,6 @@ let private emitLibraryDeclarations () =
         $"tsc --project \"{tsBuildDir}\" --declaration --emitDeclarationOnly --outDir \"{jsOutDir}\"",
         workingDirectory = Paths.root
     )
-    // The bundled big.js has a hand-written declaration file, which tsc reads but does not emit
-    File.Copy(Path.Combine(tsBuildDir, "lib", "big.d.ts"), Path.Combine(jsOutDir, "lib", "big.d.ts"), true)
 
 let private version () =
     XDocument.Load(Path.Combine(Paths.root, "src", "Fickl.Branding.targets")).Descendants(XName.Get "FicklVersion")

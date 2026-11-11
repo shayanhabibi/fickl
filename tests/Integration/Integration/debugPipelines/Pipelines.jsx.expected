@@ -1,0 +1,121 @@
+
+import { length, reverse, sum, map, filter } from "./fable_modules/fable-library-js.5.27.0/List.js";
+import { max } from "./fable_modules/fable-library-js.5.27.0/Double.js";
+import { singleton } from "./fable_modules/fable-library-js.5.27.0/AsyncBuilder.js";
+
+export function increment(x) {
+    return (x + 1) | 0;
+}
+
+export function double(x) {
+    return (x * 2) | 0;
+}
+
+/**
+ * One binding for each stage but the last, which is returned
+ */
+export function chain(xs) {
+    const pipe = filter((x) => ((x % 2) === 0), xs);
+    const pipe_1 = map((x_1) => ((x_1 * x_1) | 0), pipe);
+    return sum(pipe_1, {
+        GetZero: () => 0,
+        Add: (x_2, y) => ((x_2 + y) | 0),
+    }) | 0;
+}
+
+/**
+ * A first value that is a call is bound like a stage
+ */
+export function fromCall(x) {
+    const pipe = increment(x) | 0;
+    const pipe_1 = double(pipe) | 0;
+    return increment(pipe_1) | 0;
+}
+
+/**
+ * A name or a constant is piped as it is
+ */
+export function fromName(x) {
+    return increment(x) | 0;
+}
+
+/**
+ * The values of `||>` and `|||>` are bound from left to right
+ */
+export function two(a, b) {
+    const pipe = increment(a) | 0;
+    const pipe_1 = double(b) | 0;
+    const pipe_2 = max(pipe, pipe_1) | 0;
+    return double(pipe_2) | 0;
+}
+
+export function three(a) {
+    const pipe = increment(a) | 0;
+    const pipe_1 = double(a) | 0;
+    return ((pipe + pipe_1) + a) | 0;
+}
+
+/**
+ * Where a statement cannot stand the stages are assignments in a sequence
+ */
+export function inCondition(xs) {
+    let pipe;
+    if (((pipe = map((x) => (increment(x) | 0), xs), sum(pipe, {
+        GetZero: () => 0,
+        Add: (x_1, y) => ((x_1 + y) | 0),
+    }))) > 10) {
+        return "big";
+    }
+    else {
+        return "small";
+    }
+}
+
+export function inArgument(xs) {
+    let pipe;
+    return double((pipe = map((x) => (increment(x) | 0), xs), sum(pipe, {
+        GetZero: () => 0,
+        Add: (x_1, y) => ((x_1 + y) | 0),
+    }))) | 0;
+}
+
+/**
+ * A lambda as the last stage is applied to the binding
+ */
+export function lambdaStage(xs) {
+    const pipe = reverse(xs);
+    return (length(pipe) + 1) | 0;
+}
+
+export function inAsync(xs) {
+    return singleton.Delay(() => singleton.Bind(singleton.Delay(() => {
+        let pipe;
+        return singleton.Return((pipe = map((x) => (increment(x) | 0), xs), sum(pipe, {
+            GetZero: () => 0,
+            Add: (x_1, y) => ((x_1 + y) | 0),
+        })));
+    }), (_arg) => {
+        let pipe_1;
+        return singleton.Return((pipe_1 = (double(_arg) | 0), increment(pipe_1)));
+    }));
+}
+
+/**
+ * The name of a binding does not clash with one of the user's
+ */
+export function userNamed(x) {
+    const pipe = increment(x) | 0;
+    const pipe_2 = (pipe + double(pipe)) | 0;
+    const pipe_3 = increment(pipe_2) | 0;
+    return double(pipe_3) | 0;
+}
+
+/**
+ * `<|` and `>>` are left as they are
+ */
+export function backward(x) {
+    return double(increment(double(x))) | 0;
+}
+
+export const composed = (arg_1) => (increment(double(increment(arg_1))) | 0);
+

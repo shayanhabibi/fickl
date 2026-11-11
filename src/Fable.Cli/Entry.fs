@@ -130,6 +130,11 @@ let knownCliArgs () =
             "Raise DivideByZeroException when an integer or a decimal is divided by zero, as .NET does,"
             "by checking the divisor at runtime (JavaScript and TypeScript)"
         ]
+        [ "--debugPipelines" ],
+        [
+            "Compile each stage of a `|>` pipeline to a statement that binds its result to a constant,"
+            "so a debugger can step through the stages and inspect them (JavaScript and TypeScript)"
+        ]
         [ "--privateFields" ],
         [
             "Compile the let fields of classes with attached members to ES #private fields,"
@@ -149,6 +154,13 @@ let knownCliArgs () =
         [
             "Don't merge sources of referenced projects with specified pattern"
             "(Intended for plugin development)"
+        ]
+        [ "--redirect" ],
+        [
+            "Import a project or Fable package reference from an npm package instead of compiling it into"
+            "the output, e.g. `--redirect MyLib.Core=@me/mylib-core`. Can be repeated. The package must hold"
+            "the reference's own Fickl output, laid out as its sources are. Its files are imported with the"
+            "extension of --extension, or of --fileExtension for a source given one (JavaScript and TypeScript)"
         ]
         [], []
         [ "--optimize" ], [ "Compile with optimized F# AST (experimental)" ]
@@ -279,6 +291,62 @@ let argLanguage (args: CliArgs) =
     )
     |> Option.defaultValue (Ok JavaScript)
 
+/// fickl: `--redirect <reference>=<package>`, see `ProjectCracker.getRedirectedSources`
+let parseRedirects (language: Language) (precompile: bool) (precompiledLib: string option) (values: string list) =
+    let parse (value: string) =
+        match value.IndexOf('=') with
+        | -1 -> Error $"--redirect expects <reference>=<npm package>, e.g. MyLib.Core=@me/mylib-core, but got: {value}"
+        | i ->
+            let name = value.Substring(0, i).Trim()
+            let specifier = value.Substring(i + 1).Trim().TrimEnd('/')
+
+            if name = "" || specifier = "" then
+                Error $"--redirect expects <reference>=<npm package>, e.g. MyLib.Core=@me/mylib-core, but got: {value}"
+            elif
+                specifier.StartsWith('.')
+                || specifier.StartsWith('/')
+                || specifier.Contains('\\')
+                || specifier.Contains(':')
+            then
+                // A relative path would mean another file from each folder of the output
+                Error
+                    $"--redirect {name}: {specifier} is a path, but the reference must be imported from an npm package (or a folder of one), the same from every file"
+            else
+                Ok(name, specifier)
+
+    match values with
+    | [] -> Ok Map.empty
+    | _ when language <> JavaScript && language <> TypeScript ->
+        Error "--redirect is only supported for JavaScript and TypeScript"
+    | _ when precompile || Option.isSome precompiledLib ->
+        Error "--redirect cannot be used when precompiling or with a precompiled library"
+    | values ->
+        (Ok Map.empty, values)
+        ||> List.fold (fun acc value ->
+            match acc, parse value with
+            | Error e, _
+            | _, Error e -> Error e
+            | Ok redirects, Ok(name, specifier) ->
+                match
+                    redirects
+                    |> Map.tryFindKey (fun k _ -> String.Equals(k, name, StringComparison.OrdinalIgnoreCase))
+                with
+                | Some _ -> Error $"--redirect names {name} more than once"
+                | None -> Ok(Map.add name specifier redirects)
+        )
+
+/// fickl: a package with its own copy of fable-library has its own Some, list and union classes: values that cross
+/// between it and this output then fail type tests (a `Some None` from it reads as `Some (Some _)`)
+let warnRedirectWithoutSharedLibrary (redirect: Map<string, string>) (fableLib: string option) =
+    let fableLibIsPackage =
+        match fableLib with
+        | Some lib -> not (lib.StartsWith('.') || IO.Path.IsPathRooted lib)
+        | None -> false
+
+    if not redirect.IsEmpty && not fableLibIsPackage then
+        Log.warning
+            "--redirect without --fableLib <npm package>: this output and the redirected packages use separate copies of fable-library, so type tests on values that cross between them can fail. Compile both with the same --fableLib package, e.g. --fableLib @fable-org/fable-library-js"
+
 type Runner =
     static member Run
         (
@@ -348,6 +416,11 @@ type Runner =
                     Error("Cannot set fableLib when setting precompiledLib")
                 | _ -> Ok()
 
+            let! redirect =
+                parseRedirects language precompile precompiledLib (args.Values "--redirect")
+
+            warnRedirectWithoutSharedLibrary redirect fableLib
+
             do!
                 let reservedDirs = [ Naming.fableModules; "obj" ]
 
@@ -395,6 +468,8 @@ type Runner =
                             Fickl.Options.privateFieldsDefine
                         if args.FlagEnabled "--checkedDivision" then
                             Fickl.Options.checkedDivisionDefine
+                        if args.FlagEnabled "--debugPipelines" then
+                            Fickl.Options.debugPipelinesDefine
                         match language with
                         | Php -> "FABLE_COMPILER_PHP"
                         | Rust -> "FABLE_COMPILER_RUST"
@@ -505,6 +580,7 @@ type Runner =
                         )
                         |> Map
                     FileExtensions = fileExtensions
+                    Redirect = redirect
                     RunProcess = runProc
                     CompilerOptions = compilerOptions
                     Verbosity = verbosity
