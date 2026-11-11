@@ -3721,43 +3721,109 @@ module Util =
     type JsxPropExpr =
         | KeyValue of key: string * value: Fable.Expr
         | Spread of value: Fable.Expr
+        /// Props set only on one side of a condition: `if test then "key", value`
+        | Conditional of test: Fable.Expr * thenProps: JsxPropExpr list * elseProps: JsxPropExpr list
 
-    let transformJsxProps (com: IBabelCompiler) props =
-        (Some([], []), props)
-        ||> List.fold (fun propsAndChildren prop ->
-            match propsAndChildren, prop with
-            | None, _ -> None
-            | Some(props, children), MaybeCasted(Fable.Value(Fable.NewTuple([ StringConst key; value ], _), _)) ->
-                if key = "children" then
-                    match value with
-                    | Replacements.Util.ArrayOrListLiteral(children, _) -> Some(props, children)
-                    | value -> Some(props, [ value ])
-                else
-                    Some(JsxPropExpr.KeyValue(key, value) :: props, children)
-            // When the string value exceeds ~100 chars, Fable wraps it in a Let binding.
-            // The Let body still contains the tuple with the prop key and a reference to the bound var;
-            // we use the bound value (letValue) as the actual prop value.
-            | Some(props, children),
-              MaybeCasted(Fable.Let(_, letValue, MaybeCasted(Fable.Value(Fable.NewTuple([ StringConst key; _ ], _), _)))) ->
-                if key = "children" then
-                    match letValue with
-                    | Replacements.Util.ArrayOrListLiteral(children, _) -> Some(props, children)
-                    | _ -> Some(props, [ letValue ])
-                else
-                    Some(JsxPropExpr.KeyValue(key, letValue) :: props, children)
-            | Some(props, children),
-              MaybeCasted(Fable.Call(_,
-                                     {
-                                         Tags = Fable.Tags.Contains "jsx-spread"
-                                         Args = [ value ]
-                                     },
-                                     _,
-                                     _)) -> Some(JsxPropExpr.Spread value :: props, children)
-            | Some _, e ->
-                addError com [] e.Range "Cannot detect JSX prop key at compile time"
+    /// An element of the props list passed to `JSX.create`, before its key is resolved
+    [<RequireQualifiedAccess>]
+    type JsxPropSource =
+        | Single of Fable.Expr
+        | Conditional of test: Fable.Expr * thenProps: JsxPropSource list * elseProps: JsxPropSource list
 
+    [<return: Struct>]
+    let (|SeqLibCall|_|) (name: string) (expr: Fable.Expr) =
+        match expr with
+        | MaybeCasted(Fable.Call(Fable.Import({
+                                                  Selector = selector
+                                                  // The library is imported with a .ts extension when compiling to TypeScript
+                                                  Path = (Naming.EndsWith "/Seq.js" _ | Naming.EndsWith "/Seq.ts" _)
+                                                  Kind = Fable.LibraryImport _
+                                              },
+                                              _,
+                                              _),
+                                 callInfo,
+                                 _,
+                                 _)) when selector = name -> ValueSome callInfo.Args
+        | _ -> ValueNone
+
+    /// Reads the props out of the list expression F# builds when a props list has a condition or a
+    /// `yield!` in it: `Seq.toList (Seq.delay (fun () -> Seq.append ... (Seq.delay ...)))`.
+    /// Matches nothing when a part of it is not one of the shapes a list literal with `if` and
+    /// `yield!` of a list literal compiles to (a loop, a binding, a list built elsewhere).
+    let (|JsxPropsGenerator|_|) (expr: Fable.Expr) : JsxPropSource list option =
+        let rec read (expr: Fable.Expr) =
+            match expr with
+            | SeqLibCall "empty" _ -> Some []
+            | SeqLibCall "singleton" [ prop ] -> Some [ JsxPropSource.Single prop ]
+            | SeqLibCall "delay" [ (Fable.Lambda(_, body, _) | Fable.Delegate(_, body, _, _)) ] -> read body
+            | SeqLibCall "append" [ first; second ] ->
+                match read first, read second with
+                | Some first, Some second -> Some(first @ second)
+                | _ -> None
+            | Replacements.Util.ArrayOrListLiteral(props, _) -> props |> List.map JsxPropSource.Single |> Some
+            | MaybeCasted(Fable.IfThenElse(test, thenExpr, elseExpr, _)) ->
+                match read thenExpr, read elseExpr with
+                | Some thenProps, Some elseProps -> Some [ JsxPropSource.Conditional(test, thenProps, elseProps) ]
+                | _ -> None
+            | _ -> None
+
+        match expr with
+        | SeqLibCall "toList" [ SeqLibCall "delay" _ as generator ] -> read generator
+        | _ -> None
+
+    let transformJsxProps (com: IBabelCompiler) (props: JsxPropSource list) =
+        // `children` is taken out of the props to be printed between the tags, which the object
+        // a condition spreads into the element cannot do.
+        let readKeyValue isConditional (range: SourceLocation option) key value (props, children) =
+            if key <> "children" then
+                Some(JsxPropExpr.KeyValue(key, value) :: props, children)
+            elif isConditional then
+                addError com [] range "JSX children cannot be set under a condition in the props list"
                 None
-        )
+            else
+                match value with
+                | Replacements.Util.ArrayOrListLiteral(children, _) -> Some(props, children)
+                | value -> Some(props, [ value ])
+
+        let rec readProps isConditional props =
+            (Some([], []), props)
+            ||> List.fold (fun propsAndChildren prop ->
+                match propsAndChildren, prop with
+                | None, _ -> None
+                | Some(props, children), JsxPropSource.Conditional(test, thenProps, elseProps) ->
+                    match readProps true thenProps, readProps true elseProps with
+                    | Some(thenProps, _), Some(elseProps, _) ->
+                        Some(JsxPropExpr.Conditional(test, List.rev thenProps, List.rev elseProps) :: props, children)
+                    | _ -> None
+                | Some acc,
+                  JsxPropSource.Single(MaybeCasted(Fable.Value(Fable.NewTuple([ StringConst key; value ], _), _)) as e) ->
+                    readKeyValue isConditional e.Range key value acc
+                // When the string value exceeds ~100 chars, Fable wraps it in a Let binding.
+                // The Let body still contains the tuple with the prop key and a reference to the bound var;
+                // we use the bound value (letValue) as the actual prop value.
+                | Some acc,
+                  JsxPropSource.Single(MaybeCasted(Fable.Let(_,
+                                                             letValue,
+                                                             MaybeCasted(Fable.Value(Fable.NewTuple([ StringConst key
+                                                                                                      _ ],
+                                                                                                    _),
+                                                                                     _))) as e)) ->
+                    readKeyValue isConditional e.Range key letValue acc
+                | Some(props, children),
+                  JsxPropSource.Single(MaybeCasted(Fable.Call(_,
+                                                              {
+                                                                  Tags = Fable.Tags.Contains "jsx-spread"
+                                                                  Args = [ value ]
+                                                              },
+                                                              _,
+                                                              _))) -> Some(JsxPropExpr.Spread value :: props, children)
+                | Some _, JsxPropSource.Single e ->
+                    addError com [] e.Range "Cannot detect JSX prop key at compile time"
+
+                    None
+            )
+
+        readProps false props
 
     module Jsx =
 
@@ -3905,6 +3971,50 @@ but thanks to the optimisation done below we get
                 )
                 |> List.concat
 
+            // The object one side of a condition spreads into the element. Object literals have no
+            // spread in the Babel AST, so a side holding a spread or another condition is merged
+            // with Object.assign, which keeps the order the props were written in.
+            let rec transformConditionalProps (props: JsxPropExpr list) =
+                let makeObject keyValues =
+                    keyValues
+                    |> List.rev
+                    |> List.map (fun (key, value) ->
+                        let key, isComputed = memberFromName key
+                        ObjectMember.objectProperty (key, transformAsExpr com ctx value, isComputed = isComputed)
+                    )
+                    |> List.toArray
+                    |> Expression.objectExpression
+
+                let flush keyValues objects =
+                    match keyValues with
+                    | [] -> objects
+                    | keyValues -> makeObject keyValues :: objects
+
+                let keyValues, objects =
+                    (([], []), props)
+                    ||> List.fold (fun (keyValues, objects) prop ->
+                        match prop with
+                        | JsxPropExpr.KeyValue(key, value) -> (key, value) :: keyValues, objects
+                        | JsxPropExpr.Spread value -> [], transformAsExpr com ctx value :: flush keyValues objects
+                        | JsxPropExpr.Conditional(test, thenProps, elseProps) ->
+                            [], transformCondition test thenProps elseProps :: flush keyValues objects
+                    )
+
+                match flush keyValues objects |> List.rev with
+                | [] -> Expression.objectExpression [||]
+                | [ object ] -> object
+                | objects ->
+                    Expression.callExpression (
+                        Expression.memberExpression (Expression.identifier "Object", Expression.identifier "assign"),
+                        Expression.objectExpression [||] :: objects |> List.toArray
+                    )
+
+            and transformCondition test thenProps elseProps =
+                let test = transformAsExpr com ctx test
+                let thenProps = transformConditionalProps thenProps
+                let elseProps = transformConditionalProps elseProps
+                Expression.conditionalExpression (test, thenProps, elseProps)
+
             let props =
                 props
                 |> List.rev
@@ -3912,6 +4022,8 @@ but thanks to the optimisation done below we get
                     function
                     | JsxPropExpr.KeyValue(key, value) -> JsxProp.KeyValue(key, transformAsExpr com ctx value)
                     | JsxPropExpr.Spread value -> JsxProp.Spread(transformAsExpr com ctx value)
+                    | JsxPropExpr.Conditional(test, thenProps, elseProps) ->
+                        JsxProp.Spread(transformCondition test thenProps elseProps)
                 )
 
             Expression.jsxElement (componentOrTag, props, children)
@@ -3924,6 +4036,7 @@ but thanks to the optimisation done below we get
             List.zipSafe names args
             |> List.map (fun (key, value) ->
                 Fable.Value(Fable.NewTuple([ Fable.Value(Fable.StringConstant key, None); value ], false), None)
+                |> JsxPropSource.Single
             )
 
         transformJsxEl com ctx callee props
@@ -3975,6 +4088,9 @@ but thanks to the optimisation done below we get
             JS.Replacements.makePojo com None keyValueList
             |> Option.map (transformAsExpr com ctx)
         | Fable.Tags.Contains "jsx", componentOrTag :: Replacements.Util.ArrayOrListLiteral(props, _) :: _ ->
+            transformJsxEl com ctx componentOrTag (List.map JsxPropSource.Single props)
+            |> Some
+        | Fable.Tags.Contains "jsx", componentOrTag :: JsxPropsGenerator props :: _ ->
             transformJsxEl com ctx componentOrTag props |> Some
         | Fable.Tags.Contains "jsx", _ ->
             "Expecting a static list or array literal (no generator) for JSX props"

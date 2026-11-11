@@ -179,3 +179,60 @@ export const divWithSpreadAndChildren = <div {...spreadProps}>
     </div>
 </div>;
 
+export function divWithConditionalProp(isActive) {
+    return <div data-testid="target"
+        {...isActive ? {
+            className: "active",
+        } : {}}
+        title="always" />;
+}
+
+export function divWithConditionalPropAfterProp(isActive) {
+    return <div data-testid="target"
+        title="always"
+        {...isActive ? {
+            title: "active",
+        } : {}} />;
+}
+
+export function divWithConditionalPropWithElseBranch(isActive) {
+    return <div data-testid="target"
+        {...isActive ? {
+            className: "active",
+        } : {
+            title: "inactive",
+        }} />;
+}
+
+export function divWithSeveralConditionalProps(isActive) {
+    return <div data-testid="target"
+        {...isActive ? {
+            className: "active",
+            title: "active",
+        } : {}}>
+        <div>
+            Child
+        </div>
+    </div>;
+}
+
+export function divWithNestedConditionalProps(isActive, isFirst) {
+    return <div data-testid="target"
+        {...isActive ? Object.assign({}, {
+            className: "active",
+        }, spreadProps, isFirst ? {
+            title: "first",
+        } : {}) : {}} />;
+}
+
+export function divWithConditionalSpread(isActive) {
+    return <div data-testid="target"
+        title="before"
+        {...isActive ? spreadProps : {}} />;
+}
+
+export const divWithYieldBangProps = <div data-testid="target"
+    className="header"
+    title="yielded"
+    id="myid" />;
+

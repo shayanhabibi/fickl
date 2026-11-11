@@ -125,4 +125,75 @@ Jest.describe("JSX API tests (using React)", fun () ->
         Jest.expect(target).toHaveAttribute("title", "from-spread")
         Jest.expect(target).toHaveTextContent("Child")
     )
+
+    Jest.test("A conditional prop is set when the condition is true", fun () ->
+        let target = (RTL.render (Components.divWithConditionalProp true)).getByTestId "target"
+        Jest.expect(target).toHaveClass("active")
+        Jest.expect(target).toHaveAttribute("title", "always")
+    )
+
+    Jest.test("A conditional prop is left out when the condition is false", fun () ->
+        let target = (RTL.render (Components.divWithConditionalProp false)).getByTestId "target"
+        Jest.expect(target).not.toHaveAttribute("class")
+        Jest.expect(target).toHaveAttribute("title", "always")
+    )
+
+    Jest.test("A conditional prop overrides the same prop set before it", fun () ->
+        let target = (RTL.render (Components.divWithConditionalPropAfterProp true)).getByTestId "target"
+        Jest.expect(target).toHaveAttribute("title", "active")
+        RTL.cleanup ()
+        let target = (RTL.render (Components.divWithConditionalPropAfterProp false)).getByTestId "target"
+        Jest.expect(target).toHaveAttribute("title", "always")
+    )
+
+    Jest.test("A conditional prop can have an else branch", fun () ->
+        let target = (RTL.render (Components.divWithConditionalPropWithElseBranch true)).getByTestId "target"
+        Jest.expect(target).toHaveClass("active")
+        Jest.expect(target).not.toHaveAttribute("title")
+        RTL.cleanup ()
+        let target = (RTL.render (Components.divWithConditionalPropWithElseBranch false)).getByTestId "target"
+        Jest.expect(target).not.toHaveAttribute("class")
+        Jest.expect(target).toHaveAttribute("title", "inactive")
+    )
+
+    Jest.test("Several props can be set under one condition, next to children", fun () ->
+        let target = (RTL.render (Components.divWithSeveralConditionalProps true)).getByTestId "target"
+        Jest.expect(target).toHaveClass("active")
+        Jest.expect(target).toHaveAttribute("title", "active")
+        Jest.expect(target).toHaveTextContent("Child")
+        RTL.cleanup ()
+        let target = (RTL.render (Components.divWithSeveralConditionalProps false)).getByTestId "target"
+        Jest.expect(target).not.toHaveAttribute("class")
+        Jest.expect(target).not.toHaveAttribute("title")
+        Jest.expect(target).toHaveTextContent("Child")
+    )
+
+    Jest.test("A condition can hold a spread and another condition", fun () ->
+        let target = (RTL.render (Components.divWithNestedConditionalProps true true)).getByTestId "spread-target"
+        Jest.expect(target).toHaveClass("active")
+        Jest.expect(target).toHaveAttribute("title", "first")
+        RTL.cleanup ()
+        let target = (RTL.render (Components.divWithNestedConditionalProps true false)).getByTestId "spread-target"
+        Jest.expect(target).toHaveClass("active")
+        Jest.expect(target).toHaveAttribute("title", "from-spread")
+        RTL.cleanup ()
+        let target = (RTL.render (Components.divWithNestedConditionalProps false true)).getByTestId "target"
+        Jest.expect(target).not.toHaveAttribute("class")
+        Jest.expect(target).not.toHaveAttribute("title")
+    )
+
+    Jest.test("A spread can be conditional", fun () ->
+        let target = (RTL.render (Components.divWithConditionalSpread true)).getByTestId "spread-target"
+        Jest.expect(target).toHaveAttribute("title", "from-spread")
+        RTL.cleanup ()
+        let target = (RTL.render (Components.divWithConditionalSpread false)).getByTestId "target"
+        Jest.expect(target).toHaveAttribute("title", "before")
+    )
+
+    Jest.test("Props can be yielded from a list literal", fun () ->
+        let target = (RTL.render Components.divWithYieldBangProps).getByTestId "target"
+        Jest.expect(target).toHaveClass("header")
+        Jest.expect(target).toHaveAttribute("title", "yielded")
+        Jest.expect(target).toHaveAttribute("id", "myid")
+    )
 )
