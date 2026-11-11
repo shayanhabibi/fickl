@@ -64,6 +64,40 @@ type GenericInfoAttribute() =
 //     [<GenericInfo>]
 //     static member GenericMethod(value1: 'X, value2: 'Y): string = "foo"
 
+let decoratedMembers = ResizeArray<string>()
+
+type MemberInfoAttribute() =
+    inherit JS.ReflectedDecoratorAttribute()
+    override _.Decorate(fn, info) =
+        let parameters =
+            info.GetParameters()
+            |> Array.map (fun p -> $"{p.Name}: {p.ParameterType}")
+            |> String.concat ", "
+        decoratedMembers.Add $"{info.Name}({parameters}): {info.ReturnType}"
+        fn
+
+[<MemberInfo>]
+let ``decorated function`` () = 1
+
+[<MemberInfo>]
+let decoratedFunction (x: int) (y: string) = y + string x
+
+type DecoratedType(v: int) =
+    [<MemberInfo>]
+    static member StaticMember(x: int) = x + 1
+
+    [<MemberInfo>]
+    member _.InstanceMember(x: int) = x + v
+
+    [<MemberInfo>]
+    member _.Overloaded(x: int) = x + v
+
+    [<MemberInfo>]
+    member _.Overloaded(x: string, y: float) = x + string v
+
+    [<MemberInfo>]
+    member _.``quoted member``(x: int) = x - v
+
 let inline getNameofLambda (f: 'T->'U) =
     nameofLambda f
 
@@ -1005,6 +1039,25 @@ let tests =
           "LOG2: called 1 time(s)!"
           "LOG1: [MATH (code 3)] called 2 time(s)!"
           "LOG2: called 2 time(s)!"
+        ]
+
+    testCase "ReflectedDecorator gets the member name in MethodInfo.Name" <| fun () -> // See #276
+        let x = DecoratedType(10)
+        ``decorated function`` () |> equal 1
+        decoratedFunction 1 "a" |> equal "a1"
+        DecoratedType.StaticMember 1 |> equal 2
+        x.InstanceMember 1 |> equal 11
+        x.Overloaded 1 |> equal 11
+        x.Overloaded("a", 1.) |> equal "a10"
+        x.``quoted member`` 15 |> equal 5
+        decoratedMembers |> Seq.toList |> equal [
+            "decorated function(): System.Int32"
+            "decoratedFunction(x: System.Int32, y: System.String): System.String"
+            "StaticMember(x: System.Int32): System.Int32"
+            "InstanceMember(x: System.Int32): System.Int32"
+            "Overloaded(x: System.Int32): System.Int32"
+            "Overloaded(x: System.String, y: System.Double): System.String"
+            "quoted member(x: System.Int32): System.Int32"
         ]
 
     // testCase "ReflectedDecorator works with generic parameters" <| fun _ ->
