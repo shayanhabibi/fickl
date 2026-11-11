@@ -35,7 +35,7 @@ export class Shape<Tag extends keyof Shape_$cases> extends Union<Tag, Shape_$cas
     cases() {
         return ["Circle", "Empty"];
     }
-    static readonly Empty: any = new Shape<1>(1, []);
+    static readonly Empty: Shape_$union = new Shape<1>(1, []);
 }
 
 export function Shape_$reflection(): TypeInfo {

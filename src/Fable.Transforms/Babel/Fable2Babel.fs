@@ -6665,13 +6665,25 @@ but thanks to the optimisation done below we get
         let value =
             Expression.newExpression (Expression.identifier entName, consArgs, ?typeArguments = typeArguments)
 
+        // A case of a union with several cases has the type of the union, as in F#, so that two cases
+        // can be compared: typed as its own case, `X.A === X.B` is an error for tsc. A static member
+        // cannot name the type parameters of its class, so those stay `any`, as in the constructor call.
+        let typeAnnotation =
+            match tag with
+            | Some _ ->
+                AliasTypeAnnotation(
+                    Identifier.identifier (entName + UnionHelpers.UNION_SUFFIX),
+                    Array.create genArgsCount AnyTypeAnnotation
+                )
+            | None -> AliasTypeAnnotation(Identifier.identifier entName, defaultArg typeArguments [||])
+
         ClassMember.classProperty (
             Expression.identifier (sanitizeName case.Name),
             value = value,
             isStatic = true,
             ?typeAnnotation =
                 (if com.IsTypeScript then
-                     Some AnyTypeAnnotation
+                     Some typeAnnotation
                  else
                      None),
             ?accessModifier =
