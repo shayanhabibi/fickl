@@ -1143,6 +1143,51 @@ type SelfPrimaryBase(x: int) as this =
 type SelfPrimaryChild() =
     inherit SelfPrimaryBase(2)
 
+type ShadowedTypeParamContainer<'T> =
+    | ShadowedTypeParamCase of 'T
+    // 'T shadows the type parameter of the union on purpose
+    static member CodecInner<'T, 'E>(t: int) : int = t + 1
+
+type ExplicitExceptionSelf =
+    inherit System.Exception
+    val mutable Code: int
+    new (m: string) as self = { inherit System.Exception(m); Code = 1 } then self.Code <- self.Code + m.Length
+
+type ExplicitException =
+    inherit System.Exception
+    val Code: int
+    new (m: string) = { inherit System.Exception(m); Code = 2 }
+    new (m: string, code: int) = { inherit System.Exception(m); Code = code }
+    member x.Describe() = x.Message + string x.Code
+
+type ExplicitExceptionChild =
+    inherit ExplicitException
+    val Extra: string
+    new (m: string) = { inherit ExplicitException(m, 5); Extra = "x" }
+
+type ExplicitExceptionGeneric<'T> =
+    inherit System.Exception
+    val Value: 'T
+    new (m: string, value: 'T) = { inherit System.Exception(m); Value = value }
+
+[<Fable.Core.AttachMembers>]
+type AttachedExplicitSelf =
+    val mutable V: int
+    new (v: int) as self = { V = v } then self.V <- self.V + 1
+
+[<Fable.Core.AttachMembers>]
+type AttachedExplicitOverloads =
+    val A: int
+    val B: string
+    new (a: int) = { A = a; B = "b" }
+    new (a: int, b: string) = { A = a; B = b }
+    member x.Show() = string x.A + x.B
+
+[<Fable.Core.AttachMembers>]
+type AttachedSecondary(a: int, b: string) =
+    new (a: int) = AttachedSecondary(a + 1, "s")
+    member _.Show() = string a + b
+
 let tests =
   testList "Types" [
     testCase "Explicit constructors with `as x ... then` work" <| fun () -> // #79
@@ -2290,4 +2335,60 @@ let tests =
         valClassSelfSaved.Count |> equal 3
         obj.ReferenceEquals(valClassSelfSaved.[1], b) |> equal true
         obj.ReferenceEquals(valClassSelfSaved.[2], b) |> equal true
+
+    testCase "Static member type parameter can shadow one of its type" <| fun () ->
+        ShadowedTypeParamContainer<string>.CodecInner<float, bool> 41 |> equal 42
+        ShadowedTypeParamContainer<string>.CodecInner 41 |> equal 42
+
+    // See https://github.com/shayanhabibi/fickl/issues/334
+    testCase "Explicit constructors work in a class inheriting System.Exception" <| fun () ->
+        let e = ExplicitException("boom")
+        e.Message |> equal "boom"
+        e.Code |> equal 2
+        e.Describe() |> equal "boom2"
+        box e :? System.Exception |> equal true
+        let e = ExplicitException("boom", 7)
+        e.Message |> equal "boom"
+        e.Code |> equal 7
+        let e = ExplicitExceptionGeneric("gen", 3.5)
+        e.Message |> equal "gen"
+        e.Value |> equal 3.5
+
+    testCase "Explicit constructors with a self identifier work in a class inheriting System.Exception" <| fun () ->
+        let e = ExplicitExceptionSelf("boom")
+        e.Message |> equal "boom"
+        e.Code |> equal 5
+
+    testCase "Explicit classes inheriting System.Exception can be inherited, raised and caught" <| fun () ->
+        let e = ExplicitExceptionChild("boom")
+        e.Message |> equal "boom"
+        e.Code |> equal 5
+        e.Extra |> equal "x"
+        e.Describe() |> equal "boom5"
+        box e :? ExplicitException |> equal true
+
+        let caught =
+            try
+                raise e
+            with
+            | :? ExplicitException as e -> e.Message + string e.Code
+            | _ -> "other"
+
+        caught |> equal "boom5"
+
+        let caught =
+            try
+                failwith "plain"
+            with
+            | :? ExplicitException -> "explicit"
+            | e -> e.Message
+
+        caught |> equal "plain"
+
+    testCase "Explicit constructors run in a class with AttachMembers" <| fun () ->
+        AttachedExplicitSelf(3).V |> equal 4
+        AttachedExplicitOverloads(1).Show() |> equal "1b"
+        AttachedExplicitOverloads(2, "z").Show() |> equal "2z"
+        AttachedSecondary(1).Show() |> equal "2s"
+        AttachedSecondary(2, "z").Show() |> equal "2z"
   ]

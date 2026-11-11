@@ -452,7 +452,8 @@ let private transformTraitCall
     )
 
 /// F# accesses fields and calls members through a byref implicitly: go through the reference cell to the value.
-/// Only for parameters, which always get a cell; a byref local bound to `&x` of an immutable x holds the value.
+/// Parameters always get a cell. A byref local holds a cell when bound to the address of a mutable value, a field
+/// or an array element, and the value itself when bound to `&x` of an immutable x.
 let private derefByRefReceiver
     (com: IFableCompiler)
     (ctx: Context)
@@ -467,12 +468,21 @@ let private derefByRefReceiver
             |> Seq.exists (fun p -> p.DeclarationLocation = var.DeclarationLocation)
         )
 
+    // The cell made for an address has a getter and a setter (see `makeRefFromMutableValue`); a `ref` cell has a value
+    let isBoundToAddressCell (var: FSharpMemberOrFunctionOrValue) =
+        match tryGetValueFromScope ctx var with
+        | Some(Fable.Call(Fable.Import({ Selector = "FSharpRef" }, _, _),
+                          { Args = [ Fable.Delegate _; Fable.Delegate _ ] },
+                          _,
+                          _)) -> true
+        | _ -> false
+
     match callee with
     | Some(FSharpExprPatterns.Value var as expr) when
         isByRefValue var
         && not var.IsConstructorThisValue
         && isByRefType expr.Type
-        && isParameter var
+        && (isParameter var || isBoundToAddressCell var)
         // Python passes an inref to a struct as the struct itself
         && (
             match com.Options.Language with
@@ -484,6 +494,18 @@ let private derefByRefReceiver
         let valueType = makeType ctx.GenericArgs expr.Type.GenericArguments.[0]
         Replacements.Api.getRefCell com transformed.Range valueType transformed
     | _ -> transformed
+
+/// F# binds the source of a struct copy (`{ s with X = 1 }`, `{ ...s; X = 1 }`) by address to a generated local that
+/// it only reads fields from. That local holds the struct itself, and is typed so, also when the source is mutable.
+let private structCopySource (com: IFableCompiler) (var: FSharpMemberOrFunctionOrValue) (value: FSharpExpr) =
+    match value, com.Options.Language with
+    | FSharpExprPatterns.AddressOf source, (JavaScript | TypeScript) when
+        var.IsCompilerGenerated
+        && isByRefValue var
+        && (var.CompiledName = "inputRecord" || var.CompiledName = "spreadSrc")
+        ->
+        source
+    | _ -> value
 
 /// The steps of an explicit constructor body that constructs the object and then runs more code: the steps before
 /// the construction (without the System.Object constructor call), the construction, and the steps after it
@@ -1498,11 +1520,11 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
 
             | _ ->
                 let ctx, value =
-                    match value with
+                    match structCopySource com var value with
                     | FSharpExprPatterns.TypeLambda(genArgs, lambda) ->
                         let ctx = resolveTypeLambdaGenArgs ctx genArgs lambda
                         ctx, lambda
-                    | _ -> ctx, value
+                    | value -> ctx, value
 
                 let! value = transformExpr com ctx [] value
                 let ctx, ident = putIdentInScope com ctx var (Some value)
@@ -1718,7 +1740,20 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                                     trampoline {
                                         let ctx, args = makeFunctionArgs com ctx args
 
-                                        let! body = transformExpr com ctx [] body
+                                        // FCS leaves the type arguments it cannot infer from the trait signature
+                                        // unsolved in the witness, a direct call gets `obj` for them
+                                        let bodyCtx =
+                                            match body with
+                                            | FSharpExprPatterns.Call(_, _, ownerGenArgs, membGenArgs, _) ->
+                                                let genArgs =
+                                                    (ctx.GenericArgs,
+                                                     getUnsolvedGenericParams (ownerGenArgs @ membGenArgs))
+                                                    ||> List.fold (fun genArgs name -> Map.add name Fable.Any genArgs)
+
+                                                { ctx with GenericArgs = genArgs }
+                                            | _ -> ctx
+
+                                        let! body = transformExpr com bodyCtx [] body
 
                                         let w: Fable.Witness =
                                             {
@@ -2943,6 +2978,7 @@ let private transformMemberDecl
                  && ((FsMemberFunctionOrValue.SymbolKeyAttribute memb).IsSome
                      || FsMemberFunctionOrValue.HasJsDecorator memb)))
             && memb.CompiledName <> ".cctor"
+            && not (isExplicitConstructorFunction com memb)
             ->
             transformExplicitlyAttachedMember com ctx ent memb args body
             []

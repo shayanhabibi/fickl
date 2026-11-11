@@ -5588,6 +5588,11 @@ let tryField com returnTyp ownerTyp fieldName =
     | Builtin BclTimeSpan, "Zero" when com.Options.JsTemporal ->
         Helper.LibCall(com, "TimeSpanTemporal", "zero", returnTyp, []) |> Some
     | Builtin BclTimeSpan, "Zero" -> makeIntConst 0 |> Some
+    | Builtin BclTimeSpan, ("MaxValue" | "MinValue") when com.Options.JsTemporal ->
+        Helper.LibCall(com, "TimeSpanTemporal", Naming.lowerFirst fieldName, returnTyp, [])
+        |> Some
+    | Builtin BclTimeSpan, ("MaxValue" | "MinValue") ->
+        Helper.LibValue(com, "TimeSpan", Naming.lowerFirst fieldName, returnTyp) |> Some
     | Builtin BclDateOnly, ("MaxValue" | "MinValue") ->
         Helper.LibCall(com, dateOnlyModule com, Naming.lowerFirst fieldName, returnTyp, [])
         |> Some

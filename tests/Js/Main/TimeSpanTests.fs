@@ -693,6 +693,93 @@ let tests =
             let expected = -1
             equal actual expected
 
+        testCase "TimeSpan.FromTicks keeps sub-millisecond ticks" <| fun () ->
+            TimeSpan.FromTicks(1L).Ticks |> equal 1L
+            TimeSpan.FromTicks(3L).Ticks |> equal 3L
+            TimeSpan(12345L).Ticks |> equal 12345L
+            TimeSpan.FromTicks(1234567L).Ticks |> equal 1234567L
+            TimeSpan.FromTicks(-1234567L).Ticks |> equal -1234567L
+            TimeSpan.FromTicks(86400000000001L).Ticks |> equal 86400000000001L
+            TimeSpan.FromTicks(15000L).TotalMilliseconds |> equal 1.5
+            TimeSpan.FromTicks(15000L).Milliseconds |> equal 1
+            TimeSpan.FromTicks(15000L) = TimeSpan.FromMilliseconds(1.5) |> equal true
+            TimeSpan.FromTicks(15000L) = TimeSpan.FromMilliseconds(1.) |> equal false
+            (TimeSpan.FromTicks(1234567L) + TimeSpan.FromTicks(1L)).Ticks |> equal 1234568L
+
+        testCase "TimeSpan.FromTicks round-trips every tick count below seven years" <| fun () ->
+            let mutable n = 1L
+            let mutable failed = 0L
+
+            while n < 2251799813685248L do
+                if TimeSpan.FromTicks(n).Ticks <> n || TimeSpan.FromTicks(-n).Ticks <> -n then
+                    failed <- n
+
+                n <- n * 3L + 7L
+
+            for n in 1L .. 20000L do
+                if TimeSpan.FromTicks(n).Ticks <> n then
+                    failed <- n
+
+            failed |> equal 0L
+
+        testCase "TimeSpan.ToString keeps sub-millisecond ticks" <| fun () ->
+            TimeSpan.FromTicks(1234567L).ToString() |> equal "00:00:00.1234567"
+            TimeSpan.FromTicks(-1L).ToString() |> equal "-00:00:00.0000001"
+            TimeSpan.FromTicks(86400000000001L).ToString() |> equal "100.00:00:00.0000001"
+            TimeSpan.FromTicks(1234567L).ToString("g", CultureInfo.InvariantCulture) |> equal "0:00:00.1234567"
+            TimeSpan.FromTicks(1000000L).ToString("g", CultureInfo.InvariantCulture) |> equal "0:00:00.1"
+            TimeSpan.FromTicks(1234567L).ToString("G", CultureInfo.InvariantCulture) |> equal "0:00:00:00.1234567"
+
+        testCase "TimeSpan.MaxValue and MinValue hold the Int64 tick limits" <| fun () ->
+            TimeSpan.MaxValue.Ticks |> equal Int64.MaxValue
+            TimeSpan.MinValue.Ticks |> equal Int64.MinValue
+            TimeSpan.FromTicks(Int64.MaxValue).Ticks |> equal Int64.MaxValue
+            TimeSpan.FromTicks(Int64.MinValue).Ticks |> equal Int64.MinValue
+            TimeSpan.FromTicks(Int64.MaxValue) = TimeSpan.MaxValue |> equal true
+            TimeSpan.FromTicks(Int64.MinValue) = TimeSpan.MinValue |> equal true
+            TimeSpan.MaxValue > TimeSpan(10675199, 2, 48, 5, 477) |> equal true
+            TimeSpan.MinValue < TimeSpan(-10675199, -2, -48, -5, -477) |> equal true
+            TimeSpan.MaxValue.Days |> equal 10675199
+            TimeSpan.MaxValue.Hours |> equal 2
+            TimeSpan.MaxValue.Minutes |> equal 48
+            TimeSpan.MaxValue.Seconds |> equal 5
+            TimeSpan.MaxValue.Milliseconds |> equal 477
+            TimeSpan.MaxValue.ToString() |> equal "10675199.02:48:05.4775807"
+            TimeSpan.MinValue.ToString() |> equal "-10675199.02:48:05.4775808"
+
+        testCase "TimeSpan keeps whole milliseconds above 2^53 ticks" <| fun () ->
+            TimeSpan.FromTicks(9223372036854770000L).Ticks |> equal 9223372036854770000L
+            TimeSpan.FromTicks(-9223372036854770000L).Ticks |> equal -9223372036854770000L
+            TimeSpan.FromTicks(1234567890123450000L).Ticks |> equal 1234567890123450000L
+            TimeSpan.FromTicks(9223372036854770000L).TotalMilliseconds |> equal 922337203685477.
+
+// The Temporal representation does not check the range
+#if !FABLE_COMPILER_JAVASCRIPT_TEMPORAL
+        testCase "TimeSpan throws when it leaves the Int64 tick range" <| fun () ->
+            let overflows (f: unit -> TimeSpan) =
+                try
+                    f () |> ignore
+                    false
+                with :? OverflowException ->
+                    true
+
+            overflows (fun () -> TimeSpan.MaxValue.Add(TimeSpan.FromMilliseconds(1.))) |> equal true
+            overflows (fun () -> TimeSpan.MinValue.Subtract(TimeSpan.FromMilliseconds(1.))) |> equal true
+            overflows (fun () -> TimeSpan.MaxValue.Multiply(2.)) |> equal true
+            overflows (fun () -> TimeSpan.FromDays(1e9)) |> equal true
+            overflows (fun () -> TimeSpan.FromMilliseconds(1e15)) |> equal true
+            overflows (fun () -> TimeSpan.FromDays(10675199.).Add(TimeSpan.FromHours(2.))) |> equal false
+
+            let outOfRange =
+                try
+                    TimeSpan(20000000, 0, 0, 0, 0) |> ignore
+                    false
+                with :? ArgumentOutOfRangeException ->
+                    true
+
+            outOfRange |> equal true
+#endif
+
 // A .NET TimeSpan is an integer count of 100ns ticks. The default JS
 // representation is a float64 millisecond count, so only .NET and the Temporal
 // representation can hold these exactly.

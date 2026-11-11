@@ -18,4 +18,12 @@ let tests =
         Expect.isFalse (isPackageAssemblyPath (Path.Combine(obj, "net10.0", "ref", "Lib.dll"))) "reference assembly"
         Expect.isFalse (isPackageAssemblyPath (Path.Combine(obj, "net10.0", "Lib.dll"))) "intermediate assembly"
         Expect.isFalse (isPackageAssemblyPath (Path.Combine("Lib", "bin", "Release", "net10.0", "Lib.dll"))) "output assembly"
+
+    // #255: the checker drops the project's references, without a diagnostic, on a language version it rejects
+    testCase "Only language versions the checker accepts are supported" <| fun () ->
+        for version in [ "8.0"; "10.0"; "11"; "latest"; "default"; "preview"; "Preview" ] do
+            Expect.isTrue (isLangVersionSupported version) version
+
+        for version in [ "5.0"; "7.0"; "99.0"; "bogus" ] do
+            Expect.isFalse (isLangVersionSupported version) version
   ]

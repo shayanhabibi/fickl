@@ -2307,6 +2307,30 @@ module Util =
 
         Expression.callExpression (funcExpr, List.toArray args, ?typeArguments = genArgs, ?loc = r)
 
+    /// A declaration lists a type parameter name once (see makeTypeParamDecl), so when a type parameter
+    /// of the member shadows one of its declaring type, only the argument for the member's one is passed
+    let dropShadowedGenericArgs
+        (com: IBabelCompiler)
+        (memberInfo: Fable.MemberFunctionOrValue option)
+        (genArgs: Fable.Type list)
+        =
+        match memberInfo with
+        | Some info when com.IsTypeScript && not (List.isEmpty genArgs) ->
+            let entGenParams =
+                match info.DeclaringEntity |> Option.bind com.TryGetEntity with
+                | Some ent when not ent.IsFSharpModule -> ent.GenericParameters
+                | _ -> []
+
+            let names = entGenParams @ info.GenericParameters |> List.map (fun g -> g.Name)
+            let distinctNames = List.distinct names
+
+            if List.sameLength names genArgs && not (List.sameLength names distinctNames) then
+                let lastArgs = List.zip names genArgs |> Map
+                distinctNames |> List.map (fun name -> lastArgs[name])
+            else
+                genArgs
+        | _ -> genArgs
+
     let callFunctionWithThisContext r funcExpr (args: Expression list) =
         let args = thisExpr :: args |> List.toArray
         Expression.callExpression (get None funcExpr "call", args, ?loc = r)
@@ -4238,9 +4262,12 @@ but thanks to the optimisation done below we get
                             ?typeArguments = typeParamInst,
                             ?loc = range
                         )
-                | None -> callFunction com ctx range callee callInfo.GenericArgs args
+                | None ->
+                    let genArgs = dropShadowedGenericArgs com memberInfo callInfo.GenericArgs
+                    callFunction com ctx range callee genArgs args
                 | Some(TransformExpr com ctx thisArg) ->
-                    callFunction com ctx range callee callInfo.GenericArgs (thisArg :: args)
+                    let genArgs = dropShadowedGenericArgs com memberInfo callInfo.GenericArgs
+                    callFunction com ctx range callee genArgs (thisArg :: args)
 
     let transformCurriedApply (com: IBabelCompiler) ctx range (applied: Fable.Expr) args =
         let resultType =
@@ -5578,6 +5605,44 @@ but thanks to the optimisation done below we get
         FSharp2Fable.Util.tryExplicitBaseType ent
         |> Option.orElseWith (fun () -> FSharp2Fable.Util.tryPrimaryBaseType ent |> Option.map fst)
 
+    /// The base type of an explicit class whose base is not compiled by Fable, like System.Exception or an imported
+    /// class (#334), with the class it is at runtime, if it is one
+    let tryForeignBase (com: IBabelCompiler) (ent: Fable.Entity) =
+        FSharp2Fable.Util.tryForeignBaseType ent
+        |> Option.bind (fun baseType ->
+            com.TryGetEntity(baseType.Entity)
+            |> Option.filter (fun baseEnt ->
+                not (baseEnt.IsInterface || FSharp2Fable.Util.isErasedOrStringEnumEntity baseEnt)
+            )
+            |> Option.bind (JS.Replacements.tryConstructor com)
+            |> Option.map (fun baseRef -> baseType, baseRef)
+        )
+
+    /// The class an explicit class extends when its base is not compiled by Fable (#334)
+    let tryForeignSuperClass (com: IBabelCompiler) ctx (ent: Fable.Entity) =
+        tryForeignBase com ent
+        |> Option.map (fun (baseType, baseRef) ->
+            (match baseRef with
+             | _ when not com.IsTypeScript -> transformAsExpr com ctx baseRef |> SuperExpression
+             // A BCL base is annotated with an interface, so extend the library class it runs as
+             | Fable.Import({ Kind = Fable.LibraryImport _ }, _, _) ->
+                 match transformAsExpr com ctx baseRef with
+                 | Expression.Identifier id ->
+                     makeGenericTypeAnnotation com ctx baseType.GenericArgs id |> makeSuperType com
+                 | expr -> SuperExpression expr
+             | _ ->
+                 Fable.DeclaredType(baseType.Entity, baseType.GenericArgs)
+                 |> makeTypeAnnotation com ctx
+                 |> makeSuperType com)
+        )
+
+    /// Whether the explicit constructors of an explicit class make the base object they build an instance of the
+    /// class: when the class, or an explicit class it inherits, extends a class Fable does not compile (#334)
+    let rec adoptsBaseObject (com: IBabelCompiler) (ent: Fable.Entity) =
+        Option.isSome (tryForeignBase com ent)
+        || (FSharp2Fable.Util.tryExplicitBaseType ent
+            |> Option.exists (fun baseType -> adoptsBaseObject com (com.GetEntity(baseType.Entity))))
+
     /// The parameters an explicit class's constructor takes before its own fields and passes to `super`: the fields of
     /// its explicit base classes (#87), after the parameters of a primary constructor at the root (#96). Each has its
     /// type in terms of the class's generic parameters and, if it is a base field, the field
@@ -5622,28 +5687,49 @@ but thanks to the optimisation done below we get
     /// it (#96), unless computing the class's own fields could have side effects, which must follow the base
     /// constructor's. When every parameter is a base field, bind the base object and pass its fields on (#87).
     /// Otherwise, as when the class extends an explicit class with a primary constructor at the root, the arguments of
-    /// that constructor are not at hand, so make the base object an instance of the class and set its own fields
+    /// that constructor are not at hand, so make the base object an instance of the class and set its own fields.
+    /// The same goes for a base Fable does not compile, like System.Exception (#334)
     let passExplicitBaseArgs (com: IBabelCompiler) ctx (ent: Fable.Entity) (body: Fable.Expr) =
-        match tryExtendedBaseType ent with
+        let foreignBase = tryForeignBase com ent
+
+        match tryExtendedBaseType ent |> Option.orElse (Option.map fst foreignBase) with
         | None -> body
         | Some baseType ->
+            let adoptsBase = adoptsBaseObject com ent
             let baseParams = getExplicitBaseParams com ent
 
             let baseFields =
                 baseParams
                 |> List.choose (fun (_, typ, field) -> field |> Option.map (fun field -> field, typ))
 
-            let tryBaseConsCall expr =
+            let isBaseConsCall expr =
                 match expr with
-                | Fable.Call(_, ({ MemberRef = Some memberRef } as info), _, _) ->
-                    match com.TryGetMember(memberRef) with
-                    | Some memb when
+                | Fable.Call(_, { MemberRef = Some memberRef }, _, _) when
+                    com.TryGetMember(memberRef)
+                    |> Option.exists (fun memb ->
                         memb.IsConstructor
                         && memb.DeclaringEntity
                            |> Option.exists (fun e -> e.FullName = baseType.Entity.FullName)
-                        ->
-                        Some(memb, info)
-                    | _ -> None
+                    )
+                    ->
+                    true
+                // The constructor call of a BCL base is replaced with a call of the class it is at runtime
+                | Fable.Call(callee, _, _, _) ->
+                    match callee, foreignBase with
+                    | Fable.Import(info, _, _), Some(_, Fable.Import(baseInfo, _, _)) ->
+                        info.Selector = baseInfo.Selector && info.Path = baseInfo.Path
+                    | Fable.IdentExpr ident, Some(_, Fable.IdentExpr baseIdent) -> ident.Name = baseIdent.Name
+                    | _ -> false
+                | _ -> false
+
+            let tryPrimaryBaseConsCall expr =
+                match expr with
+                | Fable.Call(_, ({ MemberRef = Some memberRef } as info), _, _) when
+                    Option.isSome (FSharp2Fable.Util.tryPrimaryBaseType ent)
+                    ->
+                    com.TryGetMember(memberRef)
+                    |> Option.filter FSharp2Fable.Util.isPrimaryConstructor
+                    |> Option.map (fun _ -> info)
                 | _ -> None
 
             let replaceNewObj makeExpr expr =
@@ -5736,13 +5822,8 @@ but thanks to the optimisation done below we get
                 match expr with
                 | Fable.Let(ident, value, body) -> Fable.Let(ident, value, rewrite body)
                 | Fable.Sequential exprs ->
-                    let baseConsCall =
-                        exprs
-                        |> List.indexed
-                        |> List.tryPick (fun (i, e) -> tryBaseConsCall e |> Option.map (fun call -> i, call))
-
-                    match baseConsCall with
-                    | Some(i, (memb, info)) ->
+                    match List.tryFindIndex isBaseConsCall exprs with
+                    | Some i ->
                         let baseCall = exprs[i]
 
                         let rest =
@@ -5757,16 +5838,11 @@ but thanks to the optimisation done below we get
                             Fable.Let(baseIdent, baseCall, build baseIdent rest)
 
                         let rest =
-                            if
-                                FSharp2Fable.Util.isPrimaryConstructor memb
-                                && Option.isSome (FSharp2Fable.Util.tryPrimaryBaseType ent)
-                                && hasPureOwnFields rest
-                            then
-                                passPrimaryArgs info rest
-                            elif List.sameLength baseFields baseParams then
-                                bindBase passFields
-                            else
-                                bindBase adoptBase
+                            match tryPrimaryBaseConsCall baseCall with
+                            | _ when adoptsBase -> bindBase adoptBase
+                            | Some info when hasPureOwnFields rest -> passPrimaryArgs info rest
+                            | _ when List.sameLength baseFields baseParams -> bindBase passFields
+                            | _ -> bindBase adoptBase
 
                         Fable.Sequential(List.take i exprs @ [ rest ])
                     | None ->
@@ -7098,7 +7174,7 @@ but thanks to the optimisation done below we get
                     |> jsConstructor com ctx
                     |> SuperExpression
                     |> Some
-                | None -> None
+                | None -> tryForeignSuperClass com ctx ent
 
         let body =
             BlockStatement(

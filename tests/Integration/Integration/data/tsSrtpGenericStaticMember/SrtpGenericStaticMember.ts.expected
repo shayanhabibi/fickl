@@ -1,0 +1,64 @@
+
+import { Union } from "./fable_modules/fable-library-ts.5.27.0/Types.ts";
+import { union_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+
+export class Container$1<T> extends Union<0, "Container"> {
+    constructor(Item: T) {
+        super();
+        this.tag = 0;
+        this.fields = [Item];
+    }
+    readonly tag: 0;
+    readonly fields: [T];
+    cases() {
+        return ["Container"];
+    }
+}
+
+export function Container$1_$reflection(gen0: TypeInfo): TypeInfo {
+    return union_type("SrtpGenericStaticMember.Container`1", [gen0], Container$1, () => [[["Item", gen0]]]);
+}
+
+export function Container$1_CodecInner_Z524259A4<T, E>(t: int32): int32 {
+    return (t + 1) | 0;
+}
+
+export function Container$1_CodecOuter_Z524259A4<T, A, E>(t: int32): int32 {
+    return (t + 2) | 0;
+}
+
+export class Plain extends Union<0, "Plain"> {
+    constructor() {
+        super();
+        this.tag = 0;
+        this.fields = [];
+    }
+    readonly tag: 0;
+    readonly fields: [];
+    cases() {
+        return ["Plain"];
+    }
+    static readonly Plain: Plain = new Plain();
+}
+
+export function Plain_$reflection(): TypeInfo {
+    return union_type("SrtpGenericStaticMember.Plain", [], Plain, () => [[]]);
+}
+
+export function Plain_CodecPlain_Z524259A4<E>(t: int32): int32 {
+    return (t + 3) | 0;
+}
+
+export function inner(): int32 {
+    return Container$1_CodecInner_Z524259A4<any, any>(41) | 0;
+}
+
+export function outer(): int32 {
+    return Container$1_CodecOuter_Z524259A4<string, any, any>(41) | 0;
+}
+
+export function plain(): int32 {
+    return Plain_CodecPlain_Z524259A4<any>(41) | 0;
+}
+
