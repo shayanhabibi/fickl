@@ -1118,6 +1118,206 @@ let passGenericsTests =
             PassGenericsFns.GenericDescriber<int>().Names("s") |> equal "Int32String"
     ]
 
+// Type.GetMethod, see #293
+type GetMethodShape =
+    abstract Area: scale: float -> float
+
+[<AbstractClass>]
+type GetMethodAnimal() =
+    abstract Speak: unit -> string
+    member _.Kind() = "animal"
+
+type GetMethodDog() =
+    inherit GetMethodAnimal()
+    override _.Speak() = "woof"
+
+type GetMethodGreeter() =
+    abstract Greet: string -> string
+    default _.Greet(name) = "hi " + name
+
+type GetMethodLoudGreeter() =
+    inherit GetMethodGreeter()
+    override _.Greet(name) = "HI " + name
+
+type GetMethodCalc(k: int) =
+    static member Add(a: int, b: int) = a + b
+    static member Hello() = "hello"
+    static member Curried (a: int) (b: int) = a * b
+    static member Log(msg: string) : unit = ignore msg
+    static member Apply(f: int -> int -> int, x: int) = f x 2
+    static member Opt(a: int, ?b: int) = a + defaultArg b 10
+    static member Over(a: int) = a + 1
+    static member Over(a: string) = a + "!"
+    static member Fail() : int = failwith "boom"
+    member _.Scale(x: int) = x * k
+    member _.Name = "calc"
+    member _.Mixed (a: int, b: int) (c: int) = a + b + c + k
+    member private _.Hidden() = 1
+    interface GetMethodShape with
+        member _.Area scale = scale * float k
+
+[<Fable.Core.AttachMembers>]
+type GetMethodAttached(k: int) =
+    member _.Twice(x: int) = x * 2 * k
+    static member Make(x: int) = GetMethodAttached(x)
+
+type GetMethodRecord =
+    { X: int }
+    member this.Plus(y: int) = this.X + y
+    static member Zero() = { X = 0 }
+
+type GetMethodUnion =
+    | GetMethodA of int
+    | GetMethodB
+    member this.Describe() =
+        match this with
+        | GetMethodA i -> "A" + string i
+        | GetMethodB -> "B"
+
+type GetMethodBox<'T>(v: 'T) =
+    member _.Value() = v
+    member _.Same(x: 'T) = x
+    static member wrap(x: 'T) = "wrapped " + string (box x)
+
+type GetMethodIntBox() =
+    inherit GetMethodBox<int>(5)
+
+let inline getMethodName<'T> (name: string) = typeof<'T>.GetMethod(name).Name
+let inline invokeStaticMethod<'T> (name: string) (args: obj[]) = typeof<'T>.GetMethod(name).Invoke(null, args)
+
+let getMethodTests = [
+    testCase "Type.GetMethod gives the name, parameters and return type of a static method" <| fun () ->
+        let add = typeof<GetMethodCalc>.GetMethod("Add")
+        add.Name |> equal "Add"
+        add.IsStatic |> equal true
+        add.GetParameters() |> Array.map (fun p -> p.Name) |> equal [| "a"; "b" |]
+        add.GetParameters() |> Array.map (fun p -> p.ParameterType) |> equal [| typeof<int>; typeof<int> |]
+        add.ReturnType |> equal typeof<int>
+
+    testCase "MethodInfo.Invoke calls a static method" <| fun () ->
+        let add = typeof<GetMethodCalc>.GetMethod("Add")
+        add.Invoke(null, [| box 1; box 2 |]) |> unbox<int> |> equal 3
+        add.Invoke(null, [| box 10; box 20 |]) |> unbox<int> |> equal 30
+
+    testCase "MethodInfo.Invoke calls a method without parameters" <| fun () ->
+        let hello = typeof<GetMethodCalc>.GetMethod("Hello")
+        hello.GetParameters().Length |> equal 0
+        hello.Invoke(null, [||]) |> unbox<string> |> equal "hello"
+        hello.Invoke(null, null) |> unbox<string> |> equal "hello"
+
+    testCase "MethodInfo.Invoke takes curried parameters one after another" <| fun () ->
+        let curried = typeof<GetMethodCalc>.GetMethod("Curried")
+        curried.GetParameters().Length |> equal 2
+        curried.Invoke(null, [| box 3; box 4 |]) |> unbox<int> |> equal 12
+        let mixed = typeof<GetMethodCalc>.GetMethod("Mixed")
+        mixed.GetParameters().Length |> equal 3
+        mixed.Invoke(GetMethodCalc(100), [| box 1; box 2; box 3 |]) |> unbox<int> |> equal 106
+
+    testCase "MethodInfo.Invoke gives null for a method returning unit" <| fun () ->
+        typeof<GetMethodCalc>.GetMethod("Log").Invoke(null, [| box "x" |]) |> isNull |> equal true
+
+    testCase "MethodInfo.Invoke passes functions and optional arguments" <| fun () ->
+        let apply = typeof<GetMethodCalc>.GetMethod("Apply")
+        apply.Invoke(null, [| box (fun (a: int) (b: int) -> a - b); box 10 |]) |> unbox<int> |> equal 8
+        let opt = typeof<GetMethodCalc>.GetMethod("Opt")
+        opt.Invoke(null, [| box 1; box (Some 2) |]) |> unbox<int> |> equal 3
+        opt.Invoke(null, [| box 1; null |]) |> unbox<int> |> equal 11
+
+    testCase "MethodInfo.Invoke calls an instance method on the target" <| fun () ->
+        let scale = typeof<GetMethodCalc>.GetMethod("Scale")
+        scale.IsStatic |> equal false
+        scale.Invoke(GetMethodCalc(3), [| box 5 |]) |> unbox<int> |> equal 15
+        scale.Invoke(GetMethodCalc(4), [| box 5 |]) |> unbox<int> |> equal 20
+        typeof<GetMethodCalc>.GetMethod("get_Name").Invoke(GetMethodCalc(3), [||]) |> unbox<string> |> equal "calc"
+
+    testCase "Type.GetMethod gives null when the type has no such public method" <| fun () ->
+        typeof<GetMethodCalc>.GetMethod("Missing") |> isNull |> equal true
+        typeof<GetMethodCalc>.GetMethod("Hidden") |> isNull |> equal true
+        // A property is not a method, and an explicit interface implementation is not public
+        typeof<GetMethodCalc>.GetMethod("Name") |> isNull |> equal true
+        typeof<GetMethodCalc>.GetMethod("Area") |> isNull |> equal true
+        typeof<GetMethodCalc>.GetMethod(".ctor") |> isNull |> equal true
+        typeof<GetMethodRecord>.GetMethod("Missing") |> isNull |> equal true
+        // The static methods of a base class are not found
+        typeof<GetMethodIntBox>.GetMethod("wrap") |> isNull |> equal true
+
+    testCase "Type.GetMethod finds interface, abstract and inherited methods" <| fun () ->
+        typeof<GetMethodShape>.GetMethod("Area").Invoke(GetMethodCalc(2), [| box 1.5 |]) |> unbox<float> |> equal 3.
+        typeof<GetMethodAnimal>.GetMethod("Speak").Invoke(GetMethodDog(), [||]) |> unbox<string> |> equal "woof"
+        typeof<GetMethodDog>.GetMethod("Speak").Invoke(GetMethodDog(), [||]) |> unbox<string> |> equal "woof"
+        typeof<GetMethodDog>.GetMethod("Kind").Invoke(GetMethodDog(), [||]) |> unbox<string> |> equal "animal"
+        let greet = typeof<GetMethodGreeter>.GetMethod("Greet")
+        greet.Invoke(GetMethodGreeter(), [| box "a" |]) |> unbox<string> |> equal "hi a"
+        greet.Invoke(GetMethodLoudGreeter(), [| box "a" |]) |> unbox<string> |> equal "HI a"
+        typeof<GetMethodLoudGreeter>.GetMethod("Greet").Invoke(GetMethodLoudGreeter(), [| box "a" |])
+        |> unbox<string>
+        |> equal "HI a"
+
+    testCase "Type.GetMethod works with AttachMembers classes" <| fun () ->
+        typeof<GetMethodAttached>.GetMethod("Twice").Invoke(GetMethodAttached(2), [| box 5 |]) |> unbox<int> |> equal 20
+        let made = typeof<GetMethodAttached>.GetMethod("Make").Invoke(null, [| box 3 |]) :?> GetMethodAttached
+        made.Twice(1) |> equal 6
+
+    testCase "Type.GetMethod works with records and unions" <| fun () ->
+        typeof<GetMethodRecord>.GetMethod("Plus").Invoke({ X = 1 }, [| box 2 |]) |> unbox<int> |> equal 3
+        typeof<GetMethodRecord>.GetMethod("Zero").Invoke(null, [||]) |> unbox<GetMethodRecord> |> equal { X = 0 }
+        typeof<GetMethodRecord>.GetMethod("Zero").ReturnType |> equal typeof<GetMethodRecord>
+        typeof<GetMethodUnion>.GetMethod("Describe").Invoke(GetMethodA 1, [||]) |> unbox<string> |> equal "A1"
+
+    testCase "Type.GetMethod works with generic types" <| fun () ->
+        let wrap = typeof<GetMethodBox<int>>.GetMethod("wrap")
+        wrap.Invoke(null, [| box 5 |]) |> unbox<string> |> equal "wrapped 5"
+        wrap.GetParameters().[0].ParameterType |> equal typeof<int>
+        let value = typeof<GetMethodBox<string>>.GetMethod("Value")
+        value.ReturnType |> equal typeof<string>
+        value.Invoke(GetMethodBox("s"), [||]) |> unbox<string> |> equal "s"
+        let inherited = typeof<GetMethodIntBox>.GetMethod("Value")
+        inherited.ReturnType |> equal typeof<int>
+        inherited.Invoke(GetMethodIntBox(), [||]) |> unbox<int> |> equal 5
+
+    testCase "Type.GetMethod picks an overload by the types of its parameters" <| fun () ->
+        typeof<GetMethodCalc>.GetMethod("Over", [| typeof<string> |]).Invoke(null, [| box "s" |])
+        |> unbox<string>
+        |> equal "s!"
+        typeof<GetMethodCalc>.GetMethod("Over", [| typeof<int> |]).Invoke(null, [| box 1 |]) |> unbox<int> |> equal 2
+        typeof<GetMethodCalc>.GetMethod("Add", [| typeof<string> |]) |> isNull |> equal true
+        typeof<GetMethodCalc>.GetMethod("Hello", [||]).Name |> equal "Hello"
+        typeof<GetMethodIntBox>.GetMethod("Same", [| typeof<int> |]).Invoke(GetMethodIntBox(), [| box 4 |])
+        |> unbox<int>
+        |> equal 4
+
+    testCase "Type.GetMethod filters by binding flags" <| fun () ->
+        let flags = System.Reflection.BindingFlags.Static ||| System.Reflection.BindingFlags.Public
+        typeof<GetMethodCalc>.GetMethod("Add", flags).Name |> equal "Add"
+        typeof<GetMethodCalc>.GetMethod("Scale", System.Reflection.BindingFlags.Static ||| System.Reflection.BindingFlags.Public)
+        |> isNull
+        |> equal true
+        typeof<GetMethodCalc>.GetMethod("Add", System.Reflection.BindingFlags.Instance ||| System.Reflection.BindingFlags.Public)
+        |> isNull
+        |> equal true
+
+    testCase "Type.GetMethod works with the type parameter of an inline function" <| fun () ->
+        getMethodName<GetMethodUnion> "Describe" |> equal "Describe"
+        invokeStaticMethod<GetMethodCalc> "Hello" [||] |> unbox<string> |> equal "hello"
+        invokeStaticMethod<GetMethodCalc> "Add" [| box 2; box 3 |] |> unbox<int> |> equal 5
+
+    testCase "Type.GetMethod works with a type and a name bound to values" <| fun () ->
+        let t = typeof<GetMethodCalc>
+        let name = "Add"
+        t.GetMethod(name).Invoke(null, [| box 5; box 6 |]) |> unbox<int> |> equal 11
+
+    testCase "Type.GetMethod finds a method declared in another file" <| fun () ->
+        typeof<Fable.Tests.Util2.Helper>.GetMethod("Format").Invoke(null, [| box "{0}-{1}"; box [| box 1; box 2 |] |])
+        |> unbox<string>
+        |> equal "1-2"
+
+    testCase "MethodInfo.Invoke checks the target and the number of arguments" <| fun () ->
+        let add = typeof<GetMethodCalc>.GetMethod("Add")
+        Fable.Tests.Util.throwsAnyError (fun () -> add.Invoke(null, [| box 1 |]))
+        Fable.Tests.Util.throwsAnyError (fun () -> typeof<GetMethodCalc>.GetMethod("Scale").Invoke(null, [| box 1 |]))
+        Fable.Tests.Util.throwsAnyError (fun () -> typeof<GetMethodCalc>.GetMethod("Fail").Invoke(null, [||]))
+]
+
 let genericTypeNamesTests =
     testList "Naming generic types"
       [  ]
@@ -1127,6 +1327,7 @@ let tests =
         genericTests
         @ typeNameTests
         @ reflectionTests
+        @ getMethodTests
         @ fableTests
         @ [ passGenericsTests ]
     )
