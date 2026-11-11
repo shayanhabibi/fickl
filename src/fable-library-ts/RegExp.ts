@@ -44,9 +44,44 @@ export function isMatch(reg: RegExp, input: string, startAt = 0) {
   return reg.test(input);
 }
 
+// A match is the native `exec` array, which doesn't know the regex that produced it,
+// so keep it in a hidden property to be able to continue the search in `nextMatch`
+const sourceRegex = Symbol("regex");
+
+type Match = RegExpExecArray & { [sourceRegex]?: RegExp };
+
+function withSource(m: RegExpExecArray, reg: RegExp): RegExpExecArray {
+  (m as Match)[sourceRegex] = reg;
+  return m;
+}
+
 export function match(reg: RegExp, input: string, startAt = 0) {
   reg.lastIndex = startAt;
-  return reg.exec(input);
+  const m = reg.exec(input);
+  return m == null ? m : withSource(m, reg);
+}
+
+export function nextMatch(m: RegExpExecArray | null) {
+  // Same as .NET: the next match of a failed match is a failed match
+  if (m == null) {
+    return null;
+  }
+  const reg = (m as Match)[sourceRegex];
+  if (reg == null) {
+    throw new Exception("Match.NextMatch is only supported for matches returned by Regex.Match, Regex.Matches or Match.NextMatch");
+  }
+  if (!reg.global && !reg.sticky) {
+    throw new Exception("Non-global RegExp"); // lastIndex would be ignored
+  }
+  let startAt = m.index + m[0].length;
+  // Same as .NET: after an empty match the search resumes one character further
+  if (m[0].length === 0) {
+    if (startAt >= m.input.length) {
+      return null;
+    }
+    startAt++;
+  }
+  return match(reg, m.input, startAt);
 }
 
 export function matches(reg: RegExp, input: string, startAt = 0) {
@@ -66,7 +101,7 @@ export function matches(reg: RegExp, input: string, startAt = 0) {
       reg.lastIndex++
     } else {
       lastMatchIndex = m.index;
-      matches.push(m);
+      matches.push(withSource(m, reg));
     }
   }
   return matches;
