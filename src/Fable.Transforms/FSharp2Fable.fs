@@ -1741,6 +1741,7 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                 ->
                 let! e1 = transformExpr com ctx genArgs e1
                 let! e2 = transformExpr com ctx [] e2
+                let e1 = Replacements.Util.dynamicReceiver com e1
                 let e = Fable.Get(e1, Fable.ExprGet e2, Fable.Any, e1.Range)
                 let! args = transformExprList com ctx args
                 let args = destructureTupleArgs args

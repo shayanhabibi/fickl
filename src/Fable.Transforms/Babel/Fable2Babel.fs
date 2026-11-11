@@ -2688,7 +2688,7 @@ module Util =
 
         com.GetImportExpr(ctx, selector, path, r) |> getParts parts
 
-    let transformCast (com: IBabelCompiler) (ctx: Context) typ e : Expression =
+    let transformCheckedCast (com: IBabelCompiler) (ctx: Context) typ e : Expression =
         match typ with
         // fickl: TypeScript rejects a number literal outside a `[<TsEnum>]` enum, `enum 5`, unless it is widened
         | Fable.Number(_, Fable.NumberInfo.IsEnum entRef) when com.IsTypeScript ->
@@ -2780,6 +2780,22 @@ module Util =
             ->
             AsExpression(com.TransformAsExpr(ctx, e), makeTypeAnnotation com ctx typ)
         | _ -> com.TransformAsExpr(ctx, e)
+
+    let transformCast (com: IBabelCompiler) (ctx: Context) typ e : Expression =
+        match e with
+        // fickl: `unbox` and `!!` between two different types are cast through `obj`,
+        // and TypeScript only accepts an unchecked cast that goes through `unknown`
+        | Fable.TypeCast(source, Fable.Any) when
+            com.IsTypeScript
+            && typ <> Fable.Any
+            && typ <> Fable.Unit
+            && source.Type <> Fable.Any
+            && source.Type <> typ
+            ->
+            match transformCheckedCast com ctx typ e with
+            | AsExpression _ as cast -> cast
+            | jsExpr -> AsExpression(AsExpression(jsExpr, UnknownTypeAnnotation), makeTypeAnnotation com ctx typ)
+        | _ -> transformCheckedCast com ctx typ e
 
     let transformCurry (com: IBabelCompiler) (ctx: Context) expr arity : Expression =
         com.TransformAsExpr(ctx, Replacements.Api.curryExprAtRuntime com arity expr)

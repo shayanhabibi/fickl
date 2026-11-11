@@ -1,0 +1,90 @@
+
+import { Record } from "./fable_modules/fable-library-ts.5.27.0/Types.ts";
+import type { MutableArray, IComparable, IEquatable } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+import { record_type, string_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+import type { int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+
+export class Item extends Record implements IEquatable<Item>, IComparable<Item> {
+    readonly name: string;
+    constructor(name: string) {
+        super();
+        this.name = name;
+    }
+}
+
+export function Item_$reflection(): TypeInfo {
+    return record_type("DynamicCast.Item", [], Item, () => [["name", string_type]]);
+}
+
+export interface ITagged {
+    get tag(): int32,
+    set tag(arg0: int32)
+}
+
+export interface INamed {
+    get name(): string
+}
+
+export function tag(item: Item): int32 {
+    (item as any).tag = 1;
+    return (item as any).tag | 0;
+}
+
+export function describe(item: Item): string {
+    return (item as any).describe();
+}
+
+export function nested(named: INamed): int32 {
+    return (named as any).inner.value | 0;
+}
+
+export function tagOfObj(o: any): int32 {
+    o.tag = 1;
+    return o.tag | 0;
+}
+
+export function tagOfUnbox(item: Item): int32 {
+    const t = item as unknown as ITagged;
+    return t.tag | 0;
+}
+
+export function asTagged(item: Item): ITagged {
+    return item as unknown as ITagged;
+}
+
+export function namedAsTagged(named: INamed): ITagged {
+    return named as unknown as ITagged;
+}
+
+export function toGeneric<T>(item: Item): T {
+    return item as unknown as T;
+}
+
+export function ofGeneric<T>(value: T): Item {
+    return value as unknown as Item;
+}
+
+export function texts(numbers: MutableArray<int32>): MutableArray<string> {
+    return numbers as unknown as MutableArray<string>;
+}
+
+export function ofObj(o: any): ITagged {
+    return o;
+}
+
+export function ofObjErased(o: any): any {
+    return o;
+}
+
+export function toObj(item: Item): Item {
+    return item;
+}
+
+export function same(item: Item): Item {
+    return item;
+}
+
+export function sameErased(item: Item): Item {
+    return item;
+}
+
