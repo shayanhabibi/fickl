@@ -159,6 +159,35 @@ let tests =
         let m = Regex.Match(str, "Chapter \d+(\.\d)*")
         m.Groups.Count |> equal 2
 
+    testCase "Members of a failed Match work" <| fun _ ->
+        let m = Regex("^test/(.*?)$").Match("test")
+        m.Success |> equal false
+        m.Value |> equal ""
+        m.Index |> equal 0
+        m.Length |> equal 0
+
+    testCase "Groups of a failed Match work" <| fun _ ->
+        let m = Regex("^test/(?<name>.*?)$").Match("test")
+        m.Groups.Count |> equal 1
+        m.Groups.[0].Success |> equal false
+        m.Groups.[0].Value |> equal ""
+        m.Groups.[0].Length |> equal 0
+        m.Groups.[1].Success |> equal false
+        m.Groups.[1].Value |> equal ""
+        m.Groups.["name"].Success |> equal false
+        m.Groups.["name"].Value |> equal ""
+
+    testCase "Groups iteration of a failed Match works" <| fun _ ->
+        let m = Regex.Match("test", "^test/(.*?)$")
+        let mutable count = 0
+        for g in m.Groups do
+            count <- count + 1
+            g.Success |> equal false
+            g.Value |> equal ""
+        count |> equal 1
+        [ for g in m.Groups -> g.Value ] |> equal [ "" ]
+        m.Groups |> Seq.cast<Group> |> Seq.skip 1 |> Seq.length |> equal 0
+
     testCase "Match.Index works" <| fun _ ->
         let str = "For more information, see Chapter 3.4.5.1"
         let m = Regex.Match(str, "Chapter \d+(\.\d)*")
