@@ -594,6 +594,23 @@ let tests =
         raisedExceptionType (fun () -> [0. .. 0. .. 1.]) |> equal "ArgumentException"
         raisedExceptionType (fun () -> seq {0M .. 0M .. 1M} |> Seq.toList) |> equal "ArgumentException"
 
+    testCase "Float ranges do not accumulate the rounding error of the step" <| fun () ->
+        let xs = [ 0.5..0.05..1.5 ]
+        xs.Length |> equal 21
+        xs[2] |> equal 0.6
+        xs[19] |> equal 1.4500000000000002
+        List.last xs |> equal 1.5
+        [ 0.0..0.1..1.0 ] |> List.length |> equal 11
+        [| 1.0 .. -0.1 .. 0.0 |] |> Array.last |> equal 0.0
+        [ 1.0..1.0..0.5 ] |> equal []
+        [ 1.0..0.5..1.0 ] |> equal [ 1.0 ]
+        [ 0.0..0.3..1.0 ] |> equal [ 0.0; 0.3; 0.6; 0.8999999999999999 ]
+        [ 1.0..0.1..1.3 ] |> equal [ 1.0; 1.1; 1.2000000000000002 ]
+        [ 1.0..0.1..1.31 ] |> equal [ 1.0; 1.1; 1.2000000000000002; 1.3000000000000003 ]
+        [ 1.0..0.1..2.0 ] |> List.item 2 |> equal 1.2
+        raisedExceptionType (fun () -> [ 0.0..1.0..nan ]) |> equal "ArgumentException"
+        seq { 5 .. -2 .. 0 } |> Seq.toList |> equal [ 5; 3; 1 ]
+
     testCase "Seq.reduce works" <| fun () ->
         let xs = [1.; 2.]
         xs |> Seq.reduce (+)
