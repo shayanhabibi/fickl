@@ -30,6 +30,8 @@ type CliArgs =
         SourceMapsRoot: string option
         Exclude: string list
         Replace: Map<string, string>
+        /// fickl: the output extension of single source files (`--fileExtension`), by normalized full path
+        FileExtensions: Map<string, string>
         RunProcess: RunProcess option
         CompilerOptions: Fable.CompilerOptions
         Verbosity: Fable.Verbosity
@@ -37,6 +39,14 @@ type CliArgs =
 
     member this.ProjectFileAsRelativePath =
         IO.Path.GetRelativePath(this.RootDir, this.ProjectFile)
+
+    member this.FileExtensionFor(sourcePath: string) =
+        if this.FileExtensions.IsEmpty then
+            this.CompilerOptions.FileExtension
+        else
+            match Map.tryFind (Fable.Path.normalizeFullPath sourcePath) this.FileExtensions with
+            | Some fileExt -> fileExt
+            | None -> this.CompilerOptions.FileExtension
 
     member this.RunProcessEnv =
         let nodeEnv =
@@ -628,6 +638,17 @@ module Imports =
             relPath
         else
             "./" + relPath
+
+    let getFileExtension (cliArgs: CliArgs) (sourceDir: string) (importPath: string) =
+        if cliArgs.FileExtensions.IsEmpty then
+            cliArgs.CompilerOptions.FileExtension
+        elif isRelativePath importPath then
+            Path.Combine(sourceDir, importPath) |> cliArgs.FileExtensionFor
+        elif isAbsolutePath importPath then
+            cliArgs.FileExtensionFor importPath
+        else
+            // An import macro like ${outDir}: the path names an output, not a source
+            cliArgs.CompilerOptions.FileExtension
 
     let getTargetAbsolutePath (pathResolver: PathResolver) importPath projDir outDir =
         let importPath = Path.normalizePath importPath

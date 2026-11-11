@@ -44,10 +44,11 @@ type BabelWriter
         projectFile: string,
         sourcePath: string,
         targetPath: string,
-        ?fileExt: string
+        ?fileExtFor: string -> string -> string
     )
     =
-    let fileExt = Option.defaultValue ".js" fileExt
+    // fickl: the extension for an import of a source file, see `Imports.getFileExtension`
+    let fileExtFor = Option.defaultValue (fun _ _ -> ".js") fileExtFor
     let sourceDir = Path.GetDirectoryName(sourcePath)
     let targetDir = Path.GetDirectoryName(targetPath)
     let memoryStream = new MemoryStream()
@@ -73,6 +74,9 @@ type BabelWriter
 
         member _.MakeImportPath(path) =
             let projDir = Path.GetDirectoryName(projectFile)
+
+            // fickl: the path still names the imported source here, relative to this one
+            let fileExt = fileExtFor sourceDir path
 
             let path =
                 // TODO: Check precompiled out path for other languages too
@@ -240,7 +244,7 @@ module CodeServices =
         (com: Compiler)
         (pathResolver: PathResolver)
         (outPath: string)
-        (fileExt: string)
+        (fileExtFor: string -> string -> string)
         : Async<string>
         =
         async {
@@ -250,7 +254,7 @@ module CodeServices =
                 |> Fable2Babel.Compiler.transformFile com
 
             use writer =
-                new BabelWriter(com, pathResolver, com.ProjectFile, com.CurrentFile, outPath, fileExt = fileExt)
+                new BabelWriter(com, pathResolver, com.ProjectFile, com.CurrentFile, outPath, fileExtFor = fileExtFor)
 
             do! BabelPrinter.run writer babel
             let! output = writer.ReadContentAsString()
@@ -392,14 +396,14 @@ module CodeServices =
                             )
 
                         let outputPath =
-                            Path.ChangeExtension(currentFile, cliArgs.CompilerOptions.FileExtension)
+                            Path.ChangeExtension(currentFile, cliArgs.FileExtensionFor currentFile)
 
                         let! js =
                             compileFileToJs
                                 (compiler :> Compiler)
                                 pathResolver
                                 outputPath
-                                cliArgs.CompilerOptions.FileExtension
+                                (Imports.getFileExtension cliArgs)
 
                         // `AddLog` is not thread-safe, so every file keeps its own compiler and
                         // the logs are gathered once all files are done.
@@ -520,7 +524,7 @@ module CodeServices =
                                 (compiler :> Compiler)
                                 pathResolver
                                 outputPath
-                                cliArgs.CompilerOptions.FileExtension
+                                (Imports.getFileExtension cliArgs)
 
                         // `AddLog` is not thread-safe, so every file keeps its own compiler and
                         // the logs are gathered once all files are done.
