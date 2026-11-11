@@ -6,7 +6,17 @@ type KeyNotFoundException(message: string) =
 
 type Comparer<'T when 'T: comparison and 'T: null>(comparison: 'T -> 'T -> int) =
 
+#if FABLE_COMPILER_TYPESCRIPT || FABLE_COMPILER_JAVASCRIPT
+    // .NET orders strings with String.CompareTo here, while F# structural comparison is ordinal
+    static member Default =
+        Comparer<'T>(fun x y ->
+            match box x, box y with
+            | (:? string as x), (:? string as y) -> x.CompareTo(y)
+            | _ -> LanguagePrimitives.GenericComparison x y
+        )
+#else
     static member Default = Comparer<'T>(LanguagePrimitives.GenericComparison)
+#endif
 
     static member Create(comparison) = Comparer<'T>(comparison)
 

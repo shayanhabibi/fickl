@@ -907,6 +907,18 @@ let tests =
         genericCompare 1 2 |> equal -1
         genericCompare 2 1 |> equal 1
 
+    testCase "Comparer.Default compares strings like String.CompareTo" <| fun () -> // See fickl #271
+        Comparer<string>.Default.Compare("a", "Z") |> equal ("a".CompareTo("Z"))
+        Comparer<string>.Default.Compare("a", "Z") < 0 |> equal true
+        Comparer<string>.Default.Compare("a", "A") < 0 |> equal true
+        Comparer<string>.Default.Compare("a", "a") |> equal 0
+        Comparer<string>.Default.Compare(null, "a") < 0 |> equal true
+        Comparer<string>.Default.Compare("a", null) > 0 |> equal true
+        genericCompare "a" "Z" < 0 |> equal true
+        genericCompare "Z" "a" > 0 |> equal true
+        // F# structural comparison stays ordinal
+        compare "a" "Z" > 0 |> equal true
+
     testCase "Comparer.Create works" <| fun () ->
         let cmp = Comparer<'T>.Create(fun x y -> -(compare x y))
         cmp.Compare(1, 1) |> equal 0

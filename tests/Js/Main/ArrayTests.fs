@@ -760,6 +760,22 @@ let tests =
         System.Array.BinarySearch(ys, 1, 3, 3, desc) |> equal 3
         System.Array.BinarySearch([|1; 3; 5; 7; 9|], 7, (null: IComparer<int>)) |> equal 3
 
+    testCase "System.Array.Sort works" <| fun () -> // See fickl #271
+        let xs = [| 3; 1; 10; 2 |]
+        System.Array.Sort xs
+        xs |> equal [| 1; 2; 3; 10 |]
+        let ys = [| 3.5; 1.5; 2.5 |]
+        System.Array.Sort ys
+        ys |> equal [| 1.5; 2.5; 3.5 |]
+
+    testCase "System.Array.Sort orders strings like String.CompareTo" <| fun () -> // See fickl #271
+        let xs = [| "b"; "A"; "a"; "B"; "_"; "1" |]
+        System.Array.Sort xs
+        xs |> equal [| "_"; "1"; "a"; "A"; "b"; "B" |]
+        System.Array.BinarySearch(xs, "B") |> equal 5
+        // F# structural comparison stays ordinal
+        Array.sort xs |> equal [| "1"; "A"; "B"; "_"; "a"; "b" |]
+
     testCase "System.Array.BinarySearch passes the array element to the comparer first" <| fun () ->
         let xs = [|1; 3; 5; 7; 9|]
         let calls = ResizeArray<int * int>()
