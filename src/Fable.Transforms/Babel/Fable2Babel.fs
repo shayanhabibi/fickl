@@ -7215,9 +7215,22 @@ but thanks to the optimisation done below we get
         if memb.IsGetter || memb.IsSetter then
             ""
         else
-            memb.CurriedParameterGroups
-            |> List.map (fun groups -> groups |> List.map (fun group -> group.Type))
-            |> OverloadSuffix.getHash entityGenericParameters
+            let paramTypeGroupsOf (memb: Fable.MemberFunctionOrValue) =
+                memb.CurriedParameterGroups
+                |> List.map (fun groups -> groups |> List.map (fun group -> group.Type))
+
+            // fickl: the overloads FSharp2Fable.Util.getOverloadSuffixFrom compares, so both give the same suffix
+            let overloads =
+                ent.MembersFunctionsAndValues
+                |> Seq.filter (fun m ->
+                    not m.IsProperty
+                    && m.CompiledName = memb.CompiledName
+                    && m.IsInstance = memb.IsInstance
+                )
+                |> Seq.map paramTypeGroupsOf
+
+            paramTypeGroupsOf memb
+            |> OverloadSuffix.getHashAmongOverloads entityGenericParameters overloads
 
     let getMangledMemberName (ent: Fable.Entity) (memb: Fable.MemberFunctionOrValue) =
         let overloadSuffix = getOverloadSuffix ent memb
