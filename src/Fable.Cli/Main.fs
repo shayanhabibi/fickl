@@ -1173,20 +1173,51 @@ let private markFailedCompilation (fableModulesDir: string) (hasError: bool) =
     with er ->
         Log.verbose (lazy $"Cannot update {failedCompilationMarker fableModulesDir}: {er.Message}")
 
+/// fickl: sources that compile to nothing (only types, say) have no output file. They are listed in this file
+/// in fable_modules, so that any other missing output is known to have been deleted
+let private sourcesWithoutOutputFile (fableModulesDir: string) =
+    IO.Path.Combine(fableModulesDir, "sources_without_output")
+
+let private isSourceFile (path: string) =
+    path.EndsWith(".fs", StringComparison.Ordinal)
+    || path.EndsWith(".fsx", StringComparison.Ordinal)
+
+let private markSourcesWithoutOutput (state: State) (fableModulesDir: string) (sourceFiles: string[]) =
+    try
+        let pathResolver = state.GetPathResolver()
+
+        let sources =
+            sourceFiles
+            |> Array.filter (fun source ->
+                isSourceFile source
+                && not (IO.File.Exists(getOutPath state.CliArgs pathResolver source))
+            )
+
+        IO.File.WriteAllLines(sourcesWithoutOutputFile fableModulesDir, sources)
+    with er ->
+        Log.verbose (lazy $"Cannot update {sourcesWithoutOutputFile fableModulesDir}: {er.Message}")
+
 let private areCompiledFilesUpToDate (state: State) (fableModulesDir: string) (filesToCompile: string[]) =
     try
         let mutable foundCompiledFile = false
         let pathResolver = state.GetPathResolver()
 
+        // Read only when an output is missing
+        let sourcesWithoutOutput =
+            lazy
+                (let listPath = sourcesWithoutOutputFile fableModulesDir
+
+                 if IO.File.Exists listPath then
+                     HashSet(IO.File.ReadAllLines listPath), IO.File.GetLastWriteTime listPath
+                 else
+                     HashSet(), DateTime.MinValue)
+
         let upToDate =
             filesToCompile
-            |> Array.filter (fun file ->
-                file.EndsWith(".fs", StringComparison.Ordinal)
-                || file.EndsWith(".fsx", StringComparison.Ordinal)
-            )
+            |> Array.filter isSourceFile
             |> Array.forall (fun source ->
                 let outPath = getOutPath state.CliArgs pathResolver source
-                // Empty files are not written to disk so we only check date for existing files
+
                 if IO.File.Exists(outPath) then
                     foundCompiledFile <- true
 
@@ -1207,7 +1238,17 @@ let private areCompiledFilesUpToDate (state: State) (fableModulesDir: string) (f
 
                     upToDate
                 else
-                    true
+                    // Empty files are not written to disk, so a missing output is fine
+                    // only when the last compilation of this source wrote nothing
+                    let sources, listedAt = sourcesWithoutOutput.Value
+
+                    let upToDate =
+                        sources.Contains source && IO.File.GetLastWriteTime(source) < listedAt
+
+                    if not upToDate then
+                        Log.verbose (lazy $"Output file {File.relPathToCurDir outPath} is missing")
+
+                    upToDate
             )
         // If we don't find compiled files, assume we need recompilation
         upToDate
@@ -1808,6 +1849,9 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
             errorLogs |> Array.iter (formatLog cliArgs.RootDir >> Log.error)
             let hasError = Array.isEmpty errorLogs |> not
             markFailedCompilation projCracked.FableModulesDir hasError
+
+            if not (hasError || state.SilentCompilation) then
+                markSourcesWithoutOutput state projCracked.FableModulesDir projCracked.SourceFilePaths
 
             // Generate assembly and serialize info if precompile is selected
             let! exitCode =
