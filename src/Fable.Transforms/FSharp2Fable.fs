@@ -1669,6 +1669,11 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             | Some unionExpr, UnionCaseTesterFor unionCase ->
                 return! transformUnionCaseTest com ctx (makeRangeFrom fsExpr) unionExpr unionExpr.Type unionCase
 
+            | Some fsCallee, _ when isMultiDimArrayMember com fsCallee memb ->
+                let! callee = transformExpr com ctx [] fsCallee
+
+                return makeMultiDimArrayMemberCall com ctx (makeRangeFrom fsExpr) typ fsCallee.Type callee args memb
+
             | fsCallee, _ ->
                 let r = makeRangeFrom fsExpr
                 let! callee = transformExprOpt com ctx fsCallee

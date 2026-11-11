@@ -33,6 +33,7 @@ let allTests =
     Arithmetic.tests
     RandomTests.tests
     Arrays.tests
+    Array2DTests.tests
     TypedArrayViews.tests
     Async.tests
     Task.tests

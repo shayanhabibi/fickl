@@ -30,6 +30,7 @@ let allTests =
     JsNamespaceLibrary.tests
     Arithmetic.tests
     Arrays.tests
+    Array2DTests.tests
     Async.tests
     Chars.tests
     Comparison.tests
