@@ -811,7 +811,11 @@ module PrinterExtensions =
                 printer.Print("{ ")
                 printer.PrintCommaSeparatedArray(specifiers)
                 printer.Print(" }")
-                printer.PrintOptional(source, " from ")
+                printer.PrintExportSource(source)
+            | ExportNamespaceDeclaration(exported, source) ->
+                printer.Print("export * as ")
+                printer.PrintIdent(exported)
+                printer.PrintExportSource(Some source)
             | AugmentationDeclaration(modulePath, declarations) ->
                 match modulePath with
                 | Some(StringLiteral(path, _)) ->
@@ -1656,6 +1660,15 @@ module PrinterExtensions =
                 )
 
                 printer.Print(" }")
+
+        /// The path goes through the same resolution as the path of an import declaration
+        member printer.PrintExportSource(source: StringLiteral option) =
+            match source with
+            | Some(StringLiteral(value, _)) ->
+                printer.Print(" from \"")
+                printer.Print(printer.MakeImportPath(value))
+                printer.Print("\"")
+            | None -> ()
 
         member printer.Print(node: ExportSpecifier) =
             let (ExportSpecifier(local, exported)) = node

@@ -1,0 +1,9 @@
+import type { int32 } from "./fable_modules/fable-library-js.5.27.0/Int32.js";
+export interface Counter {
+    get value(): int32
+}
+export declare const counter: Counter;
+export declare const renamed: int32;
+export declare const everything: any;
+export declare const bump: (() => void);
+export declare function bumpTwice(): void;
