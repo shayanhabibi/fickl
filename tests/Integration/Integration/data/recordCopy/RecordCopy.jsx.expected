@@ -1,0 +1,327 @@
+
+import { Record } from "./fable_modules/fable-library-js.5.27.0/Types.js";
+import { list_type, option_type, record_type, bool_type, float64_type, string_type, int32_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+import { Settings } from "./Types.jsx.actual";
+import { empty, map } from "./fable_modules/fable-library-js.5.27.0/List.js";
+import { int32ToString } from "./fable_modules/fable-library-js.5.27.0/Util.js";
+
+export class Below extends Record {
+    constructor(Margin, Border, Colour, Height, Length, Weight, Radius, Shadow) {
+        super();
+        this.Margin = (Margin | 0);
+        this.Border = (Border | 0);
+        this.Colour = Colour;
+        this.Height = (Height | 0);
+        this.Length = (Length | 0);
+        this.Weight = Weight;
+        this.Radius = (Radius | 0);
+        this.Shadow = Shadow;
+    }
+}
+
+export function Below_$reflection() {
+    return record_type("RecordCopy.Below", [], Below, () => [["Margin", int32_type], ["Border", int32_type], ["Colour", string_type], ["Height", int32_type], ["Length", int32_type], ["Weight", float64_type], ["Radius", int32_type], ["Shadow", bool_type]]);
+}
+
+export class Above extends Record {
+    constructor(Margin, Border, Colour, Height, Length, Weight, Radius, Shadow) {
+        super();
+        this.Margin = (Margin | 0);
+        this.Border = (Border | 0);
+        this.Colour = Colour;
+        this.Height = (Height | 0);
+        this.Length = (Length | 0);
+        this.Weight = Weight;
+        this.Radius = (Radius | 0);
+        this.Shadow = Shadow;
+    }
+}
+
+export function Above_$reflection() {
+    return record_type("RecordCopy.Above", [], Above, () => [["Margin", int32_type], ["Border", int32_type], ["Colour", string_type], ["Height", int32_type], ["Length", int32_type], ["Weight", float64_type], ["Radius", int32_type], ["Shadow", bool_type]]);
+}
+
+export function below1(r) {
+    return new Below(1, r.Border, r.Colour, r.Height, r.Length, r.Weight, r.Radius, r.Shadow);
+}
+
+export function below2(r) {
+    return new Below(r.Margin, r.Border, "red", r.Height, r.Length, r.Weight, r.Radius, r.Shadow);
+}
+
+export function below3(r) {
+    return new Below(r.Margin, r.Border, r.Colour, r.Height, r.Length, 0.5, r.Radius, r.Shadow);
+}
+
+export function below4(r) {
+    return new Below(r.Margin, r.Border, r.Colour, r.Height, r.Length, r.Weight, r.Radius, true);
+}
+
+export function above1(r) {
+    return Above_$with(r, "Margin", 1);
+}
+
+export function above2(r) {
+    return Above_$with(r, "Colour", "red");
+}
+
+export function above3(r) {
+    return Above_$with(r, "Weight", 0.5);
+}
+
+export function above4(r) {
+    return Above_$with(r, "Shadow", true);
+}
+
+export function above5(r) {
+    return Above_$with(r, "Radius", r.Radius + 1);
+}
+
+export function rename(title, s) {
+    return Settings_$with(s, "Title", title);
+}
+
+export function resize(width, height, s) {
+    return Settings_$with(Settings_$with(s, "Width", width), "Height", height);
+}
+
+export function detach(s) {
+    return Settings_$with(s, "Parent", undefined);
+}
+
+export function raise(s) {
+    return Settings_$with(s, "z index", s["z index"] + 1);
+}
+
+export function onClose(f, s) {
+    return Settings_$with(s, "OnClose", f);
+}
+
+export function combine(s) {
+    return Settings_$with(s, "Combine", (x_1, y_1) => ((x_1 * y_1) | 0));
+}
+
+export function hideAll(xs) {
+    return map((s) => Settings_$with(s, "Visible", false), xs);
+}
+
+export function fromCall(make) {
+    const bind$0040 = make();
+    return Settings_$with(bind$0040, "Opacity", 1);
+}
+
+export function nested(s) {
+    const bind$0040 = Settings_$with(s, "Title", "a");
+    return Settings_$with(bind$0040, "Tags", empty());
+}
+
+export function reset(s) {
+    return new Settings(s.Title, 0, 0, s.Visible, 0, s.Parent, s["z index"], s.OnClose, s.Combine, s.Tags);
+}
+
+export class Slot$1 extends Record {
+    constructor(Content, Fallback, History, Caption, Position, Disabled) {
+        super();
+        this.Content = Content;
+        this.Fallback = Fallback;
+        this.History = History;
+        this.Caption = Caption;
+        this.Position = (Position | 0);
+        this.Disabled = Disabled;
+    }
+}
+
+export function Slot$1_$reflection(gen0) {
+    return record_type("RecordCopy.Slot`1", [gen0], Slot$1, () => [["Content", gen0], ["Fallback", option_type(gen0)], ["History", list_type(gen0)], ["Caption", string_type], ["Position", int32_type], ["Disabled", bool_type]]);
+}
+
+export function fill(value, slot) {
+    return Slot$1_$with(slot, "Content", value);
+}
+
+export function clear(slot) {
+    return Slot$1_$with(slot, "Fallback", undefined);
+}
+
+export function forget(slot) {
+    return Slot$1_$with(slot, "History", empty());
+}
+
+export function caption(slot) {
+    return Slot$1_$with(slot, "Caption", int32ToString(slot.Content));
+}
+
+export function move(slot) {
+    return Slot$1_$with(slot, "Position", slot.Position + 1);
+}
+
+export function disable(slot) {
+    return Slot$1_$with(slot, "Disabled", true);
+}
+
+export class Bounds extends Record {
+    constructor(Left, Right, Top, Bottom, Near, Far, Unit) {
+        super();
+        this.Left = Left;
+        this.Right = Right;
+        this.Top = Top;
+        this.Bottom = Bottom;
+        this.Near = Near;
+        this.Far = Far;
+        this.Unit = Unit;
+    }
+}
+
+export function Bounds_$reflection() {
+    return record_type("RecordCopy.Bounds", [], Bounds, () => [["Left", float64_type], ["Right", float64_type], ["Top", float64_type], ["Bottom", float64_type], ["Near", float64_type], ["Far", float64_type], ["Unit", string_type]]);
+}
+
+export function left(b) {
+    const inputRecord = b;
+    return Bounds_$with(inputRecord, "Left", 0);
+}
+
+export function right(b) {
+    const inputRecord = b;
+    return Bounds_$with(inputRecord, "Right", 0);
+}
+
+export function top(b) {
+    const inputRecord = b;
+    return Bounds_$with(inputRecord, "Top", 0);
+}
+
+export function bottom(b) {
+    const inputRecord = b;
+    return Bounds_$with(inputRecord, "Bottom", 0);
+}
+
+export function near(b) {
+    const inputRecord = b;
+    return Bounds_$with(inputRecord, "Near", 0);
+}
+
+export function far(b) {
+    const inputRecord = b;
+    return Bounds_$with(inputRecord, "Far", 0);
+}
+
+export function unit$0027(b) {
+    const inputRecord = b;
+    return Bounds_$with(inputRecord, "Unit", "px");
+}
+
+export class Counter extends Record {
+    constructor(Count, Description, Minimum, Maximum, Increment, Wraps) {
+        super();
+        this.Count = (Count | 0);
+        this.Description = Description;
+        this.Minimum = (Minimum | 0);
+        this.Maximum = (Maximum | 0);
+        this.Increment = (Increment | 0);
+        this.Wraps = Wraps;
+    }
+}
+
+export function Counter_$reflection() {
+    return record_type("RecordCopy.Counter", [], Counter, () => [["Count", int32_type], ["Description", string_type], ["Minimum", int32_type], ["Maximum", int32_type], ["Increment", int32_type], ["Wraps", bool_type]]);
+}
+
+export function describe(c) {
+    return Counter_$with(c, "Description", "counter");
+}
+
+export function minimum(c) {
+    return Counter_$with(c, "Minimum", 0);
+}
+
+export function maximum(c) {
+    return Counter_$with(c, "Maximum", 100);
+}
+
+export function increment(c) {
+    return Counter_$with(c, "Increment", 1);
+}
+
+export function wraps(c) {
+    return Counter_$with(c, "Wraps", true);
+}
+
+export function limit(next, c) {
+    const Maximum = next(c) | 0;
+    return Counter_$with(c, "Maximum", Maximum);
+}
+
+export function recount(next, c) {
+    return new Counter(next(c), c.Description, c.Minimum, c.Maximum, c.Increment, c.Wraps);
+}
+
+export class Point extends Record {
+    constructor(X, Y, Z) {
+        super();
+        this.X = X;
+        this.Y = Y;
+        this.Z = Z;
+    }
+}
+
+export function Point_$reflection() {
+    return record_type("RecordCopy.Point", [], Point, () => [["X", float64_type], ["Y", float64_type], ["Z", float64_type]]);
+}
+
+export function x(p) {
+    return new Point(0, p.Y, p.Z);
+}
+
+export function y(p) {
+    return new Point(p.X, 0, p.Z);
+}
+
+export function z(p) {
+    return new Point(p.X, p.Y, 0);
+}
+
+export function origin(p) {
+    let bind$0040_1;
+    const bind$0040 = new Point(0, p.Y, p.Z);
+    bind$0040_1 = (new Point(bind$0040.X, 0, bind$0040.Z));
+    return new Point(bind$0040_1.X, bind$0040_1.Y, 0);
+}
+
+export function mirror(p) {
+    return new Point(-p.X, p.Y, p.Z);
+}
+
+export function flip(p) {
+    return new Point(p.X, -p.Y, p.Z);
+}
+
+export function anonymous(r) {
+    return {
+        Border: r.Border,
+        Colour: r.Colour,
+        Height: r.Height,
+        Margin: 1,
+    };
+}
+
+function Above_$with(r, k, v) {
+    return new Above((k === "Margin") ? v : r.Margin, (k === "Border") ? v : r.Border, (k === "Colour") ? v : r.Colour, (k === "Height") ? v : r.Height, (k === "Length") ? v : r.Length, (k === "Weight") ? v : r.Weight, (k === "Radius") ? v : r.Radius, (k === "Shadow") ? v : r.Shadow);
+}
+
+function Settings_$with(r, k, v) {
+    return new Settings((k === "Title") ? v : r.Title, (k === "Width") ? v : r.Width, (k === "Height") ? v : r.Height, (k === "Visible") ? v : r.Visible, (k === "Opacity") ? v : r.Opacity, (k === "Parent") ? v : r.Parent, (k === "z index") ? v : r["z index"], (k === "OnClose") ? v : r.OnClose, (k === "Combine") ? v : r.Combine, (k === "Tags") ? v : r.Tags);
+}
+
+function Slot$1_$with(r, k, v) {
+    return new Slot$1((k === "Content") ? v : r.Content, (k === "Fallback") ? v : r.Fallback, (k === "History") ? v : r.History, (k === "Caption") ? v : r.Caption, (k === "Position") ? v : r.Position, (k === "Disabled") ? v : r.Disabled);
+}
+
+function Bounds_$with(r, k, v) {
+    return new Bounds((k === "Left") ? v : r.Left, (k === "Right") ? v : r.Right, (k === "Top") ? v : r.Top, (k === "Bottom") ? v : r.Bottom, (k === "Near") ? v : r.Near, (k === "Far") ? v : r.Far, (k === "Unit") ? v : r.Unit);
+}
+
+function Counter_$with(r, k, v) {
+    return new Counter((k === "Count") ? v : r.Count, (k === "Description") ? v : r.Description, (k === "Minimum") ? v : r.Minimum, (k === "Maximum") ? v : r.Maximum, (k === "Increment") ? v : r.Increment, (k === "Wraps") ? v : r.Wraps);
+}
+
