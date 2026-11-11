@@ -1304,7 +1304,8 @@ module Annotation =
         | Types.icollectionGeneric ->
             // makeFableLibImportTypeAnnotation com ctx genArgs "Util" "ICollection" |> Some
             makeNativeTypeAnnotation com ctx genArgs "Iterable" |> Some
-        // | Types.idictionary
+        // fickl: a Dictionary, an F# Map and the result of `dict` are all maps
+        | Types.idictionary -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IMap" |> Some
         // fickl: read-only views accept what F# can pass as them, including readonly arrays and ReadonlyMap
         | Types.ireadonlydictionary -> makeFableLibImportTypeAnnotation com ctx genArgs "Util" "IReadOnlyMap" |> Some
         | Types.ireadonlycollection

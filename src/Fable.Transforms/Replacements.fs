@@ -1462,6 +1462,38 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
             "\"" + arg + "\"" |> emit r t [] false |> withTag "topDirectiveProloge" |> Some
         | "emitJsDirectivePrologue", [ StringConst arg ] -> "\"" + arg + "\"" |> emit r t [] false |> Some
         | "importValueDynamic", [ MaybeInScope ctx arg ] ->
+            // The module ident is declared around the imported value, so it must not capture an ident of it
+            let moduleIdent () =
+                let isUsed name =
+                    arg
+                    |> deepExists (
+                        function
+                        | IdentExpr i
+                        | Lambda(i, _, _)
+                        | Let(i, _, _) -> i.Name = name
+                        | _ -> false
+                    )
+
+                Seq.initInfinite (fun i ->
+                    if i = 0 then
+                        "m"
+                    else
+                        "m" + string<int> i
+                )
+                |> Seq.find (isUsed >> not)
+                |> makeIdent
+
+            // A function value is eta-expanded: the lambdas (and the bindings destructuring a tupled argument)
+            // must be kept so the dynamically imported function is still called with its compiled signature
+            let rec (|WrappedImportCall|_|) expr =
+                match expr with
+                | Call(Import(importInfo, _, _), callInfo, t, r) -> Some(importInfo, makeCall r t callInfo)
+                | Lambda(arg, WrappedImportCall(importInfo, apply), name) ->
+                    Some(importInfo, (fun e -> Lambda(arg, apply e, name)))
+                | Let(ident, value, WrappedImportCall(importInfo, apply)) ->
+                    Some(importInfo, (fun e -> Let(ident, value, apply e)))
+                | _ -> None
+
             let dynamicImport selector path apply =
                 let path = fixDynamicImportPath path
                 let import = Helper.GlobalCall("import", t, [ path ], ?loc = r)
@@ -1470,7 +1502,7 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
                 | StringConst "*" -> import
                 | selector ->
                     let selector =
-                        let m = makeIdent "m"
+                        let m = moduleIdent ()
 
                         Delegate([ m ], Get(IdentExpr m, ExprGet selector, Any, None) |> apply, None, Tags.empty)
 
@@ -1479,11 +1511,19 @@ let fableCoreLib (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
             match arg with
             // TODO: Check this is not a fable-library import?
             | Import(info, _, _) -> dynamicImport (makeStrConst info.Selector) (makeStrConst info.Path) id |> Some
-            | NestedLambda(args, Call(Import(importInfo, _, _), callInfo, _, _), None) when argEquals args callInfo.Args ->
+            // With a single argument the imported function can be used as is, unless the argument has to be uncurried
+            | Lambda(arg, Call(Import(importInfo, _, _), callInfo, _, _), None) when
+                argEquals [ arg ] callInfo.Args
+                && (
+                    match arg.Type with
+                    | LambdaType _ -> false
+                    | _ -> true
+                )
+                ->
                 dynamicImport (makeStrConst importInfo.Selector) (makeStrConst importInfo.Path) id
                 |> Some
-            | Call(Import(importInfo, _, _), callInfo, t, r) ->
-                dynamicImport (makeStrConst importInfo.Selector) (makeStrConst importInfo.Path) (makeCall r t callInfo)
+            | WrappedImportCall(importInfo, apply) ->
+                dynamicImport (makeStrConst importInfo.Selector) (makeStrConst importInfo.Path) apply
                 |> Some
             | _ ->
                 "The imported value is not coming from a different file"
@@ -4133,6 +4173,22 @@ let dateTime (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
         let fieldName = Naming.removeGetSetPrefix i.CompiledName |> Naming.lowerFirst
 
         getFieldWith r t thisArg.Value fieldName |> Some
+    // Not implemented in fable-library: without this the catch-all below would import
+    // a function that doesn't exist, which only fails when the module is loaded.
+    | "ToOADate"
+    | "FromOADate"
+    | "ParseExact"
+    | "TryParseExact"
+    | "ToBinary"
+    | "FromBinary"
+    | "ToFileTime"
+    | "ToFileTimeUtc"
+    | "FromFileTime"
+    | "FromFileTimeUtc"
+    | "GetDateTimeFormats"
+    | "AddMicroseconds"
+    | "get_Microsecond"
+    | "get_Nanosecond" -> None
     | meth ->
         let args = ignoreFormatProvider com ctx r meth args
         let meth = Naming.removeGetSetPrefix meth |> Naming.lowerFirst

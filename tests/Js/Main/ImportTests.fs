@@ -313,4 +313,32 @@ let tests =
         Util.mutableValueOpt <- None
         Util.mutableValueOpt.IsNone |> equal true
 
+#if FABLE_COMPILER
+    testCaseAsync "importValueDynamic works with values and single argument functions" <| fun () -> async {
+        let! value = importValueDynamic Util.DynamicImport.value |> Async.AwaitPromise
+        value |> equal 42
+        let! single = importValueDynamic Util.DynamicImport.single |> Async.AwaitPromise
+        single 1 |> equal 2
+        let! applied = importValueDynamic (Util.DynamicImport.curried 1 "ab") |> Async.AwaitPromise
+        applied |> equal 3
+    }
+
+    testCaseAsync "importValueDynamic works with tupled functions" <| fun () -> async { // See fickl#314
+        let! tupled = importValueDynamic Util.DynamicImport.tupled |> Async.AwaitPromise
+        tupled (1, "ab") |> equal 3
+    }
+
+    testCaseAsync "importValueDynamic works with curried functions" <| fun () -> async { // See fickl#314
+        let! curried = importValueDynamic Util.DynamicImport.curried |> Async.AwaitPromise
+        curried 1 "ab" |> equal 3
+        let partial = curried 2
+        partial "abc" |> equal 5
+        let! curried3 = importValueDynamic Util.DynamicImport.curried3 |> Async.AwaitPromise
+        curried3 1 "ab" 3 |> equal 6
+        let! higherOrder = importValueDynamic Util.DynamicImport.higherOrder |> Async.AwaitPromise
+        higherOrder (fun a b -> a * b) 21 |> equal 42
+        let! higherOrder1 = importValueDynamic Util.DynamicImport.higherOrder1 |> Async.AwaitPromise
+        higherOrder1 (fun a b -> a + b) |> equal 22
+    }
+#endif
   ]

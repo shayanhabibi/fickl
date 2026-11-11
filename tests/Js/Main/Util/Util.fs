@@ -192,3 +192,13 @@ module Nested =
     let getOuterValueTimes4() = mutableValue * 4
 
 let getNestedValueTimes3() = Nested.nestedMutableValue + Nested.nestedMutableValue + Nested.nestedMutableValue
+
+// Imported with importValueDynamic, see fickl#314
+module DynamicImport =
+    let value = 42
+    let single (a: int) = a + 1
+    let tupled (a: int, b: string) = a + b.Length
+    let curried (a: int) (b: string) = a + b.Length
+    let curried3 (a: int) (b: string) (c: int) = a + b.Length + c
+    let higherOrder (f: int -> int -> int) (a: int) = f a 2
+    let higherOrder1 (f: int -> int -> int) = f 20 2

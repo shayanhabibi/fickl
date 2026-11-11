@@ -116,4 +116,46 @@ let tests =
                         Expect.equal (compile dir outDir) 0 "Compilation should succeed once the error is fixed"
                         Expect.equal (compile dir outDir) 0 "A run after a successful compilation should succeed"
                     )
+
+            // A missing output used to count as up to date, because a source with only types writes none
+            testCase "A deleted output file is generated again"
+            <| fun () ->
+                withTempProject
+                    "deleted"
+                    (fun dir outDir ->
+                        // Compiles to nothing, so it never has an output file
+                        File.WriteAllText(
+                            Path.Combine(dir, "Lib.fs"),
+                            "module Lib\n\ntype IGreeter =\n    abstract Greet: unit -> string\n"
+                        )
+
+                        File.WriteAllText(Path.Combine(dir, "Main.fs"), "module Main\n\nlet run () = printfn \"hello\"\n")
+                        File.WriteAllText(Path.Combine(dir, "Other.fs"), "module Other\n\nlet other = 1\n")
+
+                        File.WriteAllText(
+                            Path.Combine(dir, "Tests.props"),
+                            """<Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Lib.fs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Main.fs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Other.fs" />
+  </ItemGroup>
+</Project>
+"""
+                        )
+
+                        let libOut = Path.Combine(outDir, "Lib.js")
+                        let mainOut = Path.Combine(outDir, "Main.js")
+
+                        Expect.equal (compile dir outDir) 0 "First compilation should succeed"
+                        Expect.isFalse (File.Exists libOut) "A source with only types should have no output"
+
+                        File.Delete mainOut
+                        Expect.equal (compile dir outDir) 0 "Second compilation should succeed"
+                        Expect.isTrue (File.Exists mainOut) "The deleted output should have been generated again"
+
+                        writeNewer (Path.Combine(dir, "Lib.fs")) "module Lib\n\nlet greeting = \"hello\"\n"
+                        Expect.equal (compile dir outDir) 0 "Third compilation should succeed"
+                        Expect.isTrue (File.Exists libOut) "A changed source without output should have been compiled"
+                    )
         ]

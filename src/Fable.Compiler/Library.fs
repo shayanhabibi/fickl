@@ -82,7 +82,10 @@ type BabelWriter
 
             // TODO: used to be cliArgs.outDir, could be wrong.
             let path =
-                Imports.getImportPath pathResolver sourcePath targetPath projDir (Some targetDir) path
+                if Imports.isRootAbsolutePath path then
+                    path
+                else
+                    Imports.getImportPath pathResolver sourcePath targetPath projDir (Some targetDir) path
 
             // Here, we deviate from what the regular compiler does as we are never writing to disk.
             // We don't have the original file name collision problem.
