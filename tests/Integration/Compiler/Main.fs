@@ -18,6 +18,7 @@ let allTests =
         WatchDependency.tests
         RegexOptions.tests
         UnsupportedBclMember.tests
+        SourceReader.tests
     ]
 
 
