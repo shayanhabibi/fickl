@@ -1,5 +1,5 @@
 
-import { class_type } from "./fable_modules/fable-library-js.5.0.0-rc.3/Reflection.js";
+import { class_type, int32_type } from "./fable_modules/fable-library-js.5.0.0-rc.3/Reflection.js";
 
 /**
  * My superb class with attachments and doc comments
@@ -11,7 +11,7 @@ export class ClassWithAttachmentsAndDoc {
 }
 
 export function ClassWithAttachmentsAndDoc_$reflection() {
-    return class_type("ClassMember.ClassWithAttachmentsAndDoc", undefined, ClassWithAttachmentsAndDoc);
+    return class_type("ClassMember.ClassWithAttachmentsAndDoc", undefined, ClassWithAttachmentsAndDoc, undefined, () => [[[["v", int32_type]]]]);
 }
 
 export function ClassWithAttachmentsAndDoc_$ctor_Z524259A4(v) {

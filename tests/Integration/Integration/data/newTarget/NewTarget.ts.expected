@@ -1,6 +1,6 @@
 
 import { Exception } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
-import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { obj_type, class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
 
 export class Shape {
     constructor() {
@@ -59,7 +59,7 @@ export class Tagged {
 }
 
 export function Tagged_$reflection(): TypeInfo {
-    return class_type("NewTarget.Tagged", undefined, Tagged);
+    return class_type("NewTarget.Tagged", undefined, Tagged, undefined, () => [[[["target", obj_type]]]]);
 }
 
 export function Tagged_$ctor_4E60E31B(target: any): Tagged {

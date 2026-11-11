@@ -9,7 +9,7 @@ export class Shared {
 }
 
 export function Shared_$reflection() {
-    return class_type("CreateObjYield.Shared", undefined, Shared);
+    return class_type("CreateObjYield.Shared", undefined, Shared, undefined, () => []);
 }
 
 export function inlineMember() {

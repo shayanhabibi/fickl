@@ -130,7 +130,7 @@ export abstract class Base {
 }
 
 export function Base_$reflection(): TypeInfo {
-    return class_type("NativeDecorators.Base", undefined, undefined);
+    return class_type("NativeDecorators.Base", undefined, undefined, undefined, () => [[[]]]);
 }
 
 export class Derived extends Base {

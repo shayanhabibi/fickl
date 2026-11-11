@@ -1,7 +1,7 @@
 
 import type { MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
 import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
-import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { class_type, int32_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
 
 export class Counter extends EventTarget {
     #count: int32;
@@ -26,7 +26,7 @@ export class Counter extends EventTarget {
 }
 
 export function Counter_$reflection(): TypeInfo {
-    return class_type("JsSubclassMembers.Counter", undefined, Counter, class_type("JsSubclassMembers.EventTarget", undefined, EventTarget));
+    return class_type("JsSubclassMembers.Counter", undefined, Counter, class_type("JsSubclassMembers.EventTarget", undefined, EventTarget), () => [[[["start", int32_type]]]]);
 }
 
 export function Counter_$ctor_Z524259A4(start: int32): Counter {
