@@ -137,6 +137,20 @@ type GlobalSubclassGrandchild() =
         this.Increment()
         this.Increment()
 
+module Intersections =
+    type Named =
+        abstract name: string
+
+    type Aged =
+        abstract age: int
+
+    type Tagged =
+        abstract tag: string
+
+    let nameOf (x: Named) = x.name
+    let describe (x: I2<Named, Aged>) = x.As1.name + string x.As2.age
+    let describeImplicit (x: I2<Named, Aged>) = nameOf x + string x.As2.age
+
 [<Fickl.Core.AttachMembers>]
 type FicklAttachedCounter(start: int) =
     let mutable count = start
@@ -209,6 +223,9 @@ type HandlerProps =
 
 [<Emit("$0.onConnect(1, 'x')")>]
 let callOnConnectFromJs (o: obj) : string = jsNative
+
+type SharedProps =
+    static member inline pair = [ "a" ==> "b"; "c" ==> "d" ]
 
 type IMyOptions =
     interface end
@@ -460,6 +477,9 @@ type ClassWithAttachmentsChild2() =
     inherit ClassWithAttachments(3, "?")
     member this.dileHola(name) = this.SaySomethingTo(name, "Hola, {0}")
 
+
+type ConstructedBox<'T>(value: 'T) =
+    member _.Value = value
 
 [<AbstractClass>]
 [<AttachMembers>]
@@ -1096,6 +1116,28 @@ let tests =
         |> handleClass
         |> equal "Hello Narumi!!!!!!"
 
+    testCase "jsConstructorOf is the class, which Create instantiates" <| fun () ->
+        let ctor = Fickl.Core.JsInterop.jsConstructorOf<ClassWithAttachments>
+        obj.ReferenceEquals(ctor, jsConstructor<ClassWithAttachments>) |> equal true
+        let x = ctor.Create(2, "?")
+        x.SaySomethingTo("Narumi") |> equal "Hello Narumi??"
+
+    testCase "A JsConstructor can be passed, stored and instantiated" <| fun () ->
+        let instantiate (ctor: Fickl.Core.JsConstructor<'T>) (arg: obj) : 'T = ctor.Create(arg)
+        let ctors = {| Impl = Fickl.Core.JsInterop.jsConstructorOf<ConcreteAttachMembersImpl> |}
+        (instantiate ctors.Impl null).GetValueWrapped() |> equal "[hello]"
+        let box = instantiate Fickl.Core.JsInterop.jsConstructorOf<ConstructedBox<int>> 5
+        box.Value |> equal 5
+
+    testCase "jsConstructorOf works with abstract and global classes" <| fun () ->
+        let abstractCtor = Fickl.Core.JsInterop.jsConstructorOf<AbstractAttachMembersBase>
+        obj.ReferenceEquals(abstractCtor, jsConstructor<AbstractAttachMembersBase>) |> equal true
+        jsInstanceof (ConcreteAttachMembersImpl()) abstractCtor |> equal true
+        let mapCtor = Fickl.Core.JsInterop.jsConstructorOf<JS.Map<string, int>>
+        let map = mapCtor.Create()
+        map.set("a", 1) |> ignore
+        map.size |> equal 1
+
     testCase "Can useq equals with Object.create(null)" <| fun () -> // See #2900
         let o: obj = emitJsExpr () "Object.create(null)"
         o = obj() |> equal false
@@ -1134,6 +1176,47 @@ let tests =
         // TODO: This doesn't work in Fable 2, fix it or leave it as is?
         // Assigning dynamic access result to a value and applying multiple args
         // let add = dynObj?add in add(3,4) |> equal 7
+
+    testCase "createObj with yield! of list literals keeps the entries in source order" <| fun () -> // See #312
+        let o = createObj [ "e" ==> "f"; yield! SharedProps.pair ]
+        JS.JSON.stringify o |> equal """{"e":"f","a":"b","c":"d"}"""
+
+        let mutable log = []
+        let tick (s: string) = log <- s :: log; s
+        let o =
+            createObj [
+                "a" ==> tick "1"
+                yield! [ "b" ==> tick "2"; yield! [ "c" ==> tick "3"; "d" ==> tick "4" ] ]
+                yield! [| "e" ==> tick "5" |]
+                "f" ==> tick "6"
+            ]
+        JS.JSON.stringify o |> equal """{"a":"1","b":"2","c":"3","d":"4","e":"5","f":"6"}"""
+        List.rev log |> equal [ "1"; "2"; "3"; "4"; "5"; "6" ]
+
+    testCase "createObj with yield! lets a later duplicate key win" <| fun () ->
+        let mutable log = []
+        let tick (s: string) = log <- s :: log; s
+        let o = createObj [ "a" ==> tick "1"; yield! [ "b" ==> tick "2"; "a" ==> tick "3" ] ]
+        JS.JSON.stringify o |> equal """{"a":"3","b":"2"}"""
+        List.rev log |> equal [ "1"; "2"; "3" ]
+
+    testCase "createObj with yield! of entries not known at compile time still works" <| fun () ->
+        let mutable key = "y"
+        key <- "z"
+        let mutable rest = []
+        rest <- [ "q" ==> 9 ]
+        let cond c =
+            createObj [
+                "a" ==> 1
+                if c then
+                    "b" ==> 2
+                yield! [ "c" ==> 3 ]
+            ]
+        createObj [ "a" ==> 1; yield! [ key ==> 2 ] ] |> JS.JSON.stringify |> equal """{"a":1,"z":2}"""
+        createObj [ "a" ==> 1; yield! rest ] |> JS.JSON.stringify |> equal """{"a":1,"q":9}"""
+        createObj [ "a" ==> 1; for i in 1..2 do string i ==> i ] |> JS.JSON.stringify |> equal """{"1":1,"2":2,"a":1}"""
+        cond true |> JS.JSON.stringify |> equal """{"a":1,"b":2,"c":3}"""
+        cond false |> JS.JSON.stringify |> equal """{"a":1,"c":3}"""
 
     testCase "Lambdas are converted to delegates with dynamic operators" <| fun () ->
         let o =
@@ -1456,6 +1539,35 @@ let tests =
         Fickl.Core.Record.tryGet "carol" scores |> equal None
         Fickl.Core.Record.tryGet "toString" scores |> equal None
         Keys.total !!scores [| "alice"; "bob" |] |> equal 7
+
+#if FABLE_COMPILER
+    testCase "Erased intersection types are the object itself" <| fun () ->
+        let person = {| name = "Ada"; age = 36; tag = "t" |}
+        let both: I2<Intersections.Named, Intersections.Aged> = I2.UnsafeOf person
+        obj.ReferenceEquals(both, person) |> equal true
+        obj.ReferenceEquals(both.As1, person) |> equal true
+        obj.ReferenceEquals(both.As2, person) |> equal true
+        both.As1.name |> equal "Ada"
+        both.As2.age |> equal 36
+        Intersections.describe both |> equal "Ada36"
+        Intersections.describeImplicit both |> equal "Ada36"
+        let named: Intersections.Named = both
+        obj.ReferenceEquals(named, person) |> equal true
+
+        let three: I3<Intersections.Named, Intersections.Aged, Intersections.Tagged> =
+            I3.UnsafeOf person
+
+        obj.ReferenceEquals(three.As3, person) |> equal true
+        three.As1.name + three.As3.tag |> equal "Adat"
+
+        let four: I4<Intersections.Named, Intersections.Aged, Intersections.Tagged, obj> =
+            I4.UnsafeOf person
+
+        obj.ReferenceEquals(four.As4, person) |> equal true
+        four.As2.age |> equal 36
+        emitJsExpr both "typeof $0" |> equal "object"
+        emitJsExpr both "Object.keys($0).join()" |> equal "age,name,tag"
+#endif
 
     testCase "PropertyRecord and EmitIndexer interfaces index by key" <| fun () ->
         let labels: PropertyRecord<Keys.Server, string> = !!(createObj [ "Port", box "port"; "Host", box "host"; "Retries", box "retries" ])

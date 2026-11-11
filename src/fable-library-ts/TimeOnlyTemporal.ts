@@ -124,6 +124,16 @@ export function compare(x: TimeOnly, y: TimeOnly): number {
   return Temporal.PlainTime.compare(x, y);
 }
 
+// Equals(obj): as in .NET, false for null and for a value of another type
+export function equalsObj(x: TimeOnly, y: unknown): boolean {
+  return y instanceof Temporal.PlainTime && equals(x, y);
+}
+
+// CompareTo(obj): as in .NET, anything is greater than null
+export function compareToObj(x: TimeOnly, y: unknown): number {
+  return y == null ? 1 : compare(x, y as TimeOnly);
+}
+
 export function hash(t: TimeOnly): number {
   return totalNanoseconds(t) % 2147483647;
 }

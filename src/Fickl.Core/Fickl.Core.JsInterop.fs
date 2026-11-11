@@ -34,6 +34,15 @@ module JsInterop =
     /// </code></example>
     let partial<'T> (setters: 'T -> unit) : Partial<'T> = nativeOnly
 
+    /// <summary>The JavaScript class of <c>'T</c>, typed as a constructor of <c>'T</c>.</summary>
+    /// <remarks>The typed sibling of <c>jsConstructor</c>, which is an <c>obj</c> and so <c>any</c> in TypeScript.
+    /// <c>'T</c> must be a class, or an interface that binds a global or imported class.</remarks>
+    /// <example><code lang="fsharp">
+    /// let ctor = jsConstructorOf&lt;MyEl>
+    /// // const ctor: new (...args: any[]) => MyEl = MyEl;
+    /// </code></example>
+    let jsConstructorOf<'T> : JsConstructor<'T> = nativeOnly
+
     /// <summary>Imports a module dynamically with import attributes, <c>import(path, { with: { type: "json" } })</c>.</summary>
     /// <param name="path">The module path, as for <c>importDynamic</c>.</param>
     /// <param name="attributes">The attributes as a list literal of key and value pairs, such as <c>[ "type", "json" ]</c>; the keys must be constants.</param>

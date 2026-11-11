@@ -16,6 +16,22 @@ type Required<'T> = interface end
 [<EmitType("Readonly<$0>")>]
 type Readonly<'T> = interface end
 
+/// <summary>A JavaScript class as a value: the TypeScript <c>new (...args: any[]) => T</c>.</summary>
+/// <remarks>
+/// Get the constructor of an F# or imported class with <c>JsInterop.jsConstructorOf</c>. Where <c>'T</c> is an abstract
+/// class the annotation is <c>abstract new (...args: any[]) => T</c>, which accepts the class and which TypeScript
+/// does not let <c>Create</c> instantiate. Changes only TypeScript annotations; the JavaScript value is the class itself.
+/// </remarks>
+/// <example><code lang="fsharp">
+/// let register (name: string) (ctor: JsConstructor&lt;MyEl>) = customElements.define (name, ctor)
+/// // function register(name: string, ctor: new (...args: any[]) => MyEl): void
+/// </code></example>
+[<AllowNullLiteral; EmitType("new (...args: any[]) => $0")>]
+type JsConstructor<'T> =
+    /// <summary>Calls the constructor with <c>new</c>.</summary>
+    [<Fable.Core.EmitConstructor>]
+    abstract Create: [<System.ParamArray>] args: obj[] -> 'T
+
 /// <summary>Marks the <c>unknown</c> abbreviation for the compiler.</summary>
 [<System.AttributeUsage(System.AttributeTargets.All)>]
 type internal UnknownTypeAttribute() =

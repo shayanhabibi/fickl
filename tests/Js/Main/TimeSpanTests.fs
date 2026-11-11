@@ -822,4 +822,23 @@ let tests =
             (-a).Ticks |> equal -1234567L
             a.Duration().Ticks |> equal 1234567L
 #endif
+
+        testCase "TimeSpan.Equals works" <| fun () ->
+            let x = TimeSpan(1, 2, 3)
+            x.Equals(TimeSpan(1, 2, 3)) |> equal true
+            x.Equals(TimeSpan(1, 2, 4)) |> equal false
+            x.Equals(box (TimeSpan(1, 2, 3))) |> equal true
+            x.Equals(box (TimeSpan(1, 2, 4))) |> equal false
+            x.Equals(box "01:02:03") |> equal false
+            x.Equals(null: obj) |> equal false
+
+        testCase "TimeSpan.CompareTo works" <| fun () ->
+            let x = TimeSpan(1, 2, 3)
+            x.CompareTo(TimeSpan(1, 2, 3)) |> equal 0
+            x.CompareTo(TimeSpan(1, 2, 4)) |> equal -1
+            x.CompareTo(TimeSpan(1, 2, 2)) |> equal 1
+            x.CompareTo(box (TimeSpan(1, 2, 3))) |> equal 0
+            x.CompareTo(box (TimeSpan(1, 2, 4))) |> equal -1
+            x.CompareTo(box (TimeSpan(1, 2, 2))) |> equal 1
+            x.CompareTo(null: obj) |> equal 1
     ]

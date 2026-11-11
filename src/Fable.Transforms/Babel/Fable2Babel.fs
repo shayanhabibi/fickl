@@ -1614,6 +1614,14 @@ module Annotation =
             AliasTypeAnnotation(id, genArgs |> List.mapToArray (makeTypeAnnotation com ctx))
         )
 
+    /// fickl: the full name of Fickl.Core's erased intersection types, `I2<'a, 'b>` to `I4`
+    let (|ErasedIntersection|_|) (fullName: string) =
+        match fullName with
+        | "Fickl.Core.I2`2"
+        | "Fickl.Core.I3`3"
+        | "Fickl.Core.I4`4" -> Some()
+        | _ -> None
+
     /// fickl: a `[<TsEnum>]` enum is typed by its name, which TypeScript resolves to the enum's ambient declaration
     let tryTsEnumTypeAnnotation (com: IBabelCompiler) ctx (entRef: Fable.EntityRef) =
         match com.TryGetEntity entRef with
@@ -1646,9 +1654,33 @@ module Annotation =
             |> Some
         | _ -> None
 
+    /// fickl: `I2<'a, 'b>` to `I4` are `A & B`, written here rather than by their EmitType text so a union or
+    /// function argument gets parentheses
+    let tryIntersectionTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        match ent.FullName with
+        | ErasedIntersection ->
+            genArgs
+            |> List.mapToArray (makeTypeAnnotation com ctx)
+            |> IntersectionTypeAnnotation
+            |> Some
+        | _ -> None
+
+    /// fickl: `JsConstructor<'T>` of an abstract class is an abstract construct signature, the only kind TypeScript
+    /// assigns an abstract class to. Any other `'T` is left to the type's `EmitType` text.
+    let tryAbstractConstructorTypeAnnotation (com: IBabelCompiler) ctx genArgs (ent: Fable.Entity) =
+        match ent.FullName, genArgs with
+        | "Fickl.Core.JsConstructor`1", [ Fable.DeclaredType(instance, _) as genArg ] when
+            com.TryGetEntity(instance) |> Option.exists (fun ent -> ent.IsAbstractClass)
+            ->
+            EmitTypeAnnotation("abstract new (...args: any[]) => $0", [| makeTypeAnnotation com ctx genArg |])
+            |> Some
+        | _ -> None
+
     let makeEntityTypeAnnotation com ctx genArgs (ent: Fable.Entity) =
         match genArgs, ent with
         | _, Patterns.Try (tryKeyTypeAnnotation com ctx genArgs) ta -> ta
+        | _, Patterns.Try (tryIntersectionTypeAnnotation com ctx genArgs) ta -> ta
+        | _, Patterns.Try (tryAbstractConstructorTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryEmitTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryAugmentTypeAnnotation com ctx genArgs) ta -> ta
         | _, Patterns.Try (tryNativeOrFableLibraryInterface com ctx genArgs) ta -> ta
@@ -2775,6 +2807,16 @@ module Util =
                        )
 
                 match e.Type with
+                // fickl: an intersection is built by an unchecked cast, from a value TypeScript may not relate to it
+                | _ when
+                    toTaggedUnion
+                    && (
+                        match entRef.FullName with
+                        | ErasedIntersection -> true
+                        | _ -> false
+                    )
+                    ->
+                    AsExpression(AsExpression(jsExpr, UnknownTypeAnnotation), makeTypeAnnotation com ctx typ)
                 | Fable.DeclaredType(sourceEntRef, _) when com.IsTypeScript ->
                     let sourceEnt = com.GetEntity(sourceEntRef)
                     // Because we use a wrapper type for multi-case unions, TypeScript
@@ -4087,6 +4129,40 @@ but thanks to the optimisation done below we get
 
         transformJsxEl com ctx callee props
 
+    /// Reads the entries out of the list expression F# builds when the list passed to `createObj`
+    /// has a `yield!` in it: `Seq.toList (Seq.delay (fun () -> Seq.append ... (Seq.delay ...)))`.
+    /// Matches only when every part is an entry or a `yield!` of a list or array literal, and every
+    /// entry is a tuple whose key is a string known at compile time and used once, so that an
+    /// object literal has the same keys, in the same order, as the object built at run time.
+    let (|PojoEntriesGenerator|_|) (expr: Fable.Expr) : Fable.Expr list option =
+        let rec read (expr: Fable.Expr) =
+            match expr with
+            | SeqLibCall "singleton" [ entry ] -> Some [ entry ]
+            | SeqLibCall "delay" [ (Fable.Lambda(_, body, _) | Fable.Delegate(_, body, _, _)) ] -> read body
+            // A `yield!` of a list or array that itself has a `yield!` in it
+            | SeqLibCall "toList" [ generator ]
+            | SeqLibCall "toArray" [ generator ] -> read generator
+            | SeqLibCall "append" [ first; second ] ->
+                match read first, read second with
+                | Some first, Some second -> Some(first @ second)
+                | _ -> None
+            | Replacements.Util.ArrayOrListLiteral(entries, _) -> Some entries
+            | _ -> None
+
+        let key (entry: Fable.Expr) =
+            match entry with
+            | MaybeCasted(Fable.Value(Fable.NewTuple(StringConst key :: _, _), _)) -> Some key
+            | _ -> None
+
+        match expr with
+        | SeqLibCall "toList" [ SeqLibCall "delay" _ as generator ] ->
+            read generator
+            |> Option.filter (fun entries ->
+                let keys = entries |> List.choose key
+                keys.Length = entries.Length && (List.distinct keys).Length = keys.Length
+            )
+        | _ -> None
+
     let optimizeCall (com: IBabelCompiler) ctx range typ callee (callInfo: Fable.CallInfo) =
         // Try to optimize some patterns after FableTransforms
         match callInfo.Tags, callInfo.Args with
@@ -4127,6 +4203,10 @@ but thanks to the optimisation done below we get
                 |> transformAsExpr com ctx
                 |> Some
             | _ -> None
+        | Fable.Tags.Contains "pojo", [ PojoEntriesGenerator entries ] ->
+            Fable.Value(Fable.NewArray(Fable.ArrayValues entries, Fable.Any, Fable.MutableArray), None)
+            |> JS.Replacements.makePojo com None
+            |> Option.map (transformAsExpr com ctx)
         | Fable.Tags.Contains "pojo", keyValueList :: caseRule :: _ ->
             JS.Replacements.makePojo com (Some caseRule) keyValueList
             |> Option.map (transformAsExpr com ctx)

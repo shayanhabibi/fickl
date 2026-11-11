@@ -200,6 +200,16 @@ export function equals(x: TimeSpan, y: TimeSpan): boolean {
   return Temporal.Duration.compare(x, y) === 0;
 }
 
+// Equals(obj): as in .NET, false for null and for a value of another type
+export function equalsObj(x: TimeSpan, y: unknown): boolean {
+  return y instanceof Temporal.Duration && equals(x, y);
+}
+
+// CompareTo(obj): as in .NET, anything is greater than null
+export function compareToObj(x: TimeSpan, y: unknown): number {
+  return y == null ? 1 : compare(x, y as TimeSpan);
+}
+
 export function hash(ts: TimeSpan): number {
   return Number(totalNanoseconds(ts) % 2147483647n);
 }

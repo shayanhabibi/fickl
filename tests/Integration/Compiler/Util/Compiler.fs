@@ -27,7 +27,7 @@ module Compiler =
   /// NOTE: NOT threadsafe
   ///       -> don't use `parallel`
   module Cached =
-    type private CachedProject(name: string, ?language, ?isWatch: bool, ?watchDelay: int, ?recompileAllFiles: bool) =
+    type private CachedProject(name: string, ?language, ?isWatch: bool, ?watchDelay: int, ?recompileAllFiles: bool, ?jsTemporal: bool) =
         let projDir = IO.Path.Join(__SOURCE_DIRECTORY__, "../" + name) |> Path.normalizeFullPath
         let projFile = IO.Path.Join(projDir, name + ".fsproj") |> Path.normalizeFullPath
 
@@ -35,8 +35,16 @@ module Compiler =
             // The real CLI always defines these (Entry.fs), and code guarded by them is exactly where
             // Fable warnings - and the comments suppressing them - live.
             let language = defaultArg language JavaScript
-            let defines = ["FABLE_COMPILER"; "FABLE_COMPILER_5"; "FABLE_COMPILER_" + language.ToString().ToUpperInvariant()]
-            let compilerOptions = CompilerOptionsHelper.Make(language=language, define=defines)
+            let jsTemporal = defaultArg jsTemporal false
+            let defines =
+                [
+                    "FABLE_COMPILER"
+                    "FABLE_COMPILER_5"
+                    "FABLE_COMPILER_" + language.ToString().ToUpperInvariant()
+                    if jsTemporal then
+                        "FABLE_COMPILER_JAVASCRIPT_TEMPORAL"
+                ]
+            let compilerOptions = CompilerOptionsHelper.Make(language=language, define=defines, jsTemporal=jsTemporal)
             { CliArgs.ProjectFile = projFile
               FableLibraryPath = None
               RootDir = projDir
@@ -140,6 +148,15 @@ module Compiler =
                 project
 
         project.Compile [
+          "Library.fs", emptyLibrary
+          "Program.fs", programFile settings source
+        ]
+
+    let private projectWithTemporal = lazy CachedProject("TestProject", jsTemporal = true)
+
+    /// Compiles as `--temporal` does: dates and times are the Temporal runtime modules.
+    let compileWithTemporal settings source =
+        projectWithTemporal.Value.Compile [
           "Library.fs", emptyLibrary
           "Program.fs", programFile settings source
         ]
