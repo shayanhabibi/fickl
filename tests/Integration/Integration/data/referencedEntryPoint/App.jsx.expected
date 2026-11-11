@@ -1,0 +1,14 @@
+
+import { greet, main as main_1 } from "./referenced/Referenced.jsx.actual";
+import { printf, toConsole } from "./fable_modules/fable-library-js.5.27.0/String.js";
+
+export function runReferenced() {
+    return main_1([]) | 0;
+}
+
+(function (_arg) {
+    const arg = greet("app");
+    toConsole(printf("%s"))(arg);
+    return 0;
+})(typeof process === 'object' ? process.argv.slice(2) : []);
+

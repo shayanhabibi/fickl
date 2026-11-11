@@ -778,7 +778,9 @@ and FableCompiler(checker: InteractiveChecker, projCracked: ProjectCracked, fabl
                                     Array.concat
                                         [
                                             state.FSharpLogs
-                                            CodeServices.getFSharpDiagnostics results.Diagnostics
+                                            CodeServices.getProjectFSharpDiagnostics
+                                                projCracked.ProjectOptions.SourceFiles
+                                                results.Diagnostics
                                             CodeServices.getAssemblyAutoOpenHints results
                                         ]
                                 HasFSharpCompilationFinished = true

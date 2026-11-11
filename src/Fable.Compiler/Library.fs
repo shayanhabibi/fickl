@@ -218,6 +218,23 @@ module CodeServices =
                         tag = "FABLE"
                     )
                 |]
+    // Referenced projects are type-checked as part of the main one, so their entry point is no longer
+    // in the last file and FCS reports FS0433 for it. Only the entry point of the last file is run.
+    let private isEntryPointOutsideLastFile (sourceFiles: string array) (er: FSharpDiagnostic) =
+        er.ErrorNumber = 433
+        && not (Array.isEmpty sourceFiles)
+        && not (
+            String.Equals(
+                Path.normalizeFullPath er.FileName,
+                Path.normalizeFullPath (Array.last sourceFiles),
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+
+    let getProjectFSharpDiagnostics (sourceFiles: string array) (diagnostics: FSharpDiagnostic array) =
+        diagnostics
+        |> Array.filter (fun er -> not (isEntryPointOutsideLastFile sourceFiles er))
+        |> getFSharpDiagnostics
 
     let compileFileToJs
         (com: Compiler)
@@ -323,7 +340,12 @@ module CodeServices =
             return
                 {
                     FableAST = fableAST
-                    Logs = Array.append (getFSharpDiagnostics checkProjectResult.Diagnostics) compiler.Logs
+                    Logs =
+                        Array.append
+                            (getProjectFSharpDiagnostics
+                                crackerResponse.ProjectOptions.SourceFiles
+                                checkProjectResult.Diagnostics)
+                            compiler.Logs
                 }
         }
 
@@ -393,7 +415,9 @@ module CodeServices =
                     CompiledFiles = Map.ofArray compiledFiles
                     Logs =
                         Array.append
-                            (getFSharpDiagnostics typeCheckProjectResult.ProjectCheckResults.Diagnostics)
+                            (getProjectFSharpDiagnostics
+                                crackerResponse.ProjectOptions.SourceFiles
+                                typeCheckProjectResult.ProjectCheckResults.Diagnostics)
                             (Array.concat fableLogs)
                 }
         }
@@ -510,6 +534,11 @@ module CodeServices =
             return
                 {
                     CompiledFiles = Map.ofArray compiledFiles
-                    Logs = Array.append (getFSharpDiagnostics checkProjectResult.Diagnostics) (Array.concat fableLogs)
+                    Logs =
+                        Array.append
+                            (getProjectFSharpDiagnostics
+                                crackerResponse.ProjectOptions.SourceFiles
+                                checkProjectResult.Diagnostics)
+                            (Array.concat fableLogs)
                 }
         }
