@@ -41,3 +41,6 @@ export function nullableInt(x: Nullable<int32>): Nullable<int32> {
     return x;
 }
 
+export function greet(title: string, name: string | null): string {
+    return ((title + " ") + (name || "")) + "!";
+}
