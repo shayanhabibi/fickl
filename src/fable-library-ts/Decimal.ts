@@ -3,7 +3,7 @@ import { type Numeric, symbol } from "./Numeric.ts";
 import { FSharpRef } from "./Types.ts";
 import { Exception, MidpointRounding, combineHashCodes } from "./Util.ts";
 import { NumberStyles, splitNumber } from "./NumberStyles.ts";
-import { ArgumentNullException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
+import { ArgumentNullException_$ctor_Z721C83C5, DivideByZeroException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
 import { type int8, type uint8, type int16, type uint16, type int32, type uint32, type float16, type float32, type float64 } from "./Int32.ts";
 import { fromDecimal, type int64, type uint64, type int128, type uint128, type nativeint, type unativeint } from "./BigInt.ts";
 import * as bigInt from "./BigInt.ts";
@@ -89,6 +89,14 @@ export function roundToMode(x: Decimal, digits: number, mode: number) {
 
 export function roundMode(x: Decimal, mode: number) {
   return roundToMode(x, 0, mode);
+}
+
+// --checkedDivision: the divisor of a decimal division or remainder, which .NET rejects when it is zero
+export function nonZero(divisor: Decimal): Decimal {
+  if (divisor.eq(0)) {
+    throw DivideByZeroException_$ctor_Z721C83C5("Attempted to divide by zero.");
+  }
+  return divisor;
 }
 
 export function truncate(x: Decimal) {

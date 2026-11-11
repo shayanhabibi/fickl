@@ -119,6 +119,11 @@ let knownCliArgs () =
             "Make every exception a JS Error with a stack trace and a cause, at the cost of capturing"
             "a stack trace whenever one is created (JavaScript and TypeScript)"
         ]
+        [ "--checkedDivision" ],
+        [
+            "Raise DivideByZeroException when an integer or a decimal is divided by zero, as .NET does,"
+            "by checking the divisor at runtime (JavaScript and TypeScript)"
+        ]
         [ "--privateFields" ],
         [
             "Compile the let fields of classes with attached members to ES #private fields,"
@@ -382,6 +387,8 @@ type Runner =
                             Fickl.Options.nativeErrorsDefine
                         if args.FlagEnabled "--privateFields" then
                             Fickl.Options.privateFieldsDefine
+                        if args.FlagEnabled "--checkedDivision" then
+                            Fickl.Options.checkedDivisionDefine
                         match language with
                         | Php -> "FABLE_COMPILER_PHP"
                         | Rust -> "FABLE_COMPILER_RUST"

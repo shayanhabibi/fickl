@@ -1,6 +1,6 @@
 import { FSharpRef } from "./Types.ts";
 import { Exception } from "./Util.ts";
-import { ArgumentNullException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
+import { ArgumentNullException_$ctor_Z721C83C5, DivideByZeroException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
 
 export type int8 = number;
 export type uint8 = number;
@@ -153,6 +153,16 @@ export function op_UnaryNegation_Int16(x: number) {
 
 export function op_UnaryNegation_Int32(x: number) {
   return x === -2147483648 ? x : -x;
+}
+
+// --checkedDivision: the divisor of an integer division or remainder, which .NET rejects when it is zero.
+// Integers of 64 bits or more are bigints
+export function nonZero<T extends number | bigint>(divisor: T): T {
+  const value: number | bigint = divisor;
+  if (value === 0 || value === 0n) {
+    throw DivideByZeroException_$ctor_Z721C83C5("Attempted to divide by zero.");
+  }
+  return divisor;
 }
 
 export function divRem(x: number, y: number): [number, number];

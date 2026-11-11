@@ -349,12 +349,13 @@ let dllAttributeTests =
             Expect.equal exitCode 0 $"The compiled program failed:{System.Environment.NewLine}{log}"
         })
 
-/// <summary>Checks strict optional parameters and getters on .NET, JavaScript and TypeScript.</summary>
-let strictOptionsTests =
-    testCase "Strict options preserve nullable optional parameters" (fun () ->
+/// Runs the project in `folder`, which fails on a wrong result, on .NET, then compiled with `flag` to JavaScript and
+/// to TypeScript
+let private flagProjectTest (title: string) (folder: string) (flag: string) =
+    testCase title (fun () ->
         let root = Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "../../.."))
-        let source = Path.Combine(__SOURCE_DIRECTORY__, "strictOptions")
-        let output = Path.Combine(root, "temp/tests/Integration/strictOptions")
+        let source = Path.Combine(__SOURCE_DIRECTORY__, folder)
+        let output = Path.Combine(root, "temp/tests/Integration", folder)
 
         let run (executable: string) (arguments: string list) =
             let info =
@@ -378,8 +379,8 @@ let strictOptionsTests =
             let exitCode =
                 Fable.Cli.Entry.main
                     [| source; "--outDir"; destination; "--lang"; language
-                       "--strictOptions"; "--exclude"; "Fable.Core"; "--noCache" |]
-            Expect.equal exitCode 0 $"Compiling strict options for {language} failed"
+                       flag; "--exclude"; "Fable.Core"; "--noCache" |]
+            Expect.equal exitCode 0 $"Compiling {folder} for {language} failed"
 
             if language = "javascript" then
                 run "node" [ Path.Combine(destination, "Program.js") ]
@@ -403,6 +404,14 @@ let strictOptionsTests =
                 File.WriteAllText(config, System.Text.Json.JsonSerializer.Serialize settings)
                 run "node" [ Path.Combine(root, "node_modules/typescript/lib/tsc.js"); "-p"; config ]
                 run "node" [ Path.Combine(compiled, Path.GetRelativePath(root, destination), "Program.js") ])
+
+/// <summary>Checks strict optional parameters and getters on .NET, JavaScript and TypeScript.</summary>
+let strictOptionsTests =
+    flagProjectTest "Strict options preserve nullable optional parameters" "strictOptions" "--strictOptions"
+
+/// Checks that dividing an integer or a decimal by zero raises DivideByZeroException on .NET, JavaScript and TypeScript
+let checkedDivisionTests =
+    flagProjectTest "Checked division raises DivideByZeroException" "checkedDivision" "--checkedDivision"
 
 /// <summary>Executes native decorator output with standard and legacy TypeScript transforms.</summary>
 let nativeDecoratorTests =
