@@ -1,4 +1,4 @@
-import { type Shape_$union, type NumberOrText, Point } from "./Shapes.js";
+import { type Shape_$union, type NumberOrText, type Color, Point } from "./Shapes.js";
 import type { float64, int32 } from "./fable_modules/fable-library-js.5.24.0/Int32.js";
 import type { FSharpList } from "./fable_modules/fable-library-js.5.24.0/List.js";
 import type { Option } from "./fable_modules/fable-library-js.5.24.0/Option.js";
@@ -6,7 +6,7 @@ import type { TypeInfo } from "./fable_modules/fable-library-js.5.24.0/Reflectio
 import type { INamed } from "./Contracts.js";
 export declare const origin: Point;
 export declare let counter: { (): int32, (value: int32): void };
-export declare function describe(color: string, value: NumberOrText): string;
+export declare function describe(color: Color, value: NumberOrText): string;
 export declare function scale(factor: float64, shapes: FSharpList<Shape_$union>): FSharpList<Shape_$union>;
 export declare function firstOr<T>(fallback: T, items: FSharpList<T>): T;
 export declare class Greeter {

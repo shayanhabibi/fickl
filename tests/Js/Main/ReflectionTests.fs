@@ -1513,6 +1513,72 @@ let getMethodTests = [
         Fable.Tests.Util.throwsAnyError (fun () -> typeof<GetMethodCalc>.GetMethod("Fail").Invoke(null, [||]))
 ]
 
+// fickl#274
+[<Fable.Core.StringEnum>]
+type ReflectedStringEnum =
+    | FirstCase
+    | SecondCase
+
+[<Fable.Core.StringEnum(Fable.Core.CaseRules.KebabCase)>]
+type ReflectedKebabStringEnum =
+    | [<CompiledName("custom")>] Named
+    | KebabCase
+
+type RecordWithStringEnum = { Kind: ReflectedStringEnum }
+
+let inline typeOfInline<'T> () = typeof<'T>
+
+/// The case names a reflection-driven serialiser writes: on Fable the runtime value of the case,
+/// so the JSON it writes is the one it wrote when the type reflected as a string
+let caseName (value: obj) (t: System.Type) =
+    let case, _ = FSharpValue.GetUnionFields(value, t)
+    case.Name
+
+let stringEnumTests = [
+    testCase "A StringEnum reflects as a union" <| fun () ->
+        FSharpType.IsUnion typeof<ReflectedStringEnum> |> equal true
+        FSharpType.IsUnion(typeOfInline<ReflectedStringEnum> ()) |> equal true
+        typeof<ReflectedStringEnum> = typeof<string> |> equal false
+        typeof<ReflectedStringEnum>.Name |> equal "ReflectedStringEnum"
+        let field = FSharpType.GetRecordFields typeof<RecordWithStringEnum> |> Array.head
+        FSharpType.IsUnion field.PropertyType |> equal true
+
+    testCase "MakeUnion and GetUnionFields work with StringEnum" <| fun () ->
+        let cases = FSharpType.GetUnionCases typeof<ReflectedStringEnum>
+        cases |> Array.map (fun c -> c.Tag) |> equal [| 0; 1 |]
+        FSharpValue.MakeUnion(cases.[1], [||]) |> equal (box SecondCase)
+        let case, fields = FSharpValue.GetUnionFields(SecondCase, typeof<ReflectedStringEnum>)
+        case.Tag |> equal 1
+        fields |> equal [||]
+        let kebabCases = FSharpType.GetUnionCases typeof<ReflectedKebabStringEnum>
+        FSharpValue.MakeUnion(kebabCases.[0], [||]) |> equal (box Named)
+        FSharpValue.MakeUnion(kebabCases.[1], [||]) |> equal (box KebabCase)
+
+    testCase "StringEnum case names are the runtime values on Fable" <| fun () ->
+        let names (t: System.Type) = FSharpType.GetUnionCases t |> Array.map (fun c -> c.Name)
+#if FABLE_COMPILER
+        names typeof<ReflectedStringEnum> |> equal [| "firstCase"; "secondCase" |]
+        names typeof<ReflectedKebabStringEnum> |> equal [| "custom"; "kebab-case" |]
+        caseName (box SecondCase) typeof<ReflectedStringEnum> |> equal (string SecondCase)
+#else
+        names typeof<ReflectedStringEnum> |> equal [| "FirstCase"; "SecondCase" |]
+        names typeof<ReflectedKebabStringEnum> |> equal [| "Named"; "KebabCase" |]
+        caseName (box SecondCase) typeof<ReflectedStringEnum> |> equal "SecondCase"
+#endif
+
+    testCase "StringEnum keys native collections and compares like a string" <| fun () ->
+        let d = System.Collections.Generic.Dictionary<ReflectedStringEnum, int>()
+        d.[FirstCase] <- 1
+        d.[SecondCase] <- 2
+        d.[FirstCase] |> equal 1
+        let s = System.Collections.Generic.HashSet<ReflectedStringEnum>([ FirstCase; FirstCase; SecondCase ])
+        s.Count |> equal 2
+        FirstCase = FirstCase |> equal true
+        FirstCase <> SecondCase |> equal true
+        Map.empty |> Map.add SecondCase 2 |> Map.add FirstCase 1 |> Map.find FirstCase |> equal 1
+        compare FirstCase FirstCase |> equal 0
+]
+
 let genericTypeNamesTests =
     testList "Naming generic types"
       [  ]
@@ -1524,6 +1590,7 @@ let tests =
         @ reflectionTests
         @ getMethodTests
         @ fableTests
+        @ stringEnumTests
         @ [ passGenericsTests ]
     )
 

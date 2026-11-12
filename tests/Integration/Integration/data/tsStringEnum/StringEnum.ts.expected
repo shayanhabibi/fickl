@@ -1,6 +1,5 @@
 
 import { filter } from "./fable_modules/fable-library-ts.5.27.0/Seq.ts";
-import { equals } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
 import { type FSharpList, singleton } from "./fable_modules/fable-library-ts.5.27.0/List.ts";
 
 export type Level = 
@@ -17,7 +16,7 @@ export function describe(level: Level): string {
 }
 
 export function levelNames(levels: Iterable<Level>): Iterable<Level> {
-    return filter<Level>((level: Level): boolean => equals(level, "high"), levels);
+    return filter<Level>((level: Level): boolean => (level === "high"), levels);
 }
 
 export function pair(level: Level): [Level, FSharpList<Level>] {

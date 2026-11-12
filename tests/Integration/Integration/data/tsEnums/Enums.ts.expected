@@ -2,7 +2,7 @@
 import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
 import { type FSharpList, ofArray } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
 import { Dir, move } from "./dir.js";
-import { int32ToString, type MutableArray, equals } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
+import { int32ToString, type MutableArray } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
 import { enum_type, int32_type, parseEnum } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
 
 declare enum Color_$enum {
@@ -72,7 +72,7 @@ export function goUp(): string {
 }
 
 export function isDown(): boolean {
-    return equals(Dir.Down, 'DOWN');
+    return Dir.Down === ('DOWN');
 }
 
 export const outside = 5 as number as Color;
