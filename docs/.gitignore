@@ -1,0 +1,5 @@
+output/
+.nacara/
+bin/
+obj/
+static/benchmarks/

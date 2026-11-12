@@ -1,0 +1,44 @@
+/* Fickl brand tokens. The names are Ranvier's (--rv-*), so the Ranvier docs layers in brand.css and
+   landing.css apply as they are; the neutrals are Ranvier's and the accent is Fickl's amber to rose.
+   Dark is the default theme. Theme.fs maps [data-fickl-theme] to the docs theme's :root[data-theme]. */
+:root, [data-fickl-theme="dark"] {
+  --rv-canvas: #0F1115;
+  --rv-surface: #181B22;
+  --rv-raised: #21252E;
+  --rv-border: #353B47;
+  --rv-border-strong: #5D6676;
+  --rv-text: #EEF1F5;
+  --rv-muted: #A0A8B5;
+  --rv-contour: #F5A35C;
+  --rv-accent-text: #F7B074;
+  --rv-violet: #E58BB0;
+  --rv-pending: #F4C76E;
+  --rv-value: #8FDDB4;
+  --rv-error: #F4868B;
+  --rv-on-accent: #16120E;
+  --rv-grad-a: #F5A35C;
+  --rv-grad-b: #EF8170;
+  --rv-grad-c: #E07AA9;
+  --rv-gradient-accent: linear-gradient(115deg, #F5A35C 0%, #EF8170 52%, #E07AA9 100%);
+}
+
+[data-fickl-theme="light"] {
+  --rv-canvas: #FAF9F7;
+  --rv-surface: #FFFFFF;
+  --rv-raised: #F2EFEB;
+  --rv-border: #DDD6CE;
+  --rv-border-strong: #94877A;
+  --rv-text: #1E1A17;
+  --rv-muted: #5F574F;
+  --rv-contour: #B65A12;
+  --rv-accent-text: #9C4C0E;
+  --rv-violet: #A23A6C;
+  --rv-pending: #A2610D;
+  --rv-value: #1D7A52;
+  --rv-error: #AD3543;
+  --rv-on-accent: #FFFFFF;
+  --rv-grad-a: #B65A12;
+  --rv-grad-b: #B6463A;
+  --rv-grad-c: #A23A6C;
+  --rv-gradient-accent: linear-gradient(115deg, #B65A12 0%, #B6463A 52%, #A23A6C 100%);
+}

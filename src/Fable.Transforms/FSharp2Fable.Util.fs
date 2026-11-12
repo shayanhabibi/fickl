@@ -913,6 +913,9 @@ module Helpers =
             | "op_Explicit" ->
                 let returnType = TypeHelpers.makeType Map.empty memb.ReturnParameter.Type
                 OverloadSuffix.getHashWithReturnType entGenParams paramTypeGroups returnType
+            // A type the compiler sees only as an assembly, such as System.Lazy, is replaced by a runtime library type
+            // with overloads of its own, so the hash cannot depend on which overloads the assembly has
+            | _ when Option.isNone (FsEnt.Ref ent).SourcePath -> OverloadSuffix.getHash entGenParams paramTypeGroups
             | _ ->
                 let overloads =
                     ent.MembersFunctionsAndValues

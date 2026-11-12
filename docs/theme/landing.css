@@ -1,0 +1,135 @@
+/* Landing page (content/index.md, layout: splash). Layer nacara.landing, after nacara.brand.
+   Scoped to the splash layout or to .rv-hero / .rv-demo / .rv-cards.
+   The accent gradient appears once: on the primary action. */
+
+body:has(.nacara-layout--splash) { overflow-x: clip; }
+
+.nacara-layout--splash { --nacara-splash-width: 72rem; }
+
+/* ---- Section headings: left-aligned, contour rule above ---- */
+.nacara-layout--splash .nacara-content h2 {
+  margin: 6rem 0 .5rem; padding-top: 1.25rem; border-top: 0;
+  font-size: clamp(1.625rem, 1.35rem + 1vw, 2.125rem); font-weight: 600; letter-spacing: -.03em;
+  background: linear-gradient(var(--rv-contour), var(--rv-contour)) left top / 2.5rem 2px no-repeat; }
+.nacara-layout--splash .nacara-content h2 .nacara-heading-anchor { display: none; }
+.nacara-layout--splash .nacara-content h2 + p {
+  color: var(--nacara-text-muted); font-size: 1.0625rem; max-width: 40rem; margin: 0 0 2.25rem; }
+
+/* ---- Hero: copy on the left, the running demo on the right ---- */
+.rv-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 3.5rem; align-items: center;
+  padding: 4.5rem 0 1rem; position: relative; isolation: isolate; }
+/* Soft glow: two blurred washes of contour and violet behind the copy and the demo. */
+.rv-hero::before {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  inset: -6rem -12rem -4rem;
+  background:
+    radial-gradient(38% 55% at 22% 45%, color-mix(in oklab, var(--rv-contour) 24%, transparent), transparent 70%),
+    radial-gradient(34% 50% at 78% 40%, color-mix(in oklab, var(--rv-violet) 20%, transparent), transparent 70%);
+  filter: blur(24px); }
+:root[data-theme="light"] .rv-hero::before { opacity: .7; }
+
+.rv-hero__status {
+  display: inline-flex; align-items: center; gap: .625rem; margin-bottom: 1.5rem;
+  font-size: .8125rem; font-weight: 500; color: var(--nacara-text-muted); }
+
+.nacara-content h1.rv-hero__title {
+  margin: 0 0 1rem; padding: 0; border: 0;
+  font-size: clamp(3.25rem, 2.2rem + 4vw, 5rem); font-weight: 600; line-height: .95; letter-spacing: -.055em;
+  color: var(--nacara-heading); }
+.nacara-content h1.rv-hero__title::after {
+  content: ""; display: inline-block; width: .16em; height: .16em; margin-left: .06em;
+  border-radius: 50%; background: var(--rv-contour); }
+
+.nacara-content .rv-hero p.rv-hero__line {
+  margin: 0 0 1rem; font-family: var(--rv-font-display);
+  font-size: clamp(1.1875rem, 1.05rem + .5vw, 1.375rem); font-weight: 500; line-height: 1.4; letter-spacing: -.015em;
+  color: var(--nacara-heading); }
+.nacara-content .rv-hero p.rv-hero__sub {
+  margin: 0 0 2rem; font-size: 1rem; line-height: 1.65; color: var(--nacara-text-muted); max-width: 32rem; }
+
+.rv-hero__actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+.nacara-content .rv-hero__actions a.rv-btn { text-decoration: none; }
+.nacara-content .rv-hero a.rv-btn--primary { background: var(--rv-gradient-accent); }
+
+/* ---- Demo: code and the boundary's observed value ---- */
+.rv-demo {
+  margin: 0; display: grid; grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--nacara-border); border-radius: var(--nacara-radius);
+  background: var(--rv-code-bg); box-shadow: var(--nacara-shadow-floating); overflow: hidden; }
+
+.rv-demo__code pre {
+  margin: 0; padding: 1.25rem 0 1rem 1.25rem; overflow-x: auto; background: none; border: 0;
+  font-family: var(--nacara-font-mono); font-size: .8125rem; line-height: 1.7; color: var(--nacara-text); }
+.rv-demo__code code { font: inherit; background: none; border: 0; padding: 0; }
+/* Both panels share one grid cell, so the taller F# panel sets the height in either language. */
+.rv-demo__code { display: grid; grid-template-columns: minmax(0, 1fr); }
+.rv-demo__code pre[role="tabpanel"] { grid-area: 2 / 1; }
+.rv-demo__code pre[hidden] { display: block; visibility: hidden; }
+.rv-demo__tabs { display: flex; padding: 0 .5rem; background: var(--rv-code-title-bg); border-bottom: 1px solid var(--nacara-border); }
+.rv-demo__tabs button {
+  font: inherit; font-size: .8125rem; font-weight: 500; padding: .5rem .75rem;
+  background: none; border: 0; border-radius: 0; cursor: pointer; color: var(--nacara-text-muted);
+  box-shadow: inset 0 -2px transparent; transition: color .15s, box-shadow .15s; }
+.rv-demo__tabs button:hover { color: var(--nacara-text); }
+.rv-demo__tabs button[aria-selected="true"] { color: var(--nacara-text); box-shadow: inset 0 -2px var(--nacara-primary); }
+.rv-demo__tabs button:focus-visible { outline: 2px solid var(--nacara-primary); outline-offset: -2px; }
+.rv-demo .k { color: var(--rv-violet); }
+.rv-demo .t { color: var(--rv-accent-text); }
+.rv-demo .s { color: var(--rv-value); }
+.rv-demo .n { color: var(--rv-violet); }
+.rv-demo .c { color: var(--nacara-text-muted); }
+
+.rv-demo__step {
+  display: inline-block; margin-left: -1.25rem; padding: 0 1.25rem; min-width: calc(100% + 1.25rem);
+  color: var(--nacara-text-muted); cursor: default;
+  transition: color .25s, background-color .25s, box-shadow .25s; }
+.rv-demo__step.is-active {
+  color: var(--nacara-text);
+  background: color-mix(in oklab, var(--rv-contour) 9%, transparent);
+  box-shadow: inset 2px 0 var(--rv-contour); }
+
+.rv-demo__out { border-top: 1px solid var(--nacara-border); background: var(--nacara-bg-subtle); padding: .875rem 1.25rem 1rem; }
+.rv-demo__label { font-family: var(--nacara-font-mono); font-size: .75rem; color: var(--nacara-text-muted); margin-bottom: .5rem; }
+.rv-demo__frames { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.rv-demo__frames > li {
+  grid-area: 1 / 1; margin: 0; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  opacity: 0; translate: 0 .25rem; transition: opacity .3s, translate .3s var(--rv-ease); }
+.rv-demo__frames > li.is-active { opacity: 1; translate: 0 0; }
+.rv-demo__frames code { font-size: .8125rem; background: none; border: 0; padding: 0; color: var(--nacara-text); }
+.rv-demo__frames small { font-family: var(--nacara-font-mono); font-size: .75rem; color: var(--nacara-text-muted); }
+
+.rv-demo figcaption {
+  border-top: 1px solid var(--nacara-border); padding: .5rem 1.25rem;
+  font-size: .75rem; color: var(--nacara-text-muted); }
+.rv-demo figcaption code { font-size: inherit; }
+
+/* ---- Cards: text only, contour on hover ---- */
+.rv-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin: 0 0 3rem; }
+.nacara-content .rv-card {
+  display: flex; flex-direction: column; padding: 1.25rem 1.25rem 1.375rem;
+  border: 1px solid var(--nacara-border); border-radius: var(--nacara-radius);
+  background: var(--nacara-bg-subtle); color: var(--nacara-text); text-decoration: none;
+  transition: border-color .2s, box-shadow .2s; }
+.nacara-content a.rv-card:hover { border-color: var(--rv-border-strong); box-shadow: inset 0 2px var(--rv-contour); }
+.rv-card__title {
+  display: flex; align-items: center; gap: .5rem; margin: 0 0 .5rem;
+  font-family: var(--rv-font-display); font-size: 1rem; font-weight: 600; color: var(--nacara-heading); }
+.nacara-content .rv-card p { margin: 0; font-size: .875rem; line-height: 1.6; color: var(--nacara-text-muted); }
+
+/* ---- Small screens ---- */
+@media (max-width: 60rem) {
+  .rv-hero { grid-template-columns: 1fr; gap: 2.5rem; padding-top: 2.5rem; }
+  .rv-hero::before { inset: -4rem 0 -2rem; }
+  .rv-trace__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 40rem) {
+  .nacara-layout--splash .nacara-content h2 { margin-top: 4rem; }
+  .rv-demo__code pre { font-size: .75rem; }
+  .rv-trace__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-demo__frames > li, .rv-demo__step, .rv-demo__tabs button, .rv-trace__q, .rv-trace__q::after, .rv-trace__more svg { transition: none; }
+}
+
