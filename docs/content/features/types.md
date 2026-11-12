@@ -200,7 +200,7 @@ open System.Collections.Generic
 open Fickl.Core
 
 let size (xs: IReadOnlyCollection<int>) = xs.Count
-let first (xs: IReadOnlyList<string>) = Seq.head xs
+let first (xs: IReadOnlyList<string>) = xs.[0]
 let find (d: IReadOnlyDictionary<string, int>) (key: string) = d.[key]
 
 let sum (xs: JS.ReadonlyArray<int>) = Seq.sum xs
