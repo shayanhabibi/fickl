@@ -117,9 +117,10 @@ body {
 .nacara-sidebar__section {
     margin-bottom: 0;
 }
-.nacara-sidebar__sections {
-    margin-bottom: 0;
-    padding-bottom: 0;
+/* The navbar sections shown at the top of the small-screen sidebar: keep space between their rule and the menu. */
+.nacara-sidebar:not(.nacara-sidebar--drawer) .nacara-sidebar__sections {
+    margin-bottom: 1.25rem;
+    padding-bottom: .75rem;
 }
 .nacara-sidebar__link,
 .nacara-sidebar__group-link {
@@ -257,7 +258,7 @@ body {
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
 }
-.nacara-content :is(p, li, blockquote) > code {
+.nacara-content :is(p, li, blockquote, h1, h2, h3, h4) > code {
     overflow-wrap: anywhere;
 }
 .nacara-content :is(h1, h2, h3, h4) > code {
