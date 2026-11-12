@@ -111,6 +111,8 @@ export class TypeInfo implements IEquatable<TypeInfo> {
   public isInterface?: boolean;
   // Struct records and unions; a struct class has System.ValueType as parent
   public isStruct?: boolean;
+  // The runtime value of each case of a [<StringEnum>] union, by tag
+  public stringEnumValues?: (() => any[]) | undefined;
 
   constructor(
     fullname: string,
@@ -242,6 +244,19 @@ export function union_type(
   });
   if (isStruct) { t.isStruct = true; }
   return t;
+}
+
+// A [<StringEnum>] union: each case is its runtime value, so a case is named after that value
+// (as the JSON a serialiser writes for it) rather than after the F# case, as .NET does
+export function stringEnum_type(fullname: string, values: () => any[]): TypeInfo {
+  const t: TypeInfo = new TypeInfo(fullname, undefined, undefined, undefined, undefined, () =>
+    values().map((value, i) => new CaseInfo(t, i, String(value))));
+  t.stringEnumValues = values;
+  return t;
+}
+
+function stringEnumCaseIndex(t: TypeInfo, v: any): number {
+  return t.stringEnumValues!().indexOf(v);
 }
 
 export function tuple_type(...generics: TypeInfo[]): TypeInfo {
@@ -608,6 +623,13 @@ export function getUnionFields(v: any, t: TypeInfo): [CaseInfo, any[]] {
       return [cases[1]!, [innerValue]]; // Some case
     }
   }
+  if (t.stringEnumValues != null) {
+    const stringEnumCase = cases[stringEnumCaseIndex(t, v)];
+    if (stringEnumCase == null) {
+      throw new Exception(`Cannot find case ${String(v)} in union type ${t.fullname}`);
+    }
+    return [stringEnumCase, []];
+  }
   const case_ = cases[v.tag];
   if (case_ == null) {
     throw new Exception(`Cannot find case ${v.name} in union type`);
@@ -664,6 +686,10 @@ export function makeUnion(uci: CaseInfo, values: MutableArray<any>): any {
   // Special handling for option types
   if (uci.declaringType.fullname === "Microsoft.FSharp.Core.FSharpOption`1") {
     return uci.tag === 0 ? undefined : some(values[0]);
+  }
+  const stringEnumValues = uci.declaringType.stringEnumValues;
+  if (stringEnumValues != null) {
+    return stringEnumValues()[uci.tag];
   }
   const construct = uci.declaringType.construct;
   if (construct == null) {

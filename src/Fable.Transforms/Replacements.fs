@@ -1142,8 +1142,19 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
     | CustomOp com ctx r t opName args e -> e
     | _ -> nativeOp opName argTypes args
 
+/// A `[<StringEnum>]` union, which keeps its declared type on JavaScript and TypeScript (for reflection) but whose
+/// values are primitives, so it compares, equates and keys native collections like a string
+let (|StringEnumType|_|) (com: Compiler) typ =
+    match typ with
+    | DeclaredType(entRef, _) ->
+        match com.TryGetEntity entRef with
+        | Some ent when ent.Attributes |> Seq.exists (fun att -> att.Entity.FullName = Atts.stringEnum) -> Some()
+        | _ -> None
+    | _ -> None
+
 let isCompatibleWithNativeComparison (com: Compiler) typ =
     match typ with
+    | StringEnumType com -> true
     // Temporal.PlainTime and Temporal.Duration cannot be compared natively
     | Builtin(BclTimeOnly | BclTimeSpan) -> not com.Options.JsTemporal
     | Builtin(BclGuid | BclRune)
@@ -1251,6 +1262,7 @@ let rec equals (com: ICompiler) ctx r equal (left: Expr) (right: Expr) =
     | Builtin BclTimeSpan when com.Options.JsTemporal ->
         Helper.LibCall(com, "TimeSpanTemporal", "equals", Boolean, [ left; right ], ?loc = r)
         |> is equal
+    | StringEnumType com
     | Builtin(BclGuid | BclTimeSpan | BclTimeOnly | BclRune)
     | Boolean
     | Char
@@ -1314,6 +1326,7 @@ and compare (com: ICompiler) ctx r (left: Expr) (right: Expr) =
         Helper.LibCall(com, "TimeOnlyTemporal", "compare", t, [ left; right ], ?loc = r)
     | Builtin BclTimeSpan when com.Options.JsTemporal ->
         Helper.LibCall(com, "TimeSpanTemporal", "compare", t, [ left; right ], ?loc = r)
+    | StringEnumType com
     | Builtin(BclGuid | BclTimeSpan | BclTimeOnly | BclRune)
     | Boolean
     | Char
