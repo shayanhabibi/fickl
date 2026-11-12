@@ -24,6 +24,27 @@ export function count<T>(col: Iterable<T>): number {
   }
 }
 
+/** The element at `index` of an `IReadOnlyList<T>`: an array, an F# class implementing the interface, or another iterable. */
+export function item<T>(col: Iterable<T>, index: number): T {
+  if (typeof (col as any)["System.Collections.Generic.IReadOnlyList`1.get_ItemZ524259A4"] === "function") {
+    return (col as any)["System.Collections.Generic.IReadOnlyList`1.get_ItemZ524259A4"](index); // collection
+  }
+  if (isArrayLike(col)) {
+    if (index >= 0 && index < col.length) {
+      return col[index] as T; // array, resize array
+    }
+  } else if (index >= 0) {
+    let i = 0;
+    for (const v of col) {
+      if (i === index) {
+        return v; // other collections
+      }
+      i++;
+    }
+  }
+  throw new Exception("Index was out of range. Must be non-negative and less than the size of the collection.");
+}
+
 export function isReadOnly<T>(col: Iterable<T>): boolean {
   if (typeof (col as any)["System.Collections.Generic.ICollection`1.get_IsReadOnly"] === "function") {
     return (col as any)["System.Collections.Generic.ICollection`1.get_IsReadOnly"](); // collection

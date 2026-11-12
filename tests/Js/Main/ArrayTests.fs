@@ -49,6 +49,13 @@ type Things =
 
 type Animal = Duck of int | Dog of int
 
+type Squares(count: int) =
+    interface IReadOnlyList<int> with
+        member _.Item with get i = i * i
+        member _.Count = count
+        member _.GetEnumerator() : IEnumerator<int> = (Seq.init count (fun i -> i * i)).GetEnumerator()
+        member _.GetEnumerator() : System.Collections.IEnumerator = (Seq.init count (fun i -> i * i)).GetEnumerator()
+
 [<Struct>]
 type MyStruct(value: int, flag: bool) =
     member _.Value = value
@@ -1962,6 +1969,22 @@ let tests =
         let xs = [| ("A", 1); ("B", 2); ("C", 3) |]
         let coll = xs :> IReadOnlyCollection<_>
         coll.Count |> equal 3
+
+    testCase "IReadOnlyList indexer works on arrays, ResizeArray and lists" <| fun _ -> // See fickl#431
+        let first (xs: IReadOnlyList<string>) = xs.[0]
+        let last (xs: IReadOnlyList<string>) = xs.[xs.Count - 1]
+        first [| "a"; "b" |] |> equal "a"
+        last [| "a"; "b" |] |> equal "b"
+        first (ResizeArray [ "c"; "d" ]) |> equal "c"
+        last [ "e"; "f" ] |> equal "f"
+        throwsAnyError (fun () -> first [||] |> ignore)
+        throwsAnyError (fun () -> ([ "x" ] :> IReadOnlyList<_>).[5] |> ignore)
+
+    testCase "IReadOnlyList indexer works on a class implementing it" <| fun _ -> // See fickl#431
+        let xs = Squares(4) :> IReadOnlyList<int>
+        xs.[3] |> equal 9
+        xs.Count |> equal 4
+        Seq.toList xs |> equal [ 0; 1; 4; 9 ]
 
     testCase "Array ICollection.IsReadOnly works" <| fun _ ->
         let xs = [| ("A", 1); ("B", 2); ("C", 3) |]
