@@ -689,6 +689,37 @@ module Reflection =
         ]
         |> libReflectionCall com ctx None "union"
 
+    /// The runtime value of each case, with the precedence of `FSharp2Fable.Util.transformStringEnum`: the member
+    /// of the enum object for a global or imported enum, then CompiledName, CompiledValue, Emit, and the case rule.
+    let private transformStringEnumReflectionInfo (com: IBabelCompiler) ctx (ent: Fable.Entity) (attArgs: obj list) =
+        let rule =
+            match List.tryHead attArgs with
+            | Some(:? int as rule) -> enum<Core.CaseRules>(rule)
+            | _ -> Core.CaseRules.LowerFirst
+
+        let enumObject =
+            FSharp2Fable.Util.tryGlobalOrImportedEntity com ent
+            |> Option.map (fun e -> com.TransformAsExpr(ctx, e))
+
+        let values =
+            ent.UnionCases
+            |> List.mapToArray (fun uci ->
+                match enumObject, uci.CompiledName, Annotation.tryCompiledValueLiteral uci with
+                | Some enumObject, _, _ -> Util.get None enumObject uci.Name
+                | None, Some name, _ -> Expression.stringLiteral name
+                | None, None, Some value -> Expression.Literal value
+                | None, None, None ->
+                    match Util.tryFindAnyAttribute [ Atts.emitAttr ] uci.Attributes with
+                    | Some(_, (:? string as macro) :: _) -> Util.emitExpression None macro []
+                    | _ -> Naming.applyCaseRule rule uci.Name |> Expression.stringLiteral
+            )
+
+        [
+            Expression.stringLiteral ent.FullName
+            Expression.arrowFunctionExpression ([||], Expression.arrayExpression values)
+        ]
+        |> libReflectionCall com ctx None "stringEnum"
+
     let transformTypeInfoFor
         purpose
         (com: IBabelCompiler)
@@ -882,9 +913,9 @@ module Reflection =
                 | Patterns.Try (Util.tryFindAnyEntAttribute [ Atts.stringEnum
                                                               Atts.erase
                                                               Atts.tsTaggedUnion
-                                                              Atts.pojoDefinedByConsArgs ]) (att, _) as ent ->
+                                                              Atts.pojoDefinedByConsArgs ]) (att, attArgs) as ent ->
                     match att with
-                    | Atts.stringEnum -> primitiveTypeInfo "string"
+                    | Atts.stringEnum -> transformStringEnumReflectionInfo com ctx ent attArgs
                     | Atts.erase ->
                         match ent.UnionCases with
                         | [ uci ] when List.isSingle uci.UnionCaseFields ->
