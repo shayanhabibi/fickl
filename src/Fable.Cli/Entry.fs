@@ -104,6 +104,20 @@ let knownCliArgs () =
         [], []
         [ "--yes" ], [ "Automatically reply 'yes' (e.g. with `clean` command)" ]
         [ "--noRestore" ], [ "Skip `dotnet restore`" ]
+        [ "--recorded" ],
+        [
+            "With `clean`, delete only the files a compilation recorded writing to the folder,"
+            "and its fable_modules folder, so hand-written files there are kept"
+        ]
+        [ "--msbuild" ],
+        [
+            "Print diagnostics as MSBuild reads them, for a build that runs Fickl (Fickl.Sdk does):"
+            "absolute paths, the F# or Fickl code as the code, and no F# warnings, which the .NET compile reports"
+        ]
+        [ "--fsharpWarnings" ],
+        [
+            "With --msbuild, print F# warnings too (when the build skips the .NET compile)"
+        ]
         [ "--noCache" ], [ "Recompile all files, including sources from packages" ]
         [ "--noPackageCache" ],
         [
@@ -622,9 +636,17 @@ let clean (args: CliArgs) language rootDir =
         )
 
     let cleanDir = outDir |> Option.defaultValue rootDir |> IO.Path.GetFullPath
+    let recordedOnly = args.FlagEnabled "--recorded"
 
     // clean is a potentially destructive operation, we need a permission before proceeding
-    Console.WriteLine("This will recursively delete all *{0}[.map] files in {1}", fileExt, cleanDir)
+    if recordedOnly then
+        Console.WriteLine(
+            "This will delete the files Fickl recorded writing for {0}, and its {1} folder",
+            cleanDir,
+            Naming.fableModules
+        )
+    else
+        Console.WriteLine("This will recursively delete all *{0}[.map] files in {1}", fileExt, cleanDir)
 
     if not (args.FlagEnabled "--yes") then
         Console.WriteLine("Please press 'Y' or 'y' if you want to continue: ")
@@ -661,10 +683,59 @@ let clean (args: CliArgs) language rootDir =
                 recClean subdir
         )
 
-    if IO.Directory.Exists(cleanDir) then
-        recClean cleanDir
-    else
+    // fickl: only what a compilation recorded writing, so a hand-written file in the folder survives
+    let cleanRecorded () =
+        let fableModulesDir = IO.Path.Combine(cleanDir, Naming.fableModules)
+        let listPath = recordedOutputsFile fableModulesDir
+
+        let root =
+            cleanDir.TrimEnd(IO.Path.DirectorySeparatorChar)
+            + string IO.Path.DirectorySeparatorChar
+
+        let isInCleanDir (path: string) =
+            path.StartsWith(
+                root,
+                if OperatingSystem.IsWindows() then
+                    StringComparison.OrdinalIgnoreCase
+                else
+                    StringComparison.Ordinal
+            )
+
+        if IO.File.Exists listPath then
+            let dirs = Collections.Generic.HashSet<string>()
+
+            for file in IO.File.ReadAllLines listPath do
+                let file = IO.Path.GetFullPath file
+
+                if isInCleanDir file && IO.File.Exists file then
+                    IO.File.Delete file
+                    fileCount <- fileCount + 1
+                    dirs.Add(IO.Path.GetDirectoryName file) |> ignore
+                    Log.verbose (lazy ("Deleted " + file))
+
+            // Folders that held nothing but generated files, from the deepest up to the cleaned folder
+            for dir in dirs |> Seq.sortByDescending _.Length do
+                let mutable dir = dir
+
+                while isInCleanDir dir
+                      && IO.Directory.Exists dir
+                      && Seq.isEmpty (IO.Directory.EnumerateFileSystemEntries dir) do
+                    IO.Directory.Delete dir
+                    dir <- IO.Path.GetDirectoryName dir
+        else
+            Log.always $"Nothing recorded in {listPath}"
+
+        if IO.Directory.Exists fableModulesDir then
+            IO.Directory.Delete(fableModulesDir, true)
+            fableModulesDeleted <- true
+            Log.always $"Deleted {IO.Path.GetRelativePath(rootDir, fableModulesDir)}"
+
+    if not (IO.Directory.Exists(cleanDir)) then
         Log.always $"Directory does not exist: {cleanDir}"
+    elif recordedOnly then
+        cleanRecorded ()
+    else
+        recClean cleanDir
 
     if fileCount = 0 && not fableModulesDeleted then
         Log.always "No files have been deleted. If Fable output is in another directory, pass it as argument."
@@ -768,6 +839,7 @@ let private execute (argv: string array) (inServer: bool) =
                     LogLevel.Information, Verbosity.Normal
 
         Timings.setEnabled (args.FlagEnabled "--timings")
+        Util.setMSBuildDiagnostics (args.FlagEnabled "--msbuild") (args.FlagEnabled "--fsharpWarnings")
         PackageCache.setEnabled (not (args.FlagEnabled "--noPackageCache"))
         Fickl.Declarations.setEnabled (args.FlagEnabled "--declaration")
 
@@ -777,7 +849,9 @@ let private execute (argv: string array) (inServer: bool) =
                 CompileServer.setRequestVerbosity verbosity
             else
                 Log.setLogger verbosity (createLogger level)
-                logPrelude commands language
+
+                if not (Util.isMSBuildDiagnostics ()) then
+                    logPrelude commands language
 
         // fickl: compile through a compile server when asked to, or in this process when it can't be reached
         let compileHere (fsprojPath: string option) =
@@ -827,6 +901,10 @@ let private execute (argv: string array) (inServer: bool) =
     |> function
         | Ok _ -> 0
         | Error msg when msg = CompileServer.alreadyReported -> 1
+        // The diagnostics of a failed compilation are reported already, each in MSBuild's format
+        | Error msg when Util.isMSBuildDiagnostics () && msg <> "Compilation failed" ->
+            Log.error (Util.formatLog "" (Fable.Transforms.State.LogEntry.MakeError msg))
+            1
         | Error msg ->
             Log.error msg
             1

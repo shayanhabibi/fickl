@@ -39,6 +39,8 @@ dotnet fickl src/App.fsproj -o dist --declaration
 
 [Compiler flags](../flags/index.md) lists the rest.
 
+To compile as part of `dotnet build` instead, use the `Fickl.Sdk` package: see [Compiling with dotnet build](msbuild.md).
+
 ## Add Fickl.Core
 
 `Fable.Core` keeps working. Fickl's own attributes, computation expressions and bindings are in the `Fickl.Core` package:

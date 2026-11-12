@@ -154,7 +154,14 @@ module CodeServices =
 
             let msg = $"%s{er.Message} (code %i{er.ErrorNumber})"
 
-            LogEntry.Make(severity, msg, fileName = Path.normalizePath er.FileName, range = range, tag = "FSHARP")
+            LogEntry.Make(
+                severity,
+                msg,
+                fileName = Path.normalizePath er.FileName,
+                range = range,
+                tag = "FSHARP",
+                code = er.ErrorNumberText
+            )
         )
 
     // fickl: a referenced project is compiled as part of the same F# project as its consumer, and

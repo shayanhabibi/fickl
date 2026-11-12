@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup>
+    <!-- Set here rather than in Sdk.props, so that a project with TargetFrameworks does not get a TargetFramework too -->
+    <TargetFramework Condition="'$(TargetFramework)' == '' And '$(TargetFrameworks)' == ''">net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <!--
+    Opt-in, for a project that nothing references: no .NET assembly at all. CoreCompile still runs, since design-time
+    builds and Fickl's own project cracking read the fsc command line from it, but fsc is not executed and nothing is
+    copied to bin. A project that references this one fails to build, as there is no assembly to reference.
+  -->
+  <PropertyGroup Condition="'$(FicklSkipDotNetCompile)' == 'true' And '$(DesignTimeBuild)' != 'true' And '$(FICKL_COMPILER)' == ''">
+    <SkipCompilerExecution>true</SkipCompilerExecution>
+    <CopyBuildOutputToOutputDirectory>false</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <UseAppHost>false</UseAppHost>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+  </PropertyGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+  <!-- Imported already when the project also has a PackageReference to Fickl.Sdk -->
+  <Import Project="$(MSBuildThisFileDirectory)..\build\Fickl.Sdk.targets" Condition="'$(_FicklSdkTargetsImported)' != 'true'" />
+</Project>
