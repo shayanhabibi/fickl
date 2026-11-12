@@ -4,11 +4,14 @@
 .fk-demo { padding: 0; }
 .fk-demo nacara-tabs { margin: 0; }
 .fk-demo .nacara-code { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
-.fk-demo .nacara-code__body pre { max-height: 22rem; }
+/* Tall enough for the whole F# source; the longer compiled panels scroll. */
+.fk-demo .nacara-code__body pre { max-height: 25rem; }
 .nacara-content .fk-demo p.fk-demo__caption {
   margin: 0; border-top: 1px solid var(--nacara-border); padding: .5rem 1.25rem;
   font-size: .75rem; color: var(--nacara-text-muted); }
 
-/* The hero glow reaches 12rem past the content. The body's clip propagates to the viewport as hidden, which
-   focusing a demo tab can still scroll sideways, so clip it on the layout instead. */
-.nacara-layout--splash { overflow-x: clip; }
+/* The hero glow reaches 12rem past the content, so it is clipped at the viewport edges, not at the 72rem layout.
+   Without overflow on the root, the body's clip would propagate to the viewport as hidden, which focusing a demo
+   tab can still scroll sideways. Giving the root the clip keeps the body's own clip, so nothing overflows the
+   viewport to scroll to. */
+html:has(.nacara-layout--splash) { overflow-x: clip; }

@@ -105,7 +105,9 @@ body:has(.nacara-layout--splash) { overflow-x: clip; }
 .rv-demo figcaption code { font-size: inherit; }
 
 /* ---- Cards: text only, contour on hover ---- */
-.rv-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin: 0 0 3rem; }
+.rv-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; margin: 0 0 3rem; }
+/* The directive renders its contents inside one wrapper div; let the cards themselves be the grid items. */
+.rv-cards > div { display: contents; }
 .nacara-content .rv-card {
   display: flex; flex-direction: column; padding: 1.25rem 1.25rem 1.375rem;
   border: 1px solid var(--nacara-border); border-radius: var(--nacara-radius);
