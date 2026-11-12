@@ -11,7 +11,7 @@ export class Screens {
 }
 
 export function Screens_$reflection() {
-    return class_type("JsxComponentRef.Screens.Screens", undefined, Screens);
+    return class_type("JsxComponentRef.Screens.Screens", undefined, Screens, undefined, () => []);
 }
 
 export function Screens_Member_Z18115A39($props) {

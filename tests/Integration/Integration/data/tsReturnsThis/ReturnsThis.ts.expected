@@ -61,7 +61,7 @@ export abstract class Counter {
 }
 
 export function Counter_$reflection(): TypeInfo {
-    return class_type("ReturnsThis.Counter", undefined, undefined);
+    return class_type("ReturnsThis.Counter", undefined, undefined, undefined, () => [[[]]]);
 }
 
 export class StepCounter extends Counter {

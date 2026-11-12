@@ -8,7 +8,7 @@ export class Log {
 }
 
 export function Log_$reflection() {
-    return class_type("CallerFilePathTest.Log", undefined, Log);
+    return class_type("CallerFilePathTest.Log", undefined, Log, undefined, () => []);
 }
 
 export function Log_info_Z384F8060(message, path = "") {

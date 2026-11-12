@@ -3228,6 +3228,19 @@ module Util =
         | :? FsMemberFunctionOrValue as memb -> memb.FSharpMemberOrFunctionOrValue.IsImplicitConstructor
         | _ -> false
 
+    /// The function a constructor is compiled to, which is declared in the file of its class.
+    /// None for a constructor that has no function: one that is inlined or bound to native code
+    let tryConstructorFunctionIdent (com: Compiler) (memb: Fable.MemberFunctionOrValue) =
+        match memb with
+        | :? FsMemberFunctionOrValue as memb ->
+            let memb = memb.FSharpMemberOrFunctionOrValue
+
+            if isInline memb || isEmittedOrImportedMember memb then
+                None
+            else
+                getMemberDeclarationName com memb |> fst |> makeIdentExpr |> Some
+        | _ -> None
+
     let getEntityGenParams (ent: Fable.Entity) : (string * Fable.Type) list =
         ent.GenericParameters
         |> List.filter (fun p -> not (p.IsMeasure))

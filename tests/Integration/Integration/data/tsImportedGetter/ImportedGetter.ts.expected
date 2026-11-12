@@ -13,7 +13,7 @@ export class Api {
 }
 
 export function Api_$reflection(): TypeInfo {
-    return class_type("ImportedGetter.Api", undefined, Api);
+    return class_type("ImportedGetter.Api", undefined, Api, undefined, () => []);
 }
 
 export function Api_get_Nothing(): Marker {
