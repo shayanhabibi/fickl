@@ -22,7 +22,7 @@ Add the package to the entry project, the one you would pass to `dotnet fickl`, 
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Fickl.Sdk" Version="0.9.0" />
+    <PackageReference Include="Fickl.Sdk" Version="0.10.0" />
   </ItemGroup>
 </Project>
 ```
@@ -34,7 +34,7 @@ Without `FicklCompileOnBuild` the package does nothing. The package is a develop
 Name the package in the `Sdk` attribute instead of `Microsoft.NET.Sdk`:
 
 ```xml
-<Project Sdk="Fickl.Sdk/0.9.0">
+<Project Sdk="Fickl.Sdk/0.10.0">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
@@ -49,7 +49,7 @@ The SDK is `Microsoft.NET.Sdk` with the Fickl targets added. A project that uses
 ```json
 {
   "msbuild-sdks": {
-    "Fickl.Sdk": "0.9.0"
+    "Fickl.Sdk": "0.10.0"
   }
 }
 ```
