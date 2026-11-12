@@ -1,5 +1,7 @@
 # Fickl - A Fable JS/TS focused Lab
 
+**Documentation: [shayanhabibi.github.io/fickl](https://shayanhabibi.github.io/fickl/)**
+
 A fork of [Fable](https://github.com/fable-compiler/fable); focus less on x-lang support,
 and more on: the transpiler/compiler experience; the core JS/TS experience.
 
