@@ -210,6 +210,11 @@ let private compile (fable: string) (fickl: string) (workload: Workload) (direct
         ] do
         info.ArgumentList.Add argument
 
+    // The package cache is off in CI by default; the cache-hit rows measure it as a user's machine runs it. An
+    // environment variable rather than --packageCache, which releases before it do not accept.
+    if config = FicklCacheHit then
+        info.Environment["FICKL_USE_PACKAGE_CACHE"] <- "1"
+
     info.RedirectStandardOutput <- true
     info.RedirectStandardError <- true
     // CI runners opt out of telemetry; measure Fable as a user runs it, with the default

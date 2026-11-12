@@ -1,4 +1,4 @@
-/// Fickl: a per-user cache of type-checked package sources, on unless --noPackageCache is passed.
+/// Fickl: a per-user cache of type-checked package sources, on by default outside CI (see `resolveEnabled`).
 /// Fable compiles the F# sources that packages ship (copied to fable_modules) on every cold compile, and type-checking
 /// them is often most of the compilation. A package version's sources never change, so after a successful compile the
 /// package sources are precompiled once, as `fable precompile` does: an assembly with their signatures, their inline
@@ -24,6 +24,47 @@ open Fable.Compiler.Util
 let mutable private enabled = true
 
 let setEnabled value = enabled <- value
+
+/// Whether the environment `getEnv` reads is a CI build: `CI` set to anything but `false` or `0` (GitHub Actions,
+/// GitLab, CircleCI, Travis, AppVeyor, Buildkite and others), `TF_BUILD` (Azure Pipelines), `JENKINS_URL` or
+/// `TEAMCITY_VERSION`.
+let isCiEnvironmentFrom (getEnv: string -> string) =
+    let value name =
+        match getEnv name with
+        | null -> ""
+        | v -> v.Trim()
+
+    let ci = value "CI"
+
+    (ci <> ""
+     && not (ci.Equals("false", StringComparison.OrdinalIgnoreCase))
+     && ci <> "0")
+    || value "TF_BUILD" <> ""
+    || value "JENKINS_URL" <> ""
+    || value "TEAMCITY_VERSION" <> ""
+
+/// Whether the package cache is used. It is on by default and off in CI, where a fresh runner rarely reuses it and
+/// pays for building it. `--noPackageCache` and `--packageCache` win, then `FICKL_USE_PACKAGE_CACHE` (`1`/`true` or
+/// `0`/`false`).
+let resolveEnabledFrom (getEnv: string -> string) (noPackageCache: bool) (packageCache: bool) =
+    if noPackageCache then
+        false
+    elif packageCache then
+        true
+    else
+        match getEnv "FICKL_USE_PACKAGE_CACHE" with
+        | null -> not (isCiEnvironmentFrom getEnv)
+        | v ->
+            match v.Trim().ToLowerInvariant() with
+            | "1"
+            | "true" -> true
+            | "0"
+            | "false" -> false
+            | _ -> not (isCiEnvironmentFrom getEnv)
+
+/// `resolveEnabledFrom` over this process's environment.
+let resolveEnabled noPackageCache packageCache =
+    resolveEnabledFrom Environment.GetEnvironmentVariable noPackageCache packageCache
 
 /// A cache entry to build once this compilation has finished.
 type private Pending =

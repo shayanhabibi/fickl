@@ -124,6 +124,11 @@ let knownCliArgs () =
             "Type-check package sources instead of reusing them from Fickl's package cache"
             "(JavaScript and TypeScript; the cache is keyed by package contents and options)"
         ]
+        [ "--packageCache" ],
+        [
+            "Use the package cache in a CI build, where it is off by default"
+            "(FICKL_USE_PACKAGE_CACHE=1 or 0 also turns it on or off)"
+        ]
         [ "--declaration" ],
         [
             "Also write a TypeScript declaration file (.d.ts) next to each JavaScript file,"
@@ -840,7 +845,11 @@ let private execute (argv: string array) (inServer: bool) =
 
         Timings.setEnabled (args.FlagEnabled "--timings")
         Util.setMSBuildDiagnostics (args.FlagEnabled "--msbuild") (args.FlagEnabled "--fsharpWarnings")
-        PackageCache.setEnabled (not (args.FlagEnabled "--noPackageCache"))
+
+        PackageCache.setEnabled (
+            PackageCache.resolveEnabled (args.FlagEnabled "--noPackageCache") (args.FlagEnabled "--packageCache")
+        )
+
         Fickl.Declarations.setEnabled (args.FlagEnabled "--declaration")
 
         // Override the logger now that we know the verbosity level

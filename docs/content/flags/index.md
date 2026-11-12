@@ -78,3 +78,9 @@ Compiles through a background server that keeps check results between compilatio
 ### --noPackageCache
 
 Type-checks package sources instead of reusing them from Fickl's package cache. The cache is per user and keyed by the packages' contents and the compiler options, so it is safe to leave on.
+
+### --packageCache
+
+Uses the package cache in a CI build. The cache is off by default in CI, because a fresh runner rarely reuses it and pays for building it. Fickl treats a build as CI when `CI` is set to anything but `false` or `0`, or when `TF_BUILD`, `JENKINS_URL` or `TEAMCITY_VERSION` is set. Turn it on there when the runner keeps the cache folder between builds: `fickl/packages` under the local application data folder, or the folder `FICKL_PACKAGE_CACHE` names.
+
+`FICKL_USE_PACKAGE_CACHE=1` or `FICKL_USE_PACKAGE_CACHE=0` turns the cache on or off anywhere. `--noPackageCache` and `--packageCache` take precedence over it.

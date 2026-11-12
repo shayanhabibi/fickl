@@ -13,7 +13,7 @@ Compiler speed is Fickl's first priority. Each release is benchmarked against th
 
 ### Package cache
 
-Type-checked package sources are cached per user, keyed by their contents and the compiler options, so a later compile, in any project, skips checking them again. `--noPackageCache` turns it off.
+Type-checked package sources are cached per user, keyed by their contents and the compiler options, so a later compile, in any project, skips checking them again. `--noPackageCache` turns it off. It is off by default in CI builds; `--packageCache` turns it on there (see [Compiler flags](../flags/index.md)).
 
 ### Compile server
 
