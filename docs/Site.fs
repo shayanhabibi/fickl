@@ -31,6 +31,7 @@ let theme =
                     [
                         Menu.page "guide/index.md"
                         Menu.page "guide/installation.md"
+                        Menu.page "guide/msbuild.md"
                         Menu.page "guide/compatibility.md"
                         Menu.page "guide/typescript.md"
                     ]

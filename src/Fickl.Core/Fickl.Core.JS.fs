@@ -19,7 +19,7 @@ open Fable.Core
 [<RequireQualifiedAccess>]
 module JS =
     /// <summary>The JavaScript <c>Error</c>, the base of the errors JavaScript throws.</summary>
-    [<Global; AllowNullLiteral>]
+    [<Global>]
     type Error(message: string) =
         inherit System.Exception(message)
         new() = Error("")
@@ -33,31 +33,31 @@ module JS =
         member _.cause: obj = nativeOnly
 
     /// <summary>The JavaScript <c>TypeError</c>: a value is not of the expected type.</summary>
-    [<Global; AllowNullLiteral>]
+    [<Global>]
     type TypeError(message: string) =
         inherit Error(message)
         new() = TypeError("")
 
     /// <summary>The JavaScript <c>RangeError</c>: a value is outside its allowed range.</summary>
-    [<Global; AllowNullLiteral>]
+    [<Global>]
     type RangeError(message: string) =
         inherit Error(message)
         new() = RangeError("")
 
     /// <summary>The JavaScript <c>SyntaxError</c>, thrown for example by <c>JSON.parse</c>.</summary>
-    [<Global; AllowNullLiteral>]
+    [<Global>]
     type SyntaxError(message: string) =
         inherit Error(message)
         new() = SyntaxError("")
 
     /// <summary>The JavaScript <c>ReferenceError</c>: an undeclared variable was read.</summary>
-    [<Global; AllowNullLiteral>]
+    [<Global>]
     type ReferenceError(message: string) =
         inherit Error(message)
         new() = ReferenceError("")
 
     /// <summary>The JavaScript <c>AggregateError</c>, which holds several errors, thrown for example by <c>Promise.any</c>.</summary>
-    [<Global; AllowNullLiteral>]
+    [<Global>]
     type AggregateError(errors: obj[], message: string) =
         inherit Error(message)
         new(errors: obj[]) = AggregateError(errors, "")
@@ -66,7 +66,7 @@ module JS =
 
     /// <summary>The web <c>DOMException</c>, told apart by its <c>name</c>, such as <c>"AbortError"</c> or <c>"NotFoundError"</c>.</summary>
     /// <remarks>A global in browsers, Node.js 17 and later, Deno and Bun.</remarks>
-    [<Global; AllowNullLiteral>]
+    [<Global>]
     type DOMException(message: string, name: string) =
         inherit Error(message)
         new(message: string) = DOMException(message, "Error")

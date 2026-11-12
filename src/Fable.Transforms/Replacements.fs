@@ -4395,6 +4395,13 @@ let collections (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisA
     | "GetEnumerator", Some callee -> getEnumerator com r t callee |> Some
     | _ -> None
 
+/// fickl: an `IReadOnlyList<'T>` is usually an array; `CollectionUtil.item` indexes it,
+/// or calls the interface member of an F# class that implements the interface.
+let readOnlyLists (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    match i.CompiledName, thisArg, args with
+    | "get_Item", Some ar, [ idx ] -> Helper.LibCall(com, "CollectionUtil", "item", t, [ ar; idx ], ?loc = r) |> Some
+    | _ -> collections com ctx r t i thisArg args
+
 /// fickl: `WeakReference<'T>` is a native `WeakRef`
 let weakReferences (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
@@ -6614,6 +6621,7 @@ let private replacedModules =
             // fickl: AggregateException.InnerExceptions, which is the `errors` array of a JS AggregateError
             "System.Collections.ObjectModel.ReadOnlyCollection`1", resizeArrays
             "System.Collections.IList", resizeArrays
+            "System.Collections.Generic.IReadOnlyList`1", readOnlyLists
             Types.valueCollection, collections
             Types.keyCollection, collections
             Types.ireadonlycollection, collections

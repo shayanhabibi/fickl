@@ -200,7 +200,7 @@ open System.Collections.Generic
 open Fickl.Core
 
 let size (xs: IReadOnlyCollection<int>) = xs.Count
-let first (xs: IReadOnlyList<string>) = Seq.head xs
+let first (xs: IReadOnlyList<string>) = xs.[0]
 let find (d: IReadOnlyDictionary<string, int>) (key: string) = d.[key]
 
 let sum (xs: JS.ReadonlyArray<int>) = Seq.sum xs
@@ -221,4 +221,22 @@ let greet (name: string | null) =
 
 let tryFind (key: string) : string | null =
     if key = "" then null else key
+```
+
+### Joining strings that may be null
+
+In .NET, `+` treats a null string as empty, so `"a" + null + "b"` is `"ab"`. JavaScript's `+` writes the word `null`. Fickl can only make up the difference where the compiler knows that a string may be null:
+
+| The operand | Output of `"a" + s + "b"` when `s` is null |
+| --- | --- |
+| Typed `string \| null`, with `<Nullable>enable</Nullable>` | `"ab"`, as in .NET: the operand compiles to `(s \|\| "")` |
+| Typed `string`, with or without the flag | `"anullb"` |
+
+The second row covers a `string` that is null at run time: `let s: string = null` with nullness off, `Unchecked.defaultof<string>`, or a value from JavaScript or a deserialiser. Guarding every `string` operand was tried and dropped: it adds code to every concatenation, and TypeScript rejects `"bar" || ""` as a condition that is always true.
+
+`String.Concat`, interpolated strings, `sprintf "%s"` and `string` give `""` for a null string with or without the flag, so use one of them where a `string` may be null.
+
+```fsharp fickl
+let label (title: string) (name: string | null) = title + " " + name + "!"
+let safe (s: string) = $"[{s}]"
 ```

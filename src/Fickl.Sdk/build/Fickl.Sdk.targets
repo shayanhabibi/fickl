@@ -1,0 +1,90 @@
+<Project>
+  <!--
+    Fickl.Sdk: runs the Fickl compiler after `Build`, and deletes what it wrote on `Clean`.
+
+    Opt in with <FicklCompileOnBuild>true</FicklCompileOnBuild> in the entry project only: Fickl compiles the sources
+    of referenced projects as part of the entry project, so a referenced project that opts in too is compiled twice.
+    A project that uses <Project Sdk="Fickl.Sdk/..."> is opted in already.
+  -->
+
+  <PropertyGroup>
+    <_FicklSdkTargetsImported>true</_FicklSdkTargetsImported>
+    <FicklCompileOnBuild Condition="'$(FicklCompileOnBuild)' == ''">false</FicklCompileOnBuild>
+    <FicklLanguage Condition="'$(FicklLanguage)' == ''">javascript</FicklLanguage>
+    <FicklOutDir Condition="'$(FicklOutDir)' == ''">fickl-out</FicklOutDir>
+    <FicklOutDir>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(FicklOutDir)'))</FicklOutDir>
+    <FicklConfiguration Condition="'$(FicklConfiguration)' == ''">$(Configuration)</FicklConfiguration>
+    <FicklConfiguration Condition="'$(FicklConfiguration)' == ''">Debug</FicklConfiguration>
+    <!-- The compiler in this package; set FicklCompilerPath to run another build of fable.dll -->
+    <FicklCompilerPath Condition="'$(FicklCompilerPath)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'tools', 'net10.0', 'any', 'fable.dll'))</FicklCompilerPath>
+    <FicklDotnetExe Condition="'$(FicklDotnetExe)' == ''">$(DOTNET_HOST_PATH)</FicklDotnetExe>
+    <FicklDotnetExe Condition="'$(FicklDotnetExe)' == ''">dotnet</FicklDotnetExe>
+    <!-- A multi-targeting project runs Build once per framework; the compiler runs for the first one only (or '*' for each) -->
+    <FicklTargetFramework Condition="'$(FicklTargetFramework)' == '' And '$(TargetFrameworks)' != ''">$(TargetFrameworks.Split(';')[0].Trim())</FicklTargetFramework>
+    <FicklOutputImportance Condition="'$(FicklOutputImportance)' == ''">normal</FicklOutputImportance>
+    <!-- The F# warnings Fickl finds are the .NET compile's own, unless that compile is skipped -->
+    <_FicklFSharpWarningsArg Condition="'$(FicklSkipDotNetCompile)' == 'true'">--fsharpWarnings</_FicklFSharpWarningsArg>
+    <!-- The generated code, including fable_modules with its copies of package sources, is not part of the project -->
+    <DefaultItemExcludes Condition="'$(FicklCompileOnBuild)' == 'true'">$(DefaultItemExcludes);$(FicklOutDir)**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <!--
+    The run conditions are on the targets, not in a property, because BuildingProject is set at build time.
+    Fickl evaluates this project itself with DesignTimeBuild=True and FICKL_COMPILER=True, so it never recurses.
+  -->
+
+  <!-- The command line is an input too: changing an option must recompile -->
+  <Target Name="_FicklWriteArgs"
+          Condition="'$(FicklCompileOnBuild)' == 'true' And '$(DesignTimeBuild)' != 'true' And '$(BuildingProject)' == 'true' And '$(FICKL_COMPILER)' == '' And ('$(FicklTargetFramework)' == '' Or '$(FicklTargetFramework)' == '$(TargetFramework)' Or '$(FicklTargetFramework)' == '*')">
+    <PropertyGroup>
+      <!-- IntermediateOutputPath is not set yet when a package's build/*.targets is evaluated, so these are computed here -->
+      <_FicklStampFile>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'fickl.stamp'))</_FicklStampFile>
+      <_FicklArgsFile>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'fickl.args'))</_FicklArgsFile>
+      <_FicklArgs>"$(MSBuildProjectFullPath)" --outDir "$(FicklOutDir.TrimEnd('\').TrimEnd('/'))" --lang $(FicklLanguage) -c $(FicklConfiguration) --noRestore --msbuild $(_FicklFSharpWarningsArg) $(FicklExtraArgs)</_FicklArgs>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_FicklArgsFile)" Lines="$(_FicklArgs)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <FileWrites Include="$(_FicklArgsFile)" />
+      <_FicklInput Include="@(Compile->'%(FullPath)')" />
+      <_FicklInput Include="$(MSBuildAllProjects)" />
+      <_FicklInput Include="$(ProjectAssetsFile)" Condition="Exists('$(ProjectAssetsFile)')" />
+      <!-- Implementation assemblies of the (transitive) project references, rewritten whenever their sources change -->
+      <_FicklInput Include="@(_ResolvedProjectReferencePaths)" />
+      <_FicklInput Include="$(_FicklArgsFile);$(FicklCompilerPath)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="FicklCompile"
+          AfterTargets="Build"
+          DependsOnTargets="_FicklWriteArgs"
+          Condition="'$(FicklCompileOnBuild)' == 'true' And '$(DesignTimeBuild)' != 'true' And '$(BuildingProject)' == 'true' And '$(FICKL_COMPILER)' == '' And ('$(FicklTargetFramework)' == '' Or '$(FicklTargetFramework)' == '$(TargetFramework)' Or '$(FicklTargetFramework)' == '*')"
+          Inputs="@(_FicklInput)"
+          Outputs="$(_FicklStampFile)">
+    <Error Condition="!Exists('$(FicklCompilerPath)')" Code="FICKLSDK001" Text="The Fickl compiler was not found at $(FicklCompilerPath)" />
+    <Exec Command="&quot;$(FicklDotnetExe)&quot; &quot;$(FicklCompilerPath)&quot; $(_FicklArgs)"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          EnvironmentVariables="DOTNET_NOLOGO=1;NO_COLOR=1"
+          StandardOutputImportance="$(FicklOutputImportance)"
+          StandardErrorImportance="high"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="_FicklExitCode" />
+    </Exec>
+    <!-- Exit code 1 is a failure whose errors were printed, and logged by Exec, already -->
+    <Error Condition="'$(_FicklExitCode)' != '0' And '$(_FicklExitCode)' != '1'" Code="FICKLSDK002" Text="The Fickl compiler exited with code $(_FicklExitCode)" />
+    <Touch Condition="'$(_FicklExitCode)' == '0'" Files="$(_FicklStampFile)" AlwaysCreate="true" />
+    <ItemGroup>
+      <FileWrites Include="$(_FicklStampFile)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Deletes only the files the compiler recorded writing to FicklOutDir, and its fable_modules folder -->
+  <Target Name="FicklClean"
+          AfterTargets="Clean"
+          Condition="'$(FicklCompileOnBuild)' == 'true' And '$(FICKL_COMPILER)' == '' And Exists('$(FicklOutDir)') And Exists('$(FicklCompilerPath)')">
+    <Exec Command="&quot;$(FicklDotnetExe)&quot; &quot;$(FicklCompilerPath)&quot; clean --outDir &quot;$(FicklOutDir.TrimEnd('\').TrimEnd('/'))&quot; --lang $(FicklLanguage) --recorded --yes --msbuild"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          EnvironmentVariables="DOTNET_NOLOGO=1;NO_COLOR=1"
+          StandardOutputImportance="$(FicklOutputImportance)" />
+    <Delete Files="$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'fickl.stamp'));$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'fickl.args'))" />
+  </Target>
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles on .NET, but not for Fickl: the build must fail with the error where the code is -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <FicklCompileOnBuild>true</FicklCompileOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Library.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Fickl.Sdk" Version="0.0.0-integration" />
+  </ItemGroup>
+</Project>

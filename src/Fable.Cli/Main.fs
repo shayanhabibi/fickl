@@ -64,8 +64,63 @@ module Util =
         let stack = innerStack ex
         $"[ERROR] %s{file}{Log.newLine}%s{ex.Message}{Log.newLine}%s{stack}"
 
+    /// fickl: `--msbuild`, for a build that runs the compiler: diagnostics in MSBuild's canonical format, and no
+    /// F# warnings unless `--fsharpWarnings`, since the .NET compile of the same build reports them already
+    let mutable private msbuildDiagnostics = false
+
+    let mutable private msbuildFSharpWarnings = false
+
+    let setMSBuildDiagnostics enabled fsharpWarnings =
+        msbuildDiagnostics <- enabled
+        msbuildFSharpWarnings <- fsharpWarnings
+
+    let isMSBuildDiagnostics () = msbuildDiagnostics
+
+    /// An F# warning that the .NET compile of an MSBuild build has reported already
+    let isReportedByMSBuild (log: LogEntry) =
+        msbuildDiagnostics
+        && not msbuildFSharpWarnings
+        && log.Tag = "FSHARP"
+        && log.Severity <> Severity.Error
+
+    /// `file(line,col,endLine,endCol): error CODE: message` with an absolute path, on one line, as MSBuild reads it
+    let private formatMSBuildLog (log: LogEntry) =
+        let code = defaultArg log.Code log.Tag
+
+        let message =
+            // F# diagnostics end with ` (code N)`, which the code says already
+            let suffix =
+                match log.Tag, Int32.TryParse(code.Substring(min 2 code.Length)) with
+                | "FSHARP", (true, number) -> $" (code %i{number})"
+                | _ -> null
+
+            let message =
+                if not (isNull suffix) && log.Message.EndsWith(suffix, StringComparison.Ordinal) then
+                    log.Message.Substring(0, log.Message.Length - suffix.Length)
+                else
+                    log.Message
+
+            message.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ')
+
+        let severity =
+            match log.Severity with
+            | Severity.Warning -> "warning"
+            | Severity.Error -> "error"
+            | Severity.Info -> "info"
+
+        match log.FileName with
+        | None -> $"Fickl : %s{severity} %s{code}: %s{message}"
+        | Some file ->
+            let file = IO.Path.GetFullPath file
+
+            match log.Range with
+            | Some r ->
+                $"%s{file}(%i{r.start.line},%i{r.start.column},%i{r.``end``.line},%i{r.``end``.column}): %s{severity} %s{code}: %s{message}"
+            | None -> $"%s{file}: %s{severity} %s{code}: %s{message}"
+
     let formatLog rootDir (log: LogEntry) =
         match log.FileName with
+        | _ when msbuildDiagnostics -> formatMSBuildLog log
         | None -> log.Message
         | Some file ->
             // Add ./ to make sure VS Code terminal recognises this as a clickable path
@@ -81,10 +136,11 @@ module Util =
                 | Severity.Info -> "info"
 
             // MSBuild-style `<severity> <code>`: the code carries the FABLE prefix, so it replaces the tag
+            // F# diagnostics keep their FSHARP tag here: the code is in the message
             let tag =
                 match log.Code with
-                | Some code -> code
-                | None -> log.Tag
+                | Some code when log.Tag <> "FSHARP" -> code
+                | _ -> log.Tag
 
             match log.Range with
             | Some r ->
@@ -1237,6 +1293,39 @@ let private markSourcesWithoutOutput (state: State) (fableModulesDir: string) (s
     with er ->
         Log.verbose (lazy $"Cannot update {sourcesWithoutOutputFile fableModulesDir}: {er.Message}")
 
+/// fickl: every output file written for this project's sources, kept across compilations, so that
+/// `clean --recorded` deletes generated files only
+let recordedOutputsFile (fableModulesDir: string) =
+    IO.Path.Combine(fableModulesDir, "recorded_outputs")
+
+let private recordOutputs (state: State) (fableModulesDir: string) (sourceFiles: string[]) =
+    try
+        let pathResolver = state.GetPathResolver()
+        let listPath = recordedOutputsFile fableModulesDir
+
+        let recorded =
+            if IO.File.Exists listPath then
+                IO.File.ReadAllLines listPath
+            else
+                [||]
+
+        let outputs =
+            sourceFiles
+            |> Seq.filter isSourceFile
+            |> Seq.collect (fun source ->
+                let outPath = getOutPath state.CliArgs pathResolver source
+                [ outPath; outPath + ".map"; Fickl.Declarations.getPath outPath ]
+            )
+            |> Seq.filter IO.File.Exists
+            |> Seq.map IO.Path.GetFullPath
+
+        let all = Seq.append recorded outputs |> Seq.distinct |> Seq.toArray
+
+        if all.Length <> recorded.Length then
+            IO.File.WriteAllLines(listPath, all)
+    with er ->
+        Log.verbose (lazy $"Cannot update {recordedOutputsFile fableModulesDir}: {er.Message}")
+
 let private areCompiledFilesUpToDate (state: State) (fableModulesDir: string) (filesToCompile: string[]) =
     try
         let mutable foundCompiledFile = false
@@ -1925,6 +2014,7 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
                     | Severity.Info
                     | Severity.Warning ->
                         match log.FileName with
+                        | _ when isReportedByMSBuild log -> false
                         | Some filename when
                             Naming.isInFableModules (filename) || not (filesToCompile.Contains(filename))
                             ->
@@ -1958,6 +2048,7 @@ let private compilationCycle (state: State) (changes: ISet<string>) =
             errorLogs |> Array.iter (formatLog cliArgs.RootDir >> Log.error)
             let hasError = Array.isEmpty errorLogs |> not
             markFailedCompilation projCracked.FableModulesDir hasError
+            recordOutputs state projCracked.FableModulesDir projCracked.SourceFilePaths
 
             if not (hasError || state.SilentCompilation) then
                 markSourcesWithoutOutput state projCracked.FableModulesDir projCracked.SourceFilePaths

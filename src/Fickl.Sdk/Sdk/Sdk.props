@@ -1,0 +1,16 @@
+<Project>
+  <!-- <Project Sdk="Fickl.Sdk/<version>">: Microsoft.NET.Sdk, with the Fickl compiler running after Build -->
+  <PropertyGroup>
+    <UsingFicklSdk>true</UsingFicklSdk>
+    <!-- With the SDK the project is a Fickl project: compile on build unless told otherwise -->
+    <FicklCompileOnBuild Condition="'$(FicklCompileOnBuild)' == ''">true</FicklCompileOnBuild>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <!-- A referenced project's implementation assembly is an input of the Fickl compile; a reference assembly is not -->
+    <ProduceReferenceAssembly Condition="'$(ProduceReferenceAssembly)' == ''">false</ProduceReferenceAssembly>
+    <GenerateDocumentationFile Condition="'$(GenerateDocumentationFile)' == ''">false</GenerateDocumentationFile>
+  </PropertyGroup>
+</Project>
