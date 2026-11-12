@@ -1,0 +1,13 @@
+<Project Sdk="Fickl.Sdk/0.0.0-integration">
+  <!-- Mode (b): the project SDK, which opts in and defaults TargetFramework -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <FicklOutDir>dist</FicklOutDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Lib/Lib.fsproj" />
+  </ItemGroup>
+</Project>

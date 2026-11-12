@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Fickl.Sdk: MSBuild targets that run the Fickl compiler after `Build` (a PackageReference with
+    FicklCompileOnBuild), and a project SDK (`<Project Sdk="Fickl.Sdk/<version>">`). The compiler ships inside the
+    package, in tools/net10.0/any, with the runtime libraries at the package root as in the Fickl tool package.
+    This project builds no assembly of its own.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Fickl.Sdk</PackageId>
+    <Description>Fickl.Sdk: compile F# to JavaScript and the other Fickl targets as part of dotnet build, from a package reference or as a project SDK</Description>
+    <PackageType>MSBuildSdk;Dependency</PackageType>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IncludeSymbols>false</IncludeSymbols>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <!-- NU5128: no lib folder, by design. NU5100: the compiler's assemblies sit in tools, not lib -->
+    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
+    <FicklCompilerPublishDir>$(MSBuildProjectDirectory)\obj\compiler\</FicklCompilerPublishDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="build\Fickl.Sdk.targets" Pack="true" PackagePath="build" />
+    <None Include="Sdk\Sdk.props;Sdk\Sdk.targets" Pack="true" PackagePath="Sdk" />
+    <!-- The compiler finds its runtime libraries by looking up from its own folder -->
+    <None Include="..\..\temp\fable-library-js\**\*.*" Pack="true" PackagePath="fable-library-js" />
+    <None Include="..\..\temp\fable-library-ts\**\*.*" Pack="true" PackagePath="fable-library-ts" />
+    <None Include="..\..\temp\fable-library-rust\**\*.*" Pack="true" PackagePath="fable-library-rust" />
+    <None Include="..\..\temp\fable-library-dart\**\*.*" Pack="true" PackagePath="fable-library-dart" />
+    <None Include="..\..\temp\fable-library-beam\**\*.*" Pack="true" PackagePath="fable-library-beam" />
+    <None Include="..\fable-library-php\**\*.*" Pack="true" PackagePath="fable-library-php" />
+  </ItemGroup>
+
+  <!--
+    The portable, framework-dependent compiler. _IsPacking is reset so that Fable.Cli does not switch to its
+    per-runtime ReadyToRun tool packages, which `dotnet pack` of this project would otherwise ask for.
+  -->
+  <Target Name="FicklPublishCompiler" BeforeTargets="_GetPackageFiles">
+    <RemoveDir Directories="$(FicklCompilerPublishDir)" />
+    <MSBuild
+      Projects="..\Fable.Cli\Fable.Cli.fsproj"
+      Targets="Restore"
+      Properties="Configuration=$(Configuration);_IsPacking=false;MSBuildRestoreSessionId=$([System.Guid]::NewGuid())" />
+    <MSBuild
+      Projects="..\Fable.Cli\Fable.Cli.fsproj"
+      Targets="Publish"
+      Properties="Configuration=$(Configuration);_IsPacking=false;PublishDir=$(FicklCompilerPublishDir);UseAppHost=false" />
+    <ItemGroup>
+      <_FicklCompilerFile Include="$(FicklCompilerPublishDir)**\*" />
+      <None Include="@(_FicklCompilerFile)" Pack="true" PackagePath="tools\net10.0\any\%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+    <Error Condition="!Exists('$(FicklCompilerPublishDir)fable.dll')" Text="The compiler was not published to $(FicklCompilerPublishDir)" />
+  </Target>
+</Project>

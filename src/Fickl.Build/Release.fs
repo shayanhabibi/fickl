@@ -47,6 +47,7 @@ let private projects =
         "Fable.Compiler"
         "Fable.PublishUtils"
         "Fable.Cli"
+        "Fickl.Sdk"
     ]
 
 let private packageIds =
@@ -63,6 +64,7 @@ let private packageIds =
         "Fickl.linux-musl-x64"
         "Fickl.osx-x64"
         "Fickl.osx-arm64"
+        "Fickl.Sdk"
         "Fickl"
     ]
 
@@ -167,8 +169,24 @@ let publish =
                                     then
                                         failwith $"Mismatched dependency {dependencyId} {dependencyVersion} in {path}"
 
+                                let hasEntry name =
+                                    archive.Entries |> Seq.exists (fun e -> e.FullName = name)
+
+                                // Fickl.Sdk runs the compiler it carries, from its MSBuild files
+                                if id = "Fickl.Sdk" then
+                                    for name in
+                                        [
+                                            "build/Fickl.Sdk.targets"
+                                            "Sdk/Sdk.props"
+                                            "Sdk/Sdk.targets"
+                                            "tools/net10.0/any/fable.dll"
+                                        ] do
+                                        if not (hasEntry name) then
+                                            failwith $"Missing {name} in {path}"
+
                                 if
                                     id = "Fickl.any"
+                                    || id = "Fickl.Sdk"
                                     || id.StartsWith("Fickl.win-", StringComparison.Ordinal)
                                     || id.StartsWith("Fickl.linux-", StringComparison.Ordinal)
                                     || id.StartsWith("Fickl.osx-", StringComparison.Ordinal)

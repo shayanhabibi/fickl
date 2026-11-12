@@ -117,4 +117,10 @@
     <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Fable.PublishUtils'">
         <PackageId>Fickl.PublishUtils</PackageId>
     </PropertyGroup>
+
+    <!-- Carries the compiler it runs, so it shares the tool's version. A test can pack it with its own version. -->
+    <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Fickl.Sdk'">
+        <PackageVersion Condition="'$(FicklSdkPackageVersion)' == ''">$(FicklVersion)</PackageVersion>
+        <PackageVersion Condition="'$(FicklSdkPackageVersion)' != ''">$(FicklSdkPackageVersion)</PackageVersion>
+    </PropertyGroup>
 </Project>

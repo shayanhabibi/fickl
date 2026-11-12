@@ -47,3 +47,6 @@ let handle (args: string list) =
     testProjectConfig "CustomConfiguration" (Some "Test")
     testProjectConfig "ReleaseNoExtraDefines" None
     testProjectConfig "ConsoleApp" None
+
+    // fickl: the Fickl.Sdk package, packed and used by dotnet build
+    Build.Test.Sdk.handle ()
