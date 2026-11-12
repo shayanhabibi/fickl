@@ -106,6 +106,9 @@ let private transformStringEnumCase
         | Some enumExpr ->
             let typ = Fable.DeclaredType(FsEnt.Ref tdef, [])
             Fable.Get(enumExpr, Fable.FieldInfo.Create(unionCase.Name), typ, None)
+        // The literal is typed as the enum, so a tuple holding it is cast to `[Kind, …]`, not `[string, …]` (#442)
+        | None when com.Options.Language = TypeScript ->
+            Fable.TypeCast(transformStringEnum rule unionCase, Fable.DeclaredType(FsEnt.Ref tdef, []))
         | None -> transformStringEnum rule unionCase
     | _ -> transformStringEnum rule unionCase
 

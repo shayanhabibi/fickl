@@ -728,6 +728,9 @@ module private Transforms =
         | Value(NumberConstant(a, _), _), Value(NumberConstant(b, _), _) -> Some(a = b)
         | Value(NewOption(None, _, _), _), Value(NewOption(None, _, _), _) -> Some true
         | Value(NewOption(Some a, _, _), _), Value(NewOption(Some b, _, _), _) -> tryEqualsAtCompileTime a b
+        // fickl: a TypeScript StringEnum case is its literal cast to the enum type (#442)
+        | TypeCast(Value(StringConstant _, _) as a, _), b
+        | a, TypeCast(Value(StringConstant _, _) as b, _) -> tryEqualsAtCompileTime a b
         | _ -> None
 
     let operationReduction (_com: Compiler) e =

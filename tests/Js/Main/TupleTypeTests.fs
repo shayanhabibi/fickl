@@ -3,6 +3,11 @@ module Fable.Tests.TupleTypes
 open System
 open Util.Testing
 
+[<Fable.Core.StringEnum>]
+type Orientation =
+    | Vertical
+    | [<CompiledName("Horizontal")>] Horizontal
+
 let tests =
   testList "Tuples" [
     testCase "Tuple dereferencing can be generated" <| fun () ->
@@ -44,4 +49,14 @@ let tests =
         let t1b = Tuple.Create "b"
         t1.Item1 |> equal 4
         t1b.Item1 |> equal "b"
+
+    // On TypeScript, the tuples must be typed with the enum, not string, for tsc to accept them (#442)
+    testCase "Tuples can hold StringEnum cases" <| fun () ->
+        let pairs = [ Vertical, 1; Horizontal, 2 ]
+        let pair = (Horizontal, (Vertical, "v"))
+        let lookup = Map.ofList [ Horizontal, 2 ]
+        Map.find Horizontal lookup |> equal 2
+        fst pairs.Head |> equal Vertical
+        pair |> snd |> fst |> equal Vertical
+        (Vertical <> Horizontal) |> equal true
   ]
