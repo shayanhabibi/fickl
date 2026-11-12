@@ -379,6 +379,66 @@ let caseAttributesOf name =
     FSharpType.GetUnionCases typeof<UnionWithCaseAttributes>
     |> Array.find (fun case -> case.Name = name)
 
+type CtorClass(x: int, name: string) =
+    new() = CtorClass(1, "a")
+    new(s: string) = CtorClass(2, s)
+    member _.X = x
+    member _.Name = name
+
+type CtorParameterless() =
+    member _.Value = 1
+
+type CtorPrivate private (x: int) =
+    new(a: string, b: float) = CtorPrivate(a.Length + int b)
+    member _.X = x
+
+type CtorDerived() =
+    inherit CtorClass(5, "d")
+
+[<AbstractClass>]
+type CtorAbstract(x: int) =
+    abstract Value: int
+
+type CtorGeneric<'T>(value: 'T, count: int) =
+    member _.Value = value
+    member _.Count = count
+
+type CtorExplicit =
+    val A: int
+    val B: string
+    new(a: int) = { A = a; B = "b" }
+    new(a: int, b: string) = { A = a; B = b }
+
+type CtorDependency(service: CtorParameterless, generic: CtorGeneric<string>) =
+    member _.Service = service
+    member _.Generic = generic
+
+type CtorRecord = { First: int; SecondField: string }
+type CtorUnion = CtorCaseA of int | CtorCaseB
+
+[<Struct>]
+type CtorStructRecord = { StructField: int }
+
+[<Struct>]
+type CtorStructUnion = CtorStructCase of int
+
+[<Struct>]
+type CtorStruct(x: int) =
+    member _.X = x
+
+type CtorInterface =
+    abstract Value: int
+
+let describeConstructors (t: System.Type) =
+    t.GetConstructors()
+    |> Array.map (fun c ->
+        c.GetParameters()
+        |> Array.map (fun p -> $"{p.Position}:{p.Name}:{p.ParameterType.FullName}")
+        |> String.concat ",")
+    |> String.concat " | "
+
+let isClass (t: System.Type) = t.IsClass
+
 let reflectionTests = [
   testCase "Reflection: Array" <| fun () ->
     let arType = typeof<int[]>
@@ -870,6 +930,141 @@ let reflectionTests = [
     |> Array.collect (fun case -> case.GetCustomAttributes(typeof<CaseLabelAttribute>))
     |> Array.map (fun att -> (att :?> CaseLabelAttribute).Label)
     |> equal [| "DoThis"; "DoThat" |]
+
+  testCase "Type.GetConstructors gives the public constructors of a class in declaration order" <| fun () -> // #277
+    describeConstructors typeof<CtorClass>
+    |> equal "0:x:System.Int32,1:name:System.String |  | 0:s:System.String"
+    describeConstructors typeof<CtorParameterless> |> equal ""
+    typeof<CtorParameterless>.GetConstructors().Length |> equal 1
+    describeConstructors typeof<CtorPrivate> |> equal "0:a:System.String,1:b:System.Double"
+    describeConstructors typeof<CtorDerived> |> equal ""
+    typeof<CtorDerived>.GetConstructors().Length |> equal 1
+    describeConstructors typeof<CtorAbstract> |> equal "0:x:System.Int32"
+    describeConstructors typeof<CtorExplicit>
+    |> equal "0:a:System.Int32 | 0:a:System.Int32,1:b:System.String"
+    describeConstructors typeof<CtorStruct> |> equal "0:x:System.Int32"
+
+  testCase "ConstructorInfo.GetParameters gives the parameter types" <| fun () -> // #277
+    let parameters = typeof<CtorGeneric<string>>.GetConstructors().[0].GetParameters()
+    parameters |> Array.map (fun p -> p.Name) |> equal [| "value"; "count" |]
+    parameters.[0].ParameterType = typeof<string> |> equal true
+    parameters.[1].ParameterType = typeof<int> |> equal true
+    parameters |> Array.map (fun p -> p.Position) |> equal [| 0; 1 |]
+    let parameters = typeof<CtorDependency>.GetConstructors().[0].GetParameters()
+    parameters.[0].ParameterType = typeof<CtorParameterless> |> equal true
+    parameters.[1].ParameterType = typeof<CtorGeneric<string>> |> equal true
+    parameters.[1].ParameterType.GetConstructors().[0].GetParameters().[0].ParameterType = typeof<string>
+    |> equal true
+
+  testCase "ConstructorInfo.Invoke calls the constructor it describes" <| fun () -> // #277
+    let constructors = typeof<CtorClass>.GetConstructors()
+    let x = constructors.[0].Invoke([| box 7; box "z" |]) :?> CtorClass
+    (x.X, x.Name) |> equal (7, "z")
+    let x = constructors.[1].Invoke([||]) :?> CtorClass
+    (x.X, x.Name) |> equal (1, "a")
+    let x = constructors.[2].Invoke([| box "w" |]) :?> CtorClass
+    (x.X, x.Name) |> equal (2, "w")
+    let x = typeof<CtorParameterless>.GetConstructors().[0].Invoke([||]) :?> CtorParameterless
+    x.Value |> equal 1
+    let x = typeof<CtorPrivate>.GetConstructors().[0].Invoke([| box "abc"; box 2. |]) :?> CtorPrivate
+    x.X |> equal 5
+    let x = typeof<CtorDerived>.GetConstructors().[0].Invoke([||]) :?> CtorDerived
+    (x.X, x.Name) |> equal (5, "d")
+    let x = typeof<CtorGeneric<string>>.GetConstructors().[0].Invoke([| box "v"; box 2 |]) :?> CtorGeneric<string>
+    (x.Value, x.Count) |> equal ("v", 2)
+    let constructors = typeof<CtorExplicit>.GetConstructors()
+    let x = constructors.[0].Invoke([| box 4 |]) :?> CtorExplicit
+    (x.A, x.B) |> equal (4, "b")
+    let x = constructors.[1].Invoke([| box 5; box "x" |]) :?> CtorExplicit
+    (x.A, x.B) |> equal (5, "x")
+    let x = typeof<CtorStruct>.GetConstructors().[0].Invoke([| box 9 |]) :?> CtorStruct
+    x.X |> equal 9
+    Fable.Tests.Util.throwsAnyError (fun () -> typeof<CtorClass>.GetConstructors().[0].Invoke([| box 7 |]))
+
+  testCase "Constructors can be resolved recursively from their parameter types" <| fun () -> // #277
+    let rec resolve (t: System.Type) : obj =
+      if t = typeof<string> then box "resolved"
+      elif t = typeof<int> then box 3
+      else
+        let ctor = t.GetConstructors().[0]
+        ctor.GetParameters() |> Array.map (fun p -> resolve p.ParameterType) |> ctor.Invoke
+    let x = resolve typeof<CtorDependency> :?> CtorDependency
+    x.Service.Value |> equal 1
+    (x.Generic.Value, x.Generic.Count) |> equal ("resolved", 3)
+
+  testCase "Type.GetConstructor finds a constructor by its parameter types" <| fun () -> // #277
+    let ctor = typeof<CtorClass>.GetConstructor([| typeof<string> |])
+    ctor.GetParameters().[0].Name |> equal "s"
+    (ctor.Invoke([| box "q" |]) :?> CtorClass).X |> equal 2
+    (typeof<CtorClass>.GetConstructor([||]).Invoke([||]) :?> CtorClass).X |> equal 1
+    typeof<CtorClass>.GetConstructor([| typeof<int>; typeof<string> |]).GetParameters().Length |> equal 2
+    typeof<CtorClass>.GetConstructor([| typeof<float> |]) |> isNull |> equal true
+    typeof<CtorClass>.GetConstructor([| typeof<string>; typeof<int> |]) |> isNull |> equal true
+
+  testCase "Type.GetConstructors works for records and unions" <| fun () -> // #277
+    describeConstructors typeof<CtorRecord>
+    |> equal "0:first:System.Int32,1:secondField:System.String"
+    typeof<CtorRecord>.GetConstructors().[0].Invoke([| box 1; box "q" |]) :?> CtorRecord
+    |> equal { First = 1; SecondField = "q" }
+    describeConstructors typeof<CtorStructRecord> |> equal "0:structField:System.Int32"
+    typeof<CtorStructRecord>.GetConstructors().[0].Invoke([| box 2 |]) :?> CtorStructRecord
+    |> equal { StructField = 2 }
+    describeConstructors typeof<{| A: int; B: string |}> |> equal "0:A:System.Int32,1:B:System.String"
+    typeof<{| A: int; B: string |}>.GetConstructors().[0].Invoke([| box 1; box "q" |]) :?> {| A: int; B: string |}
+    |> equal {| A = 1; B = "q" |}
+    typeof<CtorUnion>.GetConstructors().Length |> equal 0
+    typeof<CtorStructUnion>.GetConstructors().Length |> equal 0
+    typeof<CtorInterface>.GetConstructors().Length |> equal 0
+    typeof<MyEnum>.GetConstructors().Length |> equal 0
+
+  testCase "Type.IsClass works for types known when compiling" <| fun () -> // #277
+    typeof<CtorClass>.IsClass |> equal true
+    typeof<CtorAbstract>.IsClass |> equal true
+    typeof<CtorGeneric<int>>.IsClass |> equal true
+    typeof<CtorRecord>.IsClass |> equal true
+    typeof<CtorUnion>.IsClass |> equal true
+    typeof<CtorStructRecord>.IsClass |> equal false
+    typeof<CtorStructUnion>.IsClass |> equal false
+    typeof<CtorStruct>.IsClass |> equal false
+    typeof<CtorInterface>.IsClass |> equal false
+    typeof<MyEnum>.IsClass |> equal false
+    typeof<int>.IsClass |> equal false
+    typeof<string>.IsClass |> equal true
+    typeof<obj>.IsClass |> equal true
+    typeof<unit>.IsClass |> equal true
+    typeof<int[]>.IsClass |> equal true
+    typeof<int * string>.IsClass |> equal true
+    typeof<struct (int * string)>.IsClass |> equal false
+    typeof<int -> int>.IsClass |> equal true
+    typeof<int option>.IsClass |> equal true
+    typeof<int voption>.IsClass |> equal false
+    typeof<System.Nullable<int>>.IsClass |> equal false
+    typeof<int list>.IsClass |> equal true
+    typeof<{| A: int |}>.IsClass |> equal true
+    typeof<struct {| A: int |}>.IsClass |> equal false
+    typeof<Result<int, string>>.IsClass |> equal false
+    typeof<System.DateTime>.IsClass |> equal false
+    typeof<seq<int>>.IsClass |> equal false
+
+  testCase "Type.IsClass works for types known only when running" <| fun () -> // #277
+    [ typeof<CtorClass>; typeof<CtorAbstract>; typeof<CtorGeneric<int>>; typeof<CtorDerived>; typeof<CtorRecord>
+      typeof<CtorUnion>; typeof<string>; typeof<obj>; typeof<unit>; typeof<int[]>; typeof<int * string>
+      typeof<int -> int>; typeof<System.Func<int, int>>; typeof<int option>; typeof<int list>; typeof<{| A: int |}>
+      typeof<exn>; typeof<Map<int, int>>; typeof<ResizeArray<int>>; typeof<System.Type>
+      typeof<System.Collections.Generic.Dictionary<int, int>> ]
+    |> List.filter (isClass >> not)
+    |> List.map (fun t -> t.FullName)
+    |> equal []
+    [ typeof<CtorStructRecord>; typeof<CtorStructUnion>; typeof<CtorStruct>; typeof<CtorInterface>
+      typeof<MyInterface<int>>; typeof<MyEnum>; typeof<int>; typeof<int64>; typeof<float>; typeof<bool>; typeof<char>
+      typeof<decimal>; typeof<bigint>; typeof<System.DateTime>; typeof<System.DateTimeOffset>; typeof<System.Guid>
+      typeof<System.TimeSpan>; typeof<Result<int, string>>; typeof<seq<int>>; typeof<System.IDisposable>
+      typeof<System.Collections.Generic.KeyValuePair<int, int>>; typeof<System.Threading.CancellationToken> ]
+    |> List.filter isClass
+    |> List.map (fun t -> t.FullName)
+    |> equal []
+    typeof<CtorRecord>.GetConstructors().[0].GetParameters() |> Array.map (fun p -> p.ParameterType.IsClass)
+    |> equal [| false; true |]
 ]
 
 #if FABLE_COMPILER

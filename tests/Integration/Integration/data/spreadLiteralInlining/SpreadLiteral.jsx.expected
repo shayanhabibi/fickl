@@ -11,7 +11,7 @@ export class Lib {
 }
 
 export function Lib_$reflection() {
-    return class_type("SpreadLiteral.Lib", undefined, Lib);
+    return class_type("SpreadLiteral.Lib", undefined, Lib, undefined, () => []);
 }
 
 export function Lib_Make_Z17053F5(tag, ...children) {

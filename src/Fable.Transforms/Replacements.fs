@@ -6259,6 +6259,25 @@ module private GetMethod =
             |> error
         | _ -> error requirements
 
+/// What .NET says of a type known when compiling. The runtime cannot tell the struct tuples, value options
+/// and nullable value types from their reference counterparts
+let rec private isClassType (com: ICompiler) (typ: Type) =
+    match typ with
+    | GenericParam _
+    | Measure _ -> None
+    | Boolean
+    | Char
+    | Number _
+    | Nullable(_, true) -> Some false
+    | Nullable(typ, false) -> isClassType com typ
+    | Option(_, isStruct)
+    | Tuple(_, isStruct)
+    | AnonymousRecordType(_, _, isStruct) -> Some(not isStruct)
+    | DeclaredType(ent, _) ->
+        let ent = com.GetEntity(ent)
+        Some(not (ent.IsInterface || ent.IsValueType || ent.IsEnum))
+    | _ -> Some true
+
 let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     let returnString r x = StringConstant x |> makeValue r |> Some
 
@@ -6344,6 +6363,7 @@ let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr optio
                 | Array(t, _) -> makeTypeInfo (changeRangeToCallSite ctx.InlinePath r) t |> Some
                 | _ -> Null t |> makeValue r |> Some
             | "get_IsGenericType" -> List.isEmpty exprType.Generics |> not |> BoolConstant |> makeValue r |> Some
+            | "get_IsClass" -> isClassType com exprType |> Option.map (BoolConstant >> makeValue r)
             | "get_GenericTypeArguments"
             | "GetGenericArguments" ->
                 let arVals =
@@ -6385,6 +6405,13 @@ let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr optio
         | "MakeGenericType" ->
             Helper.LibCall(com, "Reflection", "makeGenericType", t, thisArg :: args, ?loc = r)
             |> Some
+        // The overloads taking binding flags are not supported
+        | "GetConstructors" when List.isEmpty args ->
+            Helper.LibCall(com, "Reflection", "getConstructors", t, [ thisArg ], ?loc = r)
+            |> Some
+        | "GetConstructor" when List.isSingle args ->
+            Helper.LibCall(com, "Reflection", "getConstructor", t, thisArg :: args, ?loc = r)
+            |> Some
         | "get_FullName"
         | "get_Namespace"
         | "get_IsArray"
@@ -6392,6 +6419,7 @@ let types (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr optio
         | "get_IsGenericType"
         | "GetGenericTypeDefinition"
         | "get_IsEnum"
+        | "get_IsClass"
         | "GetEnumUnderlyingType"
         | "GetEnumValues"
         | "GetEnumNames"
@@ -7408,8 +7436,14 @@ let tryCall (com: ICompiler) (ctx: Context) r t (info: CallInfo) (thisArg: Expr 
     | "System.Reflection.ParameterInfo"
     | "System.Reflection.MethodBase"
     | "System.Reflection.MethodInfo"
+    | "System.Reflection.ConstructorInfo"
     | "System.Reflection.MemberInfo" ->
         match thisArg, info.CompiledName with
+        | Some c, "Invoke" when info.DeclaringEntityFullName = "System.Reflection.ConstructorInfo" ->
+            match args with
+            | [ _ ] -> Helper.InstanceCall(c, "invoke", t, args, ?loc = r) |> Some
+            | _ -> None
+        | Some c, "get_Position" -> makeIntConst 2 |> getExpr r t c |> Some
         | Some c, "get_Tag" -> makeStrConst "tag" |> getExpr r t c |> Some
         | Some c, "get_ReturnType" -> makeStrConst "returnType" |> getExpr r t c |> Some
         | Some c, "GetParameters" -> makeStrConst "parameters" |> getExpr r t c |> Some

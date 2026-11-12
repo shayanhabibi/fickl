@@ -30,7 +30,7 @@ export class Views {
 }
 
 export function Views_$reflection() {
-    return class_type("JsxFunctionEl.Components.Views", undefined, Views);
+    return class_type("JsxFunctionEl.Components.Views", undefined, Views, undefined, () => []);
 }
 
 export function Views_Footer_BC1C19B(props) {

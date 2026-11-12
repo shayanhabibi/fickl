@@ -1,4 +1,5 @@
-import { record_type, string_type, class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+
+import { record_type, interface_type, float64_type, class_type, string_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
 import type { int32, float64 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
 import { EventEmitter } from "node:events";
 import type { MutableArray, IEquatable, IMap } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
@@ -13,7 +14,7 @@ export class MyEl {
 }
 
 export function MyEl_$reflection(): TypeInfo {
-    return class_type("ConstructorTypes.MyEl", undefined, MyEl);
+    return class_type("ConstructorTypes.MyEl", undefined, MyEl, undefined, () => [[[["name", string_type]]]]);
 }
 
 export function MyEl_$ctor_Z721C83C5(name: string): MyEl {
@@ -31,7 +32,7 @@ export abstract class Shape {
 }
 
 export function Shape_$reflection(): TypeInfo {
-    return class_type("ConstructorTypes.Shape", undefined, undefined);
+    return class_type("ConstructorTypes.Shape", undefined, undefined, undefined, () => [[[]]]);
 }
 
 export class Circle extends Shape {
@@ -47,7 +48,7 @@ export class Circle extends Shape {
 }
 
 export function Circle_$reflection(): TypeInfo {
-    return class_type("ConstructorTypes.Circle", undefined, Circle, Shape_$reflection());
+    return class_type("ConstructorTypes.Circle", undefined, Circle, Shape_$reflection(), () => [[[["radius", float64_type]]]]);
 }
 
 export function Circle_$ctor_5E38073B(radius: float64): Circle {
@@ -62,7 +63,7 @@ export class Box$1<T> {
 }
 
 export function Box$1_$reflection(gen0: TypeInfo): TypeInfo {
-    return class_type("ConstructorTypes.Box`1", [gen0], Box$1);
+    return class_type("ConstructorTypes.Box`1", [gen0], Box$1, undefined, () => [[[["value", gen0]]]]);
 }
 
 export function Box$1_$ctor_2B595<T>(value: T): Box$1<T> {
@@ -104,7 +105,7 @@ export class Registration extends Record implements IEquatable<Registration> {
 }
 
 export function Registration_$reflection(): TypeInfo {
-    return record_type("ConstructorTypes.Registration", [], Registration, () => [["Tag", string_type], ["Ctor", class_type("Fickl.Core.JsConstructor`1", [MyEl_$reflection()])]]);
+    return record_type("ConstructorTypes.Registration", [], Registration, () => [["Tag", string_type], ["Ctor", interface_type("Fickl.Core.JsConstructor`1", [MyEl_$reflection()])]]);
 }
 
 export class Registry {

@@ -1,5 +1,5 @@
 
-import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { class_type, string_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
 import { defaultOf } from "./fable_modules/fable-library-ts.5.25.0/Util.ts";
 import { create, tryGetTarget } from "./fable_modules/fable-library-ts.5.25.0/WeakRef.ts";
 import { FSharpRef } from "./fable_modules/fable-library-ts.5.25.0/Types.ts";
@@ -14,7 +14,7 @@ export class Node$ {
 }
 
 export function Node$_$reflection(): TypeInfo {
-    return class_type("WeakRef.Node", undefined, Node$);
+    return class_type("WeakRef.Node", undefined, Node$, undefined, () => [[[["name", string_type]]]]);
 }
 
 export function Node_$ctor_Z721C83C5(name: string): Node$ {

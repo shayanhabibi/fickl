@@ -5,7 +5,7 @@ import { FSharpResult$2_Ok, FSharpResult$2_Error$, type FSharpResult$2_$union } 
 import type { int32 } from "./fable_modules/fable-library-ts.5.25.0/Int32.ts";
 import { isUserLike } from "./guards.js";
 import { type FSharpList, choose } from "./fable_modules/fable-library-ts.5.25.0/List.ts";
-import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
+import { class_type, string_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.25.0/Reflection.ts";
 
 export interface User {
     get name(): string
@@ -113,7 +113,7 @@ export class Validator {
 }
 
 export function Validator_$reflection(): TypeInfo {
-    return class_type("TypeGuards.Validator", undefined, Validator);
+    return class_type("TypeGuards.Validator", undefined, Validator, undefined, () => [[[["prefix", string_type]]]]);
 }
 
 export function Validator_$ctor_Z721C83C5(prefix: string): Validator {

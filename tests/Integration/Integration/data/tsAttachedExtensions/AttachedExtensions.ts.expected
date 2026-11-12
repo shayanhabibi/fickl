@@ -1,6 +1,6 @@
 
 import type { int32 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
-import { class_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+import { class_type, int32_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
 import { int32ToString } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
 
 export class Counter {
@@ -33,7 +33,7 @@ export class Counter {
 }
 
 export function Counter_$reflection(): TypeInfo {
-    return class_type("AttachedExtensions.Counter", undefined, Counter);
+    return class_type("AttachedExtensions.Counter", undefined, Counter, undefined, () => [[[["count", int32_type]]]]);
 }
 
 export function Counter_$ctor_Z524259A4(count: int32): Counter {
@@ -68,7 +68,7 @@ export class Box$1<T> {
 }
 
 export function Box$1_$reflection(gen0: TypeInfo): TypeInfo {
-    return class_type("AttachedExtensions.Box`1", [gen0], Box$1);
+    return class_type("AttachedExtensions.Box`1", [gen0], Box$1, undefined, () => [[[["item", gen0]]]]);
 }
 
 export function Box$1_$ctor_2B595<T>(item: T): Box$1<T> {

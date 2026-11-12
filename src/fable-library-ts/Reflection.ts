@@ -5,7 +5,10 @@ import { Some, some } from "./Option.ts";
 
 export type FieldInfo = [string, TypeInfo, PropertyKey?];
 export type PropertyInfo = FieldInfo;
-export type ParameterInfo = FieldInfo;
+// The third element is the position, set by the MethodInfo or ConstructorInfo that owns the parameter
+export type ParameterInfo = [string, TypeInfo, number?];
+// The parameters of a constructor and the function to call, when it is not the class constructor
+export type ConstructorData = [ParameterInfo[], ((...args: any[]) => any)?];
 
 export type Constructor = new (...args: any[]) => any;
 
@@ -34,6 +37,11 @@ export class CaseInfo {
 
 export type EnumCase = [string, number];
 
+function withPositions(parameters: ParameterInfo[]): ParameterInfo[] {
+  parameters.forEach((p, i) => p[2] = i);
+  return parameters;
+}
+
 export class MethodInfo {
   public name: string;
   public parameters: ParameterInfo[];
@@ -50,10 +58,42 @@ export class MethodInfo {
     invoke?: (target: any, args: any[]) => any,
   ) {
     this.name = name;
-    this.parameters = parameters;
+    this.parameters = withPositions(parameters);
     this.returnType = returnType;
     this.isStatic = isStatic;
     this.invoke = invoke;
+  }
+}
+
+export class ConstructorInfo {
+  public name: string = ".ctor";
+  public declaringType: TypeInfo;
+  public parameters: ParameterInfo[];
+  private factory?: ((...args: any[]) => any) | undefined;
+
+  constructor(
+    declaringType: TypeInfo,
+    parameters: ParameterInfo[],
+    factory?: (...args: any[]) => any,
+  ) {
+    this.declaringType = declaringType;
+    this.parameters = withPositions(parameters);
+    this.factory = factory;
+  }
+
+  public invoke(args?: any[] | null): any {
+    args = args ?? [];
+    if (args.length !== this.parameters.length) {
+      throw new Exception("Parameter count mismatch.");
+    }
+    if (this.factory != null) {
+      return this.factory(...args);
+    }
+    const construct = this.declaringType.construct;
+    if (construct == null) {
+      throw new Exception(`Cannot create an instance of ${this.declaringType.fullname}`);
+    }
+    return new construct(...args);
   }
 }
 
@@ -66,6 +106,11 @@ export class TypeInfo implements IEquatable<TypeInfo> {
   public fields?: (() => FieldInfo[]) | undefined;
   public cases?: (() => CaseInfo[]) | undefined;
   public enumCases?: EnumCase[] | undefined;
+  // Only for classes whose public constructors are not a single parameterless one
+  public constructors?: (() => ConstructorData[]) | undefined;
+  public isInterface?: boolean;
+  // Struct records and unions; a struct class has System.ValueType as parent
+  public isStruct?: boolean;
 
   constructor(
     fullname: string,
@@ -74,7 +119,8 @@ export class TypeInfo implements IEquatable<TypeInfo> {
     parent?: TypeInfo | (() => TypeInfo),
     fields?: () => FieldInfo[],
     cases?: () => CaseInfo[],
-    enumCases?: EnumCase[]
+    enumCases?: EnumCase[],
+    constructors?: () => ConstructorData[]
   ) {
     this.fullname = fullname;
     this.generics = generics;
@@ -83,6 +129,7 @@ export class TypeInfo implements IEquatable<TypeInfo> {
     this.fields = fields;
     this.cases = cases;
     this.enumCases = enumCases;
+    this.constructors = constructors;
   }
   public get parent(): TypeInfo | undefined {
     if (typeof this.lazyParent === "function") {
@@ -154,16 +201,26 @@ export function class_type(
   fullname: string,
   generics?: TypeInfo[],
   construct?: Constructor,
-  parent?: TypeInfo | (() => TypeInfo)): TypeInfo {
-  return new TypeInfo(fullname, generics, construct, parent);
+  parent?: TypeInfo | (() => TypeInfo),
+  constructors?: () => ConstructorData[]): TypeInfo {
+  return new TypeInfo(fullname, generics, construct, parent, undefined, undefined, undefined, constructors);
+}
+
+export function interface_type(fullname: string, generics?: TypeInfo[]): TypeInfo {
+  const t = new TypeInfo(fullname, generics);
+  t.isInterface = true;
+  return t;
 }
 
 export function record_type(
   fullname: string,
   generics: TypeInfo[],
   construct: Constructor,
-  fields: () => FieldInfo[]): TypeInfo {
-  return new TypeInfo(fullname, generics, construct, undefined, fields);
+  fields: () => FieldInfo[],
+  isStruct?: boolean): TypeInfo {
+  const t = new TypeInfo(fullname, generics, construct, undefined, fields);
+  if (isStruct) { t.isStruct = true; }
+  return t;
 }
 
 export function anonRecord_type(...fields: FieldInfo[]): TypeInfo {
@@ -176,12 +233,14 @@ export function union_type(
   construct: Constructor,
   cases: () => FieldInfo[][],
   // The custom attributes of each case, by tag
-  attributes?: () => any[][]): TypeInfo {
+  attributes?: () => any[][],
+  isStruct?: boolean): TypeInfo {
   const t: TypeInfo = new TypeInfo(fullname, generics, construct, undefined, undefined, () => {
     const caseNames = construct.prototype.cases() as string[];
     return cases().map((fields, i) =>
       new CaseInfo(t, i, caseNames[i]!, fields, attributes && (() => attributes()[i] ?? [])))
   });
+  if (isStruct) { t.isStruct = true; }
   return t;
 }
 
@@ -266,7 +325,7 @@ export const float64_type: TypeInfo = new TypeInfo("System.Double");
 export const decimal_type: TypeInfo = new TypeInfo("System.Decimal");
 export const bigint_type: TypeInfo = new TypeInfo("System.Numerics.BigInteger");
 
-export function name(info: FieldInfo | TypeInfo | CaseInfo | MethodInfo): string {
+export function name(info: FieldInfo | ParameterInfo | TypeInfo | CaseInfo | MethodInfo | ConstructorInfo): string {
   if (Array.isArray(info)) {
     return info[0];
   } else if (info instanceof TypeInfo) {
@@ -325,6 +384,30 @@ export function isGenericParameter(t: TypeInfo) {
 
 export function isEnum(t: TypeInfo) {
   return t.enumCases != null && t.enumCases.length > 0;
+}
+
+const valueTypeName = "System.ValueType";
+
+// Struct tuples, value options and nullable value types have the type info of their reference counterparts
+const valueTypeNames = new Set([
+  "System.Char", "System.Boolean", "System.SByte", "System.Byte", "System.Int16", "System.UInt16",
+  "System.Int32", "System.UInt32", "System.Int64", "System.UInt64", "System.Int128", "System.UInt128",
+  "System.IntPtr", "System.UIntPtr", "System.Half", "System.Single", "System.Double", "System.Decimal",
+  "System.Numerics.BigInteger", "System.Guid", "System.TimeSpan", "System.DateTime", "System.DateTimeOffset",
+  "System.DateOnly", "System.TimeOnly", "System.Text.Rune", "System.Collections.Generic.KeyValuePair`2",
+  valueTypeName, "System.Enum",
+]);
+
+export function isClass(t: TypeInfo): boolean {
+  if (t.isInterface || t.isStruct || t.enumCases != null || valueTypeNames.has(t.fullname)) {
+    return false;
+  }
+  for (let parent = t.parent; parent != null; parent = parent.parent) {
+    if (parent.fullname === valueTypeName) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function isSubclassOf(t1: TypeInfo, t2: TypeInfo): boolean {
@@ -619,7 +702,33 @@ export function makeGenericType(t: TypeInfo, generics: TypeInfo[]): TypeInfo {
     t.construct,
     t.parent,
     t.fields,
-    t.cases);
+    t.cases,
+    undefined,
+    t.constructors);
+}
+
+// Public instance constructors, in declaration order. Only types compiled as classes or records have them:
+// unions have none, as in .NET, and neither do the types the runtime represents natively (tuples, options...)
+export function getConstructors(t: TypeInfo): ConstructorInfo[] {
+  if (t.constructors != null) {
+    return t.constructors().map(([parameters, factory]) => new ConstructorInfo(t, parameters, factory));
+  } else if (t.fields != null) {
+    // .NET names the parameters of a record after its fields, starting in lower case
+    const parameters = getRecordElements(t).map(([name, fieldType]): ParameterInfo =>
+      [isAnonRecord(t) ? name : name.charAt(0).toLowerCase() + name.slice(1), fieldType]);
+    return [new ConstructorInfo(t, parameters, (...args) => makeRecord(t, args))];
+  } else if (t.cases != null || t.construct == null) {
+    return [];
+  } else {
+    return [new ConstructorInfo(t, [])];
+  }
+}
+
+// Null when there is none, which the F# type does not say
+export function getConstructor(t: TypeInfo, types: TypeInfo[]): ConstructorInfo {
+  const found = getConstructors(t).find((c) =>
+    c.parameters.length === types.length && c.parameters.every((p, i) => equals(p[1], types[i]!)));
+  return (found ?? null) as ConstructorInfo;
 }
 
 export function createInstance(t: TypeInfo, consArgs?: any[]): any {
