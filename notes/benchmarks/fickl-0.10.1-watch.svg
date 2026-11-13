@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 612" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<style>
+  svg { --surface: #fcfcfb; --ink: #0b0b0b; --muted: #52514e; --grid: #e4e3df;
+        --fable: #2a78d6; --nopkg: #1baf7a; --hit: #eda100; }
+  @media (prefers-color-scheme: dark) {
+    svg { --surface: #1a1a19; --ink: #f0efec; --muted: #c3c2b7; --grid: #383835;
+          --fable: #3987e5; --nopkg: #199e70; --hit: #c98500; }
+  }
+  .surface { fill: var(--surface); } .ink { fill: var(--ink); } .muted { fill: var(--muted); }
+  .grid { stroke: var(--grid); stroke-width: 1; }
+  .fable { fill: var(--fable); } .nopkg { fill: var(--nopkg); } .hit { fill: var(--hit); }
+</style>
+<rect class="surface" width="960" height="612"/>
+<text class="ink" x="32" y="52" font-size="28" font-weight="700">Fickl 0.10.1 against Fable 5.27.0 in --watch</text>
+<text class="muted" x="32" y="80" font-size="14">From saving a file to the compiler reporting Watching again · median · lower is better</text>
+<path class="fable" d="M32 93h10a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-10z"/>
+<text class="ink" x="54" y="104" font-size="13">Fable 5.27.0</text>
+<path class="hit" d="M412 93h10a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-10z"/>
+<text class="ink" x="434" y="104" font-size="13">Fickl 0.10.1</text>
+<line class="grid" x1="250" y1="130" x2="250" y2="502"/>
+<text class="muted" x="250" y="520" font-size="11" text-anchor="middle">0 ms</text>
+<line class="grid" x1="347.48" y1="130" x2="347.48" y2="502"/>
+<text class="muted" x="347.48" y="520" font-size="11" text-anchor="middle">2.0 s</text>
+<line class="grid" x1="444.95" y1="130" x2="444.95" y2="502"/>
+<text class="muted" x="444.95" y="520" font-size="11" text-anchor="middle">4.0 s</text>
+<line class="grid" x1="542.43" y1="130" x2="542.43" y2="502"/>
+<text class="muted" x="542.43" y="520" font-size="11" text-anchor="middle">6.0 s</text>
+<line class="grid" x1="639.9" y1="130" x2="639.9" y2="502"/>
+<text class="muted" x="639.9" y="520" font-size="11" text-anchor="middle">8.0 s</text>
+<line class="grid" x1="737.38" y1="130" x2="737.38" y2="502"/>
+<text class="muted" x="737.38" y="520" font-size="11" text-anchor="middle">10.0 s</text>
+<text x="234" y="151" font-size="14" text-anchor="end"><tspan class="ink" font-weight="600">Sutil demo app</tspan><tspan class="muted" x="234" dy="18" font-size="12">comment in a leaf file</tspan></text>
+<path class="fable" d="M250 138h20.76a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-20.76z"/>
+<text class="ink" x="280.76" y="149" font-size="11">508 ms</text>
+<path class="hit" d="M250 156h19.83a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-19.83z"/>
+<text class="ink" x="279.83" y="167" font-size="11">489 ms</text>
+<text class="ink" x="844" y="158" font-size="22" font-weight="700">1.0×</text>
+<text class="muted" x="844" y="176" font-size="11">faster*</text>
+<text x="234" y="213" font-size="14" text-anchor="end"><tspan class="ink" font-weight="600">Sutil demo app</tspan><tspan class="muted" x="234" dy="18" font-size="12">comment in an early file</tspan></text>
+<path class="fable" d="M250 200h83.29a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-83.29z"/>
+<text class="ink" x="343.29" y="211" font-size="11">1.8 s</text>
+<path class="hit" d="M250 218h14.81a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-14.81z"/>
+<text class="ink" x="274.81" y="229" font-size="11">386 ms</text>
+<text class="ink" x="844" y="220" font-size="22" font-weight="700">4.6×</text>
+<text class="muted" x="844" y="238" font-size="11">faster*</text>
+<text x="234" y="275" font-size="14" text-anchor="end"><tspan class="ink" font-weight="600">Sutil demo app</tspan><tspan class="muted" x="234" dy="18" font-size="12">new value in an early file</tspan></text>
+<path class="fable" d="M250 262h83.19a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-83.19z"/>
+<text class="ink" x="343.19" y="273" font-size="11">1.8 s</text>
+<path class="hit" d="M250 280h21.34a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-21.34z"/>
+<text class="ink" x="281.34" y="291" font-size="11">520 ms</text>
+<text class="ink" x="844" y="282" font-size="22" font-weight="700">3.4×</text>
+<text class="muted" x="844" y="300" font-size="11">faster*</text>
+<text x="234" y="337" font-size="14" text-anchor="end"><tspan class="ink" font-weight="600">Fable JS test suite</tspan><tspan class="muted" x="234" dy="18" font-size="12">comment in a leaf file</tspan></text>
+<path class="fable" d="M250 324h6.53a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-6.53z"/>
+<text class="ink" x="266.53" y="335" font-size="11">216 ms</text>
+<path class="hit" d="M250 342h0a4 4 0 0 1 4 4v6.01a4 4 0 0 1 -4 4h-0z"/>
+<text class="ink" x="260" y="353" font-size="11">82 ms</text>
+<text class="ink" x="844" y="344" font-size="22" font-weight="700">2.6×</text>
+<text class="muted" x="844" y="362" font-size="11">faster*</text>
+<text x="234" y="399" font-size="14" text-anchor="end"><tspan class="ink" font-weight="600">Fable JS test suite</tspan><tspan class="muted" x="234" dy="18" font-size="12">comment in an early file</tspan></text>
+<path class="fable" d="M250 386h304.95a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-304.95z"/>
+<text class="ink" x="564.95" y="397" font-size="11">6.3 s</text>
+<path class="hit" d="M250 404h0.34a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-0.34z"/>
+<text class="ink" x="260.34" y="415" font-size="11">89 ms</text>
+<text class="ink" x="844" y="406" font-size="22" font-weight="700">71.2×</text>
+<text class="muted" x="844" y="424" font-size="11">faster*</text>
+<text x="234" y="461" font-size="14" text-anchor="end"><tspan class="ink" font-weight="600">Fable JS test suite</tspan><tspan class="muted" x="234" dy="18" font-size="12">new value in an early file</tspan></text>
+<path class="fable" d="M250 448h514.18a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-514.18z"/>
+<text class="ink" x="774.18" y="459" font-size="11">10.6 s</text>
+<path class="hit" d="M250 466h207.38a4 4 0 0 1 4 4v6a4 4 0 0 1 -4 4h-207.38z"/>
+<text class="ink" x="467.38" y="477" font-size="11">4.3 s</text>
+<text class="ink" x="844" y="468" font-size="22" font-weight="700">2.5×</text>
+<text class="muted" x="844" y="486" font-size="11">faster*</text>
+<text class="muted" x="32" y="548" font-size="11">*Speedup versus Fable. Each edit appends a comment; both compilers keep their default debounce.</text>
+<text class="muted" x="32" y="566" font-size="11">Median of 5 edits per file after a warm-up edit, in one watch session per compiler.</text>
+<text class="muted" x="32" y="584" font-size="11">Ubuntu 24.04.5 LTS X64 · .NET 10.0.15 · 13 Nov 2026</text>
+</svg>
