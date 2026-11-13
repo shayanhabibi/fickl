@@ -4677,11 +4677,34 @@ let bitConvert (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option
             expr |> Some
         else
             toArray r t expr |> Some // convert to dynamic array
-    | _ ->
-        let memberName = Naming.lowerFirst i.CompiledName
+    | compiledName ->
+        let memberName = Naming.lowerFirst compiledName
 
-        Helper.LibCall(com, "BitConverter", memberName, t, args, i.SignatureArgTypes, ?loc = r)
-        |> Some
+        // fickl: only members fable-library exports; any other name compiled to an import that failed when the module loaded
+        match memberName with
+        | "isLittleEndian"
+        | "int64BitsToDouble"
+        | "doubleToInt64Bits"
+        | "uInt64BitsToDouble"
+        | "doubleToUInt64Bits"
+        | "int32BitsToSingle"
+        | "singleToInt32Bits"
+        | "uInt32BitsToSingle"
+        | "singleToUInt32Bits"
+        | "toBoolean"
+        | "toChar"
+        | "toInt16"
+        | "toInt32"
+        | "toInt64"
+        | "toUInt16"
+        | "toUInt32"
+        | "toUInt64"
+        | "toSingle"
+        | "toDouble"
+        | "toString" ->
+            Helper.LibCall(com, "BitConverter", memberName, t, args, i.SignatureArgTypes, ?loc = r)
+            |> Some
+        | _ -> None
 
 // The library decodes into a Uint8Array regardless of the typedArrays option
 let private decodedBytes (com: ICompiler) r t expr =
