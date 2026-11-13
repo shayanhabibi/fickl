@@ -141,6 +141,24 @@ let tests =
         0xFFFFFFFFu >>> 1 |> equal 2147483647u           // uint32: 0x7FFFFFFF
         0xFFFFFFFFFFFFFFFFUL >>> 1 |> equal 9223372036854775807UL  // uint64: 0x7FFFFFFFFFFFFFFF
 
+    testCase "uint32 addition, subtraction and multiplication wrap modulo 2^32" <| fun () ->
+        let mutable max = 4294967295u
+        let mutable one = 1u
+        max + one |> equal 0u
+        one - max |> equal 2u
+        0u - one |> equal 4294967295u
+        max * max |> equal 1u
+        // FNV-1a: each step's full product needs more than the 53 bits of a JS number
+        let fnv (text: string) =
+            let mutable hash = 2166136261u
+            for ch in text do hash <- (hash ^^^ uint32 ch) * 16777619u
+            hash
+        fnv "a" |> equal 3826002220u
+        fnv "hello" |> equal 1335831723u
+        let mutable h = 7u
+        for c in "hierarchy-key-0123456789" do h <- h * 31u + uint32 c
+        h |> equal 1465161682u
+
     testCase "Arithmetic right shift preserves sign for signed integer types" <| fun () ->
         // For signed types, >>> is arithmetic (sign-propagating) - the sign bit IS extended
         -2y >>> 1 |> equal -1y   // int8:  0xFF = -1
