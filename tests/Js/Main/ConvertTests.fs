@@ -2547,6 +2547,14 @@ let tests =
         let i = BitConverter.DoubleToInt64Bits(1.0)
         i |> equal 4607182418800017408L
 
+    testCase "BitConverter unsigned and single bit casts work" <| fun () ->
+        BitConverter.DoubleToUInt64Bits(-1.0) |> equal 13830554455654793216UL
+        BitConverter.UInt64BitsToDouble(13830554455654793216UL) |> equal -1.0
+        BitConverter.SingleToInt32Bits(1.0f) |> equal 1065353216
+        BitConverter.Int32BitsToSingle(-1082130432) |> equal -1.0f
+        BitConverter.SingleToUInt32Bits(-1.0f) |> equal 3212836864u
+        BitConverter.UInt32BitsToSingle(1065353216u) |> equal 1.0f
+
     testCase "BitConverter.ToBoolean works" <| fun () ->
         let value = true
         let bytes = BitConverter.GetBytes(value)

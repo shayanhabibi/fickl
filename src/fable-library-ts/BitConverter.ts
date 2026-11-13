@@ -92,6 +92,42 @@ export function doubleToInt64Bits(value: float64): int64 {
   return view.getBigInt64(0, littleEndian);
 }
 
+export function uInt64BitsToDouble(value: uint64): float64 {
+  const view = new DataView(new ArrayBuffer(8));
+  view.setBigUint64(0, value, littleEndian);
+  return view.getFloat64(0, littleEndian);
+}
+
+export function doubleToUInt64Bits(value: float64): uint64 {
+  const view = new DataView(new ArrayBuffer(8));
+  view.setFloat64(0, value, littleEndian);
+  return view.getBigUint64(0, littleEndian);
+}
+
+export function int32BitsToSingle(value: int32): float32 {
+  const view = new DataView(new ArrayBuffer(4));
+  view.setInt32(0, value, littleEndian);
+  return view.getFloat32(0, littleEndian);
+}
+
+export function singleToInt32Bits(value: float32): int32 {
+  const view = new DataView(new ArrayBuffer(4));
+  view.setFloat32(0, value, littleEndian);
+  return view.getInt32(0, littleEndian);
+}
+
+export function uInt32BitsToSingle(value: uint32): float32 {
+  const view = new DataView(new ArrayBuffer(4));
+  view.setUint32(0, value, littleEndian);
+  return view.getFloat32(0, littleEndian);
+}
+
+export function singleToUInt32Bits(value: float32): uint32 {
+  const view = new DataView(new ArrayBuffer(4));
+  view.setFloat32(0, value, littleEndian);
+  return view.getUint32(0, littleEndian);
+}
+
 export function toBoolean(bytes: ArrayLike<uint8>, offset: int32): boolean {
   const array = ArrayBuffer.isView(bytes) ? bytes : Uint8Array.from(bytes);
   const view = new DataView(array.buffer, array.byteOffset, array.byteLength);

@@ -1040,12 +1040,19 @@ let applyOp (com: ICompiler) (ctx: Context) r t opName (args: Expr list) =
                     | _ -> expr
 
                 binOp BinaryPlus (nullAsEmpty left) (nullAsEmpty right)
-            | _ -> binOp BinaryPlus left right
+            // fickl: uint32 arithmetic wraps modulo 2^32 on .NET, as its bitwise operators already do here (#1550)
+            | _ -> binOp BinaryPlus left right |> truncateUnsigned
         | Operators.subtraction, [ left; right ] ->
             match argTypes with
             | Char :: _ -> binOpChar BinaryMinus left right
-            | _ -> binOp BinaryMinus left right
-        | Operators.multiply, [ left; right ] -> binOp BinaryMultiply left right
+            | _ -> binOp BinaryMinus left right |> truncateUnsigned
+        | Operators.multiply, [ left; right ] ->
+            match t with
+            // A full 32 x 32 product can exceed 2^53 and lose its low bits as a JS number; Math.imul keeps them
+            | Number(UInt32, _) ->
+                Helper.GlobalCall("Math", t, [ left; right ], memb = "imul", ?loc = r)
+                |> truncateUnsigned
+            | _ -> binOp BinaryMultiply left right
         | (Operators.division | Operators.divideByInt), [ left; right ] ->
             match argTypes with
             // Floor result of integer divisions (see #172)
@@ -4677,11 +4684,34 @@ let bitConvert (com: ICompiler) (ctx: Context) r t (i: CallInfo) (_: Expr option
             expr |> Some
         else
             toArray r t expr |> Some // convert to dynamic array
-    | _ ->
-        let memberName = Naming.lowerFirst i.CompiledName
+    | compiledName ->
+        let memberName = Naming.lowerFirst compiledName
 
-        Helper.LibCall(com, "BitConverter", memberName, t, args, i.SignatureArgTypes, ?loc = r)
-        |> Some
+        // fickl: only members fable-library exports; any other name compiled to an import that failed when the module loaded
+        match memberName with
+        | "isLittleEndian"
+        | "int64BitsToDouble"
+        | "doubleToInt64Bits"
+        | "uInt64BitsToDouble"
+        | "doubleToUInt64Bits"
+        | "int32BitsToSingle"
+        | "singleToInt32Bits"
+        | "uInt32BitsToSingle"
+        | "singleToUInt32Bits"
+        | "toBoolean"
+        | "toChar"
+        | "toInt16"
+        | "toInt32"
+        | "toInt64"
+        | "toUInt16"
+        | "toUInt32"
+        | "toUInt64"
+        | "toSingle"
+        | "toDouble"
+        | "toString" ->
+            Helper.LibCall(com, "BitConverter", memberName, t, args, i.SignatureArgTypes, ?loc = r)
+            |> Some
+        | _ -> None
 
 // The library decodes into a Uint8Array regardless of the typedArrays option
 let private decodedBytes (com: ICompiler) r t expr =
