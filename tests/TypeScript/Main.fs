@@ -34,6 +34,8 @@ let allTests =
     Async.tests
     Chars.tests
     Complexes.tests
+    NumericsVectors.tests
+    Spans.tests
     Comparison.tests
     ConditionalWeakTable.tests
     Convert.tests

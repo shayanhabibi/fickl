@@ -39,6 +39,9 @@ let allTests =
     Task.tests
     Chars.tests
     Complexes.tests
+    NumericsVectors.tests
+    Spans.tests
+    SpanSlices.tests
     Comparison.tests
     ConditionalWeakTable.tests
     Convert.tests

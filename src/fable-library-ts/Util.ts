@@ -736,6 +736,13 @@ export abstract class ObjectRef {
   private static count = 0;
 }
 
+/** System.StringComparer.Ordinal: JavaScript compares and orders strings by UTF-16 code unit. */
+export const ordinalStringComparer = {
+  Equals: (x: string, y: string): boolean => x === y,
+  GetHashCode: (x: string): number => stringHash(x),
+  Compare: (x: string, y: string): number => (x < y ? -1 : x > y ? 1 : 0),
+};
+
 export function stringHash(s: string) {
   let i = 0;
   let h = 5381;

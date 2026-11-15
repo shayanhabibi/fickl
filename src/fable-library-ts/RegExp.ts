@@ -9,9 +9,10 @@ export function create(pattern: string, options = 0) {
   // * Compiled:    0x0008 (ignored)
   // * Singleline:  0x0010
   // * ECMAScript:  0x0100 (ignored)
+  // * CultureInvariant: 0x0200 (ignored: matching never depends on a culture)
   // * NonBacktracking: 0x0400 (ignored)
-  if ((options & ~(1 ^ 2 ^ 8 ^ 16 ^ 256 ^ 1024)) !== 0) {
-    throw new Exception("RegexOptions only supports: IgnoreCase, Multiline, Compiled, Singleline, ECMAScript and NonBacktracking");
+  if ((options & ~(1 ^ 2 ^ 8 ^ 16 ^ 256 ^ 512 ^ 1024)) !== 0) {
+    throw new Exception("RegexOptions only supports: IgnoreCase, Multiline, Compiled, Singleline, ECMAScript, CultureInvariant and NonBacktracking");
   }
   // Set always global and unicode flags for compatibility with dotnet, see #2925
   let flags = "gu";

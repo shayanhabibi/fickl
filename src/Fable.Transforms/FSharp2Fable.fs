@@ -537,6 +537,78 @@ let private explicitConstructionSteps (body: FSharpExpr) =
     | Some i when i < steps.Length - 1 -> Some(List.take i steps, steps[i], List.skip (i + 1) steps)
     | _ -> None
 
+/// fickl: the assembly types whose public fields the JavaScript runtime library defines under the same names
+/// (System.Numerics.fs), so a field read or write compiles to a property read or write
+let private isLibraryFieldOwner (com: IFableCompiler) (ownerTyp: FSharpType) =
+    match com.Options.Language with
+    | JavaScript
+    | TypeScript when ownerTyp.HasTypeDefinition ->
+        match ownerTyp.TypeDefinition.TryFullName with
+        | Some("System.Numerics.Vector2" | "System.Numerics.Vector3" | "System.Numerics.Vector4" | "System.Numerics.Matrix4x4") ->
+            true
+        | _ -> false
+    | _ -> false
+
+/// fickl: whether the expression reads the value, also from inside a closure
+let rec private referencesValue (var: FSharpMemberOrFunctionOrValue) (expr: FSharpExpr) =
+    match expr with
+    | FSharpExprPatterns.Value v when obj.Equals(v, var) -> true
+    | e -> e.ImmediateSubExpressions |> List.exists (referencesValue var)
+
+/// fickl: `let mutable s = S()` followed by `s.A <- a` and `s.B <- b` builds the default struct and then overwrites its
+/// fields, so every field of a struct type is allocated twice. This takes the leading assignments that can become
+/// constructor arguments: each sets a later field than the one before, so the values keep their order of evaluation,
+/// and none reads the struct. It returns them with their field index, and the rest of the body.
+let private structInitPrefix (var: FSharpMemberOrFunctionOrValue) (fieldNames: string list) (body: FSharpExpr) =
+    let rec collect lastIndex acc (body: FSharpExpr) =
+        match body with
+        | FSharpExprPatterns.Sequential(FSharpExprPatterns.FSharpFieldSet(Some(IgnoreAddressOf(FSharpExprPatterns.Value target)),
+                                                                          _,
+                                                                          field,
+                                                                          value),
+                                        rest) when
+            obj.Equals(target, var) && not field.IsStatic && not (referencesValue var value)
+            ->
+            match List.tryFindIndex ((=) (FsField.FSharpFieldName field)) fieldNames with
+            | Some index when index > lastIndex -> collect index ((index, value) :: acc) rest
+            | _ -> List.rev acc, body
+        | _ -> List.rev acc, body
+
+    collect -1 [] body
+
+/// fickl: whether the member is the indexer of Span or ReadOnlySpan, which returns a reference to the element
+let private isSpanIndexer (com: IFableCompiler) (memb: FSharpMemberOrFunctionOrValue) =
+    match com.Options.Language with
+    | JavaScript
+    | TypeScript when memb.CompiledName = "get_Item" ->
+        match memb.DeclaringEntity |> Option.bind (fun ent -> ent.TryFullName) with
+        | Some("System.Span`1" | "System.ReadOnlySpan`1") -> true
+        | _ -> false
+    | _ -> false
+
+/// fickl: `span[i]`, also behind the local F# makes for a span that is itself a call result (`memory.Span[i]`)
+let private (|SpanElementRef|_|) (com: IFableCompiler) (expr: FSharpExpr) =
+    match expr with
+    | FSharpExprPatterns.Call(Some(IgnoreAddressOf span), memb, _, _, [ index ]) when isSpanIndexer com memb ->
+        Some(None, span, index)
+    | FSharpExprPatterns.Let((inner, innerValue, _),
+                             FSharpExprPatterns.Call(Some(IgnoreAddressOf span), memb, _, _, [ index ])) when
+        isSpanIndexer com memb
+        ->
+        Some(Some(inner, innerValue), span, index)
+    | _ -> None
+
+/// fickl: F# binds the reference that `span[i]` returns to a local, and reads or assigns the element through it. A
+/// span is its array in JS, so that local stands for the element `span[i]` (see the Let case that puts it in scope):
+/// no binding is emitted for it and no reference cell is made.
+let private trySpanElement (ctx: Context) (var: FSharpMemberOrFunctionOrValue) =
+    if isByRefValue var then
+        match tryGetValueFromScope ctx var with
+        | Some(Fable.Get(_, Fable.ExprGet _, _, _) as element) -> Some element
+        | _ -> None
+    else
+        None
+
 let private transformCallee com ctx callee (calleeType: FSharpType) =
     trampoline {
         let! transformed = transformExprOpt com ctx callee
@@ -1410,19 +1482,22 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                         "Cannot resolve locally inlined value: " + var.DisplayName
                         |> addErrorAndReturnNull com ctx.InlinePath r
             else
-                let v = makeValueFrom com ctx r var
+                match trySpanElement ctx var with
+                | Some element -> return element
+                | None ->
+                    let v = makeValueFrom com ctx r var
 
-                if
-                    isByRefValue var
-                    &&
-                    // The replacement only needs to happen when var.FullType = byref<fsExpr.Type>
-                    fsExpr.Type = var.FullType.GenericArguments.[0]
-                    && not (com.Options.Language = Rust)
-                then
-                    // Getting byref value is compiled as FSharpRef op_Dereference
-                    return Replacements.Api.getRefCell com r (List.head v.Type.Generics) v
-                else
-                    return v
+                    if
+                        isByRefValue var
+                        &&
+                        // The replacement only needs to happen when var.FullType = byref<fsExpr.Type>
+                        fsExpr.Type = var.FullType.GenericArguments.[0]
+                        && not (com.Options.Language = Rust)
+                    then
+                        // Getting byref value is compiled as FSharpRef op_Dereference
+                        return Replacements.Api.getRefCell com r (List.head v.Type.Generics) v
+                    else
+                        return v
 
         // This is usually used to fill missing [<Optional>] arguments.
         // Unchecked.defaultof<'T> is resolved in Replacements instead.
@@ -1475,6 +1550,39 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             | FSharpExprPatterns.DefaultValue(FableType com ctx typ) ->
                 let r = makeRangeFrom fsExpr
                 let value = Replacements.Api.defaultof com ctx r typ
+
+                // fickl: fold the field assignments that follow a default struct into its construction
+                let inits, body =
+                    match com.Options.Language, value with
+                    | (JavaScript | TypeScript), Fable.Call(_, info, _, _) when var.IsMutable ->
+                        let fieldNames =
+                            match var.FullType with
+                            | fullType when fullType.HasTypeDefinition && fullType.TypeDefinition.IsValueType ->
+                                fullType.TypeDefinition.FSharpFields
+                                |> Seq.filter (fun field -> not field.IsStatic)
+                                |> Seq.mapToList FsField.FSharpFieldName
+                            | _ -> []
+
+                        if not fieldNames.IsEmpty && fieldNames.Length = info.Args.Length then
+                            structInitPrefix var fieldNames body
+                        else
+                            [], body
+                    | _ -> [], body
+
+                let! initValues = transformExprList com ctx (List.map snd inits)
+
+                let value =
+                    match value with
+                    | Fable.Call(callee, info, typ, range) when not inits.IsEmpty ->
+                        let assigned = List.zip (List.map fst inits) initValues |> Map.ofList
+
+                        let args =
+                            info.Args
+                            |> List.mapi (fun index zero -> Map.tryFind index assigned |> Option.defaultValue zero)
+
+                        Fable.Call(callee, { info with Args = args }, typ, range)
+                    | value -> value
+
                 let ctx, ident = putIdentInScope com ctx var (Some value)
                 let! body = transformExpr com ctx [] body
                 return Fable.Let(ident, value, body)
@@ -1520,6 +1628,46 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                 let ctx = { ctx with ScopeInlineValues = (var, value) :: ctx.ScopeInlineValues }
 
                 return! transformExpr com ctx [] body
+
+            // fickl: `span[i]` returns a reference to the element, which F# binds to a local. The span and the index are
+            // evaluated once here; a read of the local reads the element and an assignment through it sets the element.
+            | SpanElementRef com (inner, spanExpr, indexExpr) when isByRefValue var ->
+                let r = makeRangeFrom value
+
+                let! ctx, wrapInner =
+                    match inner with
+                    | None -> trampoline { return ctx, id }
+                    | Some(innerVar, innerValue) ->
+                        trampoline {
+                            let! innerValue = transformExpr com ctx [] innerValue
+                            let ctx, innerIdent = putIdentInScope com ctx innerVar (Some innerValue)
+                            return ctx, (fun body -> Fable.Let(innerIdent, innerValue, body))
+                        }
+
+                let elemType = makeType ctx.GenericArgs var.FullType.GenericArguments.[0]
+                let! span = transformCallee com ctx (Some spanExpr) spanExpr.Type
+                let! index = transformExpr com ctx [] indexExpr
+
+                let bindIfComplex name (e: Fable.Expr) =
+                    match e with
+                    | Fable.IdentExpr ident when not ident.IsMutable -> [], e
+                    | Fable.Value _ -> [], e
+                    | _ ->
+                        let ident = getIdentUniqueName com ctx name |> makeTypedIdent e.Type
+                        [ ident, e ], Fable.IdentExpr ident
+
+                let spanBinding, span = bindIfComplex "span" span
+                let indexBinding, index = bindIfComplex "index" index
+                let element = Fable.Get(span, Fable.ExprGet index, elemType, r)
+                let ctx, _ = putIdentInScope com ctx var (Some element)
+                let! body = transformExpr com ctx [] body
+
+                return
+                    List.foldBack
+                        (fun (ident, value) body -> Fable.Let(ident, value, body))
+                        (spanBinding @ indexBinding)
+                        body
+                    |> wrapInner
 
             | _ ->
                 let ctx, value =
@@ -2301,6 +2449,20 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
                     $"Cannot compile ILFieldGet(%A{ownerTyp}, %s{fieldName})"
                     |> addErrorAndReturnNull com ctx.InlinePath (makeRangeFrom fsExpr)
 
+        // fickl: an instance field of an assembly type that the runtime library defines with the same field names
+        | FSharpExprPatterns.ILFieldGet(Some callee, ownerTyp, fieldName) when isLibraryFieldOwner com ownerTyp ->
+            let r = makeRangeFrom fsExpr
+            let typ = makeType ctx.GenericArgs fsExpr.Type
+            let! callee = transformCallee com ctx (Some callee) ownerTyp
+            let kind = Fable.FieldInfo.Create(fieldName, fieldType = typ, isMutable = true)
+            return Fable.Get(callee, kind, typ, r)
+
+        | FSharpExprPatterns.ILFieldSet(Some callee, ownerTyp, fieldName, value) when isLibraryFieldOwner com ownerTyp ->
+            let r = makeRangeFrom fsExpr
+            let! callee = transformCallee com ctx (Some callee) ownerTyp
+            let! value = transformExpr com ctx [] value
+            return Fable.Set(callee, Fable.FieldSet fieldName, value.Type, value, r)
+
         | FSharpExprPatterns.Quote quotedExpr ->
             // Capturing mode: member calls keep their .NET metadata instead of being replaced/emitted/inlined.
             let! body = transformExpr com { ctx with CapturingQuotation = true } [] quotedExpr
@@ -2343,6 +2505,14 @@ let private transformExpr (com: IFableCompiler) (ctx: Context) appliedGenArgs fs
             let r = makeRangeFrom fsExpr
 
             match expr with
+            // fickl: assigning through the local that stands for `span[i]` sets the element
+            | FSharpExprPatterns.Value valToSet, valueExpr when Option.isSome (trySpanElement ctx valToSet) ->
+                let! value = transformExpr com ctx [] valueExpr
+
+                match trySpanElement ctx valToSet with
+                | Some(Fable.Get(span, Fable.ExprGet index, elemType, _)) ->
+                    return Fable.Set(span, Fable.ExprSet index, elemType, value, r)
+                | _ -> return value
             | FSharpExprPatterns.Value valToSet, valueExpr when isByRefValue valToSet ->
                 // Setting byref value is compiled as FSharpRef op_ColonEquals
                 let! value = transformExpr com ctx [] valueExpr

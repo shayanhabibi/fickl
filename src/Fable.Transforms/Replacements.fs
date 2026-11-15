@@ -1426,6 +1426,14 @@ let makeDefaultComparer (com: ICompiler) ctx typArg =
     objExpr [ "Compare", makeDefaultComparerFunction com ctx typArg ]
 
 // TODO: Try to detect at compile-time if the object already implements `Compare`?
+/// fickl: the runtime library constant that StringComparer.Ordinal compiles to
+[<return: Struct>]
+let (|OrdinalStringComparer|_|) (e: Expr) =
+    match e with
+    | Import(info, _, _)
+    | TypeCast(Import(info, _, _), _) when info.Selector = "ordinalStringComparer" -> ValueSome()
+    | _ -> ValueNone
+
 let inline makeComparerFromEqualityComparer e = e // leave it as is, if implementation supports it
 // Helper.LibCall(com, "Util", "comparerFromEqualityComparer", Any, [e])
 
@@ -1842,6 +1850,16 @@ let rec defaultof (com: ICompiler) (ctx: Context) r t =
     // A struct in .NET, a class in the library
     | DeclaredType(entRef, _) when entRef.FullName = "System.Numerics.Complex" ->
         Helper.LibCall(com, "System.Numerics", "Complex_get_Zero", t, [], ?loc = r)
+    | DeclaredType(entRef, _) when
+        (match entRef.FullName with
+         | "System.Numerics.Vector2"
+         | "System.Numerics.Vector3"
+         | "System.Numerics.Vector4"
+         | "System.Numerics.Matrix4x4" -> true
+         | _ -> false)
+        ->
+        let name = entRef.FullName.Substring("System.Numerics.".Length)
+        Helper.LibCall(com, "System.Numerics", name + "_get_Zero", t, [], ?loc = r)
     | DeclaredType(entRef, _) ->
         let ent = com.GetEntity(entRef)
         // TODO: For BCL types we cannot access the constructor, raise error or warning?
@@ -2439,7 +2457,7 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
             Helper.LibCall(com, "Decimal", "pow", t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
             |> Some
         | CustomOp com ctx r t "Pow" args e -> Some e
-        | _ -> math r t args i.SignatureArgTypes "pow" |> Some
+        | _ -> math r t args i.SignatureArgTypes "pow" |> roundToFloat32 r t |> Some
     | ("Ceiling" | "Floor" as meth), _ ->
         let meth = Naming.lowerFirst meth
 
@@ -2461,7 +2479,7 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
 
         let divisor = math None t [ arg2 ] (List.skip 1 i.SignatureArgTypes) "log"
 
-        makeBinOp r t dividend divisor BinaryDivide |> Some
+        makeBinOp r t dividend divisor BinaryDivide |> roundToFloat32 r t |> Some
     | "Abs", _ ->
         match args with
         | ExprType(Number(Decimal, _)) :: _ ->
@@ -2474,7 +2492,9 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
     | ("Acos" | "Asin" | "Atan" | "Atan2" | "Cos" | "Cosh" | "Exp" | "Log" | "Log2" | "Log10" | "Sin" | "Sinh" | "Sqrt" | "Tan" | "Tanh"),
       _ ->
         match args with
-        | ExprType(Number(_, _)) :: _ -> math r t args i.SignatureArgTypes i.CompiledName |> Some
+        // fickl: Math.sqrt, Math.sin... return a double; a float32 result is rounded to single precision, as the
+        // arithmetic operators are, so MathF.Sqrt gives the bits .NET gives
+        | ExprType(Number(_, _)) :: _ -> math r t args i.SignatureArgTypes i.CompiledName |> roundToFloat32 r t |> Some
         | _ -> applyOp com ctx r t i.CompiledName args |> Some
     | "Round", _ ->
         match args with
@@ -3342,10 +3362,106 @@ let collectionExtensions
         |> Some
     | _ -> None
 
-let readOnlySpans (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
-    match i.CompiledName, args with
-    | "op_Implicit", [ arg ] -> arg |> Some
+/// fickl: the start and end arguments of `substring` or `subarray` for a start and a length. A start that is not a
+/// constant or a local is bound first, so it is evaluated once.
+let private withStartAndEnd (com: ICompiler) (ctx: Context) (start: Expr) (length: Expr) (build: Expr list -> Expr) =
+    match start with
+    | Value _
+    | IdentExpr _ -> build [ start; add start length ]
+    | _ ->
+        let ident = makeUniqueIdent com ctx start.Type "start"
+        Let(ident, start, build [ IdentExpr ident; add (IdentExpr ident) length ])
+
+/// fickl: a span or a memory over an array is the array itself, and over characters it is a string, so indexing a
+/// span compiles to indexing the array. A slice is a `subarray` view of a typed array, or a substring. A slice of any
+/// other array would need a copy, which a span must not make, so it is an error.
+let spans (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    let int32 = Number(Int32, NumberInfo.Empty)
+
+    let sliceMethod =
+        match i.GenericArgs with
+        | [ Char ] -> Some "substring"
+        | [ TypedArrayCompatible com MutableArray _ ] -> Some "subarray"
+        | _ -> None
+
+    let slice (source: Expr) (start: Expr) (length: Expr option) =
+        match sliceMethod, length with
+        | Some meth, None -> Helper.InstanceCall(source, meth, t, [ start ], ?loc = r) |> Some
+        | Some meth, Some length ->
+            withStartAndEnd com ctx start length (fun range -> Helper.InstanceCall(source, meth, t, range, ?loc = r))
+            |> Some
+        | None, _ ->
+            "A slice of a span or a memory is only supported in JS over characters and over numeric arrays compiled as typed arrays"
+            |> addErrorAndReturnNull com ctx.InlinePath r
+            |> Some
+
+    match i.CompiledName, thisArg, args with
+    | "op_Implicit", None, [ arg ] -> TypeCast(arg, t) |> Some
+    | ".ctor", None, [ source ] -> TypeCast(source, t) |> Some
+    | ".ctor", None, [ source; start; length ] -> slice (TypeCast(source, t)) start (Some length)
+    | "get_Empty", None, [] ->
+        match i.GenericArgs with
+        | [ Char ] -> TypeCast(makeStrConst "", t) |> Some
+        | [ elementType ] -> TypeCast(makeArray elementType [], t) |> Some
+        | _ -> None
+    | "get_Length", Some span, [] -> getFieldWith r t span "length" |> Some
+    | "get_IsEmpty", Some span, [] ->
+        makeEqOp r (getFieldWith None int32 span "length") (makeIntConst 0) BinaryEqual
+        |> Some
+    | "get_Item", Some span, [ index ] -> getExpr r t span index |> Some
+    | "set_Item", Some span, [ index; value ] -> setExpr r span index value |> Some
+    | "get_Span", Some memory, [] -> TypeCast(memory, t) |> Some
+    | "Slice", Some span, [ start ] -> slice span start None
+    | "Slice", Some span, [ start; length ] -> slice span start (Some length)
+    | "ToArray", Some span, [] ->
+        match i.GenericArgs with
+        | [ Char ] -> Helper.InstanceCall(span, "split", t, [ makeStrConst "" ], ?loc = r) |> Some
+        | _ -> Helper.InstanceCall(span, "slice", t, [], ?loc = r) |> Some
+    | "ToString", Some span, [] ->
+        match i.GenericArgs with
+        | [ Char ] -> TypeCast(span, t) |> Some
+        | _ -> None
     | _ -> None
+
+/// fickl: System.MemoryExtensions.AsSpan and AsMemory, over a string or an array
+let memoryExtensions (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Expr option) (args: Expr list) =
+    let sliceMethod (source: Expr) =
+        match source.Type with
+        | String -> Some "substring"
+        | Array(TypedArrayCompatible com MutableArray _, _) -> Some "subarray"
+        | _ -> None
+
+    match i.CompiledName, args with
+    | ("AsSpan" | "AsMemory"), [ ExprType(String | Array _) as source ] -> TypeCast(source, t) |> Some
+    | ("AsSpan" | "AsMemory"), [ source; ExprType(Number(Int32, _)) as start ] ->
+        sliceMethod source
+        |> Option.map (fun meth -> Helper.InstanceCall(source, meth, t, [ start ], ?loc = r))
+    | ("AsSpan" | "AsMemory"), [ source; ExprType(Number(Int32, _)) as start; ExprType(Number(Int32, _)) as length ] ->
+        sliceMethod source
+        |> Option.map (fun meth ->
+            withStartAndEnd com ctx start length (fun range -> Helper.InstanceCall(source, meth, t, range, ?loc = r))
+        )
+    | _ -> None
+
+/// fickl: StringComparer.Ordinal is a constant of the runtime library. JavaScript compares, orders and hashes
+/// strings by code unit, so a set or a dictionary of strings built with it is the native one.
+let stringComparers (com: ICompiler) (_: Context) _r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    match i.CompiledName, thisArg, args with
+    | "get_Ordinal", None, [] -> Helper.LibValue(com, "Util", "ordinalStringComparer", t) |> Some
+    | ("Equals" | "Compare" as meth), Some comparer, [ _; _ ]
+    | ("GetHashCode" as meth), Some comparer, [ _ ] ->
+        Helper.InstanceCall(comparer, meth, t, args, i.SignatureArgTypes) |> Some
+    | _ -> None
+
+/// fickl: System.Numerics.Vector2, Vector3, Vector4 and Matrix4x4 are classes of the runtime library
+/// (System.Numerics.fs). A member the library does not define is reported as unsupported.
+let numericsVectors (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
+    match i.CompiledName, thisArg, args with
+    // The out argument arrives as a reference cell, which a member with the .NET signature cannot take
+    | "Invert", None, [ _; _ ] when i.DeclaringEntityFullName = "System.Numerics.Matrix4x4" ->
+        Helper.LibCall(com, "System.Numerics", "Matrix4x4Helpers_invert", t, args, ?loc = r)
+        |> Some
+    | _ -> bclType com ctx r t i thisArg args
 
 /// fickl: an ArraySegment over a numeric array is a typed-array view made with `subarray`, which shares its memory
 let arraySegments (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
@@ -4367,6 +4483,11 @@ let dictionaries (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Exp
         match i.SignatureArgTypes, args with
         | ([] | [ Number _ ]), _ -> makeBclDictionary com ctx r t (makeArray Any []) |> Some
         | [ IDictionary ], [ arg ] -> makeBclDictionary com ctx r t arg |> Some
+        | [ IEqualityComparer ], [ OrdinalStringComparer ]
+        | [ Number _; IEqualityComparer ], [ _; OrdinalStringComparer ] ->
+            makeBclDictionary com ctx r t (makeArray Any []) |> Some
+        | [ (IDictionary | IEnumerable); IEqualityComparer ], [ arg; OrdinalStringComparer ] ->
+            makeBclDictionary com ctx r t arg |> Some
         | [ IDictionary; IEqualityComparer ], [ arg; eqComp ] ->
             makeComparerFromEqualityComparer eqComp
             |> makeDictionaryWithComparer com r t arg
@@ -4511,6 +4632,10 @@ let hashSets (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr op
         match i.SignatureArgTypes, args with
         | ([] | [ Number _ ]), _ -> makeHashSet com ctx r t (makeArray Any []) |> Some
         | [ IEnumerable ], [ arg ] -> makeHashSet com ctx r t arg |> Some
+        | [ IEqualityComparer ], [ OrdinalStringComparer ]
+        | [ Number _; IEqualityComparer ], [ _; OrdinalStringComparer ] ->
+            makeHashSet com ctx r t (makeArray Any []) |> Some
+        | [ IEnumerable; IEqualityComparer ], [ arg; OrdinalStringComparer ] -> makeHashSet com ctx r t arg |> Some
         | [ IEnumerable; IEqualityComparer ], [ arg; eqComp ] ->
             makeComparerFromEqualityComparer eqComp
             |> makeHashSetWithComparer com r t arg
@@ -5495,7 +5620,8 @@ let regex com (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Exp
          ||| RegexOption.Compiled
          ||| RegexOption.Singleline
          ||| RegexOption.ECMAScript
-         ||| RegexOption.NonBacktracking)
+         ||| RegexOption.NonBacktracking
+         ||| RegexOption.CultureInvariant)
         args
 
     let isGroup =
@@ -6629,6 +6755,11 @@ let private replacedModules =
             "System.Runtime.CompilerServices.FormattableStringFactory", formattableString
             "System.Text.StringBuilder", bclType
             "System.Numerics.Complex", bclType
+            "System.Numerics.Vector2", numericsVectors
+            "System.Numerics.Vector3", numericsVectors
+            "System.Numerics.Vector4", numericsVectors
+            "System.Numerics.Matrix4x4", numericsVectors
+            "System.StringComparer", stringComparers
             Types.array, arrays
             Types.array + "`2", arrays2D
             "Microsoft.FSharp.Collections.Array2DModule", array2DModule
@@ -6671,7 +6802,11 @@ let private replacedModules =
             Types.icollectionGeneric, collections
             Types.icollection, collections
             "System.Collections.Generic.CollectionExtensions", collectionExtensions
-            "System.ReadOnlySpan`1", readOnlySpans
+            "System.ReadOnlySpan`1", spans
+            "System.Span`1", spans
+            "System.ReadOnlyMemory`1", spans
+            "System.Memory`1", spans
+            "System.MemoryExtensions", memoryExtensions
             "System.ArraySegment`1", arraySegments
             Types.hashset, hashSets
             Types.stack, bclType

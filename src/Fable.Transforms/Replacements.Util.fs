@@ -1431,6 +1431,8 @@ let (|RegexFlags|_|) e =
             | RegexOption.Singleline -> Some [ RegexSingleline ]
             | RegexOption.ECMAScript -> Some []
             | RegexOption.NonBacktracking -> Some []
+            // fickl: a target whose matching never depends on a culture accepts the option and ignores it
+            | RegexOption.CultureInvariant -> Some []
             | _ -> None
         | Operation(Binary(BinaryOrBitwise, flags1, flags2), _, _, _) ->
             match getFlags flags1, getFlags flags2 with
