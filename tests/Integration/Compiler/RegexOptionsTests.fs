@@ -25,10 +25,10 @@ let r = Regex("a", RegexOptions.RightToLeft)
         """
 open System.Text.RegularExpressions
 
-let found = Regex.IsMatch("abc", "b", RegexOptions.IgnoreCase ||| RegexOptions.ExplicitCapture ||| RegexOptions.CultureInvariant)
+let found = Regex.IsMatch("abc", "b", RegexOptions.IgnoreCase ||| RegexOptions.ExplicitCapture ||| RegexOptions.IgnorePatternWhitespace)
 """
       compile source
-      |> Assert.Exists.errorWith "RegexOptions.ExplicitCapture, RegexOptions.CultureInvariant is not supported"
+      |> Assert.Exists.errorWith "RegexOptions.ExplicitCapture, RegexOptions.IgnorePatternWhitespace is not supported"
       |> ignore
 
     testCase "Options that only affect performance compile without a diagnostic" <| fun _ ->
@@ -38,6 +38,18 @@ open System.Text.RegularExpressions
 
 let r = Regex("a", RegexOptions.Compiled ||| RegexOptions.NonBacktracking ||| RegexOptions.IgnoreCase)
 let parts = Regex.Split("a1b", "\\d", RegexOptions.ECMAScript)
+"""
+      compile source
+      |> Assert.Is.strictSuccess
+      |> ignore
+
+    testCase "CultureInvariant compiles without a diagnostic" <| fun _ ->
+      let source =
+        """
+open System.Text.RegularExpressions
+
+let r = Regex("a", RegexOptions.CultureInvariant ||| RegexOptions.IgnoreCase)
+let found = Regex.IsMatch("abc", "b", RegexOptions.CultureInvariant)
 """
       compile source
       |> Assert.Is.strictSuccess

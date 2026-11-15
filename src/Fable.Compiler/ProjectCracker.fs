@@ -1278,6 +1278,10 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
             let coreRefs = HashSet Metadata.coreAssemblies
             // TODO: Not sure if we still need this
             coreRefs.Add("System.Private.CoreLib") |> ignore
+            // fickl: the vector and matrix types, and the span extensions (String.AsSpan, array.AsSpan). They are kept
+            // here and not in Metadata.coreAssemblies, which the standalone compiler loads from fable-metadata.
+            coreRefs.Add("System.Numerics.Vectors") |> ignore
+            coreRefs.Add("System.Memory") |> ignore
 
             let ignoredRefs =
                 HashSet
