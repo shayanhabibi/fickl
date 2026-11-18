@@ -5306,22 +5306,20 @@ let timeSpans (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg
 
         getFieldWith r t thisArg.Value fieldName |> Some
     | "ToString" when (args.Length = 1) ->
-        "TimeSpan.ToString with one argument is not supported, because it depends on local culture, please add CultureInfo.InvariantCulture"
-        |> addError com ctx.InlinePath r
-
-        None
-    | "ToString" when (args.Length = 2) ->
         match args.Head with
-        | StringConst "c"
-        | StringConst "g"
-        | StringConst "G" ->
+        // The constant format and custom format strings read the same in every culture
+        | StringConst format when format <> "g" && format <> "G" ->
             Helper.LibCall(com, moduleName, "toString", t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
             |> Some
         | _ ->
-            "TimeSpan.ToString don't support custom format. It only handles \"c\", \"g\" and \"G\" format, with CultureInfo.InvariantCulture."
+            "TimeSpan.ToString with one argument is only supported for the \"c\" format and custom format strings, because \"g\" and \"G\" depend on local culture, please add CultureInfo.InvariantCulture"
             |> addError com ctx.InlinePath r
 
             None
+    | "ToString" when (args.Length = 2) ->
+        // "c", "g", "G" or a custom format string; the library raises FormatException for any other
+        Helper.LibCall(com, moduleName, "toString", t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
+        |> Some
     | "FromDays" -> limitArgsCountToMilliseconds "fromDays" 5
     | "FromHours" -> limitArgsCountToMilliseconds "fromHours" 4
     | "FromMinutes" -> limitArgsCountToMilliseconds "fromMinutes" 3

@@ -1,7 +1,8 @@
 import { FSharpRef } from "./Types.ts";
 import { Exception, comparePrimitives, padWithZeros } from "./Util.ts";
 import { fromFloat64, type int64 } from "./BigInt.ts";
-import { ArgumentOutOfRangeException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
+import { ArgumentOutOfRangeException_$ctor_Z721C83C5, FormatException_$ctor_Z721C83C5, OverflowException_$ctor_Z721C83C5 } from "./System.ts";
+import { formatCustom } from "./TimeSpanFormat.ts";
 
 // TimeSpan in runtime just becomes a number representing milliseconds
 export type TimeSpan = number;
@@ -167,8 +168,12 @@ export function duration(x: number) {
 }
 
 export function toString(ts: TimeSpan, format = "c", _provider?: any) {
-  if (["c", "g", "G"].indexOf(format) === -1) {
-    throw new Exception("Custom formats are not supported");
+  // A null or empty format is the constant format, which "t" and "T" also name
+  if (format == null || format === "" || format === "t" || format === "T") {
+    format = "c";
+  }
+  if (format.length === 1 && ["c", "g", "G"].indexOf(format) === -1) {
+    throw FormatException_$ctor_Z721C83C5("Input string was not in a correct format.");
   }
   const d = Math.abs(days(ts));
   const h = Math.abs(hours(ts));
@@ -180,6 +185,10 @@ export function toString(ts: TimeSpan, format = "c", _provider?: any) {
   if (ts >= minValue && ts <= maxValue) {
     const t = ticks(ts);
     fraction = Number((t < 0n ? -t : t) % 10000000n);
+  }
+  // A format longer than one character is a custom format string
+  if (format.length > 1) {
+    return formatCustom(d, h, m, s, fraction, format);
   }
   const digits = padWithZeros(fraction, 7);
   const dayPart = d === 0 && format !== "G" ? "" : format === "c" ? d + "." : d + ":";
