@@ -1,0 +1,32 @@
+import { Record } from "./fable_modules/fable-library-js.5.27.0/Types.js";
+import { record_type, int32_type, array_type, float64_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+import { setItem, item } from "./fable_modules/fable-library-js.5.27.0/Array.js";
+
+export class Body extends Record {
+    constructor(Pos, Count) {
+        super();
+        this.Pos = Pos;
+        this.Count = (Count | 0);
+    }
+}
+
+export function Body_$reflection() {
+    return record_type("MutableFieldItem.Body", [], Body, () => [["Pos", array_type(float64_type)], ["Count", int32_type]]);
+}
+
+export function read(body, i) {
+    return body.Pos[i] ?? item(i, body.Pos);
+}
+
+export function readAtField(xs, body) {
+    return xs[body.Count] ?? item(body.Count, xs);
+}
+
+export function writeAtField(xs, body, v) {
+    ((body.Count >= 0) && (body.Count < xs.length)) ? (xs[body.Count] = v) : setItem(xs, body.Count, v);
+}
+
+export function readProperty(holder, i) {
+    return item(i, holder.Items);
+}
+

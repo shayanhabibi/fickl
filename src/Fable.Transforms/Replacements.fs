@@ -2236,14 +2236,15 @@ let (|PrintfNoFormatSpecifiers|_|) (arg: Expr) =
         | _ -> None
     | _ -> None
 
-/// True when the expression can be written twice in the output: evaluating it again has no effect and gives the
-/// same value
+/// True when the expression can be written twice in a row in the output: evaluating it again at once has no effect
+/// and gives the same value. Nothing may run between the copies, as a local or a field can be mutable.
 let rec canRepeat e =
     match e with
     | IdentExpr _
     | Value((StringConstant _ | NumberConstant _ | CharConstant _ | BoolConstant _), _) -> true
     | TypeCast(e, _) -> canRepeat e
-    | Get(e, FieldGet info, _, _) -> not info.CanHaveSideEffects && canRepeat e
+    // A property may run code, a field does not
+    | Get(e, FieldGet info, _, _) -> not info.MaybeCalculated && canRepeat e
     | _ -> false
 
 /// A write to an array. For a local array this is a `Set`, which Fable2Babel stores at the place it is written when
