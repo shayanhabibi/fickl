@@ -2236,13 +2236,23 @@ let (|PrintfNoFormatSpecifiers|_|) (arg: Expr) =
         | _ -> None
     | _ -> None
 
-let rec private canRepeat e =
+/// True when the expression can be written twice in a row in the output: evaluating it again at once has no effect
+/// and gives the same value. Nothing may run between the copies, as a local or a field can be mutable.
+let rec canRepeat e =
     match e with
     | IdentExpr _
     | Value((StringConstant _ | NumberConstant _ | CharConstant _ | BoolConstant _), _) -> true
     | TypeCast(e, _) -> canRepeat e
-    | Get(e, FieldGet info, _, _) -> not info.CanHaveSideEffects && canRepeat e
+    // A property may run code, a field does not
+    | Get(e, FieldGet info, _, _) -> not info.MaybeCalculated && canRepeat e
     | _ -> false
+
+/// A write to an array. For a local array this is a `Set`, which Fable2Babel stores at the place it is written when
+/// the index is in range; any other array goes through the library's `setItem`
+let arraySetItem (com: ICompiler) r (t: Type) (ar: Expr) (idx: Expr) (value: Expr) (signatureArgTypes: Type list) =
+    match ar with
+    | IdentExpr { Type = Array _ } -> setExpr r ar idx value
+    | _ -> Helper.LibCall(com, "Array", "setItem", t, [ ar; idx; value ], signatureArgTypes, ?loc = r)
 
 // The fallback only runs for a nullish read, and every out-of-bounds read is nullish
 let readAtCallSite (com: ICompiler) r t container idx (fallback: Expr) =
@@ -3250,8 +3260,7 @@ let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (this
         |> withTag "array"
         |> Some
     | "get_Item", Some ar, [ idx ] -> arrayGetItem com r t [ idx; ar ] []
-    | "set_Item", Some ar, [ idx; value ] ->
-        Helper.LibCall(com, "Array", "setItem", t, [ ar; idx; value ], ?loc = r) |> Some
+    | "set_Item", Some ar, [ idx; value ] -> arraySetItem com r t ar idx value [] |> Some
     | "CopyTo", Some ar, [ target ] ->
         let count = getFieldWith r t ar "length"
         copyToArray com r t i [ ar; makeIntConst 0; target; makeIntConst 0; count ]
@@ -3668,9 +3677,7 @@ let arrayModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Ex
     | ("Length" | "Count"), [ arg ] -> getFieldWith r t arg "length" |> Some
     | "Item", [ idx; ar ] -> arrayGetItem com r t [ idx; ar ] i.SignatureArgTypes
     | "Get", [ ar; idx ] -> arrayGetItem com r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
-    | "Set", [ ar; idx; value ] ->
-        Helper.LibCall(com, "Array", "setItem", t, [ ar; idx; value ], i.SignatureArgTypes, ?loc = r)
-        |> Some
+    | "Set", [ ar; idx; value ] -> arraySetItem com r t ar idx value i.SignatureArgTypes |> Some
     | "ZeroCreate", [ count ] -> createArray count None |> Some
     | "Create", [ count; value ] -> createArray count (Some value) |> Some
     | "Empty", _ ->

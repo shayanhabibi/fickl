@@ -5152,8 +5152,31 @@ but thanks to the optimisation done below we get
             match ident.Type with
             | Fable.Type.Array _ ->
                 match kind with
-                | Fable.ExprSet(TransformExpr com ctx index) ->
-                    libCall com ctx range "Array" "setItem" [] [ expr; index; value ]
+                | Fable.ExprSet indexExpr ->
+                    let index = com.TransformAsExpr(ctx, indexExpr)
+                    let checkedSet = libCall com ctx range "Array" "setItem" [] [ expr; index; value ]
+
+                    // fickl: V8 keeps type feedback per function, so the store inside the shared `setItem` runs
+                    // generic once an app has written several kinds of array. An index in range is stored here,
+                    // and `setItem` only runs to throw. The value is in both branches, so it is evaluated once
+                    // and before the throw, as on .NET.
+                    if JS.Replacements.canRepeat indexExpr then
+                        let belowLength =
+                            Expression.binaryExpression (BinaryLess, index, get None expr "length")
+
+                        let inRange =
+                            match indexExpr with
+                            | Fable.Value(Fable.NumberConstant(Fable.NumberValue.Int32 i, _), _) when i >= 0 ->
+                                belowLength
+                            | _ ->
+                                let notBelowZero =
+                                    Expression.binaryExpression (BinaryGreaterOrEqual, index, ofInt 0)
+
+                                Expression.logicalExpression (notBelowZero, LogicalAnd, belowLength)
+
+                        Expression.conditionalExpression (inRange, assign None ret value, checkedSet, ?loc = range)
+                    else
+                        checkedSet
 
                 | _ -> assign range ret value
             | _ -> assign range ret value

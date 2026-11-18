@@ -1,0 +1,29 @@
+import { setItem } from "./fable_modules/fable-library-js.5.27.0/Array.js";
+
+export function setLocal(xs, i, v) {
+    ((i >= 0) && (i < xs.length)) ? (xs[i] = v) : setItem(xs, i, v);
+}
+
+export function setConstant(xs) {
+    (2 < xs.length) ? (xs[2] = 7) : setItem(xs, 2, 7);
+}
+
+export function setFromCall(xs, i, next) {
+    ((i >= 0) && (i < xs.length)) ? (xs[i] = next()) : setItem(xs, i, next());
+}
+
+export function setByModule(xs, i) {
+    ((i >= 0) && (i < xs.length)) ? (xs[i] = 3) : setItem(xs, i, 3);
+}
+
+export function setResizeArray(xs, i) {
+    ((i >= 0) && (i < xs.length)) ? (xs[i] = "a") : setItem(xs, i, "a");
+}
+
+export function setAtCallIndex(xs, next) {
+    setItem(xs, next(), 1);
+}
+
+export function setInCallResult(make, i) {
+    setItem(make(), i, 3);
+}

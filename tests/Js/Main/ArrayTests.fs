@@ -61,6 +61,12 @@ type MyStruct(value: int, flag: bool) =
     member _.Value = value
     member _.Flag = flag
 
+type MutableArrayHolder =
+    {
+        mutable Items: float[]
+        mutable Next: int
+    }
+
 let tests =
   testList "Arrays" [
     testCase "Pattern matching with arrays works" <| fun () ->
@@ -357,6 +363,130 @@ let tests =
         throwsAnyError (fun () -> Array.set b 0 10.)
         throwsAnyError (fun () -> b[0] <- 10.)
         throwsAnyError (fun () -> b.[0] <- 10.)
+
+    testCase "Array setter stores in range on plain and typed arrays" <| fun () ->
+        let setName (xs: string[]) (i: int) (v: string) = xs[i] <- v
+        let setFloat (xs: float[]) (i: int) (v: float) = xs[i] <- v
+        let setInt (xs: int[]) (i: int) (v: int) = xs[i] <- v
+        let names = [| "a"; "b"; "c" |]
+        let floats = [| 1.; 2.; 3. |]
+        let ints = [| 1; 2; 3 |]
+        setName names 0 "x"
+        setName names 2 "z"
+        setFloat floats 0 10.
+        setFloat floats 2 30.
+        setInt ints 0 10
+        setInt ints 2 30
+        names |> equal [| "x"; "b"; "z" |]
+        floats |> equal [| 10.; 2.; 30. |]
+        ints |> equal [| 10; 2; 30 |]
+
+    testCase "Array setter throws below zero and past the end on plain and typed arrays" <| fun () ->
+        let setName (xs: string[]) (i: int) (v: string) = xs[i] <- v
+        let setFloat (xs: float[]) (i: int) (v: float) = xs[i] <- v
+        let setInt (xs: int[]) (i: int) (v: int) = xs[i] <- v
+        let names = [| "a"; "b"; "c" |]
+        let floats = [| 1.; 2.; 3. |]
+        let ints = [| 1; 2; 3 |]
+        throwsAnyError (fun () -> setName names -1 "x")
+        throwsAnyError (fun () -> setName names 3 "x")
+        throwsAnyError (fun () -> setFloat floats -1 10.)
+        throwsAnyError (fun () -> setFloat floats 3 10.)
+        throwsAnyError (fun () -> setInt ints -1 10)
+        throwsAnyError (fun () -> setInt ints 3 10)
+        // A write that throws leaves the array as it was
+        names |> equal [| "a"; "b"; "c" |]
+        floats |> equal [| 1.; 2.; 3. |]
+        ints |> equal [| 1; 2; 3 |]
+
+    testCase "Array setter evaluates the value once, also when the index is out of range" <| fun () ->
+        let mutable calls = 0
+        let next () =
+            calls <- calls + 1
+            calls
+        let setNext (xs: int[]) (i: int) = xs[i] <- next ()
+        let xs = [| 0; 0; 0 |]
+        setNext xs 1
+        calls |> equal 1
+        xs |> equal [| 0; 1; 0 |]
+        // As on .NET, the value is evaluated before the index is found to be out of range
+        throwsAnyError (fun () -> setNext xs 3)
+        calls |> equal 2
+        throwsAnyError (fun () -> setNext xs -1)
+        calls |> equal 3
+
+    testCase "Array setter evaluates an index with effects once" <| fun () ->
+        let mutable calls = 0
+        let next () =
+            calls <- calls + 1
+            calls
+        let xs = [| 0; 0; 0 |]
+        xs[next ()] <- 5
+        calls |> equal 1
+        xs |> equal [| 0; 5; 0 |]
+        Array.set xs (next ()) 6
+        calls |> equal 2
+        xs |> equal [| 0; 5; 6 |]
+        throwsAnyError (fun () -> xs[next ()] <- 7)
+        calls |> equal 3
+
+    testCase "Array in a mutable field is read by index, and throws out of range" <| fun () ->
+        let read (holder: MutableArrayHolder) (i: int) = holder.Items[i]
+        let holder = { Items = [| 1.; 2.; 3. |]; Next = 1 }
+        read holder 0 |> equal 1.
+        read holder 2 |> equal 3.
+        throwsAnyError (fun () -> read holder -1)
+        throwsAnyError (fun () -> read holder 3)
+        holder.Items <- [| 5. |]
+        read holder 0 |> equal 5.
+        throwsAnyError (fun () -> read holder 1)
+
+    testCase "Array is read and written at an index held in a mutable field" <| fun () ->
+        let readNext (xs: float[]) (holder: MutableArrayHolder) = xs[holder.Next]
+        let writeNext (xs: float[]) (holder: MutableArrayHolder) (v: float) = xs[holder.Next] <- v
+        let xs = [| 1.; 2.; 3. |]
+        let holder = { Items = [||]; Next = 1 }
+        readNext xs holder |> equal 2.
+        writeNext xs holder 20.
+        xs |> equal [| 1.; 20.; 3. |]
+        holder.Next <- 3
+        throwsAnyError (fun () -> readNext xs holder)
+        throwsAnyError (fun () -> writeNext xs holder 0.)
+        holder.Next <- -1
+        throwsAnyError (fun () -> readNext xs holder)
+        throwsAnyError (fun () -> writeNext xs holder 0.)
+        xs |> equal [| 1.; 20.; 3. |]
+
+    testCase "Array write uses the index its mutable field held before the value ran" <| fun () ->
+        let xs = [| 1.; 2.; 3. |]
+        let holder = { Items = [||]; Next = 1 }
+        let moveTo (next: int) (v: float) =
+            holder.Next <- next
+            v
+        // The index is read before the value moves it, in range ...
+        xs[holder.Next] <- moveTo 2 20.
+        xs |> equal [| 1.; 20.; 3. |]
+        holder.Next |> equal 2
+        // ... and out of range, where the value still runs before the throw
+        holder.Next <- 3
+        throwsAnyError (fun () -> xs[holder.Next] <- moveTo 0 30.)
+        holder.Next |> equal 0
+        xs |> equal [| 1.; 20.; 3. |]
+
+    testCase "Array.set and a ResizeArray setter check the bounds of a local" <| fun () ->
+        let setByModule (xs: int[]) (i: int) (v: int) = Array.set xs i v
+        let setList (xs: ResizeArray<string>) (i: int) (v: string) = xs[i] <- v
+        let ints = [| 1; 2; 3 |]
+        let names = ResizeArray [ "a"; "b"; "c" ]
+        setByModule ints 2 30
+        setList names 2 "z"
+        ints |> equal [| 1; 2; 30 |]
+        List.ofSeq names |> equal [ "a"; "b"; "z" ]
+        throwsAnyError (fun () -> setByModule ints -1 0)
+        throwsAnyError (fun () -> setByModule ints 3 0)
+        throwsAnyError (fun () -> setList names -1 "x")
+        throwsAnyError (fun () -> setList names 3 "x")
+        names.Count |> equal 3
 
     testCase "Array equality works" <| fun () ->
         let a1 = [|1; 2; 3|]
