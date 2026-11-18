@@ -544,7 +544,7 @@ let private isLibraryFieldOwner (com: IFableCompiler) (ownerTyp: FSharpType) =
     | JavaScript
     | TypeScript when ownerTyp.HasTypeDefinition ->
         match ownerTyp.TypeDefinition.TryFullName with
-        | Some("System.Numerics.Vector2" | "System.Numerics.Vector3" | "System.Numerics.Vector4" | "System.Numerics.Matrix4x4") ->
+        | Some("System.Numerics.Vector2" | "System.Numerics.Vector3" | "System.Numerics.Vector4" | "System.Numerics.Matrix4x4" | "System.Numerics.Quaternion") ->
             true
         | _ -> false
     | _ -> false

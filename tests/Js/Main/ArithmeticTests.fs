@@ -1163,6 +1163,21 @@ let tests =
     testCase "Math.Log2 works" <| fun () ->
         Math.Log2 8.0 |> checkTo3dp 3000.
 
+    testCase "Math.Asinh, Math.Acosh and Math.Atanh work" <| fun () ->
+        Math.Asinh 1.0 |> checkTo3dp 881.
+        Math.Acosh 2.0 |> checkTo3dp 1316.
+        Math.Atanh 0.5 |> checkTo3dp 549.
+        float (MathF.Asinh 1.0f) |> checkTo3dp 881.
+        float (MathF.Acosh 2.0f) |> checkTo3dp 1316.
+        float (MathF.Atanh 0.5f) |> checkTo3dp 549.
+
+    testCase "Math.Cbrt works" <| fun () ->
+        abs (Math.Cbrt 27.0 - 3.0) < 1e-12 |> equal true
+        abs (Math.Cbrt(-8.0) + 2.0) < 1e-12 |> equal true
+        abs (MathF.Cbrt 27.0f - 3.0f) < 1e-6f |> equal true
+        // A float32 cube root is rounded to single precision
+        float (MathF.Cbrt 2.0f) = Math.Cbrt 2.0 |> equal false
+
     testCase "Math.log10 works" <| fun () ->
         Math.Log10 232.12 |> checkTo3dp 2365.
 
