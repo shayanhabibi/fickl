@@ -1,0 +1,31 @@
+import { setItem } from "./fable_modules/fable-library-ts.5.27.0/Array.ts";
+import type { int32, float64 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import type { MutableArray } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+
+export function setLocal(xs: MutableArray<float64>, i: int32, v: float64): void {
+    ((i >= 0) && (i < xs.length)) ? (xs[i] = v) : setItem(xs, i, v);
+}
+
+export function setConstant(xs: MutableArray<int32>): void {
+    (2 < xs.length) ? (xs[2] = 7) : setItem(xs, 2, 7);
+}
+
+export function setFromCall(xs: MutableArray<string>, i: int32, next: (() => string)): void {
+    ((i >= 0) && (i < xs.length)) ? (xs[i] = next()) : setItem(xs, i, next());
+}
+
+export function setByModule(xs: MutableArray<int32>, i: int32): void {
+    ((i >= 0) && (i < xs.length)) ? (xs[i] = 3) : setItem(xs, i, 3);
+}
+
+export function setResizeArray(xs: string[], i: int32): void {
+    ((i >= 0) && (i < xs.length)) ? (xs[i] = "a") : setItem(xs, i, "a");
+}
+
+export function setAtCallIndex(xs: MutableArray<float64>, next: (() => int32)): void {
+    setItem(xs, next(), 1);
+}
+
+export function setInCallResult(make: (() => MutableArray<int32>), i: int32): void {
+    setItem(make(), i, 3);
+}

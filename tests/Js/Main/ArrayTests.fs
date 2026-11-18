@@ -358,6 +358,87 @@ let tests =
         throwsAnyError (fun () -> b[0] <- 10.)
         throwsAnyError (fun () -> b.[0] <- 10.)
 
+    testCase "Array setter stores in range on plain and typed arrays" <| fun () ->
+        let setName (xs: string[]) (i: int) (v: string) = xs[i] <- v
+        let setFloat (xs: float[]) (i: int) (v: float) = xs[i] <- v
+        let setInt (xs: int[]) (i: int) (v: int) = xs[i] <- v
+        let names = [| "a"; "b"; "c" |]
+        let floats = [| 1.; 2.; 3. |]
+        let ints = [| 1; 2; 3 |]
+        setName names 0 "x"
+        setName names 2 "z"
+        setFloat floats 0 10.
+        setFloat floats 2 30.
+        setInt ints 0 10
+        setInt ints 2 30
+        names |> equal [| "x"; "b"; "z" |]
+        floats |> equal [| 10.; 2.; 30. |]
+        ints |> equal [| 10; 2; 30 |]
+
+    testCase "Array setter throws below zero and past the end on plain and typed arrays" <| fun () ->
+        let setName (xs: string[]) (i: int) (v: string) = xs[i] <- v
+        let setFloat (xs: float[]) (i: int) (v: float) = xs[i] <- v
+        let setInt (xs: int[]) (i: int) (v: int) = xs[i] <- v
+        let names = [| "a"; "b"; "c" |]
+        let floats = [| 1.; 2.; 3. |]
+        let ints = [| 1; 2; 3 |]
+        throwsAnyError (fun () -> setName names -1 "x")
+        throwsAnyError (fun () -> setName names 3 "x")
+        throwsAnyError (fun () -> setFloat floats -1 10.)
+        throwsAnyError (fun () -> setFloat floats 3 10.)
+        throwsAnyError (fun () -> setInt ints -1 10)
+        throwsAnyError (fun () -> setInt ints 3 10)
+        // A write that throws leaves the array as it was
+        names |> equal [| "a"; "b"; "c" |]
+        floats |> equal [| 1.; 2.; 3. |]
+        ints |> equal [| 1; 2; 3 |]
+
+    testCase "Array setter evaluates the value once, also when the index is out of range" <| fun () ->
+        let mutable calls = 0
+        let next () =
+            calls <- calls + 1
+            calls
+        let setNext (xs: int[]) (i: int) = xs[i] <- next ()
+        let xs = [| 0; 0; 0 |]
+        setNext xs 1
+        calls |> equal 1
+        xs |> equal [| 0; 1; 0 |]
+        // As on .NET, the value is evaluated before the index is found to be out of range
+        throwsAnyError (fun () -> setNext xs 3)
+        calls |> equal 2
+        throwsAnyError (fun () -> setNext xs -1)
+        calls |> equal 3
+
+    testCase "Array setter evaluates an index with effects once" <| fun () ->
+        let mutable calls = 0
+        let next () =
+            calls <- calls + 1
+            calls
+        let xs = [| 0; 0; 0 |]
+        xs[next ()] <- 5
+        calls |> equal 1
+        xs |> equal [| 0; 5; 0 |]
+        Array.set xs (next ()) 6
+        calls |> equal 2
+        xs |> equal [| 0; 5; 6 |]
+        throwsAnyError (fun () -> xs[next ()] <- 7)
+        calls |> equal 3
+
+    testCase "Array.set and a ResizeArray setter check the bounds of a local" <| fun () ->
+        let setByModule (xs: int[]) (i: int) (v: int) = Array.set xs i v
+        let setList (xs: ResizeArray<string>) (i: int) (v: string) = xs[i] <- v
+        let ints = [| 1; 2; 3 |]
+        let names = ResizeArray [ "a"; "b"; "c" ]
+        setByModule ints 2 30
+        setList names 2 "z"
+        ints |> equal [| 1; 2; 30 |]
+        List.ofSeq names |> equal [ "a"; "b"; "z" ]
+        throwsAnyError (fun () -> setByModule ints -1 0)
+        throwsAnyError (fun () -> setByModule ints 3 0)
+        throwsAnyError (fun () -> setList names -1 "x")
+        throwsAnyError (fun () -> setList names 3 "x")
+        names.Count |> equal 3
+
     testCase "Array equality works" <| fun () ->
         let a1 = [|1; 2; 3|]
         let a2 = [|1; 2; 3|]
