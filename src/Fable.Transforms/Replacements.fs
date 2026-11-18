@@ -1855,7 +1855,8 @@ let rec defaultof (com: ICompiler) (ctx: Context) r t =
          | "System.Numerics.Vector2"
          | "System.Numerics.Vector3"
          | "System.Numerics.Vector4"
-         | "System.Numerics.Matrix4x4" -> true
+         | "System.Numerics.Matrix4x4"
+         | "System.Numerics.Quaternion" -> true
          | _ -> false)
         ->
         let name = entRef.FullName.Substring("System.Numerics.".Length)
@@ -2489,7 +2490,7 @@ let operators (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr o
             Helper.LibCall(com, "BigInt", "abs", t, args, i.SignatureArgTypes, ?thisArg = thisArg, ?loc = r)
             |> Some
         | _ -> math r t args i.SignatureArgTypes i.CompiledName |> Some
-    | ("Acos" | "Asin" | "Atan" | "Atan2" | "Cos" | "Cosh" | "Exp" | "Log" | "Log2" | "Log10" | "Sin" | "Sinh" | "Sqrt" | "Tan" | "Tanh"),
+    | ("Acos" | "Acosh" | "Asin" | "Asinh" | "Atan" | "Atan2" | "Atanh" | "Cbrt" | "Cos" | "Cosh" | "Exp" | "Log" | "Log2" | "Log10" | "Sin" | "Sinh" | "Sqrt" | "Tan" | "Tanh"),
       _ ->
         match args with
         // fickl: Math.sqrt, Math.sin... return a double; a float32 result is rounded to single precision, as the
@@ -3453,7 +3454,7 @@ let stringComparers (com: ICompiler) (_: Context) _r (t: Type) (i: CallInfo) (th
         Helper.InstanceCall(comparer, meth, t, args, i.SignatureArgTypes) |> Some
     | _ -> None
 
-/// fickl: System.Numerics.Vector2, Vector3, Vector4 and Matrix4x4 are classes of the runtime library
+/// fickl: System.Numerics.Vector2, Vector3, Vector4, Matrix4x4 and Quaternion are classes of the runtime library
 /// (System.Numerics.fs). A member the library does not define is reported as unsupported.
 let numericsVectors (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr option) (args: Expr list) =
     match i.CompiledName, thisArg, args with
@@ -6759,6 +6760,7 @@ let private replacedModules =
             "System.Numerics.Vector3", numericsVectors
             "System.Numerics.Vector4", numericsVectors
             "System.Numerics.Matrix4x4", numericsVectors
+            "System.Numerics.Quaternion", numericsVectors
             "System.StringComparer", stringComparers
             Types.array, arrays
             Types.array + "`2", arrays2D

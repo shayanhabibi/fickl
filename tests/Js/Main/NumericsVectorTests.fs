@@ -34,6 +34,17 @@ type private Particle =
     val mutable Velocity: Vector4
     val mutable Age: float32
 
+let private closeQ (x: float32, y: float32, z: float32, w: float32) (q: Quaternion) =
+    close x q.X
+    close y q.Y
+    close z q.Z
+    close w q.W
+
+[<Struct>]
+type private Pose =
+    val mutable Position: Vector3
+    val mutable Rotation: Quaternion
+
 let private half = MathF.PI / 2.0f
 
 let tests =
@@ -353,4 +364,138 @@ let tests =
         let v = Vector2(0.1f, 0.2f) + Vector2(0.2f, 0.1f)
         v.X |> equal (0.1f + 0.2f)
         float v.X = 0.1 + 0.2 |> equal false
+
+    testCase "Quaternion constructors, fields and constants work" <| fun () ->
+        let q = Quaternion(1.0f, 2.0f, 3.0f, 4.0f)
+        (q.X, q.Y, q.Z, q.W) |> equal (1.0f, 2.0f, 3.0f, 4.0f)
+        Quaternion(Vector3(1.0f, 2.0f, 3.0f), 4.0f) |> equal q
+        Quaternion.Identity |> equal (Quaternion(0.0f, 0.0f, 0.0f, 1.0f))
+        Quaternion.Zero |> equal (Quaternion(0.0f, 0.0f, 0.0f, 0.0f))
+        Quaternion.Identity.IsIdentity |> equal true
+        q.IsIdentity |> equal false
+        q.ToString() |> equal "{X:1 Y:2 Z:3 W:4}"
+
+    testCase "Quaternion fields can be set" <| fun () ->
+        let mutable q = Quaternion.Identity
+        q.X <- 5.0f
+        q.W <- 2.0f
+        (q.X, q.Y, q.Z, q.W) |> equal (5.0f, 0.0f, 0.0f, 2.0f)
+
+    testCase "A default Quaternion is zero" <| fun () ->
+        let q = Quaternion()
+        (q.X, q.Y, q.Z, q.W) |> equal (0.0f, 0.0f, 0.0f, 0.0f)
+        Unchecked.defaultof<Quaternion> |> equal Quaternion.Zero
+        let pose = Pose()
+        pose.Rotation |> equal Quaternion.Zero
+
+    testCase "Quaternion arithmetic works" <| fun () ->
+        let a = Quaternion(1.0f, 2.0f, 3.0f, 4.0f)
+        let b = Quaternion(5.0f, 6.0f, 7.0f, 8.0f)
+        a + b |> equal (Quaternion(6.0f, 8.0f, 10.0f, 12.0f))
+        b - a |> equal (Quaternion(4.0f, 4.0f, 4.0f, 4.0f))
+        -a |> equal (Quaternion(-1.0f, -2.0f, -3.0f, -4.0f))
+        a * 2.0f |> equal (Quaternion(2.0f, 4.0f, 6.0f, 8.0f))
+        a * b |> equal (Quaternion(24.0f, 48.0f, 48.0f, -6.0f))
+        b * a |> equal (Quaternion(32.0f, 32.0f, 56.0f, -6.0f))
+        Quaternion.Multiply(a, b) |> equal (a * b)
+        Quaternion.Multiply(a, 2.0f) |> equal (a * 2.0f)
+        Quaternion.Add(a, b) |> equal (a + b)
+        Quaternion.Subtract(b, a) |> equal (b - a)
+        Quaternion.Negate a |> equal (-a)
+        Quaternion.Dot(a, b) |> equal 70.0f
+
+    testCase "Quaternion Concatenate applies the first rotation first" <| fun () ->
+        let a = Quaternion(1.0f, 2.0f, 3.0f, 4.0f)
+        let b = Quaternion(5.0f, 6.0f, 7.0f, 8.0f)
+        Quaternion.Concatenate(a, b) |> equal (b * a)
+        let aboutZ = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, half)
+        let aboutX = Quaternion.CreateFromAxisAngle(Vector3.UnitX, half)
+        // X turns to Y about Z, and Y then turns to Z about X
+        Vector3.Transform(Vector3.UnitX, Quaternion.Concatenate(aboutZ, aboutX)) |> closeV3 (0.0f, 0.0f, 1.0f)
+
+    testCase "Quaternion equality works" <| fun () ->
+        let a = Quaternion(1.0f, 2.0f, 3.0f, 4.0f)
+        a = Quaternion(1.0f, 2.0f, 3.0f, 4.0f) |> equal true
+        a <> Quaternion(1.0f, 2.0f, 3.0f, 5.0f) |> equal true
+        a.Equals(Quaternion(1.0f, 2.0f, 3.0f, 4.0f)) |> equal true
+        a.GetHashCode() = Quaternion(1.0f, 2.0f, 3.0f, 4.0f).GetHashCode() |> equal true
+
+    testCase "Quaternion length, normalization, conjugate and inverse work" <| fun () ->
+        let q = Quaternion(1.0f, 2.0f, 3.0f, 4.0f)
+        q.LengthSquared() |> equal 30.0f
+        close 5.477226f (q.Length())
+        close 1.0f (Quaternion.Normalize(q).Length())
+        closeQ (0.18257418f, 0.36514837f, 0.5477226f, 0.73029673f) (Quaternion.Normalize q)
+        Quaternion.Conjugate q |> equal (Quaternion(-1.0f, -2.0f, -3.0f, 4.0f))
+        closeQ (-0.033333335f, -0.06666667f, -0.1f, 0.13333334f) (Quaternion.Inverse q)
+        closeQ (0.0f, 0.0f, 0.0f, 1.0f) (q * Quaternion.Inverse q)
+        closeQ (0.0f, 0.0f, 0.0f, 1.0f) (q / q)
+        closeQ (0.0f, 0.0f, 0.0f, 1.0f) (Quaternion.Divide(q, q))
+
+    testCase "Quaternion CreateFromAxisAngle rotates vectors" <| fun () ->
+        let q = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, half)
+        closeQ (0.0f, 0.0f, 0.70710677f, 0.70710677f) q
+        Vector3.Transform(Vector3.UnitX, q) |> closeV3 (0.0f, 1.0f, 0.0f)
+        Vector3.Transform(Vector3(1.0f, 2.0f, 3.0f), q) |> closeV3 (-2.0f, 1.0f, 3.0f)
+        let v2 = Vector2.Transform(Vector2(1.0f, 2.0f), q)
+        close -2.0f v2.X
+        close 1.0f v2.Y
+        let v4 = Vector4.Transform(Vector4(1.0f, 2.0f, 3.0f, 5.0f), q)
+        closeV3 (-2.0f, 1.0f, 3.0f) (Vector3(v4.X, v4.Y, v4.Z))
+        close 5.0f v4.W
+        let fromV3 = Vector4.Transform(Vector3(1.0f, 2.0f, 3.0f), q)
+        closeV3 (-2.0f, 1.0f, 3.0f) (Vector3(fromV3.X, fromV3.Y, fromV3.Z))
+        close 1.0f fromV3.W
+        let fromV2 = Vector4.Transform(Vector2(1.0f, 2.0f), q)
+        closeV3 (-2.0f, 1.0f, 0.0f) (Vector3(fromV2.X, fromV2.Y, fromV2.Z))
+        close 1.0f fromV2.W
+
+    testCase "Quaternion CreateFromYawPitchRoll turns about Y, X and Z" <| fun () ->
+        let s = 0.70710677f
+        closeQ (0.0f, s, 0.0f, s) (Quaternion.CreateFromYawPitchRoll(half, 0.0f, 0.0f))
+        closeQ (s, 0.0f, 0.0f, s) (Quaternion.CreateFromYawPitchRoll(0.0f, half, 0.0f))
+        closeQ (0.0f, 0.0f, s, s) (Quaternion.CreateFromYawPitchRoll(0.0f, 0.0f, half))
+        let q = Quaternion.CreateFromYawPitchRoll(0.3f, 0.5f, 0.7f)
+        closeQ (0.2794439f, 0.052132413f, 0.29377717f, 0.91262716f) q
+        let m = Matrix4x4.CreateFromYawPitchRoll(0.3f, 0.5f, 0.7f)
+        closeM (cells m) (Matrix4x4.CreateFromQuaternion q)
+
+    testCase "Matrix4x4 CreateFromQuaternion and Transform by a quaternion work" <| fun () ->
+        let q = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, half)
+        let turn = Matrix4x4.CreateRotationZ half
+        closeM (cells turn) (Matrix4x4.CreateFromQuaternion q)
+        closeM (cells turn) (Matrix4x4.Transform(Matrix4x4.Identity, q))
+        let moved = Matrix4x4.CreateScale(2.0f, 3.0f, 4.0f) * Matrix4x4.CreateTranslation(1.0f, 2.0f, 3.0f)
+        closeM (cells (moved * turn)) (Matrix4x4.Transform(moved, q))
+
+    testCase "Quaternion CreateFromRotationMatrix inverts CreateFromQuaternion" <| fun () ->
+        // A small turn has a positive trace; a turn of 3 radians about an axis makes that axis' diagonal cell the largest
+        let turns =
+            [
+                Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.4f)
+                Quaternion.CreateFromAxisAngle(Vector3.UnitX, 3.0f)
+                Quaternion.CreateFromAxisAngle(Vector3.UnitY, 3.0f)
+                Quaternion.CreateFromAxisAngle(Vector3.UnitZ, 3.0f)
+                Quaternion.CreateFromYawPitchRoll(0.3f, 0.5f, 0.7f)
+            ]
+
+        for q in turns do
+            closeQ (q.X, q.Y, q.Z, q.W) (Quaternion.CreateFromRotationMatrix(Matrix4x4.CreateFromQuaternion q))
+
+    testCase "Quaternion Lerp and Slerp work" <| fun () ->
+        let a = Quaternion.Identity
+        let b = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, half)
+        let mid = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, half / 2.0f)
+        let quarter = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, half / 4.0f)
+        let expect (q: Quaternion) = closeQ (q.X, q.Y, q.Z, q.W)
+        expect a (Quaternion.Slerp(a, b, 0.0f))
+        expect b (Quaternion.Slerp(a, b, 1.0f))
+        expect mid (Quaternion.Slerp(a, b, 0.5f))
+        expect quarter (Quaternion.Slerp(a, b, 0.25f))
+        expect mid (Quaternion.Lerp(a, b, 0.5f))
+        // With a negative dot product both take the shorter arc
+        expect mid (Quaternion.Slerp(a, -b, 0.5f))
+        expect mid (Quaternion.Lerp(a, -b, 0.5f))
+        // Nearly equal rotations are interpolated linearly
+        expect a (Quaternion.Slerp(a, a, 0.5f))
   ]

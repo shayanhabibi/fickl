@@ -247,8 +247,8 @@ type Complex(real: float, imaginary: float) =
     interface IEquatable<Complex> with
         member this.Equals(other: Complex) = this.Equals(box other)
 
-// System.Numerics.Vector2, Vector3, Vector4 and Matrix4x4. Structs in .NET, classes here: the fields are plain
-// properties, so reading `v.X` is a property load and each operation is a small function that returns a new object.
+// System.Numerics.Vector2, Vector3, Vector4, Matrix4x4 and Quaternion. Structs in .NET, classes here: the fields are
+// plain properties, so reading `v.X` is a property load and each operation is a small function that returns a new object.
 // A float32 is a JavaScript number, so a result can differ from .NET in its last bits until it is stored in a
 // Float32Array. Matrix4x4 follows the row-vector convention of .NET: a point is transformed as `v * M`.
 
@@ -362,6 +362,21 @@ type Vector2 =
         Vector2(
             position.X * matrix.M11 + position.Y * matrix.M21 + matrix.M41,
             position.X * matrix.M12 + position.Y * matrix.M22 + matrix.M42
+        )
+
+    static member Transform(value: Vector2, rotation: Quaternion) =
+        let x2 = rotation.X + rotation.X
+        let y2 = rotation.Y + rotation.Y
+        let z2 = rotation.Z + rotation.Z
+        let wz2 = rotation.W * z2
+        let xx2 = rotation.X * x2
+        let xy2 = rotation.X * y2
+        let yy2 = rotation.Y * y2
+        let zz2 = rotation.Z * z2
+
+        Vector2(
+            value.X * (1.0f - yy2 - zz2) + value.Y * (xy2 - wz2),
+            value.X * (xy2 + wz2) + value.Y * (1.0f - xx2 - zz2)
         )
 
     static member TransformNormal(normal: Vector2, matrix: Matrix4x4) =
@@ -541,6 +556,26 @@ and [<Sealed; AllowNullLiteral>] Vector3 =
             + position.Y * matrix.M23
             + position.Z * matrix.M33
             + matrix.M43
+        )
+
+    static member Transform(value: Vector3, rotation: Quaternion) =
+        let x2 = rotation.X + rotation.X
+        let y2 = rotation.Y + rotation.Y
+        let z2 = rotation.Z + rotation.Z
+        let wx2 = rotation.W * x2
+        let wy2 = rotation.W * y2
+        let wz2 = rotation.W * z2
+        let xx2 = rotation.X * x2
+        let xy2 = rotation.X * y2
+        let xz2 = rotation.X * z2
+        let yy2 = rotation.Y * y2
+        let yz2 = rotation.Y * z2
+        let zz2 = rotation.Z * z2
+
+        Vector3(
+            value.X * (1.0f - yy2 - zz2) + value.Y * (xy2 - wz2) + value.Z * (xz2 + wy2),
+            value.X * (xy2 + wz2) + value.Y * (1.0f - xx2 - zz2) + value.Z * (yz2 - wx2),
+            value.X * (xz2 - wy2) + value.Y * (yz2 + wx2) + value.Z * (1.0f - xx2 - yy2)
         )
 
     static member TransformNormal(normal: Vector3, matrix: Matrix4x4) =
@@ -779,6 +814,18 @@ and [<Sealed; AllowNullLiteral>] Vector4 =
             + vector.Z * matrix.M34
             + vector.W * matrix.M44
         )
+
+    static member Transform(value: Vector2, rotation: Quaternion) =
+        let turned = Vector3.Transform(Vector3(value.X, value.Y, 0.0f), rotation)
+        Vector4(turned.X, turned.Y, turned.Z, 1.0f)
+
+    static member Transform(value: Vector3, rotation: Quaternion) =
+        let turned = Vector3.Transform(value, rotation)
+        Vector4(turned.X, turned.Y, turned.Z, 1.0f)
+
+    static member Transform(value: Vector4, rotation: Quaternion) =
+        let turned = Vector3.Transform(Vector3(value.X, value.Y, value.Z), rotation)
+        Vector4(turned.X, turned.Y, turned.Z, value.W)
 
     override this.Equals(other: obj) =
         match other with
@@ -1196,6 +1243,62 @@ and [<Sealed; AllowNullLiteral>] Matrix4x4 =
             1.0f
         )
 
+    static member CreateFromQuaternion(quaternion: Quaternion) =
+        let xx = quaternion.X * quaternion.X
+        let yy = quaternion.Y * quaternion.Y
+        let zz = quaternion.Z * quaternion.Z
+        let xy = quaternion.X * quaternion.Y
+        let wz = quaternion.Z * quaternion.W
+        let xz = quaternion.Z * quaternion.X
+        let wy = quaternion.Y * quaternion.W
+        let yz = quaternion.Y * quaternion.Z
+        let wx = quaternion.X * quaternion.W
+
+        Matrix4x4(
+            1.0f - 2.0f * (yy + zz),
+            2.0f * (xy + wz),
+            2.0f * (xz - wy),
+            0.0f,
+            2.0f * (xy - wz),
+            1.0f - 2.0f * (zz + xx),
+            2.0f * (yz + wx),
+            0.0f,
+            2.0f * (xz + wy),
+            2.0f * (yz - wx),
+            1.0f - 2.0f * (yy + xx),
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f
+        )
+
+    static member CreateFromYawPitchRoll(yaw: float32, pitch: float32, roll: float32) =
+        Matrix4x4.CreateFromQuaternion(Quaternion.CreateFromYawPitchRoll(yaw, pitch, roll))
+
+    /// Turns the three axis rows and the translation row of the matrix by the rotation; the fourth column is kept.
+    static member Transform(value: Matrix4x4, rotation: Quaternion) =
+        let q = Matrix4x4.CreateFromQuaternion rotation
+
+        Matrix4x4(
+            value.M11 * q.M11 + value.M12 * q.M21 + value.M13 * q.M31,
+            value.M11 * q.M12 + value.M12 * q.M22 + value.M13 * q.M32,
+            value.M11 * q.M13 + value.M12 * q.M23 + value.M13 * q.M33,
+            value.M14,
+            value.M21 * q.M11 + value.M22 * q.M21 + value.M23 * q.M31,
+            value.M21 * q.M12 + value.M22 * q.M22 + value.M23 * q.M32,
+            value.M21 * q.M13 + value.M22 * q.M23 + value.M23 * q.M33,
+            value.M24,
+            value.M31 * q.M11 + value.M32 * q.M21 + value.M33 * q.M31,
+            value.M31 * q.M12 + value.M32 * q.M22 + value.M33 * q.M32,
+            value.M31 * q.M13 + value.M32 * q.M23 + value.M33 * q.M33,
+            value.M34,
+            value.M41 * q.M11 + value.M42 * q.M21 + value.M43 * q.M31,
+            value.M41 * q.M12 + value.M42 * q.M22 + value.M43 * q.M32,
+            value.M41 * q.M13 + value.M42 * q.M23 + value.M43 * q.M33,
+            value.M44
+        )
+
     static member CreateLookAt(cameraPosition: Vector3, cameraTarget: Vector3, cameraUpVector: Vector3) =
         let zAxis = Vector3.Normalize(cameraPosition - cameraTarget)
         let xAxis = Vector3.Normalize(Vector3.Cross(cameraUpVector, zAxis))
@@ -1502,6 +1605,261 @@ and [<Sealed; AllowNullLiteral>] Matrix4x4 =
 
     interface IEquatable<Matrix4x4> with
         member this.Equals(other: Matrix4x4) = this.Equals(box other)
+
+/// A rotation as a vector part (X, Y, Z) and a scalar part W. The product `a * b` applies `b` first.
+and [<Sealed; AllowNullLiteral>] Quaternion =
+    val mutable X: float32
+    val mutable Y: float32
+    val mutable Z: float32
+    val mutable W: float32
+
+    new(x: float32, y: float32, z: float32, w: float32)
+        =
+        {
+            X = x
+            Y = y
+            Z = z
+            W = w
+        }
+
+    new(vectorPart: Vector3, scalarPart: float32)
+        =
+        {
+            X = vectorPart.X
+            Y = vectorPart.Y
+            Z = vectorPart.Z
+            W = scalarPart
+        }
+
+    static member Zero = Quaternion(0.0f, 0.0f, 0.0f, 0.0f)
+    static member Identity = Quaternion(0.0f, 0.0f, 0.0f, 1.0f)
+
+    member this.IsIdentity =
+        this.X = 0.0f && this.Y = 0.0f && this.Z = 0.0f && this.W = 1.0f
+
+    static member (+)(value1: Quaternion, value2: Quaternion) =
+        Quaternion(value1.X + value2.X, value1.Y + value2.Y, value1.Z + value2.Z, value1.W + value2.W)
+
+    static member (-)(value1: Quaternion, value2: Quaternion) =
+        Quaternion(value1.X - value2.X, value1.Y - value2.Y, value1.Z - value2.Z, value1.W - value2.W)
+
+    static member (*)(value1: Quaternion, value2: Quaternion) =
+        let cx = value1.Y * value2.Z - value1.Z * value2.Y
+        let cy = value1.Z * value2.X - value1.X * value2.Z
+        let cz = value1.X * value2.Y - value1.Y * value2.X
+        let dot = value1.X * value2.X + value1.Y * value2.Y + value1.Z * value2.Z
+
+        Quaternion(
+            value1.X * value2.W + value2.X * value1.W + cx,
+            value1.Y * value2.W + value2.Y * value1.W + cy,
+            value1.Z * value2.W + value2.Z * value1.W + cz,
+            value1.W * value2.W - dot
+        )
+
+    static member (*)(value1: Quaternion, value2: float32) =
+        Quaternion(value1.X * value2, value1.Y * value2, value1.Z * value2, value1.W * value2)
+
+    static member (/)(value1: Quaternion, value2: Quaternion) = value1 * Quaternion.Inverse value2
+
+    static member (~-)(value: Quaternion) =
+        Quaternion(-value.X, -value.Y, -value.Z, -value.W)
+
+    static member op_Equality(value1: Quaternion, value2: Quaternion) =
+        value1.X = value2.X
+        && value1.Y = value2.Y
+        && value1.Z = value2.Z
+        && value1.W = value2.W
+
+    static member op_Inequality(value1: Quaternion, value2: Quaternion) =
+        value1.X <> value2.X
+        || value1.Y <> value2.Y
+        || value1.Z <> value2.Z
+        || value1.W <> value2.W
+
+    static member Add(value1: Quaternion, value2: Quaternion) = value1 + value2
+    static member Subtract(value1: Quaternion, value2: Quaternion) = value1 - value2
+    static member Multiply(value1: Quaternion, value2: Quaternion) = value1 * value2
+    static member Multiply(value1: Quaternion, value2: float32) = value1 * value2
+    static member Divide(value1: Quaternion, value2: Quaternion) = value1 / value2
+    static member Negate(value: Quaternion) = -value
+
+    /// The rotation `value1` followed by the rotation `value2`.
+    static member Concatenate(value1: Quaternion, value2: Quaternion) = value2 * value1
+
+    static member Dot(quaternion1: Quaternion, quaternion2: Quaternion) : float32 =
+        quaternion1.X * quaternion2.X
+        + quaternion1.Y * quaternion2.Y
+        + quaternion1.Z * quaternion2.Z
+        + quaternion1.W * quaternion2.W
+
+    member this.LengthSquared() : float32 =
+        this.X * this.X + this.Y * this.Y + this.Z * this.Z + this.W * this.W
+
+    member this.Length() : float32 =
+        sqrt (this.X * this.X + this.Y * this.Y + this.Z * this.Z + this.W * this.W)
+
+    static member Normalize(value: Quaternion) =
+        let length = value.Length()
+        Quaternion(value.X / length, value.Y / length, value.Z / length, value.W / length)
+
+    static member Conjugate(value: Quaternion) =
+        Quaternion(-value.X, -value.Y, -value.Z, value.W)
+
+    static member Inverse(value: Quaternion) =
+        let lengthSquared = value.LengthSquared()
+
+        Quaternion(
+            -value.X / lengthSquared,
+            -value.Y / lengthSquared,
+            -value.Z / lengthSquared,
+            value.W / lengthSquared
+        )
+
+    static member CreateFromAxisAngle(axis: Vector3, angle: float32) =
+        let halfAngle = angle * 0.5f
+        let s = sin halfAngle
+        Quaternion(axis.X * s, axis.Y * s, axis.Z * s, cos halfAngle)
+
+    /// Yaw turns about the Y axis, pitch about the X axis and roll about the Z axis; roll is applied first.
+    static member CreateFromYawPitchRoll(yaw: float32, pitch: float32, roll: float32) =
+        let halfRoll = roll * 0.5f
+        let sr = sin halfRoll
+        let cr = cos halfRoll
+        let halfPitch = pitch * 0.5f
+        let sp = sin halfPitch
+        let cp = cos halfPitch
+        let halfYaw = yaw * 0.5f
+        let sy = sin halfYaw
+        let cy = cos halfYaw
+
+        Quaternion(
+            cy * sp * cr + sy * cp * sr,
+            sy * cp * cr - cy * sp * sr,
+            cy * cp * sr - sy * sp * cr,
+            cy * cp * cr + sy * sp * sr
+        )
+
+    /// Reads the rotation from the upper-left 3 by 3 cells. The largest of the trace and the three diagonal
+    /// cells is the one divided by, so the divisor is never near zero.
+    static member CreateFromRotationMatrix(matrix: Matrix4x4) =
+        let trace = matrix.M11 + matrix.M22 + matrix.M33
+
+        if trace > 0.0f then
+            let s = sqrt (trace + 1.0f)
+            let invS = 0.5f / s
+
+            Quaternion(
+                (matrix.M23 - matrix.M32) * invS,
+                (matrix.M31 - matrix.M13) * invS,
+                (matrix.M12 - matrix.M21) * invS,
+                s * 0.5f
+            )
+        elif matrix.M11 >= matrix.M22 && matrix.M11 >= matrix.M33 then
+            let s = sqrt (1.0f + matrix.M11 - matrix.M22 - matrix.M33)
+            let invS = 0.5f / s
+
+            Quaternion(
+                0.5f * s,
+                (matrix.M12 + matrix.M21) * invS,
+                (matrix.M13 + matrix.M31) * invS,
+                (matrix.M23 - matrix.M32) * invS
+            )
+        elif matrix.M22 > matrix.M33 then
+            let s = sqrt (1.0f + matrix.M22 - matrix.M11 - matrix.M33)
+            let invS = 0.5f / s
+
+            Quaternion(
+                (matrix.M21 + matrix.M12) * invS,
+                0.5f * s,
+                (matrix.M32 + matrix.M23) * invS,
+                (matrix.M31 - matrix.M13) * invS
+            )
+        else
+            let s = sqrt (1.0f + matrix.M33 - matrix.M11 - matrix.M22)
+            let invS = 0.5f / s
+
+            Quaternion(
+                (matrix.M31 + matrix.M13) * invS,
+                (matrix.M32 + matrix.M23) * invS,
+                0.5f * s,
+                (matrix.M12 - matrix.M21) * invS
+            )
+
+    /// Normalised linear interpolation along the shorter arc.
+    static member Lerp(quaternion1: Quaternion, quaternion2: Quaternion, amount: float32) =
+        let t1 = 1.0f - amount
+
+        let t2 =
+            if Quaternion.Dot(quaternion1, quaternion2) >= 0.0f then
+                amount
+            else
+                -amount
+
+        Quaternion.Normalize(
+            Quaternion(
+                t1 * quaternion1.X + t2 * quaternion2.X,
+                t1 * quaternion1.Y + t2 * quaternion2.Y,
+                t1 * quaternion1.Z + t2 * quaternion2.Z,
+                t1 * quaternion1.W + t2 * quaternion2.W
+            )
+        )
+
+    /// Spherical interpolation along the shorter arc; nearly equal rotations are interpolated linearly.
+    static member Slerp(quaternion1: Quaternion, quaternion2: Quaternion, amount: float32) =
+        let dot = Quaternion.Dot(quaternion1, quaternion2)
+        let flip = dot < 0.0f
+
+        let cosOmega =
+            if flip then
+                -dot
+            else
+                dot
+
+        let s1, s2 =
+            if cosOmega > 1.0f - 1e-6f then
+                1.0f - amount, amount
+            else
+                let omega = acos cosOmega
+                let invSinOmega = 1.0f / sin omega
+                sin ((1.0f - amount) * omega) * invSinOmega, sin (amount * omega) * invSinOmega
+
+        let s2 =
+            if flip then
+                -s2
+            else
+                s2
+
+        Quaternion(
+            s1 * quaternion1.X + s2 * quaternion2.X,
+            s1 * quaternion1.Y + s2 * quaternion2.Y,
+            s1 * quaternion1.Z + s2 * quaternion2.Z,
+            s1 * quaternion1.W + s2 * quaternion2.W
+        )
+
+    override this.Equals(other: obj) =
+        match other with
+        | :? Quaternion as other -> this.X = other.X && this.Y = other.Y && this.Z = other.Z && this.W = other.W
+        | _ -> false
+
+    override this.GetHashCode() =
+        (((((this.X.GetHashCode() * 397) ^^^ this.Y.GetHashCode()) * 397)
+          ^^^ this.Z.GetHashCode())
+         * 397)
+        ^^^ this.W.GetHashCode()
+
+    override this.ToString() =
+        "{X:"
+        + this.X.ToString()
+        + " Y:"
+        + this.Y.ToString()
+        + " Z:"
+        + this.Z.ToString()
+        + " W:"
+        + this.W.ToString()
+        + "}"
+
+    interface IEquatable<Quaternion> with
+        member this.Equals(other: Quaternion) = this.Equals(box other)
 
 module Matrix4x4Helpers =
     /// Matrix4x4.Invert(matrix, out result): the compiler passes the out argument as a reference cell.
