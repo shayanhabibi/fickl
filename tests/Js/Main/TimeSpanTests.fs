@@ -3,6 +3,7 @@ module Fable.Tests.TimeSpan
 open System
 open Util.Testing
 open Fable.Tests
+open Fable.Tests.Util
 open System.Globalization
 
 let tests =
@@ -36,10 +37,49 @@ let tests =
             TimeSpan.FromDays(18.).ToString("G", CultureInfo.InvariantCulture) |> equal "18:00:00:00.0000000"
             TimeSpan.FromMilliseconds(25.).ToString("G", CultureInfo.InvariantCulture) |> equal "0:00:00:00.0250000"
 
-        // TODO
-        // testCase "TimeSpan.ToString with custom format works" <| fun () ->
-        //     TimeSpan.FromMinutes(234.).ToString("hh\:mm\:ss")
-        //     |> equal "03:54:00"
+        testCase "TimeSpan.ToString with custom format works" <| fun () ->
+            TimeSpan.FromMinutes(234.).ToString(@"hh\:mm\:ss") |> equal "03:54:00"
+            let span = TimeSpan(3, 4, 5, 6, 78)
+            span.ToString(@"d\.hh\:mm\:ss") |> equal "3.04:05:06"
+            span.ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture) |> equal "3.04:05:06"
+            span.ToString(@"ddd\ h\-m\-s") |> equal "003 4-5-6"
+            span.ToString("%d") |> equal "3"
+            span.ToString("%h") |> equal "4"
+            span.ToString("%m") |> equal "5"
+            span.ToString("%s") |> equal "6"
+            span.ToString("d' days, 'h' hours'") |> equal "3 days, 4 hours"
+            span.ToString("h\"h \"m\"m\"") |> equal "4h 5m"
+
+        testCase "TimeSpan.ToString with custom format writes the fraction" <| fun () ->
+            let span = TimeSpan.FromTicks(61234500L)
+            span.ToString(@"s\.fff") |> equal "6.123"
+            span.ToString(@"s\.fffffff") |> equal "6.1234500"
+            span.ToString(@"s\.FFFFFFF") |> equal "6.12345"
+            span.ToString(@"s\.f") |> equal "6.1"
+            TimeSpan.FromSeconds(6.).ToString(@"s\.fff") |> equal "6.000"
+            TimeSpan.FromSeconds(6.).ToString(@"s\.FFF") |> equal "6."
+            TimeSpan.FromTicks(60090000L).ToString(@"s\.FF") |> equal "6."
+            TimeSpan.FromTicks(60090000L).ToString(@"s\.FFF") |> equal "6.009"
+
+        testCase "TimeSpan.ToString with custom format writes no sign" <| fun () ->
+            TimeSpan(-3, -4, -5, -6).ToString(@"d\.hh\:mm\:ss") |> equal "3.04:05:06"
+            TimeSpan.FromSeconds(-75.).ToString(@"mm\:ss") |> equal "01:15"
+            TimeSpan.FromSeconds(-75.).ToString(@"\-mm\:ss") |> equal "-01:15"
+
+        testCase "TimeSpan.ToString(\"c\") works without a culture" <| fun () ->
+            TimeSpan.FromSeconds(12345.).ToString("c") |> equal "03:25:45"
+            TimeSpan.FromSeconds(12345.).ToString("t") |> equal "03:25:45"
+            TimeSpan.FromSeconds(12345.).ToString("T", CultureInfo.InvariantCulture) |> equal "03:25:45"
+            TimeSpan.FromSeconds(12345.).ToString("") |> equal "03:25:45"
+
+        testCase "TimeSpan.ToString rejects a format it cannot read" <| fun () ->
+            let span = TimeSpan(3, 4, 5, 6)
+            raisedExceptionType (fun () -> span.ToString("hh:mm")) |> equal "FormatException"
+            raisedExceptionType (fun () -> span.ToString("hhh")) |> equal "FormatException"
+            raisedExceptionType (fun () -> span.ToString("fffffffff")) |> equal "FormatException"
+            raisedExceptionType (fun () -> span.ToString("d'unclosed")) |> equal "FormatException"
+            raisedExceptionType (fun () -> span.ToString("x", CultureInfo.InvariantCulture)) |> equal "FormatException"
+            raisedExceptionType (fun () -> span.ToString("%%")) |> equal "FormatException"
 
         testCase "TimeSpan constructors work" <| fun () ->
             let t1 = TimeSpan(20000L)

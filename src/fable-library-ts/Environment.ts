@@ -1,7 +1,7 @@
-// process.env is Node-specific; there is no browser equivalent for reading
-// environment variables, so this only works when running under Node.
-declare const process: { env: Record<string, string | undefined> };
+// process.env is Node-specific. A browser page has no environment variables, so there every
+// variable is missing, which .NET reports as null.
+declare const process: { env: Record<string, string | undefined> } | undefined;
 
 export function getEnvironmentVariable(name: string): string {
-  return process.env[name] as string;
+  return (typeof process !== "undefined" && process.env != null ? process.env[name] : undefined) as string;
 }

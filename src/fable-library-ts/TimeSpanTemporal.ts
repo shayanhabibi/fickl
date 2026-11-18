@@ -1,6 +1,8 @@
 import { FSharpRef } from "./Types.ts";
 import { toInt64, type int64 } from "./BigInt.ts";
 import { Exception, padWithZeros } from "./Util.ts";
+import { FormatException_$ctor_Z721C83C5 } from "./System.ts";
+import { formatCustom } from "./TimeSpanFormat.ts";
 
 export type TimeSpan = Temporal.Duration;
 export const Duration = Temporal.Duration;
@@ -219,8 +221,12 @@ export function duration(ts: TimeSpan): TimeSpan {
 }
 
 export function toString(ts: TimeSpan, format = "c", _provider?: any): string {
-  if (["c", "g", "G"].indexOf(format) === -1) {
-    throw new Exception("Custom formats are not supported");
+  // A null or empty format is the constant format, which "t" and "T" also name
+  if (format == null || format === "" || format === "t" || format === "T") {
+    format = "c";
+  }
+  if (format.length === 1 && ["c", "g", "G"].indexOf(format) === -1) {
+    throw FormatException_$ctor_Z721C83C5("Input string was not in a correct format.");
   }
   const d = Math.abs(ts.days);
   const h = Math.abs(ts.hours);
@@ -229,6 +235,10 @@ export function toString(ts: TimeSpan, format = "c", _provider?: any): string {
   const ticks = Math.abs(ts.milliseconds) * 10_000
     + Math.abs(ts.microseconds) * 10
     + Math.trunc(Math.abs(ts.nanoseconds) / 100);
+  // A format longer than one character is a custom format string
+  if (format.length > 1) {
+    return formatCustom(d, h, m, s, ticks, format);
+  }
   const sign = ts.sign < 0 ? "-" : "";
   const days = d === 0 && format !== "G" ? "" : format === "c" ? d + "." : d + ":";
   const time = `${format === "g" ? h : padWithZeros(h, 2)}:${padWithZeros(m, 2)}:${padWithZeros(s, 2)}`;
