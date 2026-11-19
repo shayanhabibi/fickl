@@ -4228,7 +4228,7 @@ let private bigintParseStyles =
     int (
         System.Globalization.NumberStyles.Integer
         ||| System.Globalization.NumberStyles.AllowHexSpecifier
-        ||| System.Globalization.NumberStyles.AllowBinarySpecifier
+        ||| enum<System.Globalization.NumberStyles> 1024 // AllowBinarySpecifier
     )
 
 let bigints (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (thisArg: Expr option) (args: Expr list) =

@@ -1718,11 +1718,14 @@ module Annotation =
                         | Expression.Identifier id -> id
                         | _ -> Identifier.identifier name.Value
 
+                    // The head matches from the start of the text and ends with the name.
+                    let nameIndex = head.Value.Length - name.Value.Length
+
                     let text =
-                        text.Substring(0, name.Index)
+                        text.Substring(0, nameIndex)
                         + "$"
                         + string args.Length
-                        + text.Substring(name.Index + name.Length)
+                        + text.Substring(nameIndex + name.Value.Length)
 
                     EmitTypeAnnotation(text, Array.append args [| AliasTypeAnnotation(id, [||]) |])
                 else

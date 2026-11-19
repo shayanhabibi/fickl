@@ -804,7 +804,6 @@ let inline MapReduceD mapper zero reducer l =
 let inline MapReduce2D mapper zero reducer xs ys =
     List.zip xs ys |> MapReduceD (fun (x, y) -> mapper x y) zero reducer
 
-[<RequireQualifiedAccess>]
 module OperationResult =
     let inline ignore (res: OperationResult<'a>) =
         match res with

@@ -8,8 +8,9 @@
 import fs from "node:fs"
 import path from "node:path"
 import vm from "node:vm"
+import { fileURLToPath } from "node:url"
 
-const HERE = path.dirname(new URL(import.meta.url).pathname)
+const HERE = path.dirname(fileURLToPath(import.meta.url))
 
 const arg = (name, fallback) => {
     const i = process.argv.indexOf(`--${name}`)

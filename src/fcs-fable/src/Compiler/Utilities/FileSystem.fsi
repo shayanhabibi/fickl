@@ -32,6 +32,7 @@ module internal Bytes =
 /// A view over bytes.
 /// May be backed by managed or unmanaged memory, or memory mapped file.
 [<AbstractClass>]
+[<Experimental("This FCS API/Type is experimental and subject to change.")>]
 type public ByteMemory =
 
     abstract Item: int -> byte with get

@@ -10,7 +10,6 @@ type FSharpDiagnosticKind =
     | ReplaceWithSuggestion of suggestion: string
     | RemoveIndexerDot
 
-[<RequireQualifiedAccess>]
 module CompilerDiagnostics =
 
     let GetErrorMessage diagnosticKind =

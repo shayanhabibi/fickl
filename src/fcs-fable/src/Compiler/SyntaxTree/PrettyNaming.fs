@@ -1092,7 +1092,6 @@ let mkExceptionFieldName =
 /// The prefix of the names used for the fake namespace path added to all dynamic code entries in FSI.EXE
 let FsiDynamicModulePrefix = "FSI_"
 
-[<RequireQualifiedAccess>]
 module CustomOperations =
     [<Literal>]
     let Into = "into"

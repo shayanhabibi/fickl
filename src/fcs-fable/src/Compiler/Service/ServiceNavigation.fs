@@ -688,7 +688,6 @@ module NavigationImpl =
 
         NavigationItems(items)
 
-[<RequireQualifiedAccess>]
 module Navigation =
     let getNavigation (parsedInput: ParsedInput) =
         match parsedInput with
@@ -754,7 +753,6 @@ type NavigableItem =
         Container: NavigableContainer
     }
 
-[<RequireQualifiedAccess>]
 module NavigateTo =
     let GetNavigableItems (parsedInput: ParsedInput) : NavigableItem[] =
 
