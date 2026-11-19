@@ -35,6 +35,26 @@ let private emitLibraryDeclarations () =
         workingDirectory = Paths.root
     )
 
+/// Whether the GitHub release of a tag exists: `gh release view` exits 0 for one that does.
+let private releaseExists (tag: string) =
+    let info =
+        ProcessStartInfo(
+            "gh",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            WorkingDirectory = Paths.root
+        )
+
+    for argument in [ "release"; "view"; tag ] do
+        info.ArgumentList.Add argument
+
+    use child = Process.Start info
+    child.StandardOutput.ReadToEnd() |> ignore
+    child.StandardError.ReadToEnd() |> ignore
+    child.WaitForExit()
+    child.ExitCode = 0
+
 let private version () =
     XDocument.Load(Path.Combine(Paths.root, "src", "Fickl.Branding.targets")).Descendants(XName.Get "FicklVersion")
     |> Seq.exactlyOne
@@ -67,6 +87,29 @@ let private packageIds =
         "Fickl.Sdk"
         "Fickl"
     ]
+
+/// <summary>Builds the browser compiler and writes the two archives a release carries.</summary>
+/// <remarks>The archives go to <c>temp/release-&lt;version&gt;</c>, beside the packages <c>publish</c> writes.</remarks>
+let browserCompiler =
+    command "browser-compiler" {
+        description
+            "Build the browser compiler and write fickl-standalone-<version>.tgz and fickl-metadata-<version>.tgz to temp/release-<version>"
+
+        input {
+            return
+                stage "Browser compiler" {
+                    run (fun _ ->
+                        let releaseVersion = version ()
+                        let output = Path.Combine(Paths.root, "temp", "release-" + releaseVersion)
+
+                        for path in BrowserCompiler.pack releaseVersion output do
+                            printfn $"{path}"
+
+                        0
+                    )
+                }
+        }
+    }
 
 let publish =
     let packOnly =
@@ -129,6 +172,8 @@ let publish =
                                         "-o"
                                         output
                                     ]
+
+                            BrowserCompiler.pack releaseVersion output |> ignore
                         // Validate the entire set before the first upload. Never publish upstream package IDs.
                         let packages =
                             packageIds
@@ -216,6 +261,28 @@ let publish =
                                 path
                             )
 
+                        let archives = BrowserCompiler.validate releaseVersion output
+
+                        // The release carries the browser compiler before NuGet has the version, so a roll to it
+                        // finds the archives.
+                        if not packOnly && githubRelease then
+                            let tag = $"v{releaseVersion}"
+                            let assets = archives |> List.map (fun path -> $"\"{path}\"") |> String.concat " "
+
+                            // A rerun after a failed NuGet push finds the release already there.
+                            if releaseExists tag then
+                                SimpleExec.Command.Run(
+                                    "gh",
+                                    $"release upload {tag} {assets} --clobber",
+                                    workingDirectory = Paths.root
+                                )
+                            else
+                                SimpleExec.Command.Run(
+                                    "gh",
+                                    $"release create {tag} --title \"Fickl {releaseVersion}\" --generate-notes {assets}",
+                                    workingDirectory = Paths.root
+                                )
+
                         if not packOnly then
                             for path in packages do
                                 printfn $"Publishing {Path.GetFileName path}"
@@ -239,14 +306,7 @@ let publish =
                                             "--no-symbols"
                                     ]
 
-                        if not packOnly && githubRelease then
-                            SimpleExec.Command.Run(
-                                "gh",
-                                $"release create v{releaseVersion} --title \"Fickl {releaseVersion}\" --generate-notes",
-                                workingDirectory = Paths.root
-                            )
-
-                        printfn $"Validated {packages.Length} packages in {output}"
+                        printfn $"Validated {packages.Length} packages and {archives.Length} archives in {output}"
                         0
                     )
                 }

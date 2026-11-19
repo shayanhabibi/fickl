@@ -173,7 +173,27 @@ jobs:
       - name: Fable Tests
         run: dotnet run --project src/Fickl.Build -- test integration
 
-  # fickl: no standalone job; the browser compiler is not shipped by this fork
+  # fickl: the browser compiler a docs site compiles live examples with, and the two archives each release carries
+  build-browser-compiler:
+    name: Browser compiler
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Setup .NET
+        uses: ./.github/actions/setup-dotnet
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node
+
+      - name: Build the browser compiler and its archives
+        run: dotnet run --project src/Fickl.Build -- browser-compiler
+
+      - name: Test the browser compiler's worker
+        run: node src/fable-standalone/test/worker/run.mjs
 
   # Separate build job for Python since we use a test matrix (will run in parallell)
   build-python:
