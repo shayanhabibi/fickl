@@ -35,6 +35,26 @@ let private emitLibraryDeclarations () =
         workingDirectory = Paths.root
     )
 
+/// Whether the GitHub release of a tag exists: `gh release view` exits 0 for one that does.
+let private releaseExists (tag: string) =
+    let info =
+        ProcessStartInfo(
+            "gh",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            WorkingDirectory = Paths.root
+        )
+
+    for argument in [ "release"; "view"; tag ] do
+        info.ArgumentList.Add argument
+
+    use child = Process.Start info
+    child.StandardOutput.ReadToEnd() |> ignore
+    child.StandardError.ReadToEnd() |> ignore
+    child.WaitForExit()
+    child.ExitCode = 0
+
 let private version () =
     XDocument.Load(Path.Combine(Paths.root, "src", "Fickl.Branding.targets")).Descendants(XName.Get "FicklVersion")
     |> Seq.exactlyOne
@@ -246,13 +266,22 @@ let publish =
                         // The release carries the browser compiler before NuGet has the version, so a roll to it
                         // finds the archives.
                         if not packOnly && githubRelease then
+                            let tag = $"v{releaseVersion}"
                             let assets = archives |> List.map (fun path -> $"\"{path}\"") |> String.concat " "
 
-                            SimpleExec.Command.Run(
-                                "gh",
-                                $"release create v{releaseVersion} --title \"Fickl {releaseVersion}\" --generate-notes {assets}",
-                                workingDirectory = Paths.root
-                            )
+                            // A rerun after a failed NuGet push finds the release already there.
+                            if releaseExists tag then
+                                SimpleExec.Command.Run(
+                                    "gh",
+                                    $"release upload {tag} {assets} --clobber",
+                                    workingDirectory = Paths.root
+                                )
+                            else
+                                SimpleExec.Command.Run(
+                                    "gh",
+                                    $"release create {tag} --title \"Fickl {releaseVersion}\" --generate-notes {assets}",
+                                    workingDirectory = Paths.root
+                                )
 
                         if not packOnly then
                             for path in packages do
