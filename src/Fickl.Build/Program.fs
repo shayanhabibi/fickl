@@ -20,6 +20,7 @@ let main argv =
                 Fickl.timings
                 Fickl.fcsFork
                 Release.publish
+                Release.browserCompiler
                 Benchmark.benchmark
                 Differences.differences
             ]

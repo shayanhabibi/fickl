@@ -71,7 +71,9 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: packages
-          path: temp/release-*/*.nupkg
+          path: |
+            temp/release-*/*.nupkg
+            temp/release-*/*.tgz
           if-no-files-found: error
 
       - name: Log in to NuGet
