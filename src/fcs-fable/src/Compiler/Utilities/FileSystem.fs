@@ -415,7 +415,6 @@ module MemoryMappedFileExtensions =
 
 #endif //!FABLE_COMPILER
 
-[<RequireQualifiedAccess>]
 module internal FileSystemUtils =
     let checkPathForIllegalChars =
         let chars = System.Collections.Generic.HashSet<_>(Path.GetInvalidPathChars())

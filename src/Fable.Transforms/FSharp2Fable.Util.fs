@@ -537,7 +537,11 @@ type FsEnt(maybeAbbrevEnt: FSharpEntity) =
                 // When compiling with netcoreapp target, netstandard only contains redirects
                 // We can find the actual assembly name from the entity qualified name
                 // fickl: QualifiedName is an option since FCS 11; netstandard entities always have one
+#if FABLE_COMPILER
+                | "netstandard" -> ent.QualifiedName.Split(',').[1].Trim() |> Fable.CoreAssemblyName
+#else
                 | "netstandard" -> (Option.get ent.QualifiedName).Split(',').[1].Trim() |> Fable.CoreAssemblyName
+#endif
                 // fickl: the package cache names its further assemblies Fable.Precompiled.<n>, as assemblies loaded
                 // together need distinct names
                 | dllName when

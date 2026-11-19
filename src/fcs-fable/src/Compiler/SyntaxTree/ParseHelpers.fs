@@ -86,7 +86,6 @@ type LexerIfdefStack = LexerIfdefStackEntries
 /// Specifies how the 'endline' function in the lexer should continue after
 /// it reaches end of line or eof. The options are to continue with 'token' function
 /// or to continue with 'ifdefSkip' function.
-[<RequireQualifiedAccess>]
 type LexerEndlineContinuation =
     | Token
     | IfdefSkip of int * range: range

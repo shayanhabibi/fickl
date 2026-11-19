@@ -13,7 +13,6 @@ open FSharp.Compiler.UnicodeLexing
 open Internal.Utilities.Library
 open System.Text.RegularExpressions
 
-[<RequireQualifiedAccess>]
 module internal WarnScopes =
 
     // *************************************
