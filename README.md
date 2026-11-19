@@ -169,13 +169,13 @@ measure performance differences in the compiler. This keeps the claims honest; w
 contributing upstream, and these gaps **SHOULD** close over time.
 
 <!-- fickl-benchmarks:start -->
-![Fickl 0.11.0 against Fable 5.27.0: up to 8.3× faster end to end](notes/benchmarks/fickl-0.11.0.svg)
+![Fickl 0.12.0 against Fable 5.27.0: up to 8.3× faster end to end](notes/benchmarks/fickl-0.12.0.svg)
 
-Wall clock of a fresh process with `--noCache`, median of 5 interleaved runs on Ubuntu 26.04.1 LTS, measured by the release workflow. Raw timings are in [notes/benchmarks/fickl-0.11.0.tsv](notes/benchmarks/fickl-0.11.0.tsv).
+Wall clock of a fresh process with `--noCache`, median of 5 interleaved runs on Ubuntu 26.04.1 LTS, measured by the release workflow. Raw timings are in [notes/benchmarks/fickl-0.12.0.tsv](notes/benchmarks/fickl-0.12.0.tsv).
 
-![Fickl 0.11.0 against Fable 5.27.0 in watch mode: up to 90.1× faster to respond](notes/benchmarks/fickl-0.11.0-watch.svg)
+![Fickl 0.12.0 against Fable 5.27.0 in watch mode: up to 60.7× faster to respond](notes/benchmarks/fickl-0.12.0-watch.svg)
 
-Time from saving a file to `Watching` in one `--watch` session per compiler. Raw timings are in [notes/benchmarks/fickl-0.11.0-watch.tsv](notes/benchmarks/fickl-0.11.0-watch.tsv).
+Time from saving a file to `Watching` in one `--watch` session per compiler. Raw timings are in [notes/benchmarks/fickl-0.12.0-watch.tsv](notes/benchmarks/fickl-0.12.0-watch.tsv).
 <!-- fickl-benchmarks:end -->
 
 ## Differences from Fable
