@@ -1206,6 +1206,7 @@ module EmitMacro =
     /// as `undefined`, and counts as not passed.
     let tryFindNonLiteralRawArg (args: Expression array) (value: string) =
         Regex.Matches(expandGroups args value, @"\$(\d+)!")
+        |> Seq.cast<Match>
         |> Seq.map (fun m -> int m.Groups[1].Value)
         |> Seq.tryFind (fun i ->
             match Array.tryItem i args with

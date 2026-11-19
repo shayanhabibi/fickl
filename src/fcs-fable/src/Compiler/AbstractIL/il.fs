@@ -1199,7 +1199,7 @@ type ILAttribElem =
 
 type ILAttributeNamedArg = string * ILType * bool * ILAttribElem
 
-[<RequireQualifiedAccess; StructuralEquality; StructuralComparison; StructuredFormatDisplay("{DebugText}")>]
+[<StructuralEquality; StructuralComparison; StructuredFormatDisplay("{DebugText}")>]
 type ILAttribute =
     | Encoded of method: ILMethodSpec * data: byte[] * elements: ILAttribElem list
     | Decoded of method: ILMethodSpec * fixedArgs: ILAttribElem list * namedArgs: ILAttributeNamedArg list
@@ -1699,7 +1699,7 @@ type ILSecurityAction =
     | InheritanceDemandChoice
     | DemandChoice
 
-[<RequireQualifiedAccess; StructuralEquality; StructuralComparison>]
+[<StructuralEquality; StructuralComparison>]
 type ILSecurityDecl = ILSecurityDecl of ILSecurityAction * byte[]
 
 [<NoEquality; NoComparison; Struct>]
