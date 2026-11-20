@@ -791,7 +791,12 @@ let private logPrelude commands language =
 let private createLogger level =
     use factory =
         LoggerFactory.Create(fun builder ->
-            builder.SetMinimumLevel(level).AddCustomConsole(fun options -> options.UseNoPrefixMsgStyle <- true)
+            builder
+                .SetMinimumLevel(level)
+                .AddCustomConsole(fun options ->
+                    options.UseNoPrefixMsgStyle <- true
+                    options.UseColor <- colorEnabled ()
+                )
             |> ignore
         )
 
@@ -894,7 +899,8 @@ let private execute (argv: string array) (inServer: bool) =
 
         match commands with
         | [ "--help" ] -> return printHelp ()
-        | [ "--version" ] -> return Log.always Literals.VERSION
+        // fickl: the version is data a script reads, so it bypasses the logger and its colour codes
+        | [ "--version" ] -> return stdout.WriteLine Literals.VERSION
         | [ "clean"; dir ] -> return clean args language dir
         | [ "clean" ] -> return clean args language rootDir
         | [ "watch"; path ] ->
