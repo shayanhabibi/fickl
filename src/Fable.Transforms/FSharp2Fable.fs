@@ -3072,6 +3072,7 @@ let private transformMemberDecl
         { ctx with
             EnclosingMember = Some memb
             UsedNamesInDeclarationScope = HashSet()
+            BoundsChecked = not (canUncheckArrays com) || isBoundsCheckedMember memb
         }
 
     TypeGuards.check com memb
@@ -3725,6 +3726,17 @@ let rec private transformDeclarations (com: FableCompiler) ctx fsDecls =
     |> List.collect (fun fsDecl ->
         match fsDecl with
         | FSharpImplementationFileDeclaration.Entity(fsEnt, sub) ->
+            // fickl: an InitAction of the module, such as a top-level loop, follows its [<BoundsChecks>]
+            let ctx =
+                if canUncheckArrays com then
+                    { ctx with
+                        BoundsChecked =
+                            tryBoundsChecksAttribute fsEnt.Attributes
+                            |> Option.defaultValue ctx.BoundsChecked
+                    }
+                else
+                    ctx
+
             warnIgnoredCaseTests com ctx fsEnt
             checkInlinedTaggedUnionCases com ctx fsEnt
             warnDuplicateCompiledNames com ctx fsEnt
@@ -4284,7 +4296,7 @@ let resolveInlineExpr (com: IFableCompiler) ctx info expr =
             let callee = callee |> Option.map (resolveInlineExpr com ctx info)
             let callInfo = resolveInlinedCallInfo com ctx info callInfo
             let ctx = { ctx with Witnesses = witnesses @ ctx.Witnesses }
-            inlineExpr com ctx r t callee callInfo membUniqueName
+            inlineExpr com ctx r t callee callInfo membUniqueName (isBoundsCheckedCall com callInfo)
 
         | Fable.UnresolvedReplaceCall(thisArg, args, callInfo, attachedCall) ->
             let typ = resolveInlineType ctx.GenericArgs t
@@ -4417,6 +4429,12 @@ type FableCompiler(com: Compiler) =
                                 let declName, _ = getMemberDeclarationName (this :> Compiler) memb
 
                                 if declName = name then
+                                    // fickl: the function's body follows its own [<BoundsChecks>], not the inline's
+                                    let ctx =
+                                        { ctx with
+                                            BoundsChecked = not (canUncheckArrays this) || isBoundsCheckedMember memb
+                                        }
+
                                     let flatArgs = List.concat membArgIds
 
                                     match flatArgs with

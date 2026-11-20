@@ -1,0 +1,196 @@
+
+import { setItem, item, initialize } from "./fable_modules/fable-library-js.5.27.0/Array.js";
+import { int32_type, class_type, array_type, float64_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+
+export function Marked_read(a, i) {
+    return a[i + 1];
+}
+
+export function Marked_readLocal(a, i) {
+    return a[i];
+}
+
+export function Marked_write(a, i, v) {
+    a[i + 1] = v;
+}
+
+export function Marked_writeLocal(a, i, v) {
+    a[i] = v;
+}
+
+export function Marked_getSet(a, i) {
+    a[i * 2] = a[i];
+}
+
+export function Marked_item(a, i) {
+    return a[i - 1] | 0;
+}
+
+export function Marked_grid(g, i, j) {
+    g[i][j + 1] = g[i][j];
+}
+
+export function Marked_resize(r, i) {
+    r[i + 1] = r[i];
+}
+
+export function Marked_lambda(a) {
+    return initialize(3, (i) => a[i + 1], Float64Array);
+}
+
+export function Marked_comparer(a) {
+    return {
+        Compare(x, y) {
+            return (a[x + 1] - a[y + 1]) | 0;
+        },
+    };
+}
+
+export function Marked_checkedAgain(a, i) {
+    return item(i + 1, a);
+}
+
+export class Marked_Solver {
+    constructor(data) {
+        this.data = data;
+    }
+}
+
+export function Marked_Solver_$reflection() {
+    return class_type("BoundsChecks.Marked.Solver", undefined, Marked_Solver, undefined, () => [[[["data", array_type(float64_type)]]]]);
+}
+
+export function Marked_Solver_$ctor_52AF8430(data) {
+    return new Marked_Solver(data);
+}
+
+export function Marked_Solver__At_Z524259A4(_, i) {
+    return _.data[i + 1];
+}
+
+export const Init_table = new Float64Array(4);
+
+for (let i = 0; i <= 2; i++) {
+    Init_table[i + 1] = i;
+}
+
+export function Plain_read(a, i) {
+    return item(i + 1, a);
+}
+
+export function Plain_callsMarkedInline(a, i) {
+    return a[i + 1];
+}
+
+export const Plain_first = Init_table[1];
+
+export function MarkedCaller_callsPlainInline(a, i) {
+    return item(i + 1, a);
+}
+
+export class Grid {
+    constructor(cells) {
+        this.cells = cells;
+    }
+}
+
+export function Grid_$reflection() {
+    return class_type("BoundsChecks.Grid", undefined, Grid, undefined, () => [[[["cells", array_type(float64_type)]]]]);
+}
+
+export function Grid_$ctor_52AF8430(cells) {
+    return new Grid(cells);
+}
+
+export function Grid__Fast_Z524259A4(_, i) {
+    return _.cells[i * 2];
+}
+
+export function Grid__Safe_Z524259A4(_, i) {
+    return item(i * 2, _.cells);
+}
+
+export class Buffer {
+    constructor(n) {
+        this.n = (n | 0);
+        this.data = (new Float64Array(this.n));
+        this.data[this.n - 1] = 1;
+        this.twice = (this.data[this.n - 1] * 2);
+    }
+}
+
+export function Buffer_$reflection() {
+    return class_type("BoundsChecks.Buffer", undefined, Buffer, undefined, () => [[[["n", int32_type]]]]);
+}
+
+export function Buffer_$ctor_Z524259A4(n) {
+    return new Buffer(n);
+}
+
+export function Buffer__get_Last(_) {
+    return _.data[_.n - 1];
+}
+
+export function Buffer__get_Twice(_) {
+    return _.twice;
+}
+
+export class Mixed {
+    constructor(d) {
+        this.d = d;
+    }
+}
+
+export function Mixed_$reflection() {
+    return class_type("BoundsChecks.Mixed", undefined, Mixed, undefined, () => [[[["d", array_type(float64_type)]]]]);
+}
+
+export function Mixed_$ctor_52AF8430(d) {
+    return new Mixed(d);
+}
+
+export function Mixed__Fast_Z524259A4(_, i) {
+    return _.d[i + 1];
+}
+
+export function Mixed__Safe_Z524259A4(_, i) {
+    return item(i + 1, _.d);
+}
+
+export function Mixed__get_Second(_) {
+    return _.d[1];
+}
+
+export const PlainApp_data = new Float64Array(4);
+
+export function PlainApp_bump(i) {
+    setItem(PlainApp_data, i + 1, (PlainApp_data[i] ?? item(i, PlainApp_data)) + 1);
+}
+
+export function PlainApp_run() {
+    for (let i_2 = 0; i_2 <= (3 - 1); i_2++) {
+        const i_1 = i_2 | 0;
+        setItem(PlainApp_data, i_1 + 1, (PlainApp_data[i_1] ?? item(i_1, PlainApp_data)) + 1);
+    }
+}
+
+export const MarkedApp_data = new Float64Array(4);
+
+export function MarkedApp_bump(i) {
+    MarkedApp_data[i + 1] = (MarkedApp_data[i] + 1);
+}
+
+export function MarkedApp_run() {
+    for (let i_2 = 0; i_2 <= (3 - 1); i_2++) {
+        const i_1 = i_2 | 0;
+        MarkedApp_data[i_1 + 1] = (MarkedApp_data[i_1] + 1);
+    }
+}
+
+export function NestedCalls_viaPlainWrap(a, i) {
+    return a[i + 1];
+}
+
+export function NestedCalls_viaMarkedWrap(a, i) {
+    return item(i + 1, a);
+}

@@ -272,6 +272,10 @@ let tests =
             langVersionTest "An F# 11 feature compiles under LangVersion 11.0" "lang11" true
             debugPipelinesTest "--debugPipelines binds each pipeline stage in JavaScript" "debugPipelines"
             debugPipelinesTest "--debugPipelines binds each pipeline stage in TypeScript" "debugPipelinesTs"
+            // fickl: the cases under `data` compile in Release, where [<BoundsChecks(false)>] applies
+            testCaseAsync
+                "BoundsChecks(false) keeps every check in a Debug build"
+                (compileCaseWith [| "-c"; "Debug" |] (Path.Combine(__SOURCE_DIRECTORY__, "boundsChecksDebug")))
         ]
     |> testList "Compilation"
 

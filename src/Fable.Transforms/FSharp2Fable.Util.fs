@@ -714,6 +714,8 @@ type Context =
         // True while translating a quotation body (<@ @>): member calls are kept as-is,
         // not replaced/emitted/inlined, to preserve .NET metadata for QuotationEmitter.
         CapturingQuotation: bool
+        /// fickl: false inside the nearest [<Fickl.Core.BoundsChecks(false)>] scope, see Util.isBoundsCheckedMember
+        BoundsChecked: bool
     }
 
     static member Create(?usedRootNames) =
@@ -733,6 +735,7 @@ type Context =
             CaptureBaseConsCall = None
             Witnesses = []
             CapturingQuotation = false
+            BoundsChecked = true
         }
 
 type IFableCompiler =
@@ -3013,6 +3016,74 @@ module Util =
             | _ -> None
         )
 
+    /// fickl: the argument of a [<Fickl.Core.BoundsChecks>] among the attributes
+    let tryBoundsChecksAttribute (atts: FSharpAttribute seq) =
+        atts
+        |> Seq.tryPick (fun att ->
+            match att.AttributeType.TryFullName with
+            | Some Atts.ficklBoundsChecks ->
+                match Seq.tryHead att.ConstructorArguments with
+                | Some(_, (:? bool as value)) -> Some value
+                | _ -> None
+            | _ -> None
+        )
+
+    /// fickl: false when the nearest [<Fickl.Core.BoundsChecks>] on the entity or an enclosing one is false
+    let rec isBoundsCheckedEntity (ent: FSharpEntity) =
+        match tryBoundsChecksAttribute ent.Attributes, ent.DeclaringEntity with
+        | Some value, _ -> value
+        | None, Some parent -> isBoundsCheckedEntity parent
+        | None, None -> true
+
+    /// fickl: false when the nearest [<Fickl.Core.BoundsChecks>] is false, looking at the member, then the declaring
+    /// entity and those enclosing it
+    let isBoundsCheckedMember (memb: FSharpMemberOrFunctionOrValue) =
+        match tryBoundsChecksAttribute memb.Attributes, memb.DeclaringEntity with
+        | Some value, _ -> value
+        | None, Some ent -> isBoundsCheckedEntity ent
+        | None, None -> true
+
+    /// fickl: true for a Release build of JavaScript or TypeScript, the only builds where [<BoundsChecks(false)>] applies
+    let canUncheckArrays (com: Compiler) =
+        not com.Options.DebugMode
+        && (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
+
+    /// fickl: isBoundsCheckedMember for the member a call refers to, which may be in another assembly. A member that
+    /// does not resolve is checked
+    let isBoundsCheckedCall (com: Compiler) (info: Fable.CallInfo) =
+        let tryAttribute (atts: Fable.Attribute seq) =
+            atts
+            |> Seq.tryPick (fun att ->
+                if att.Entity.FullName = Atts.ficklBoundsChecks then
+                    match att.ConstructorArgs with
+                    | [ (:? bool as value) ] -> Some value
+                    | _ -> None
+                else
+                    None
+            )
+
+        let rec ofEntity (entRef: Fable.EntityRef option) =
+            match entRef |> Option.bind com.TryGetEntity with
+            | Some ent ->
+                match tryAttribute ent.Attributes with
+                | Some value -> value
+                | None -> ofEntity ent.DeclaringEntity
+            | None -> true
+
+        match info.MemberRef with
+        | Some(Fable.MemberRef(entRef, membInfo) as membRef) when canUncheckArrays com ->
+            let own =
+                if List.contains Atts.ficklBoundsChecks membInfo.AttributeFullNames then
+                    com.TryGetMember membRef
+                    |> Option.bind (fun memb -> tryAttribute memb.Attributes)
+                else
+                    None
+
+            match own with
+            | Some value -> value
+            | None -> ofEntity (Some entRef)
+        | _ -> true
+
     /// fickl: whether a base class, transitively, is a global, imported or [<AttachMembers>] class
     let rec private inheritsJsClass (ent: FSharpEntity) =
         match ent.BaseType |> Option.bind tryDefinition with
@@ -4182,7 +4253,9 @@ module Util =
         |> Option.tap (fun _ -> addWatchDependencyFromMember com memb)
         |> ValueOption.ofOption
 
-    let inlineExpr (com: IFableCompiler) (ctx: Context) r t callee (info: Fable.CallInfo) membUniqueName =
+    /// <summary>Expands an inline function. <c>boundsChecked</c> is the [&lt;BoundsChecks>] scope of the inline function,
+    /// which its body's replacements follow</summary>
+    let inlineExpr (com: IFableCompiler) (ctx: Context) r t callee (info: Fable.CallInfo) membUniqueName boundsChecked =
         let args: Fable.Expr list =
             match callee with
             | Some c -> c :: info.Args
@@ -4212,6 +4285,8 @@ module Util =
                         FromRange = fromRange
                     }
                     :: ctx.InlinePath
+                // fickl: the replacements in the body, resolved here, follow the inline function's [<BoundsChecks>]
+                BoundsChecked = boundsChecked
             }
 
         let bindings, expr = com.ResolveInlineExpr(ctx, inExpr, args)
@@ -4265,7 +4340,9 @@ module Util =
                 let e = Fable.UnresolvedInlineCall(membUniqueName, ctx.Witnesses, callee, info)
 
                 Fable.Unresolved(e, t, r) |> ValueSome
-            | None -> inlineExpr com ctx r t callee info membUniqueName |> ValueSome
+            | None ->
+                let boundsChecked = not (canUncheckArrays com) || isBoundsCheckedMember memb
+                inlineExpr com ctx r t callee info membUniqueName boundsChecked |> ValueSome
         else
             ValueNone
 

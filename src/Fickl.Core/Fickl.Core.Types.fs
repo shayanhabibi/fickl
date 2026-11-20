@@ -171,6 +171,30 @@ type PrivateFieldsAttribute(enabled: bool) =
     new() = PrivateFieldsAttribute(true)
 
 /// <summary>
+/// With <c>false</c>, Release builds for JavaScript and TypeScript compile the reads and writes of arrays, 2D arrays and
+/// <c>ResizeArray</c> inside the module, type, member or <c>let</c> to plain <c>a[i]</c> and <c>a[i] = v</c>, without checks.
+/// </summary>
+/// <remarks>
+/// The nearest attribute applies: <c>[&lt;BoundsChecks(true)>]</c> restores the checks inside an unchecked scope, and an
+/// inline function keeps the setting of its own scope. Debug builds, <c>fickl watch</c>, .NET and other targets check.
+/// Out of range, a read gives <c>undefined</c>, a write grows a plain array, a typed array ignores it, a 2D row throws.
+/// </remarks>
+/// <example>
+/// <code lang="fsharp">
+/// [&lt;BoundsChecks(false)>]
+/// module Kernels =
+///     let shift (a: float[]) = for i in a.Length - 1 .. -1 .. 1 do a.[i] &lt;- a.[i - 1]
+/// </code>
+/// </example>
+[<AttributeUsage(AttributeTargets.Class
+                 ||| AttributeTargets.Struct
+                 ||| AttributeTargets.Method
+                 ||| AttributeTargets.Property
+                 ||| AttributeTargets.Constructor)>]
+type BoundsChecksAttribute(enabled: bool) =
+    inherit Attribute()
+
+/// <summary>
 /// Represents a JavaScript callable with a single generic or non-generic Invoke method.
 /// </summary>
 /// <remarks>

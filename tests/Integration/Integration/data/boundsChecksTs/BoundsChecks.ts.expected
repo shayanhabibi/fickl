@@ -1,0 +1,81 @@
+
+import type { int32, float64 } from "./fable_modules/fable-library-ts.5.27.0/Int32.ts";
+import type { IComparer, MutableArray } from "./fable_modules/fable-library-ts.5.27.0/Util.ts";
+import { item, initialize } from "./fable_modules/fable-library-ts.5.27.0/Array.ts";
+import { class_type, array_type, float64_type, type TypeInfo } from "./fable_modules/fable-library-ts.5.27.0/Reflection.ts";
+
+export function Marked_read(a: MutableArray<float64>, i: int32): float64 {
+    return (a[i + 1])!;
+}
+
+export function Marked_readLocal(a: MutableArray<float64>, i: int32): float64 {
+    return (a[i])!;
+}
+
+export function Marked_write(a: MutableArray<float64>, i: int32, v: float64): void {
+    a[i + 1] = v;
+}
+
+export function Marked_writeLocal(a: MutableArray<float64>, i: int32, v: float64): void {
+    a[i] = v;
+}
+
+export function Marked_getSet(a: MutableArray<int32>, i: int32): void {
+    a[i * 2] = ((a[i])!);
+}
+
+export function Marked_item(a: MutableArray<int32>, i: int32): int32 {
+    return ((a[i - 1])!) | 0;
+}
+
+export function Marked_grid(g: MutableArray<float64[]>, i: int32, j: int32): void {
+    ((g[i])!)[j + 1] = ((((g[i])!)[j])!);
+}
+
+export function Marked_resize(r: int32[], i: int32): void {
+    r[i + 1] = ((r[i])!);
+}
+
+export function Marked_lambda(a: MutableArray<float64>): MutableArray<float64> {
+    return initialize<float64>(3, (i: int32): float64 => ((a[i + 1])!), Float64Array);
+}
+
+export function Marked_comparer(a: MutableArray<int32>): IComparer<int32> {
+    return {
+        Compare(x: int32, y: int32): int32 {
+            return (((a[x + 1])!) - ((a[y + 1])!)) | 0;
+        },
+    };
+}
+
+export function Marked_checkedAgain(a: MutableArray<float64>, i: int32): float64 {
+    return item<float64>(i + 1, a);
+}
+
+export class Marked_Solver {
+    readonly data: MutableArray<float64>;
+    constructor(data: MutableArray<float64>) {
+        this.data = data;
+    }
+}
+
+export function Marked_Solver_$reflection(): TypeInfo {
+    return class_type("BoundsChecks.Marked.Solver", undefined, Marked_Solver, undefined, () => [[[["data", array_type(float64_type)]]]]);
+}
+
+export function Marked_Solver_$ctor_52AF8430(data: MutableArray<float64>): Marked_Solver {
+    return new Marked_Solver(data);
+}
+
+export function Marked_Solver__At_Z524259A4(_: Marked_Solver, i: int32): float64 {
+    return (_.data[i + 1])!;
+}
+
+export function Plain_read(a: MutableArray<float64>, i: int32): float64 {
+    return item<float64>(i + 1, a);
+}
+
+export function Plain_callsMarkedInline(a: MutableArray<float64>, i: int32): float64 {
+    return (a[i + 1])!;
+}
+

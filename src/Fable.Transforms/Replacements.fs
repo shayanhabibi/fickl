@@ -2247,10 +2247,36 @@ let rec canRepeat e =
     | Get(e, FieldGet info, _, _) -> not info.MaybeCalculated && canRepeat e
     | _ -> false
 
+/// fickl: true in a Release build inside a [<Fickl.Core.BoundsChecks(false)>] scope, whose array accesses are not checked
+let uncheckedArrays (com: ICompiler) (ctx: Context) =
+    not com.Options.DebugMode && not ctx.BoundsChecked
+
+/// fickl: an array read without a bounds check. TypeScript reads `a[i]` as possibly undefined under
+/// noUncheckedIndexedAccess, so the read asserts that it is not. In an emit, `$0!` is a raw string argument (#197)
+let uncheckedRead (com: ICompiler) r t (ar: Expr) (idx: Expr) =
+    match com.Options.Language with
+    | TypeScript -> emitExpr r t [ getExpr None t ar idx ] "($0)!"
+    | _ -> getExpr r t ar idx
+
+/// fickl: an array write without a bounds check. Fable2Babel checks a `Set` of a local array, so the write is an emit,
+/// whose target is the indexed access: the printer leaves a member expression without parentheses
+let uncheckedWrite r (target: Expr) (idx: Expr) (value: Expr) =
+    emitExpr r Unit [ getExpr None value.Type target idx; value ] "$0 = $1"
+
 /// A write to an array. For a local array this is a `Set`, which Fable2Babel stores at the place it is written when
 /// the index is in range; any other array goes through the library's `setItem`
-let arraySetItem (com: ICompiler) r (t: Type) (ar: Expr) (idx: Expr) (value: Expr) (signatureArgTypes: Type list) =
+let arraySetItem
+    (com: ICompiler)
+    (ctx: Context)
+    r
+    (t: Type)
+    (ar: Expr)
+    (idx: Expr)
+    (value: Expr)
+    (signatureArgTypes: Type list)
+    =
     match ar with
+    | _ when uncheckedArrays com ctx -> uncheckedWrite r ar idx value
     | IdentExpr { Type = Array _ } -> setExpr r ar idx value
     | _ -> Helper.LibCall(com, "Array", "setItem", t, [ ar; idx; value ], signatureArgTypes, ?loc = r)
 
@@ -3172,7 +3198,7 @@ let binarySearch (com: ICompiler) ctx r t rangeMeth (ar: Expr) args =
     | [ index; length; value; comparer ] -> call rangeMeth [ index; length; value ] (Some comparer)
     | _ -> None
 
-let arrayGetItem (com: ICompiler) r (t: Type) (args: Expr list) (signatureArgTypes: Type list) =
+let arrayGetItem (com: ICompiler) (ctx: Context) r (t: Type) (args: Expr list) (signatureArgTypes: Type list) =
     // fickl: tsc infers `unknown` for the item when no contextual type reaches the call, so name the item type
     let genArgs =
         match args with
@@ -3183,27 +3209,34 @@ let arrayGetItem (com: ICompiler) r (t: Type) (args: Expr list) (signatureArgTyp
         Helper.LibCall(com, "Array", "item", t, args, signatureArgTypes, genArgs = genArgs, ?loc = r)
 
     match args with
+    | [ idx; ar ] when uncheckedArrays com ctx -> uncheckedRead com r t ar idx |> Some
     // V8 cannot specialise the read inside the shared `item` once it sees many array kinds
     | [ idx; ar ] -> readAtCallSite com r t ar idx item |> Some
     | _ -> Some item
 
+let private array2DRowType (ar: Expr) =
+    match ar.Type with
+    | Array(rowType, _) -> rowType
+    | _ -> Any
+
 // fickl: a `'T[,]` is an array of rows. As with `readAtCallSite`, the checked read only runs for a nullish result
-let array2DGetItem (com: ICompiler) r (t: Type) (ar: Expr) (idx1: Expr) (idx2: Expr) =
+let array2DGetItem (com: ICompiler) (ctx: Context) r (t: Type) (ar: Expr) (idx1: Expr) (idx2: Expr) =
     let item =
         Helper.LibCall(com, "Array2D", "item", t, [ ar; idx1; idx2 ], genArgs = [ t ], ?loc = r)
 
-    if canRepeat ar && canRepeat idx1 && canRepeat idx2 then
+    if uncheckedArrays com ctx then
+        uncheckedRead com r t (uncheckedRead com None (array2DRowType ar) ar idx1) idx2
+    elif canRepeat ar && canRepeat idx1 && canRepeat idx2 then
         emitExpr r t [ ar; idx1; idx2; item ] "$0[$1]?.[$2] ?? $3"
     else
         item
 
 let array2DSetItem r (ar: Expr) (idx1: Expr) (idx2: Expr) (value: Expr) =
-    let rowType =
-        match ar.Type with
-        | Array(rowType, _) -> rowType
-        | _ -> Any
+    setExpr r (getExpr None (array2DRowType ar) ar idx1) idx2 value
 
-    setExpr r (getExpr None rowType ar idx1) idx2 value
+/// fickl: `Array2D.set` and `a.[i, j] <- v` in a [<BoundsChecks(false)>] scope
+let uncheckedArray2DSetItem (com: ICompiler) r (ar: Expr) (idx1: Expr) (idx2: Expr) (value: Expr) =
+    uncheckedWrite r (uncheckedRead com None (array2DRowType ar) ar idx1) idx2 value
 
 let array2DLength (com: ICompiler) r (t: Type) (ar: Expr) (dimension: Expr) =
     match dimension with
@@ -3238,7 +3271,9 @@ let array2DModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: 
     | "Length2", [ ar ] -> array2DLength com r t ar (makeIntConst 1) |> Some
     // Arrays with a base other than zero cannot be created
     | ("Base1" | "Base2"), [ _ ] -> makeIntConst 0 |> Some
-    | "Get", [ ar; idx1; idx2 ] -> array2DGetItem com r t ar idx1 idx2 |> Some
+    | "Get", [ ar; idx1; idx2 ] -> array2DGetItem com ctx r t ar idx1 idx2 |> Some
+    | "Set", [ ar; idx1; idx2; value ] when uncheckedArrays com ctx ->
+        uncheckedArray2DSetItem com r ar idx1 idx2 value |> Some
     | "Set", [ _; _; _; _ ] -> libCall "setItem"
     | "Map", _ -> libCall "map"
     | "MapIndexed", _ -> libCall "mapIndexed"
@@ -3259,8 +3294,8 @@ let resizeArrays (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (this
         Helper.GlobalCall("Array", t, args, memb = "from", ?loc = r)
         |> withTag "array"
         |> Some
-    | "get_Item", Some ar, [ idx ] -> arrayGetItem com r t [ idx; ar ] []
-    | "set_Item", Some ar, [ idx; value ] -> arraySetItem com r t ar idx value [] |> Some
+    | "get_Item", Some ar, [ idx ] -> arrayGetItem com ctx r t [ idx; ar ] []
+    | "set_Item", Some ar, [ idx; value ] -> arraySetItem com ctx r t ar idx value [] |> Some
     | "CopyTo", Some ar, [ target ] ->
         let count = getFieldWith r t ar "length"
         copyToArray com r t i [ ar; makeIntConst 0; target; makeIntConst 0; count ]
@@ -3675,9 +3710,9 @@ let arrayModule (com: ICompiler) (ctx: Context) r (t: Type) (i: CallInfo) (_: Ex
         Helper.LibCall(com, "List", "ofArray", t, args, i.SignatureArgTypes, genArgs = i.GenericArgs, ?loc = r)
         |> Some
     | ("Length" | "Count"), [ arg ] -> getFieldWith r t arg "length" |> Some
-    | "Item", [ idx; ar ] -> arrayGetItem com r t [ idx; ar ] i.SignatureArgTypes
-    | "Get", [ ar; idx ] -> arrayGetItem com r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
-    | "Set", [ ar; idx; value ] -> arraySetItem com r t ar idx value i.SignatureArgTypes |> Some
+    | "Item", [ idx; ar ] -> arrayGetItem com ctx r t [ idx; ar ] i.SignatureArgTypes
+    | "Get", [ ar; idx ] -> arrayGetItem com ctx r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
+    | "Set", [ ar; idx; value ] -> arraySetItem com ctx r t ar idx value i.SignatureArgTypes |> Some
     | "ZeroCreate", [ count ] -> createArray count None |> Some
     | "Create", [ count; value ] -> createArray count (Some value) |> Some
     | "Empty", _ ->
@@ -4384,9 +4419,12 @@ let intrinsicFunctions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisAr
         Helper.LibCall(com, "String", "getCharAtIndex", t, [ str; idx ], i.SignatureArgTypes, ?loc = r)
         |> readAtCallSite com r t str idx
         |> Some
-    | "GetArray", _, [ ar; idx ] -> arrayGetItem com r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
+    | "GetArray", _, [ ar; idx ] -> arrayGetItem com ctx r t [ idx; ar ] (i.SignatureArgTypes |> List.rev)
+    | "SetArray", _, [ ar; idx; value ] when uncheckedArrays com ctx -> uncheckedWrite r ar idx value |> Some
     | "SetArray", _, [ ar; idx; value ] -> setExpr r ar idx value |> Some
-    | "GetArray2D", _, [ ar; idx1; idx2 ] -> array2DGetItem com r t ar idx1 idx2 |> Some
+    | "GetArray2D", _, [ ar; idx1; idx2 ] -> array2DGetItem com ctx r t ar idx1 idx2 |> Some
+    | "SetArray2D", _, [ ar; idx1; idx2; value ] when uncheckedArrays com ctx ->
+        uncheckedArray2DSetItem com r ar idx1 idx2 value |> Some
     | "SetArray2D", _, [ ar; idx1; idx2; value ] -> array2DSetItem r ar idx1 idx2 value |> Some
     | ("GetArraySlice" | "GetStringSlice"), None, [ ar; lower; upper ] ->
         // JS slice counts a negative index from the end, .NET clamps it to 0

@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {
+    // An unchecked read in a [<BoundsChecks(false)>] scope must still type-check under this flag
+    "noUncheckedIndexedAccess": true
+  }
+}
