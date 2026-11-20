@@ -120,6 +120,9 @@ type CrackerOptions(cliArgs: CliArgs, evaluateOnly: bool) =
 
     let builtDlls = HashSet()
     let pendingDllBuilds = Dictionary<string, Task<string>>()
+    // fickl: excluded projects build one at a time. One often references another (Fickl.Core references
+    // Fable.Core), and two concurrent `dotnet build` of a shared reference write the same output files.
+    let mutable lastDllBuild: Task = Task.CompletedTask
 
     let cacheInfo =
         if cliArgs.NoCache then
@@ -163,15 +166,21 @@ type CrackerOptions(cliArgs: CliArgs, evaluateOnly: bool) =
                 |> Array.rev
                 |> String.concat "/"
 
-            pendingDllBuilds[normalizedDllPath] <-
-                Task.Run(fun () ->
-                    // fickl: dotnetEnvVars
-                    Process.runSyncWithOutputEnv
-                        (Process.dotnetEnvVars ())
-                        projDir
-                        "dotnet"
-                        [ "build"; "-c"; cliArgs.Configuration; "--no-restore" ]
+            let build =
+                lastDllBuild.ContinueWith(
+                    (fun (_: Task) ->
+                        // fickl: dotnetEnvVars
+                        Process.runSyncWithOutputEnv
+                            (Process.dotnetEnvVars ())
+                            projDir
+                            "dotnet"
+                            [ "build"; "-c"; cliArgs.Configuration; "--no-restore" ]
+                    ),
+                    TaskScheduler.Default
                 )
+
+            lastDllBuild <- build
+            pendingDllBuilds[normalizedDllPath] <- build
 
     member _.WaitForBuiltDlls() =
         for KeyValue(normalizedDllPath, build) in pendingDllBuilds |> Seq.toArray do
