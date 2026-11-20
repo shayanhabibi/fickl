@@ -288,49 +288,53 @@ let declarationTests =
         "Declarations"
         (async {
             let dir = Path.Combine(__SOURCE_DIRECTORY__, "declarations")
-            let outDir = Path.Combine(Path.GetTempPath(), "fickl-declarations-test")
+            let outDir =
+                Path.Combine(Path.GetTempPath(), "fickl-declarations-test-" + System.Guid.NewGuid().ToString("N"))
 
-            if Directory.Exists outDir then
-                Directory.Delete(outDir, true)
+            try
+                let exitCode =
+                    Fable.Cli.Entry.main
+                        [|
+                            Path.Combine(dir, "declarations.fsproj")
+                            "--cwd"
+                            $"'%s{dir}'"
+                            "--outDir"
+                            outDir
+                            "--exclude"
+                            "Fable.Core"
+                            "--declaration"
+                            "--noCache"
+                        |]
 
-            let exitCode =
-                Fable.Cli.Entry.main
-                    [|
-                        Path.Combine(dir, "declarations.fsproj")
-                        "--cwd"
-                        $"'%s{dir}'"
-                        "--outDir"
-                        outDir
-                        "--exclude"
-                        "Fable.Core"
-                        "--declaration"
-                        "--noCache"
-                    |]
+                Expect.equal exitCode 0 "Expected exit code to be 0"
 
-            Expect.equal exitCode 0 "Expected exit code to be 0"
+                let normalize content =
+                    Regex.Replace(content, @"(/fable-library-js)[^/]+", "$1").ReplaceLineEndings().Trim()
 
-            let normalize content =
-                Regex.Replace(content, @"(/fable-library-js)[^/]+", "$1").ReplaceLineEndings().Trim()
+                for expected in Directory.GetFileSystemEntries(dir, "*.d.ts.expected") do
+                    let actual = Path.Combine(outDir, Path.GetFileNameWithoutExtension expected)
+                    Expect.isTrue (File.Exists actual) $"No declaration file was produced for {expected}"
 
-            for expected in Directory.GetFileSystemEntries(dir, "*.d.ts.expected") do
-                let actual = Path.Combine(outDir, Path.GetFileNameWithoutExtension expected)
-                Expect.isTrue (File.Exists actual) $"No declaration file was produced for {expected}"
+                    Expect.equal
+                        (File.ReadAllText actual |> normalize)
+                        (File.ReadAllText expected |> normalize)
+                        $"{Path.GetFileName actual} differs from {Path.GetFileName expected}"
+
+                // Mangled members are the quoted keys: the declarations must name those the JavaScript calls
+                let mangledKeys pattern file =
+                    Regex.Matches(File.ReadAllText(Path.Combine(outDir, file)), pattern)
+                    |> Seq.map _.Groups[1].Value
+                    |> Set.ofSeq
 
                 Expect.equal
-                    (File.ReadAllText actual |> normalize)
-                    (File.ReadAllText expected |> normalize)
-                    $"{Path.GetFileName actual} differs from {Path.GetFileName expected}"
-
-            // Mangled members are the quoted keys: the declarations must name those the JavaScript calls
-            let mangledKeys pattern file =
-                Regex.Matches(File.ReadAllText(Path.Combine(outDir, file)), pattern)
-                |> Seq.map _.Groups[1].Value
-                |> Set.ofSeq
-
-            Expect.equal
-                (mangledKeys "\"(Mangling\\.[^\"]+)\"\\(" "Mangling.d.ts")
-                (mangledKeys "\\[\"(Mangling\\.[^\"]+)\"\\]" "Mangling.js")
-                "Mangling.d.ts names members other than those Mangling.js calls"
+                    (mangledKeys "\"(Mangling\\.[^\"]+)\"\\(" "Mangling.d.ts")
+                    (mangledKeys "\\[\"(Mangling\\.[^\"]+)\"\\]" "Mangling.js")
+                    "Mangling.d.ts names members other than those Mangling.js calls"
+            finally
+                try
+                    Directory.Delete(outDir, true)
+                with _ ->
+                    ()
         })
 
 /// fickl: a compiled assembly that uses Fickl.Core attributes needs Fickl.Core as a reference. Compiled from its
@@ -363,26 +367,30 @@ let dllAttributeTests =
 
             Expect.equal exitCode 0 $"Building Support.dll failed:{System.Environment.NewLine}{log}"
 
-            let outDir = Path.Combine(Path.GetTempPath(), "fickl-dll-attributes-test")
+            let outDir =
+                Path.Combine(Path.GetTempPath(), "fickl-dll-attributes-test-" + System.Guid.NewGuid().ToString("N"))
 
-            if Directory.Exists outDir then
-                Directory.Delete(outDir, true)
+            try
+                let exitCode =
+                    Fable.Cli.Entry.main
+                        [|
+                            Path.Combine(dir, "Consumer", "Consumer.fsproj")
+                            "--outDir"
+                            outDir
+                            "--exclude"
+                            "Fable.Core"
+                            "--noCache"
+                        |]
 
-            let exitCode =
-                Fable.Cli.Entry.main
-                    [|
-                        Path.Combine(dir, "Consumer", "Consumer.fsproj")
-                        "--outDir"
-                        outDir
-                        "--exclude"
-                        "Fable.Core"
-                        "--noCache"
-                    |]
-
-            Expect.equal exitCode 0 "Expected exit code to be 0"
-            File.WriteAllText(Path.Combine(outDir, "package.json"), """{ "type": "module" }""")
-            let exitCode, log = run outDir "node" [ "Program.js" ]
-            Expect.equal exitCode 0 $"The compiled program failed:{System.Environment.NewLine}{log}"
+                Expect.equal exitCode 0 "Expected exit code to be 0"
+                File.WriteAllText(Path.Combine(outDir, "package.json"), """{ "type": "module" }""")
+                let exitCode, log = run outDir "node" [ "Program.js" ]
+                Expect.equal exitCode 0 $"The compiled program failed:{System.Environment.NewLine}{log}"
+            finally
+                try
+                    Directory.Delete(outDir, true)
+                with _ ->
+                    ()
         })
 
 /// Runs the project in `folder`, which fails on a wrong result, on .NET, then compiled with `flag` to JavaScript and
