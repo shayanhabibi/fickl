@@ -200,6 +200,82 @@ let flavour () =
 /// tests when they run alongside them.
 let multiTargetTests = MultiTarget.tests
 
+/// The cracker runs `dotnet build` on each excluded project. Fickl.Core references Fable.Core, so two of these builds
+/// running at once both wrote Fable.Core.dll, and the docs examples failed to compile (FS0229, FS0078). Each project
+/// here records when its build target starts and ends, five seconds apart: long enough that builds started together
+/// overlap even when one `dotnet build` starts a second or two late.
+module private ExcludedBuilds =
+
+    let private project =
+        """<Project DefaultTargets="Build">
+  <Target Name="Build">
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)/span.txt" Lines="$([System.DateTime]::UtcNow.Ticks)" Overwrite="true" />
+    <Exec Command="ping -n 6 127.0.0.1 &gt; nul" Condition="'$(OS)' == 'Windows_NT'" />
+    <Exec Command="sleep 5" Condition="'$(OS)' != 'Windows_NT'" />
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)/span.txt" Lines="$([System.DateTime]::UtcNow.Ticks)" />
+  </Target>
+</Project>
+"""
+
+    let private cliArgs (projectFile: string) : Fable.Compiler.Util.CliArgs =
+        {
+            ProjectFile = projectFile
+            RootDir = Path.GetDirectoryName projectFile
+            OutDir = None
+            IsWatch = false
+            Precompile = false
+            PrecompiledLib = None
+            PrintAst = false
+            FableLibraryPath = None
+            Configuration = "Release"
+            NoRestore = true
+            NoCache = false
+            NoGitignore = false
+            NoParallelTypeCheck = false
+            SourceMaps = false
+            SourceMapsRoot = None
+            Exclude = []
+            Replace = Map.empty
+            FileExtensions = Map.empty
+            Redirect = Map.empty
+            RunProcess = None
+            CompilerOptions = Fable.CompilerOptionsHelper.Make()
+            Verbosity = Fable.Verbosity.Normal
+        }
+
+    let tests =
+        testCase "Excluded projects build one at a time" <| fun () ->
+            let dir = Path.Combine(Path.GetTempPath(), "fable-excluded-builds-" + Guid.NewGuid().ToString("N"))
+            let names = [ "First"; "Second" ]
+
+            try
+                for name in names do
+                    Directory.CreateDirectory(Path.Combine(dir, name)) |> ignore
+                    File.WriteAllText(Path.Combine(dir, name, name + ".proj"), project)
+
+                let opts = CrackerOptions(cliArgs (Path.Combine(dir, "First", "First.proj")), true)
+
+                for name in names do
+                    opts.BuildDll(Path.Combine(dir, name, "bin", "Release", "net10.0", name + ".dll").Replace('\\', '/'))
+
+                opts.WaitForBuiltDlls()
+
+                let span name =
+                    match File.ReadAllLines(Path.Combine(dir, name, "span.txt")) |> Array.map int64 with
+                    | [| start; finish |] -> start, finish
+                    | ticks -> failtest $"%s{name} recorded %d{ticks.Length} of its 2 times"
+
+                let (firstStart, firstEnd), (secondStart, secondEnd) = span "First", span "Second"
+
+                Expect.isTrue
+                    (firstEnd <= secondStart || secondEnd <= firstStart)
+                    $"The builds overlapped: First %d{firstStart}-%d{firstEnd}, Second %d{secondStart}-%d{secondEnd}"
+            finally
+                try
+                    Directory.Delete(dir, true)
+                with _ ->
+                    ()
+
 let tests =
   testList "ProjectCracker" [
 
@@ -222,4 +298,6 @@ let tests =
 
         for version in [ "5.0"; "7.0"; "99.0"; "bogus" ] do
             Expect.isFalse (isLangVersionSupported version) version
+
+    ExcludedBuilds.tests
   ]

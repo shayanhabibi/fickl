@@ -174,6 +174,16 @@ let private run (cli: string) (args: string list) =
     proc.WaitForExit()
     proc.ExitCode, out.Result + err.Result
 
+let private core =
+    Path.Combine(repository, "src", "Fickl.Core", "Fickl.Core.fsproj")
+
+/// <summary>
+/// Builds Fickl.Core, and Fable.Core with it, once before the first example compiles. Nacara transforms pages in
+/// parallel and each compile builds the projects it excludes, so without this the first compiles all build the
+/// same projects at once and write the same files.
+/// </summary>
+let private references = lazy (run "build" [ core; "-c"; "Release" ])
+
 /// <summary>
 /// Compiles the cells of one page that share their flags, once to JavaScript and once to TypeScript, into a
 /// folder named by their sources, the flags and the compiler, so an unchanged page is not compiled again.
@@ -223,8 +233,6 @@ let private compile (cells: (int * Cell) list) (flags: string list) : Result<Out
                 |> List.map (fun (i, _) -> $"    <Compile Include=\"%s{fileName i}.fs\" />\n")
                 |> String.concat ""
 
-            let core = Path.Combine(repository, "src", "Fickl.Core", "Fickl.Core.fsproj")
-
             File.WriteAllText(
                 Path.Combine(dir, "Examples.fsproj"),
                 project.Replace("FILES", files).Replace("CORE", core)
@@ -244,14 +252,17 @@ let private compile (cells: (int * Cell) list) (flags: string list) : Result<Out
                      @ extra
                      @ flags)
 
-            match compileTo "js" [] with
+            match references.Force() with
             | code, log when code <> 0 -> Error log
             | _ ->
-                match compileTo "ts" [ "--lang"; "ts" ] with
+                match compileTo "js" [] with
                 | code, log when code <> 0 -> Error log
                 | _ ->
-                    File.WriteAllText(done', "")
-                    Ok(outputs ())
+                    match compileTo "ts" [ "--lang"; "ts" ] with
+                    | code, log when code <> 0 -> Error log
+                    | _ ->
+                        File.WriteAllText(done', "")
+                        Ok(outputs ())
 
 let private label =
     function
