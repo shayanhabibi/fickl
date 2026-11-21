@@ -488,7 +488,8 @@ type CompilerImpl
         ?signatureDependencies: HashSet<string>,
         ?logs: ResizeArray<LogEntry>,
         ?isPrecompilingInlineFunction: bool,
-        ?warningSuppression: WarningSuppression.Resolver
+        ?warningSuppression: WarningSuppression.Resolver,
+        ?uncheckedSources: Set<string>
     )
     =
 
@@ -496,6 +497,7 @@ type CompilerImpl
     let outType = defaultArg outType OutputType.Exe
     let logs = Option.defaultWith ResizeArray logs
     let fableLibraryDir = fableLibDir.TrimEnd('/')
+    let uncheckedSources = defaultArg uncheckedSources Set.empty
 
     let getSuppressions fileName =
         match warningSuppression with
@@ -525,6 +527,10 @@ type CompilerImpl
         member _.ProjectOptions = project.ProjectOptions
         member _.SourceFiles = project.ProjectOptions.SourceFiles
 
+        member _.ProjectBoundsChecks(file) =
+            Set.isEmpty uncheckedSources
+            || not (uncheckedSources.Contains(Path.normalizePath file))
+
         member _.IncrementCounter() =
             counter <- counter + 1
             counter
@@ -550,7 +556,8 @@ type CompilerImpl
                 ?signatureDependencies = signatureDependencies,
                 logs = logs,
                 isPrecompilingInlineFunction = true,
-                ?warningSuppression = warningSuppression
+                ?warningSuppression = warningSuppression,
+                uncheckedSources = uncheckedSources
             )
 
         member _.GetImplementationFile(fileName) =

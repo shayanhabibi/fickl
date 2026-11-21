@@ -32,6 +32,10 @@ written inside code marked `[<BoundsChecks(false)>]` compile to plain `a[i]` and
 - **The nearest attribute wins:** the member or value being compiled, then the type that declares it, then each
   enclosing module, outward. `[<BoundsChecks(true)>]` turns checks back on inside an unchecked scope. Without any
   attribute, code is checked as today.
+- **Project setting** (added after review, goswinr on #473): `<FicklBoundsChecks>false</FicklBoundsChecks>` in a project
+  file is the outermost scope for that project's own source files, so an attribute inside still wins. A referenced
+  project and the sources of a package follow their own setting. The browser compiler has no project file and keeps
+  the attribute only.
 - **Lexical:** the attribute applies to the code written inside the scope. An `inline` function follows its own scope
   wherever it is inlined, in both directions. An inline body defers its replacements to each call site
   (`UnresolvedReplaceCall`), so `FSharp2Fable.Util.inlineExpr` sets the scope from the inline member's attributes and
@@ -39,17 +43,20 @@ written inside code marked `[<BoundsChecks(false)>]` compile to plain `a[i]` and
 - **TypeScript:** each unchecked read is `(a[i])!`, so the output type-checks under `noUncheckedIndexedAccess`. In an
   emit, `$0!` is a raw string argument (#197), hence the parentheses.
 - **Accesses covered:** `'T[]` and typed arrays (`a.[i]`, `a.[i] <- v`, `Array.get`, `Array.set`, `Array.item`),
-  2D arrays (`a.[i, j]`, `a.[i, j] <- v`, `Array2D.get`, `Array2D.set`), and the `ResizeArray` indexer.
+  2D arrays (`a.[i, j]`, `a.[i, j] <- v`, `Array2D.get`, `Array2D.set`), the `ResizeArray` and `IList<'T>` indexers,
+  and string reads (`s.[i]`, `s.Chars(i)`). Strings are immutable, so only reads change.
 - **No effect on .NET**, where the runtime always checks.
 
-Without checks, an out-of-range read gives `undefined` (NaN in arithmetic), a write past the end of a plain array grows
-it, and a typed array drops the write. The documentation says so.
+Without checks, an out-of-range read gives `undefined` (NaN in arithmetic, and no character for a string), a write
+past the end of a plain array grows it, and a typed array drops the write. The documentation says so.
 
 ## Goals, non-goals, anti-goals
 
 - Goal: in Release, marked code indexes arrays with no comparison and no library call.
 - Non-goal: the temporary-variable index for code without the attribute (approach B below); a possible later PR.
-- Non-goal: a project-wide switch; `[<assembly: BoundsChecks(false)>]` could be added later.
+- Changed after review: a project-wide switch is now the `FicklBoundsChecks` property (see above). An
+  `[<assembly: BoundsChecks(false)>]` was not used: the cracker compiles every project's sources in one compilation,
+  so an assembly attribute could not tell a referenced project's sources from the project's own.
 - Non-goal: Python, Rust, Dart, PHP and BEAM.
 - Non-goal: library range functions (`Array.sub`, `Array.blit`, `Array.fill`, slices) keep their argument checks.
 - Non-goal: the writes through a field and into 2D arrays that are unchecked today stay as they are; a separate fix.
@@ -88,7 +95,18 @@ reads are already rewritten to library calls.
   attribute rather than the type's.
 - An unchecked write is the emit `$0 = $1`, whose target is the indexed access, since Fable2Babel's `transformSet`
   checks a `Set` of a local array.
+- String reads go through `uncheckedRead` in `strings` (`get_Chars`) and `intrinsicFunctions` (`GetString`). An
+  `IList<'T>` indexer is routed to `resizeArrays`, so it was already covered; the tests now show it.
+- The project setting: the design-time build queries `FicklBoundsChecks` (`MSBuildCrackerResolver`) into
+  `ProjectOptionsResponse.BoundsChecks`, per cracked project. `getFullProjectOpts` collects the sources of the projects
+  that set it to false into `CrackerResponse.UncheckedSources`, also kept in the cache (`CacheInfo.UncheckedSources`; a
+  cache written without it is cracked again). `CompilerImpl` answers `Compiler.ProjectBoundsChecks(file)` from that set.
+  It is the default at the end of each lookup: `isBoundsCheckedMember` asks for the member's declaration file,
+  `isBoundsCheckedCall` for the entity's source path, and `transformFile` for the current file's top-level code.
+- Adding a field to `ProjectOptionsResponse`, a public type of Fable.Compiler, breaks a resolver written outside this
+  repository at compile time. The one in this repository is updated.
 - Tests: `tests/Integration/Integration/data/boundsChecks` (JavaScript, Release), `data/boundsChecksTs` (TypeScript
   under `noUncheckedIndexedAccess`), `data/boundsChecksLibrary` (inline functions of a precompiled library),
-  `boundsChecksDebug` (the same source in Debug, unchanged output), and the `BoundsChecks(false)` cases in
-  `tests/Js/Main/ArrayTests.fs`.
+  `boundsChecksDebug` (the same source in Debug, unchanged output), `boundsChecksProject` (the property, with a
+  referenced project that keeps its checks, compiled from a fresh crack and from the cache), and the
+  `BoundsChecks(false)` cases in `tests/Js/Main/ArrayTests.fs`.

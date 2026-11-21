@@ -714,7 +714,8 @@ type Context =
         // True while translating a quotation body (<@ @>): member calls are kept as-is,
         // not replaced/emitted/inlined, to preserve .NET metadata for QuotationEmitter.
         CapturingQuotation: bool
-        /// fickl: false inside the nearest [<Fickl.Core.BoundsChecks(false)>] scope, see Util.isBoundsCheckedMember
+        /// fickl: false inside the nearest [<Fickl.Core.BoundsChecks(false)>] scope, or a file of a project that sets
+        /// FicklBoundsChecks to false, see Util.isBoundsCheckedMember
         BoundsChecked: bool
     }
 
@@ -3028,28 +3029,33 @@ module Util =
             | _ -> None
         )
 
-    /// fickl: false when the nearest [<Fickl.Core.BoundsChecks>] on the entity or an enclosing one is false
-    let rec isBoundsCheckedEntity (ent: FSharpEntity) =
-        match tryBoundsChecksAttribute ent.Attributes, ent.DeclaringEntity with
-        | Some value, _ -> value
-        | None, Some parent -> isBoundsCheckedEntity parent
-        | None, None -> true
-
-    /// fickl: false when the nearest [<Fickl.Core.BoundsChecks>] is false, looking at the member, then the declaring
-    /// entity and those enclosing it
-    let isBoundsCheckedMember (memb: FSharpMemberOrFunctionOrValue) =
-        match tryBoundsChecksAttribute memb.Attributes, memb.DeclaringEntity with
-        | Some value, _ -> value
-        | None, Some ent -> isBoundsCheckedEntity ent
-        | None, None -> true
-
     /// fickl: true for a Release build of JavaScript or TypeScript, the only builds where [<BoundsChecks(false)>] applies
     let canUncheckArrays (com: Compiler) =
         not com.Options.DebugMode
         && (com.Options.Language = JavaScript || com.Options.Language = TypeScript)
 
-    /// fickl: isBoundsCheckedMember for the member a call refers to, which may be in another assembly. A member that
-    /// does not resolve is checked
+    /// fickl: the nearest [<Fickl.Core.BoundsChecks>] on the entity or an enclosing one
+    let rec private tryEntityBoundsChecks (ent: FSharpEntity) =
+        match tryBoundsChecksAttribute ent.Attributes with
+        | Some value -> Some value
+        | None -> ent.DeclaringEntity |> Option.bind tryEntityBoundsChecks
+
+    /// fickl: whether the code of a file is checked outside any [<Fickl.Core.BoundsChecks>]: false in a source of a
+    /// project that sets FicklBoundsChecks to false. Always true outside canUncheckArrays
+    let isBoundsCheckedFile (com: Compiler) (file: string) =
+        not (canUncheckArrays com) || com.ProjectBoundsChecks file
+
+    /// fickl: false when the nearest [<Fickl.Core.BoundsChecks>] is false, looking at the member, then the declaring
+    /// entity and those enclosing it, then the FicklBoundsChecks setting of the project that declares the member.
+    /// Always true outside canUncheckArrays
+    let isBoundsCheckedMember (com: Compiler) (memb: FSharpMemberOrFunctionOrValue) =
+        not (canUncheckArrays com)
+        || tryBoundsChecksAttribute memb.Attributes
+           |> Option.orElseWith (fun () -> memb.DeclaringEntity |> Option.bind tryEntityBoundsChecks)
+           |> Option.defaultWith (fun () -> com.ProjectBoundsChecks memb.DeclarationLocation.FileName)
+
+    /// fickl: isBoundsCheckedMember for the member a call refers to, which may be in another assembly. A member of an
+    /// assembly without the attribute is checked
     let isBoundsCheckedCall (com: Compiler) (info: Fable.CallInfo) =
         let tryAttribute (atts: Fable.Attribute seq) =
             atts
@@ -3066,9 +3072,9 @@ module Util =
             match entRef |> Option.bind com.TryGetEntity with
             | Some ent ->
                 match tryAttribute ent.Attributes with
-                | Some value -> value
+                | Some value -> Some value
                 | None -> ofEntity ent.DeclaringEntity
-            | None -> true
+            | None -> None
 
         match info.MemberRef with
         | Some(Fable.MemberRef(entRef, membInfo) as membRef) when canUncheckArrays com ->
@@ -3079,9 +3085,9 @@ module Util =
                 else
                     None
 
-            match own with
+            match own |> Option.orElseWith (fun () -> ofEntity (Some entRef)) with
             | Some value -> value
-            | None -> ofEntity (Some entRef)
+            | None -> entRef.SourcePath |> Option.forall com.ProjectBoundsChecks
         | _ -> true
 
     /// fickl: whether a base class, transitively, is a global, imported or [<AttachMembers>] class
@@ -4341,7 +4347,7 @@ module Util =
 
                 Fable.Unresolved(e, t, r) |> ValueSome
             | None ->
-                let boundsChecked = not (canUncheckArrays com) || isBoundsCheckedMember memb
+                let boundsChecked = isBoundsCheckedMember com memb
                 inlineExpr com ctx r t callee info membUniqueName boundsChecked |> ValueSome
         else
             ValueNone

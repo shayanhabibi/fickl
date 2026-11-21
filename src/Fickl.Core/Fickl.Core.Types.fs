@@ -171,13 +171,13 @@ type PrivateFieldsAttribute(enabled: bool) =
     new() = PrivateFieldsAttribute(true)
 
 /// <summary>
-/// With <c>false</c>, Release builds for JavaScript and TypeScript compile the reads and writes of arrays, 2D arrays and
-/// <c>ResizeArray</c> inside the module, type, member or <c>let</c> to plain <c>a[i]</c> and <c>a[i] = v</c>, without checks.
+/// With <c>false</c>, Release builds for JavaScript and TypeScript compile the reads and writes of arrays, 2D arrays,
+/// <c>ResizeArray</c> and <c>IList</c>, and the string reads, inside the module, type, member or <c>let</c> to plain <c>a[i]</c>.
 /// </summary>
 /// <remarks>
-/// The nearest attribute applies: <c>[&lt;BoundsChecks(true)>]</c> restores the checks inside an unchecked scope, and an
-/// inline function keeps the setting of its own scope. Debug builds, <c>fickl watch</c>, .NET and other targets check.
-/// Out of range, a read gives <c>undefined</c>, a write grows a plain array, a typed array ignores it, a 2D row throws.
+/// The nearest attribute applies, then the project's <c>FicklBoundsChecks</c> property, and an inline function keeps the
+/// setting of its own scope. Debug builds, <c>fickl watch</c>, .NET and other targets check. Out of range, a read gives
+/// <c>undefined</c>, a write grows a plain array, a typed array ignores it, a 2D row throws.
 /// </remarks>
 /// <example>
 /// <code lang="fsharp">

@@ -98,6 +98,19 @@ module UncheckedKernels =
             s <- s + a.[i] * b.[i]
         s
 
+    let countChar (c: char) (s: string) =
+        let mutable n = 0
+        for i in 0 .. s.Length - 1 do
+            if s.[i] = c then n <- n + 1
+        n
+
+    let swapEnds (xs: System.Collections.Generic.IList<float>) =
+        let last = xs.Count - 1
+        let first = xs.[0]
+        xs.[0] <- xs.[last]
+        xs.[last] <- first
+        xs
+
 let tests =
   testList "Arrays" [
     testCase "BoundsChecks(false) reads and writes an array in range" <| fun () ->
@@ -115,6 +128,12 @@ let tests =
 
     testCase "BoundsChecks(false) applies inside an inline function called from checked code" <| fun () ->
         UncheckedKernels.dot [| 1.; 2.; 3. |] [| 4.; 5.; 6. |] |> equal 32.
+
+    testCase "BoundsChecks(false) reads the characters of a string in range" <| fun () ->
+        UncheckedKernels.countChar 'a' "banana" |> equal 3
+
+    testCase "BoundsChecks(false) reads and writes an IList in range" <| fun () ->
+        UncheckedKernels.swapEnds (ResizeArray [ 1.; 2.; 3. ]) |> List.ofSeq |> equal [ 3.; 2.; 1. ]
 
     testCase "Pattern matching with arrays works" <| fun () ->
         match [||] with [||] -> true | _ -> false

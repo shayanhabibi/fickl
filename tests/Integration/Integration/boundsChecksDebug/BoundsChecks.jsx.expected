@@ -1,6 +1,7 @@
 
 import { initialize, setItem, item } from "./fable_modules/fable-library-js.5.27.0/Array.js";
 import { item as item_1, setItem as setItem_1 } from "./fable_modules/fable-library-js.5.27.0/Array2D.js";
+import { getCharAtIndex } from "./fable_modules/fable-library-js.5.27.0/String.js";
 import { int32_type, class_type, array_type, float64_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
 
 export function Marked_read(a, i) {
@@ -33,6 +34,18 @@ export function Marked_grid(g, i, j) {
 
 export function Marked_resize(r, i) {
     setItem(r, i + 1, (r[i] ?? item(i, r)) | 0);
+}
+
+export function Marked_stringRead(s, i) {
+    return getCharAtIndex(s, i + 1);
+}
+
+export function Marked_stringChars(s, i) {
+    return getCharAtIndex(s, i + 1);
+}
+
+export function Marked_iList(xs, i) {
+    setItem(xs, i + 1, xs[i] ?? item(i, xs));
 }
 
 export function Marked_lambda(a) {
@@ -77,6 +90,14 @@ for (let i = 0; i <= 2; i++) {
 
 export function Plain_read(a, i) {
     return item(i + 1, a);
+}
+
+export function Plain_stringRead(s, i) {
+    return getCharAtIndex(s, i + 1);
+}
+
+export function Plain_iList(xs, i) {
+    setItem(xs, i + 1, xs[i] ?? item(i, xs));
 }
 
 export function Plain_callsMarkedInline(a, i) {

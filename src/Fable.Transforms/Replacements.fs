@@ -2247,11 +2247,12 @@ let rec canRepeat e =
     | Get(e, FieldGet info, _, _) -> not info.MaybeCalculated && canRepeat e
     | _ -> false
 
-/// fickl: true in a Release build inside a [<Fickl.Core.BoundsChecks(false)>] scope, whose array accesses are not checked
+/// fickl: true in a Release build inside a [<Fickl.Core.BoundsChecks(false)>] scope, whose array accesses and string reads
+/// are not checked
 let uncheckedArrays (com: ICompiler) (ctx: Context) =
     not com.Options.DebugMode && not ctx.BoundsChecked
 
-/// fickl: an array read without a bounds check. TypeScript reads `a[i]` as possibly undefined under
+/// fickl: an array or string read without a bounds check. TypeScript reads `a[i]` as possibly undefined under
 /// noUncheckedIndexedAccess, so the read asserts that it is not. In an emit, `$0!` is a raw string argument (#197)
 let uncheckedRead (com: ICompiler) r t (ar: Expr) (idx: Expr) =
     match com.Options.Language with
@@ -2849,6 +2850,7 @@ let strings (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisArg: Expr opt
                 |> Some
         | _ -> fsFormat com ctx r t i thisArg args
     | "get_Length", Some c, _ -> getFieldWith r t c "length" |> Some
+    | "get_Chars", Some c, [ idx ] when uncheckedArrays com ctx -> uncheckedRead com r t c idx |> Some
     | "get_Chars", Some c, [ idx ] ->
         Helper.LibCall(com, "String", "getCharAtIndex", t, args, i.SignatureArgTypes, thisArg = c, ?loc = r)
         |> readAtCallSite com r t c idx
@@ -4415,6 +4417,7 @@ let intrinsicFunctions (com: ICompiler) (ctx: Context) r t (i: CallInfo) (thisAr
         |> withTag "downcast"
         |> Some
     | "MakeDecimal", _, _ -> decimals com ctx r t i thisArg args
+    | "GetString", _, [ str; idx ] when uncheckedArrays com ctx -> uncheckedRead com r t str idx |> Some
     | "GetString", _, [ str; idx ] ->
         Helper.LibCall(com, "String", "getCharAtIndex", t, [ str; idx ], i.SignatureArgTypes, ?loc = r)
         |> readAtCallSite com r t str idx

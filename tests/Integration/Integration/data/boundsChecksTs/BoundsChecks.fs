@@ -12,6 +12,9 @@ module Marked =
     let item (a: int[]) i = Array.item (i - 1) a
     let grid (g: float[,]) i j = Array2D.set g i (j + 1) g.[i, j]
     let resize (r: ResizeArray<int>) i = r.[i + 1] <- r.[i]
+    let stringRead (s: string) i = s.[i + 1]
+    let stringChars (s: string) i = s.Chars(i + 1)
+    let iList (xs: System.Collections.Generic.IList<float>) i = xs.[i + 1] <- xs.[i]
     let lambda (a: float[]) = Array.init 3 (fun i -> a.[i + 1])
 
     let comparer (a: int[]) =
@@ -29,5 +32,7 @@ module Marked =
 
 module Plain =
     let read (a: float[]) i = a.[i + 1]
+    let stringRead (s: string) i = s.[i + 1]
+    let iList (xs: System.Collections.Generic.IList<float>) i = xs.[i + 1] <- xs.[i]
     let inline inlineRead (a: float[]) i = a.[i + 1]
     let callsMarkedInline (a: float[]) i = Marked.inlineRead a i

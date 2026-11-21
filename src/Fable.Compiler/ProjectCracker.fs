@@ -49,6 +49,8 @@ type CacheInfo =
         SourceMapsRoot: string option
         TreatWarningsAsErrors: bool
         FileExtensions: Map<string, string>
+        /// fickl: the sources of the projects that set `FicklBoundsChecks` to false
+        UncheckedSources: string array
     }
 
     static member GetPath(fableModulesDir: string, isDebug: bool) =
@@ -215,6 +217,8 @@ type CrackerResponse =
         TreatWarningsAsErrors: bool
         /// fickl: sources that are type-checked but not compiled, each with the specifier to import it from
         RedirectedSources: Map<string, string>
+        /// fickl: the sources of the projects that set `FicklBoundsChecks` to false, normalized full paths
+        UncheckedSources: Set<string>
     }
 
 type ProjectOptionsResponse =
@@ -223,6 +227,8 @@ type ProjectOptionsResponse =
         ProjectReferences: string array
         OutputType: string option
         TargetFramework: string option
+        /// fickl: the project's `FicklBoundsChecks` property, when it is set to true or false
+        BoundsChecks: bool option
     }
 
 type ProjectCrackerResolver =
@@ -240,6 +246,7 @@ type CrackedFsproj =
         OutputType: string option
         TargetFramework: string option
         TreatWarningsAsErrors: bool
+        BoundsChecks: bool option
     }
 
 let makeProjectOptions (opts: CrackerOptions) otherOptions sources : FSharpProjectOptions =
@@ -622,6 +629,7 @@ let getCrackedMainFsproj (opts: CrackerOptions) (projectOptionsResponse: Project
         OutputType = projectOptionsResponse.OutputType
         TargetFramework = projectOptionsResponse.TargetFramework
         TreatWarningsAsErrors = treatWarningsAsErrors
+        BoundsChecks = projectOptionsResponse.BoundsChecks
     }
 
 let getProjectOptionsFromScript (opts: CrackerOptions) : CrackedFsproj =
@@ -643,6 +651,7 @@ let getProjectOptionsFromScript (opts: CrackerOptions) : CrackedFsproj =
             ProjectReferences = Array.empty
             TargetFramework = None
             OutputType = None
+            BoundsChecks = None
         }
 
     getCrackedMainFsproj opts optionsResponse
@@ -676,6 +685,7 @@ let crackReferenceProject
         TargetFramework = projectOptionsResponse.TargetFramework
         // Treat warnings as errors only applies to the main project
         TreatWarningsAsErrors = false
+        BoundsChecks = projectOptionsResponse.BoundsChecks
     }
 
 let getCrackedProjectsFromMainFsproj
@@ -1143,6 +1153,8 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
             && cacheInfo.FableLib = opts.FableLib
             && cacheInfo.Replace = opts.Replace
             && cacheInfo.Redirect = opts.Redirect
+            // fickl: a cache written before `FicklBoundsChecks` was read does not list the unchecked sources
+            && not (isNull (box cacheInfo.UncheckedSources))
             // An imported .props/.targets can add or remove source files with no .fsproj touched
             && ([ cacheInfo.ProjectPath; yield! cacheInfo.References ]
                 |> List.collect getProjectImports
@@ -1237,6 +1249,7 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
             CanReuseCompiledFiles = canReuseCompiledFiles
             TreatWarningsAsErrors = cacheInfo.TreatWarningsAsErrors
             RedirectedSources = cacheInfo.RedirectedSources
+            UncheckedSources = Set.ofArray cacheInfo.UncheckedSources
         }
 
     | None ->
@@ -1317,6 +1330,13 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
                     Some("-r:" + r)
             )
 
+        // fickl: each project's sources follow its own setting, so a referenced project stays checked unless it sets it
+        let uncheckedSources =
+            mainProj :: projRefs
+            |> List.filter (fun proj -> proj.BoundsChecks = Some false)
+            |> List.collect _.SourceFiles
+            |> List.toArray
+
         let projRefs = projRefs |> List.map (fun p -> p.ProjectFile)
 
         let otherOptions = [| yield! otherOptions; yield! dllRefs |]
@@ -1349,6 +1369,7 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
                 SourceMapsRoot = opts.SourceMapsRoot
                 TreatWarningsAsErrors = mainProj.TreatWarningsAsErrors
                 FileExtensions = opts.FileExtensions
+                UncheckedSources = uncheckedSources
             }
 
         if not opts.EvaluateOnly && not opts.NoCache then
@@ -1371,4 +1392,5 @@ let getFullProjectOpts (resolver: ProjectCrackerResolver) (opts: CrackerOptions)
             CanReuseCompiledFiles = false
             TreatWarningsAsErrors = mainProj.TreatWarningsAsErrors
             RedirectedSources = redirectedSources
+            UncheckedSources = Set.ofArray uncheckedSources
         }
