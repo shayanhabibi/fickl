@@ -9,12 +9,32 @@ open Microsoft.Extensions.Logging.Console
 open Microsoft.Extensions.Logging.Abstractions
 open Microsoft.Extensions.Options
 
+/// fickl: whether log messages are coloured. `NO_COLOR` set to anything but an empty string turns colour off
+/// (https://no-color.org). Redirected output, a pipe or a file, is coloured only when
+/// `DOTNET_SYSTEM_CONSOLE_ALLOW_ANSI_COLOR_REDIRECTION` is `1` or `true`, the switch .NET's own console logging reads.
+let colorEnabledFrom (getEnv: string -> string) (outputRedirected: bool) =
+    if not (String.IsNullOrEmpty(getEnv "NO_COLOR")) then
+        false
+    elif outputRedirected then
+        match getEnv "DOTNET_SYSTEM_CONSOLE_ALLOW_ANSI_COLOR_REDIRECTION" with
+        | null -> false
+        | v -> v = "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase)
+    else
+        true
+
+/// `colorEnabledFrom` over this process's environment and standard output.
+let colorEnabled () =
+    colorEnabledFrom Environment.GetEnvironmentVariable Console.IsOutputRedirected
+
 type CustomOptions() =
     inherit ConsoleFormatterOptions()
 
-    /// if true: no LogLevel as prefix, colored output according to LogLevel
+    /// if true: no LogLevel as prefix, output coloured according to LogLevel when `UseColor` is true
     /// if false: LogLevel as prefix, no colored output
     member val UseNoPrefixMsgStyle = false with get, set
+
+    /// fickl: whether the no-prefix style colours messages. The CLI sets it from `colorEnabled`.
+    member val UseColor = true with get, set
 
 type CustomFormatter(options: IOptionsMonitor<CustomOptions>) as this =
     inherit ConsoleFormatter("customName")
@@ -31,9 +51,14 @@ type CustomFormatter(options: IOptionsMonitor<CustomOptions>) as this =
         let message = logEntry.Formatter.Invoke(logEntry.State, logEntry.Exception)
 
         if formatterOptions.UseNoPrefixMsgStyle then
-            this.SetColor(textWriter, logEntry.LogLevel)
-            textWriter.WriteLine(message)
-            this.ResetColor(textWriter)
+            if formatterOptions.UseColor then
+                // fickl: the reset goes before the closing newline, which would otherwise start a line of its own
+                this.SetColor(textWriter, logEntry.LogLevel)
+                textWriter.Write(message)
+                this.ResetColor(textWriter)
+                textWriter.WriteLine()
+            else
+                textWriter.WriteLine(message)
         else
             this.WritePrefix(textWriter, logEntry.LogLevel)
             textWriter.WriteLine(message)
