@@ -1,0 +1,19 @@
+
+import { item } from "./precompiled/fable_modules/fable-library-js.5.27.0/Array.js";
+
+export function plainCallsMarked(a, i) {
+    return a[i + 1];
+}
+
+export function markedCallsPlain(a, i) {
+    return item(i + 1, a);
+}
+
+export function viaMarkedWrap(a, i) {
+    return item(i + 1, a);
+}
+
+export function viaPlainWrap(a, i) {
+    return a[i + 1];
+}
+

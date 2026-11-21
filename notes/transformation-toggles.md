@@ -23,6 +23,7 @@ test. Paths are under `src/Fable.Transforms/` unless they start with `src/`.
 | Auto-uncurrying of `Emit` arguments typed `obj` (FableTransforms.fs) | Make an F# lambda callable from emitted JS | Also uncurries when the JS side expects a curried function | `[<Fickl.Core.Curried>]` on the parameter |
 | `ParamArray` spread (FSharp2Fable.Util.fs) | Match JS variadic calls | Wrong when the JS API takes an actual array | `[<ParamList>]` for seq only |
 | Typed arrays and byte clamping (Replacements.fs) | Match .NET numeric wraparound | Chosen by the static element type, so `'T[]` built generically differs from `int[]` | `--typedArrays`; `--clampByteArrays` (#39) |
+| Array bounds checks (Replacements.fs `arrayGetItem`, `arraySetItem`, string `get_Chars`; Babel/Fable2Babel.fs `transformSet`) | Throw on an index out of range, as .NET | The checks cost time in numeric loops (#466, #473) | `[<Fickl.Core.BoundsChecks(false)>]`, or `<FicklBoundsChecks>false</FicklBoundsChecks>` for a project, in Release builds (#473) |
 | `[<ParamObject>]` (FSharp2Fable.Util.fs) | Interop with options objects | Applies through an interface only when the attribute is on the abstract slot | the attribute |
 | `[<InlineIfLambda>]` (FSharp2Fable.fs) | Avoid closure allocation | Read only from the member itself, so not through interface/abstract dispatch | the attribute |
 

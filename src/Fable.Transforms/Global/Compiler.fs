@@ -75,6 +75,8 @@ type Compiler =
     abstract ProjectFile: string
     abstract ProjectOptions: FSharpProjectOptions
     abstract SourceFiles: string array
+    /// fickl: false for a source of a project that sets `FicklBoundsChecks` to false
+    abstract ProjectBoundsChecks: file: string -> bool
     abstract Options: CompilerOptions
     abstract Plugins: CompilerPlugins
     abstract IncrementCounter: unit -> int

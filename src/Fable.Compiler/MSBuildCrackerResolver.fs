@@ -424,7 +424,7 @@ Exception:
                     $"/restore -restoreProperty:%s{restoreProperties}"
 
             let arguments targetFramework =
-                $"%s{restoreArg} /t:%s{targets} %s{properties targetFramework} --getItem:FscCommandLineArgs --getItem:ProjectReference --getItem:_MSBuildProjectReferenceExistent --getProperty:OutputType --getProperty:TargetFramework --getProperty:TargetFrameworks --getProperty:ProjectAssetsFile --getProperty:MSBuildProjectExtensionsPath -warnAsMessage:NU1608"
+                $"%s{restoreArg} /t:%s{targets} %s{properties targetFramework} --getItem:FscCommandLineArgs --getItem:ProjectReference --getItem:_MSBuildProjectReferenceExistent --getProperty:OutputType --getProperty:TargetFramework --getProperty:TargetFrameworks --getProperty:ProjectAssetsFile --getProperty:MSBuildProjectExtensionsPath --getProperty:FicklBoundsChecks -warnAsMessage:NU1608"
 
             let parse (json: string) =
                 try
@@ -539,12 +539,28 @@ Exception:
                     ]
                     |> List.filter (String.IsNullOrWhiteSpace >> not)
 
+                // fickl: the default of [<Fickl.Core.BoundsChecks>] for this project's sources
+                let boundsChecks =
+                    match properties.TryGetProperty "FicklBoundsChecks" with
+                    | true, value when not (String.IsNullOrWhiteSpace(value.GetString())) ->
+                        let text = value.GetString().Trim()
+
+                        match Boolean.TryParse text with
+                        | true, enabled -> Some enabled
+                        | false, _ ->
+                            Log.warning
+                                $"%s{fsproj.Name} sets FicklBoundsChecks to '%s{text}', which is neither true nor false, so it is ignored"
+
+                            None
+                    | _ -> None
+
                 return
                     {
                         ProjectOptions = options
                         ProjectReferences = projectReferences
                         OutputType = Some outputType
                         TargetFramework = Some targetFramework
+                        BoundsChecks = boundsChecks
                     }
         }
 

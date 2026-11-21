@@ -1,0 +1,15 @@
+
+import { setItem, item } from "../fable_modules/fable-library-js.5.27.0/Array.js";
+import { getCharAtIndex } from "../fable_modules/fable-library-js.5.27.0/String.js";
+
+export function read(a, i) {
+    return item(i + 1, a);
+}
+
+export function write(a, i, v) {
+    setItem(a, i + 1, v);
+}
+
+export function stringRead(s, i) {
+    return getCharAtIndex(s, i + 1);
+}
