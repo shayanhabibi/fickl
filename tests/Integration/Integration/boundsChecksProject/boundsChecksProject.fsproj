@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <FicklBoundsChecks>false</FicklBoundsChecks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="App.fs" />
+    <ProjectReference Include="referenced/referenced.fsproj" />
+    <ProjectReference Include="../../../../src/Fable.Core/Fable.Core.fsproj" />
+    <ProjectReference Include="../../../../src/Fickl.Core/Fickl.Core.fsproj" />
+  </ItemGroup>
+</Project>

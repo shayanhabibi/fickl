@@ -30,6 +30,8 @@ type CacheInfo =
         SourceMapsRoot: string option
         TreatWarningsAsErrors: bool
         FileExtensions: Map<string, string>
+        /// fickl: the sources of the projects that set `FicklBoundsChecks` to false
+        UncheckedSources: string array
     }
 
 type CrackerOptions =
@@ -68,6 +70,8 @@ type CrackerResponse =
         TreatWarningsAsErrors: bool
         /// fickl: sources that are type-checked but not compiled, each with the specifier to import it from
         RedirectedSources: Map<string, string>
+        /// fickl: the sources of the projects that set `FicklBoundsChecks` to false, normalized full paths
+        UncheckedSources: Set<string>
     }
 
 type ProjectOptionsResponse =
@@ -76,6 +80,8 @@ type ProjectOptionsResponse =
         ProjectReferences: string array
         OutputType: string option
         TargetFramework: string option
+        /// fickl: the project's `FicklBoundsChecks` property, when it is set to true or false
+        BoundsChecks: bool option
     }
 
 [<Interface>]

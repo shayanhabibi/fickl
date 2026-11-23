@@ -240,7 +240,14 @@ let private compileCaseWith (extraArgs: string array) (testCaseDir: string) =
             |> _.ReplaceLineEndings()
             |> _.Trim()
 
-        for expected in Directory.GetFileSystemEntries(testCaseDir, "*.expected") do
+        // A referenced project in a subfolder can have its own expected files
+        let isOutputOrBuildDir (path: string) =
+            Path.GetRelativePath(testCaseDir, path).Replace('\\', '/').Split('/')
+            |> Array.exists (fun part -> part = "bin" || part = "obj" || part = "fable_modules")
+
+        for expected in
+            Directory.GetFiles(testCaseDir, "*.expected", SearchOption.AllDirectories)
+            |> Array.filter (isOutputOrBuildDir >> not) do
             let actual = Path.ChangeExtension(expected, ".actual")
             Expect.isTrue (File.Exists actual) $"No actual file was produced for {expected}"
             let expectedContent = File.ReadAllText expected |> normalize
@@ -272,6 +279,24 @@ let tests =
             langVersionTest "An F# 11 feature compiles under LangVersion 11.0" "lang11" true
             debugPipelinesTest "--debugPipelines binds each pipeline stage in JavaScript" "debugPipelines"
             debugPipelinesTest "--debugPipelines binds each pipeline stage in TypeScript" "debugPipelinesTs"
+            // fickl: the cases under `data` compile in Release, where [<BoundsChecks(false)>] applies
+            testCaseAsync
+                "BoundsChecks(false) keeps every check in a Debug build"
+                (compileCaseWith [| "-c"; "Debug" |] (Path.Combine(__SOURCE_DIRECTORY__, "boundsChecksDebug")))
+            // fickl: compiled twice, so the second compilation reads the cracked project from the cache
+            testCaseAsync
+                "<FicklBoundsChecks>false</FicklBoundsChecks> unchecks the project's own sources, also from the cache"
+                (async {
+                    let dir = Path.Combine(__SOURCE_DIRECTORY__, "boundsChecksProject")
+                    let cache = Path.Combine(dir, "fable_modules", "project_cracked.json")
+
+                    if File.Exists cache then
+                        File.Delete cache
+
+                    do! compileCase dir
+                    Expect.isTrue (File.Exists cache) "The first compilation caches the cracked project"
+                    do! compileCase dir
+                })
         ]
     |> testList "Compilation"
 

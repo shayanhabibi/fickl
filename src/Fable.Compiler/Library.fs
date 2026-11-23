@@ -340,7 +340,8 @@ module CodeServices =
                         WarningSuppression.Resolver.FromCompilerOptions(
                             crackerResponse.ProjectOptions.OtherOptions,
                             sourceReader
-                        )
+                        ),
+                    uncheckedSources = crackerResponse.UncheckedSources
                 )
 
             // TODO: make it configurable if FableTransforms.transformFile is applied?
@@ -521,7 +522,8 @@ module CodeServices =
                                 fableLibDir,
                                 crackerResponse.OutputType,
                                 ?outDir = cliArgs.OutDir,
-                                warningSuppression = warningSuppression
+                                warningSuppression = warningSuppression,
+                                uncheckedSources = crackerResponse.UncheckedSources
                             )
 
                         let outputPath = Path.ChangeExtension(currentFile, ".js")

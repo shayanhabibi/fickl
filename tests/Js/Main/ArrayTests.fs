@@ -67,8 +67,74 @@ type MutableArrayHolder =
         mutable Next: int
     }
 
+// The suites compile in Release, so this module runs without bounds checks in JavaScript and TypeScript
+[<Fickl.Core.BoundsChecks(false)>]
+module UncheckedKernels =
+    let prefixSums (a: float[]) =
+        let r = Array.zeroCreate a.Length
+        r.[0] <- a.[0]
+        for i in 1 .. a.Length - 1 do
+            r.[i] <- r.[i - 1] + a.[i]
+        r
+
+    let transpose (m: int[,]) =
+        let t = Array2D.zeroCreate (Array2D.length2 m) (Array2D.length1 m)
+        for i in 0 .. Array2D.length1 m - 1 do
+            for j in 0 .. Array2D.length2 m - 1 do
+                Array2D.set t j i (Array2D.get m i j)
+        t
+
+    let reverseInPlace (r: ResizeArray<int>) =
+        let n = r.Count
+        for i in 0 .. n / 2 - 1 do
+            let x = r.[i]
+            r.[i] <- r.[n - 1 - i]
+            r.[n - 1 - i] <- x
+        r
+
+    let inline dot (a: float[]) (b: float[]) =
+        let mutable s = 0.
+        for i in 0 .. a.Length - 1 do
+            s <- s + a.[i] * b.[i]
+        s
+
+    let countChar (c: char) (s: string) =
+        let mutable n = 0
+        for i in 0 .. s.Length - 1 do
+            if s.[i] = c then n <- n + 1
+        n
+
+    let swapEnds (xs: System.Collections.Generic.IList<float>) =
+        let last = xs.Count - 1
+        let first = xs.[0]
+        xs.[0] <- xs.[last]
+        xs.[last] <- first
+        xs
+
 let tests =
   testList "Arrays" [
+    testCase "BoundsChecks(false) reads and writes an array in range" <| fun () ->
+        UncheckedKernels.prefixSums [| 1.; 2.; 3.; 4. |] |> equal [| 1.; 3.; 6.; 10. |]
+
+    testCase "BoundsChecks(false) reads and writes a 2D array in range" <| fun () ->
+        let t = UncheckedKernels.transpose (array2D [ [ 1; 2; 3 ]; [ 4; 5; 6 ] ])
+        equal 3 (Array2D.length1 t)
+        equal 2 (Array2D.length2 t)
+        equal 4 t.[0, 1]
+        equal 3 t.[2, 0]
+
+    testCase "BoundsChecks(false) reads and writes a ResizeArray in range" <| fun () ->
+        UncheckedKernels.reverseInPlace (ResizeArray [ 1; 2; 3 ]) |> List.ofSeq |> equal [ 3; 2; 1 ]
+
+    testCase "BoundsChecks(false) applies inside an inline function called from checked code" <| fun () ->
+        UncheckedKernels.dot [| 1.; 2.; 3. |] [| 4.; 5.; 6. |] |> equal 32.
+
+    testCase "BoundsChecks(false) reads the characters of a string in range" <| fun () ->
+        UncheckedKernels.countChar 'a' "banana" |> equal 3
+
+    testCase "BoundsChecks(false) reads and writes an IList in range" <| fun () ->
+        UncheckedKernels.swapEnds (ResizeArray [ 1.; 2.; 3. ]) |> List.ofSeq |> equal [ 3.; 2.; 1. ]
+
     testCase "Pattern matching with arrays works" <| fun () ->
         match [||] with [||] -> true | _ -> false
         |> equal true

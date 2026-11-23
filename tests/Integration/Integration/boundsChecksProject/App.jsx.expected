@@ -1,0 +1,67 @@
+
+import { item } from "./fable_modules/fable-library-js.5.27.0/Array.js";
+import { class_type, array_type, float64_type } from "./fable_modules/fable-library-js.5.27.0/Reflection.js";
+
+export function read(a, i) {
+    return a[i + 1];
+}
+
+export function write(a, i, v) {
+    a[i + 1] = v;
+}
+
+export function stringRead(s, i) {
+    return s[i + 1];
+}
+
+export function grid(g, i, j) {
+    g[i][j + 1] = g[i][j];
+}
+
+export function resize(r, i) {
+    r[i + 1] = r[i];
+}
+
+export function callsOwnInline(a, i) {
+    return a[i + 1];
+}
+
+export function callsReferencedInline(a, i) {
+    return item(i + 1, a);
+}
+
+export function checkedAgain(a, i) {
+    return item(i + 1, a);
+}
+
+export function Checked_read(a, i) {
+    return item(i + 1, a);
+}
+
+export function Checked_callsOwnInline(a, i) {
+    return a[i + 1];
+}
+
+export class Solver {
+    constructor(data) {
+        this.data = data;
+    }
+}
+
+export function Solver_$reflection() {
+    return class_type("App.Solver", undefined, Solver, undefined, () => [[[["data", array_type(float64_type)]]]]);
+}
+
+export function Solver_$ctor_52AF8430(data) {
+    return new Solver(data);
+}
+
+export function Solver__At_Z524259A4(_, i) {
+    return _.data[i + 1];
+}
+
+export const table = new Float64Array(4);
+
+for (let i = 0; i <= 2; i++) {
+    table[i + 1] = i;
+}

@@ -475,7 +475,8 @@ type ProjectCracked(cliArgs: CliArgs, crackerResponse: CrackerResponse, sourceFi
             ?outDir = cliArgs.OutDir,
             ?watchDependencies = watchDependencies,
             ?signatureDependencies = signatureDependencies,
-            warningSuppression = warningSuppression.Value
+            warningSuppression = warningSuppression.Value,
+            uncheckedSources = crackerResponse.UncheckedSources
         )
 
     /// Problems with the `fable-disable` directives themselves (typo'd codes, directives that
