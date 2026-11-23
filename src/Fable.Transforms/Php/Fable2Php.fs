@@ -2155,6 +2155,7 @@ type PhpCompiler(com: Fable.Compiler) =
         member this.ProjectFile = com.ProjectFile
         member this.ProjectOptions = com.ProjectOptions
         member this.SourceFiles = com.SourceFiles
+        member _.ProjectBoundsChecks(file) = com.ProjectBoundsChecks(file)
         member this.Options = com.Options
         member this.Plugins = com.Plugins
         member this.GetRootModule(fileName) = com.GetRootModule(fileName)

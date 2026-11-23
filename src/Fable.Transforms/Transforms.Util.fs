@@ -164,6 +164,9 @@ module Atts =
     [<Literal>]
     let ficklPrivateFields = "Fickl.Core.PrivateFieldsAttribute"
 
+    [<Literal>]
+    let ficklBoundsChecks = "Fickl.Core.BoundsChecksAttribute" // typeof<Fickl.Core.BoundsChecksAttribute>.FullName
+
     let ficklAsyncGeneratorFunction = "Fickl.Core.AsyncGeneratorFunctionAttribute"
 
     let ficklGeneratorFunction = "Fickl.Core.GeneratorFunctionAttribute"

@@ -3195,6 +3195,7 @@ module Compiler =
             member _.ProjectFile = com.ProjectFile
             member _.ProjectOptions = com.ProjectOptions
             member _.SourceFiles = com.SourceFiles
+            member _.ProjectBoundsChecks(file) = com.ProjectBoundsChecks(file)
             member _.IncrementCounter() = com.IncrementCounter()
 
             member _.IsPrecompilingInlineFunction = com.IsPrecompilingInlineFunction
