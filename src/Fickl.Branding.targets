@@ -122,5 +122,6 @@
     <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Fickl.Sdk'">
         <PackageVersion Condition="'$(FicklSdkPackageVersion)' == ''">$(FicklVersion)</PackageVersion>
         <PackageVersion Condition="'$(FicklSdkPackageVersion)' != ''">$(FicklSdkPackageVersion)</PackageVersion>
+        <PackageVersion Include="Fable.Core" Version="5.6.1" />
     </PropertyGroup>
 </Project>
